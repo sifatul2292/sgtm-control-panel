@@ -164,17 +164,58 @@ async function getDockerSummary() {
     })
     .filter(Boolean);
 
+  const inspectedContainers = await addDockerInspectState(containers);
+
   return {
     available: true,
     message: "Docker container data loaded.",
-    containers,
+    containers: inspectedContainers,
     totals: {
-      running: containers.filter((container) => container.state === "running").length,
-      stopped: containers.filter((container) => container.state !== "running").length,
-      unhealthy: containers.filter((container) => container.health === "unhealthy").length,
-      total: containers.length
+      running: inspectedContainers.filter((container) => container.state === "running").length,
+      stopped: inspectedContainers.filter((container) => container.state !== "running").length,
+      unhealthy: inspectedContainers.filter((container) => container.health === "unhealthy").length,
+      total: inspectedContainers.length
     }
   };
+}
+
+async function addDockerInspectState(containers) {
+  if (!containers.length) return containers;
+
+  const inspect = await command("docker", [
+    "inspect",
+    "--format",
+    "{{json .State}}",
+    ...containers.map((container) => container.id)
+  ]);
+
+  if (!inspect.ok) return containers;
+
+  const states = inspect.stdout
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    });
+
+  return containers.map((container, index) => {
+    const state = states[index];
+    if (!state) return container;
+
+    return {
+      ...container,
+      state: state.Status || container.state,
+      health: state.Health?.Status || container.health,
+      startedAt: state.StartedAt || "",
+      finishedAt: state.FinishedAt || "",
+      restartCount: state.RestartCount ?? null,
+      exitCode: state.ExitCode ?? null
+    };
+  });
 }
 
 async function getDockerLogs(containers) {
@@ -185,6 +226,7 @@ async function getDockerLogs(containers) {
   const running = containers.find((container) => container.state === "running") || containers[0];
   const logs = await command("docker", [
     "logs",
+    "--timestamps",
     "--tail",
     String(config.logTailLines),
     running.id
@@ -197,7 +239,8 @@ async function getDockerLogs(containers) {
   return {
     available: true,
     container: running.name,
-    lines: splitLines(logs.stdout || logs.stderr)
+    containerId: running.id,
+    lines: splitLines([logs.stdout, logs.stderr].filter(Boolean).join("\n"))
   };
 }
 

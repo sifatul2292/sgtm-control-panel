@@ -245,14 +245,91 @@ tr:last-child td {
   min-height: 290px;
   max-height: 420px;
   margin: 0;
-  padding: 16px 18px 18px;
+  padding: 10px;
   overflow: auto;
-  background: #141815;
-  color: #dce8dd;
-  font:
-    0.82rem/1.55 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  white-space: pre-wrap;
+  background: #f8faf7;
+  color: var(--ink);
+}
+
+.log-row {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.log-row + .log-row {
+  margin-top: 8px;
+}
+
+.log-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.log-level {
+  display: inline-flex;
+  min-height: 23px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgb(29 111 95 / 10%);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.log-row.warn .log-level,
+.log-row.warning .log-level {
+  background: rgb(168 97 0 / 12%);
+  color: var(--warn);
+}
+
+.log-row.error .log-level,
+.log-row.crit .log-level {
+  background: rgb(180 35 24 / 12%);
+  color: var(--danger);
+}
+
+.log-row.debug .log-level {
+  background: rgb(102 115 108 / 12%);
+  color: var(--muted);
+}
+
+.log-meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.log-message,
+.log-detail,
+.empty-log {
   overflow-wrap: anywhere;
+}
+
+.log-message {
+  color: #1f2c25;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.log-detail {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.empty-log {
+  padding: 16px;
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .muted-row {

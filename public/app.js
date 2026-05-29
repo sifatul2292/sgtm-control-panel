@@ -35,13 +35,122 @@ function setBadge(el, status, label) {
   el.textContent = label;
 }
 
-function setLog(el, log) {
+function escapeHtml(value) {
+  return text(value, "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function levelFromMessage(message = "") {
+  const lower = message.toLowerCase();
+  if (lower.includes("error") || lower.includes("failed") || lower.includes("exception")) return "error";
+  if (lower.includes("warn")) return "warn";
+  if (lower.includes("debug")) return "debug";
+  return "info";
+}
+
+function formatMaybeDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(date);
+}
+
+function parseNginxAccess(line) {
+  const match = line.match(/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*?) (HTTP\/[^"]+)" (\d{3}) (\S+) "([^"]*)" "([^"]*)"/);
+  if (!match) {
+    return {
+      level: "info",
+      primary: line,
+      meta: "Unparsed Nginx access line",
+      detail: ""
+    };
+  }
+
+  const [, ip, time, method, path, protocol, status, bytes, referer, agent] = match;
+  const code = Number(status);
+  const level = code >= 500 ? "error" : code >= 400 ? "warn" : "info";
+  return {
+    level,
+    primary: `${method} ${path}`,
+    meta: `${status} - ${ip} - ${time}`,
+    detail: `${protocol} - ${bytes} bytes${referer !== "-" ? ` - from ${referer}` : ""}${agent !== "-" ? ` - ${agent}` : ""}`
+  };
+}
+
+function parseNginxError(line) {
+  const match = line.match(/^(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}) \[(\w+)\] \d+#\d+: (.*)$/);
+  if (!match) {
+    return {
+      level: levelFromMessage(line),
+      primary: line,
+      meta: "Nginx error log",
+      detail: ""
+    };
+  }
+
+  const [, time, level, message] = match;
+  return {
+    level: level === "crit" ? "error" : level,
+    primary: message,
+    meta: `${level.toUpperCase()} - ${time}`,
+    detail: ""
+  };
+}
+
+function parseDockerLog(line) {
+  const match = line.match(/^(\d{4}-\d{2}-\d{2}T\S+?)\s+(.*)$/);
+  const message = match ? match[2] : line;
+  return {
+    level: levelFromMessage(message),
+    primary: message,
+    meta: match ? formatMaybeDate(match[1]) : "Docker log",
+    detail: ""
+  };
+}
+
+function logParser(kind) {
+  if (kind === "access") return parseNginxAccess;
+  if (kind === "error") return parseNginxError;
+  return parseDockerLog;
+}
+
+function setLog(el, log, kind) {
   if (!log?.available) {
-    el.textContent = `${log?.message || "Unavailable"}\n${log?.detail || ""}`.trim();
+    el.innerHTML = `<div class="empty-log">${escapeHtml(`${log?.message || "Unavailable"} ${log?.detail || ""}`.trim())}</div>`;
     return;
   }
 
-  el.textContent = log.lines.length ? log.lines.join("\n") : "No recent log lines.";
+  if (!log.lines.length) {
+    el.innerHTML = '<div class="empty-log">No recent log lines.</div>';
+    return;
+  }
+
+  const parse = logParser(kind);
+  el.replaceChildren(
+    ...log.lines.map((line) => {
+      const item = parse(line);
+      const row = document.createElement("article");
+      row.className = `log-row ${stateClass(item.level)}`;
+      row.innerHTML = `
+        <div class="log-row-top">
+          <span class="log-level">${escapeHtml(item.level)}</span>
+          <span class="log-meta">${escapeHtml(item.meta)}</span>
+        </div>
+        <p class="log-message">${escapeHtml(item.primary)}</p>
+        ${item.detail ? `<p class="log-detail">${escapeHtml(item.detail)}</p>` : ""}
+      `;
+      return row;
+    })
+  );
 }
 
 function stateClass(value) {
@@ -117,9 +226,9 @@ async function loadDashboard() {
     els.generatedAt.textContent = `Updated ${formatDate(data.generatedAt)}`;
     renderSummary(data);
     renderContainers(data.docker);
-    setLog(els.accessLog, data.nginx.accessLog);
-    setLog(els.errorLog, data.nginx.errorLog);
-    setLog(els.dockerLog, data.dockerLogs);
+    setLog(els.accessLog, data.nginx.accessLog, "access");
+    setLog(els.errorLog, data.nginx.errorLog, "error");
+    setLog(els.dockerLog, data.dockerLogs, "docker");
     els.dockerLogSource.textContent = data.dockerLogs.container || "tail";
   } catch (error) {
     els.generatedAt.textContent = "Update failed";
