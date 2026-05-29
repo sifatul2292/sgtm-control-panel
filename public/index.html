@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SGTM Control Panel</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Read-only dashboard</p>
+          <h1>SGTM Control Panel</h1>
+        </div>
+        <div class="topbar-actions">
+          <span id="generatedAt" class="timestamp">Loading...</span>
+          <button id="refreshButton" class="icon-button" type="button" aria-label="Refresh dashboard" title="Refresh dashboard">
+            <span aria-hidden="true">↻</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="status-grid" aria-label="System summary">
+        <article class="metric">
+          <span class="metric-label">Containers</span>
+          <strong id="containerTotal">--</strong>
+          <small id="containerDetail">Waiting for Docker</small>
+        </article>
+        <article class="metric">
+          <span class="metric-label">Docker health</span>
+          <strong id="dockerHealth">--</strong>
+          <small id="dockerDetail">Waiting for status</small>
+        </article>
+        <article class="metric">
+          <span class="metric-label">Requests today</span>
+          <strong id="requestCount">--</strong>
+          <small id="requestDetail">Waiting for Nginx</small>
+        </article>
+        <article class="metric">
+          <span class="metric-label">SSL expiry</span>
+          <strong id="sslDays">--</strong>
+          <small id="sslDetail">Waiting for certificate</small>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <div class="panel panel-wide">
+          <div class="panel-header">
+            <h2>Containers</h2>
+            <span id="dockerBadge" class="badge">Read only</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Image</th>
+                  <th>State</th>
+                  <th>Health</th>
+                  <th>Ports</th>
+                </tr>
+              </thead>
+              <tbody id="containerRows">
+                <tr>
+                  <td colspan="5">Loading containers...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Recent Nginx Access</h2>
+            <span class="badge">tail</span>
+          </div>
+          <pre id="accessLog" class="log-output">Loading access log...</pre>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Recent Nginx Errors</h2>
+            <span class="badge">tail</span>
+          </div>
+          <pre id="errorLog" class="log-output">Loading error log...</pre>
+        </div>
+
+        <div class="panel panel-wide">
+          <div class="panel-header">
+            <h2>Recent Docker Logs</h2>
+            <span id="dockerLogSource" class="badge">tail</span>
+          </div>
+          <pre id="dockerLog" class="log-output">Loading Docker logs...</pre>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

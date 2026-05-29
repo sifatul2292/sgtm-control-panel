@@ -1,0 +1,14 @@
+{
+  "name": "sgtm-control-panel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only server-side Google Tag Manager control panel dashboard.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
