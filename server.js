@@ -420,7 +420,8 @@ async function serveStatic(req, res) {
   try {
     const content = await readFile(absolutePath);
     res.writeHead(200, {
-      "content-type": mimeTypes[extname(absolutePath)] || "application/octet-stream"
+      "content-type": mimeTypes[extname(absolutePath)] || "application/octet-stream",
+      "cache-control": "no-store"
     });
     res.end(content);
   } catch {
