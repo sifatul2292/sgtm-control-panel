@@ -18,6 +18,8 @@ const config = {
   errorLog: process.env.NGINX_ERROR_LOG || "/var/log/nginx/error.log",
   logTailLines: Number(process.env.LOG_TAIL_LINES || 80),
   trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data"),
+  trackingHosts: parseCsv(process.env.TRACKING_HOSTS || inferHostFromCertPath(process.env.SSL_CERT_PATH || "") || process.env.SSL_DOMAIN || ""),
+  dockerLogExclude: parseCsv(process.env.DOCKER_LOG_EXCLUDE || "Sending aggregate usage beacon,googletagmanager.com/sgtm/a"),
   sslCertPath: process.env.SSL_CERT_PATH || "",
   sslDomain: process.env.SSL_DOMAIN || "",
   sslPort: Number(process.env.SSL_PORT || 443)
@@ -28,6 +30,11 @@ function parseCsv(value) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function inferHostFromCertPath(pathname) {
+  const match = String(pathname || "").match(/\/live\/([^/]+)\//);
+  return match ? match[1] : "";
 }
 
 async function loadDotEnv(pathname) {
@@ -248,7 +255,7 @@ async function getDockerLogs(containers) {
     available: true,
     container: running.name,
     containerId: running.id,
-    lines: splitLines([logs.stdout, logs.stderr].filter(Boolean).join("\n"))
+    lines: filterDockerLogLines(splitLines([logs.stdout, logs.stderr].filter(Boolean).join("\n")))
   };
 }
 
@@ -257,6 +264,21 @@ function splitLines(value) {
     .split("\n")
     .map((line) => line.trimEnd())
     .filter(Boolean);
+}
+
+function filterDockerLogLines(lines) {
+  return lines.filter((line) => {
+    const lower = line.toLowerCase();
+    return !config.dockerLogExclude.some((pattern) => lower.includes(pattern.toLowerCase()));
+  });
+}
+
+function filterLogLinesForHosts(lines) {
+  if (!config.trackingHosts.length) return lines;
+  return lines.filter((line) => {
+    const lower = line.toLowerCase();
+    return config.trackingHosts.some((host) => lower.includes(host.toLowerCase()));
+  });
 }
 
 async function tailFile(pathname, lineCount) {
@@ -413,6 +435,13 @@ async function getDashboardData() {
     ? await getDockerLogs(docker.containers)
     : unavailable("Docker logs are not available because Docker could not be queried.", docker.detail);
 
+  if (errorLog.available) {
+    errorLog.lines = filterLogLinesForHosts(errorLog.lines);
+    errorLog.message = errorLog.lines.length
+      ? errorLog.message
+      : "No recent Nginx errors matched the configured tracking host filter.";
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     readOnly: true,
@@ -431,6 +460,7 @@ async function getDashboardData() {
       errorLog: config.errorLog,
       logTailLines: config.logTailLines,
       trackingPaths: config.trackingPaths,
+      trackingHosts: config.trackingHosts,
       sslDomain: config.sslDomain,
       sslPort: config.sslPort
     }

@@ -384,7 +384,7 @@ function renderEventTable(log) {
   els.eventLogSummary.textContent = `Showing ${visibleItems.length.toLocaleString()} records (${errors.toLocaleString()} errors) from the recent access log sample.`;
 
   if (!visibleItems.length) {
-    els.accessLog.innerHTML = '<tr><td colspan="6">No matching incoming requests.</td></tr>';
+    els.accessLog.innerHTML = '<tr><td colspan="6">No SGTM event collection requests found in the recent sample. If begin_checkout or purchase did not fire in GTM, this is expected.</td></tr>';
     return;
   }
 
