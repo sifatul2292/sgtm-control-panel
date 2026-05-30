@@ -269,14 +269,14 @@
                 <h2>Analytics</h2>
                 <p id="analyticsSummary">Waiting for incoming requests.</p>
               </div>
-              <span class="badge">Recent sample</span>
+              <span id="analyticsModeBadge" class="badge">Today</span>
             </div>
             <div class="analytics-layout">
               <div class="analytics-copy">
                 <label>
                   Period
                   <select id="analyticsPeriod">
-                    <option>Recent log tail</option>
+                    <option>Today</option>
                   </select>
                 </label>
                 <strong id="analyticsTotal">Total requests: --</strong>
@@ -299,9 +299,9 @@
                 <table class="event-table">
                   <thead>
                     <tr>
-                      <th>Request</th>
+                      <th>Group</th>
                       <th>Total</th>
-                      <th>Client</th>
+                      <th>Type</th>
                       <th>Error rate</th>
                     </tr>
                   </thead>

@@ -35,6 +35,7 @@ const els = {
   requestUrlFilter: document.querySelector("#requestUrlFilter"),
   analyticsSummary: document.querySelector("#analyticsSummary"),
   analyticsTotal: document.querySelector("#analyticsTotal"),
+  analyticsModeBadge: document.querySelector("#analyticsModeBadge"),
   analyticsLegend: document.querySelector("#analyticsLegend"),
   analyticsChart: document.querySelector("#analyticsChart"),
   clientBreakdown: document.querySelector("#clientBreakdown"),
@@ -713,6 +714,17 @@ function renderLegend(counts) {
   );
 }
 
+function renderLegendRows(rows) {
+  els.analyticsLegend.replaceChildren(
+    ...rows.slice(0, 6).map((row, index) => {
+      const item = document.createElement("div");
+      item.className = "legend-item";
+      item.innerHTML = `<span class="legend-dot dot-${index % 4}"></span><span>${escapeHtml(row.label)}</span><strong>${row.value.toLocaleString()}</strong>`;
+      return item;
+    })
+  );
+}
+
 function chartPoints(items, bucketCount = 12) {
   const dated = items.filter((item) => item.date).sort((a, b) => a.date - b.date);
   if (!dated.length) return [];
@@ -776,6 +788,55 @@ function renderChart(el, items, mode = "total") {
   `;
 }
 
+function renderBarChart(el, rows) {
+  const visibleRows = rows.slice(0, 8);
+  const max = Math.max(1, ...visibleRows.map((row) => row.value));
+  if (!visibleRows.length) {
+    el.innerHTML = '<div class="empty-log">No chart data yet.</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="bar-chart" role="img" aria-label="Today request totals">
+      ${visibleRows.map((row) => {
+        const percent = Math.max(2, Math.round((row.value / max) * 100));
+        return `
+          <div class="bar-row">
+            <div class="bar-row-top">
+              <strong>${escapeHtml(row.label)}</strong>
+              <span>${row.value.toLocaleString()}</span>
+            </div>
+            <div class="bar-track">
+              <span style="width: ${percent}%"></span>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderClientSummaryRows(rows) {
+  if (!rows.length) {
+    els.clientBreakdown.innerHTML = '<tr><td colspan="4">No request data available.</td></tr>';
+    return;
+  }
+
+  els.clientBreakdown.replaceChildren(
+    ...rows.slice(0, 10).map((item) => {
+      const row = document.createElement("tr");
+      const errorRate = item.total ? `${((item.errors / item.total) * 100).toFixed(1)}%` : "0%";
+      row.innerHTML = `
+        <td>${escapeHtml(item.label)}</td>
+        <td>${item.total.toLocaleString()}</td>
+        <td>${escapeHtml(item.type)}</td>
+        <td>${errorRate}</td>
+      `;
+      return row;
+    })
+  );
+}
+
 function renderClientBreakdown(items) {
   const grouped = new Map();
   for (const item of items) {
@@ -808,10 +869,42 @@ function renderClientBreakdown(items) {
 }
 
 function renderAnalytics(data) {
+  const summary = data.nginx?.todayEvents;
+  if (summary?.available) {
+    const eventRows = (summary.events || [])
+      .map((item) => ({
+        label: canonicalEventName(item.name),
+        value: Number(item.count) || 0,
+        total: Number(item.count) || 0,
+        errors: Number(item.errors) || 0,
+        type: "Event"
+      }))
+      .sort((a, b) => b.value - a.value);
+    const clientRows = (summary.clients || [])
+      .map((item) => ({
+        label: item.name || "Other",
+        value: Number(item.count) || 0,
+        total: Number(item.count) || 0,
+        errors: Number(item.errors) || 0,
+        type: "Client"
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    els.analyticsModeBadge.textContent = "Today";
+    els.analyticsSummary.textContent = `${summary.count.toLocaleString()} requests today across ${eventRows.length.toLocaleString()} event types and ${clientRows.length.toLocaleString()} clients.`;
+    els.analyticsTotal.textContent = `Total requests: ${summary.count.toLocaleString()}${summary.errors ? `, ${summary.errors.toLocaleString()} errors` : ""}`;
+    renderLegendRows(eventRows);
+    renderBarChart(els.analyticsChart, eventRows);
+    renderClientSummaryRows(clientRows);
+    renderBarChart(els.clientChart, clientRows);
+    return;
+  }
+
   const items = trackingEvents(data);
   const errors = items.filter((item) => Number(item.status) >= 400).length;
   const counts = eventCounts(items);
   const clients = clientCounts(items);
+  els.analyticsModeBadge.textContent = "Recent sample";
   els.analyticsSummary.textContent = `${items.length.toLocaleString()} requests across ${counts.size.toLocaleString()} event types and ${clients.size.toLocaleString()} clients.`;
   els.analyticsTotal.textContent = `Total requests: ${items.length.toLocaleString()}`;
   renderLegend(counts);

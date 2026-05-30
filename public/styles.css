@@ -665,6 +665,45 @@ input::placeholder {
   background: var(--color-surface-2);
 }
 
+.bar-chart {
+  width: 100%;
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+}
+
+.bar-row {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.bar-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  color: var(--color-text);
+}
+
+.bar-row-top span {
+  color: var(--color-muted);
+  font-weight: 900;
+}
+
+.bar-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--color-line), transparent 35%);
+}
+
+.bar-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-ok));
+}
+
 .small-chart {
   min-height: 320px;
 }
