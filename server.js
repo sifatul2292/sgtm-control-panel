@@ -401,7 +401,16 @@ async function getDashboardData() {
       errorLog
     },
     dockerLogs,
-    ssl
+    ssl,
+    config: {
+      host: config.host,
+      port: config.port,
+      accessLog: config.accessLog,
+      errorLog: config.errorLog,
+      logTailLines: config.logTailLines,
+      sslDomain: config.sslDomain,
+      sslPort: config.sslPort
+    }
   };
 }
 

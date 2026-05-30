@@ -1,0 +1,9 @@
+[
+  {
+    "date": "2026-05-30",
+    "macrostructure": "Operations Console",
+    "theme": "restrained dark",
+    "enrichment": "none",
+    "brief": "Redesign SGTM dashboard and settings like a dark SaaS operations console"
+  }
+]

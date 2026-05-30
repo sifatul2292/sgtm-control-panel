@@ -4,97 +4,225 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SGTM Control Panel</title>
+    <link rel="stylesheet" href="/tokens.css" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Read-only dashboard</p>
-          <h1>SGTM Control Panel</h1>
-        </div>
-        <div class="topbar-actions">
-          <span id="generatedAt" class="timestamp">Loading...</span>
-          <button id="refreshButton" class="icon-button" type="button" aria-label="Refresh dashboard" title="Refresh dashboard">
-            <span aria-hidden="true">↻</span>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary">
+        <a class="brand" href="#dashboard" aria-label="SGTM Control Panel home">
+          <span class="brand-mark">S</span>
+          <span>SGTM Panel</span>
+        </a>
+
+        <nav class="nav-stack" aria-label="Dashboard sections">
+          <button class="nav-item is-active" type="button" data-view-target="dashboard" aria-label="Dashboard" title="Dashboard">
+            <span class="nav-icon" aria-hidden="true">▦</span>
+            <span>Dashboard</span>
           </button>
-        </div>
-      </header>
+          <button class="nav-item" type="button" data-view-target="logs" aria-label="Event Logs" title="Event Logs">
+            <span class="nav-icon" aria-hidden="true">≡</span>
+            <span>Event Logs</span>
+          </button>
+          <button class="nav-item" type="button" data-view-target="settings" aria-label="Settings" title="Settings">
+            <span class="nav-icon" aria-hidden="true">⚙</span>
+            <span>Settings</span>
+          </button>
+        </nav>
 
-      <section class="status-grid" aria-label="System summary">
-        <article class="metric">
-          <span class="metric-label">Containers</span>
-          <strong id="containerTotal">--</strong>
-          <small id="containerDetail">Waiting for Docker</small>
-        </article>
-        <article class="metric">
-          <span class="metric-label">Docker health</span>
-          <strong id="dockerHealth">--</strong>
-          <small id="dockerDetail">Waiting for status</small>
-        </article>
-        <article class="metric">
-          <span class="metric-label">Requests today</span>
-          <strong id="requestCount">--</strong>
-          <small id="requestDetail">Waiting for Nginx</small>
-        </article>
-        <article class="metric">
-          <span class="metric-label">SSL expiry</span>
-          <strong id="sslDays">--</strong>
-          <small id="sslDetail">Waiting for certificate</small>
-        </article>
-      </section>
-
-      <section class="workspace">
-        <div class="panel panel-wide">
-          <div class="panel-header">
-            <h2>Containers</h2>
-            <span id="dockerBadge" class="badge">Read only</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Image</th>
-                  <th>State</th>
-                  <th>Health</th>
-                  <th>Ports</th>
-                </tr>
-              </thead>
-              <tbody id="containerRows">
-                <tr>
-                  <td colspan="5">Loading containers...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div class="sidebar-group">
+          <p>Tracking</p>
+          <a class="side-link" href="#containers">Containers</a>
+          <a class="side-link" href="#nginx">Nginx Logs</a>
+          <a class="side-link" href="#docker">Docker Logs</a>
         </div>
 
-        <div class="panel">
-          <div class="panel-header">
-            <h2>Recent Nginx Access</h2>
-            <span class="badge">tail</span>
-          </div>
-          <div id="accessLog" class="log-output">Loading access log...</div>
+        <div class="sidebar-footer">
+          <span id="readOnlyBadge" class="status-pill">Read only</span>
         </div>
+      </aside>
 
-        <div class="panel">
-          <div class="panel-header">
-            <h2>Recent Nginx Errors</h2>
-            <span class="badge">tail</span>
+      <main class="main-shell">
+        <header class="topbar">
+          <div>
+            <p id="breadcrumb" class="breadcrumb">Dashboard</p>
+            <h1 id="pageTitle">Server Overview</h1>
           </div>
-          <div id="errorLog" class="log-output">Loading error log...</div>
-        </div>
+          <div class="topbar-actions">
+            <span id="generatedAt" class="timestamp">Loading...</span>
+            <button id="refreshButton" class="button button-primary" type="button">
+              <span aria-hidden="true">↻</span>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </header>
 
-        <div class="panel panel-wide">
-          <div class="panel-header">
-            <h2>Recent Docker Logs</h2>
-            <span id="dockerLogSource" class="badge">tail</span>
-          </div>
-          <div id="dockerLog" class="log-output">Loading Docker logs...</div>
-        </div>
-      </section>
-    </main>
+        <section id="dashboardView" class="view is-active" data-view="dashboard">
+          <section class="notice" aria-label="System mode">
+            <div>
+              <strong>Read-only operations</strong>
+              <p>This dashboard reads Docker, Nginx, and SSL status. It does not restart, create, or delete anything.</p>
+            </div>
+            <span id="systemMode" class="status-dot">Live</span>
+          </section>
+
+          <section class="metrics-grid" aria-label="Server summary">
+            <article class="metric-card">
+              <span class="metric-label">Containers</span>
+              <strong id="containerTotal">--</strong>
+              <small id="containerDetail">Waiting for Docker</small>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Docker health</span>
+              <strong id="dockerHealth">--</strong>
+              <small id="dockerDetail">Waiting for status</small>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Requests today</span>
+              <strong id="requestCount">--</strong>
+              <small id="requestDetail">Waiting for Nginx</small>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">SSL expiry</span>
+              <strong id="sslDays">--</strong>
+              <small id="sslDetail">Waiting for certificate</small>
+            </article>
+          </section>
+
+          <section id="containers" class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Containers</h2>
+                <p>Live Docker inventory from this server.</p>
+              </div>
+              <span id="dockerBadge" class="badge">Read only</span>
+            </div>
+            <div class="container-list" id="containerCards">Loading containers...</div>
+          </section>
+
+          <section class="split-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Traffic Snapshot</h2>
+                  <p>Recent request mix from Nginx access logs.</p>
+                </div>
+              </div>
+              <div id="trafficSummary" class="summary-list"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Runtime Checks</h2>
+                  <p>Service availability for the dashboard collectors.</p>
+                </div>
+              </div>
+              <div id="runtimeChecks" class="summary-list"></div>
+            </article>
+          </section>
+        </section>
+
+        <section id="logsView" class="view" data-view="logs">
+          <section class="logs-hero">
+            <div>
+              <p class="breadcrumb">Containers / Event Logs</p>
+              <h2>Event Logs</h2>
+              <p>Human-readable views over recent Nginx and Docker output.</p>
+            </div>
+            <div class="filter-row" aria-label="Log filters">
+              <label>
+                Source
+                <select id="logSourceFilter">
+                  <option value="all">All logs</option>
+                  <option value="access">Nginx access</option>
+                  <option value="error">Nginx errors</option>
+                  <option value="docker">Docker</option>
+                </select>
+              </label>
+              <label>
+                Status
+                <select id="logStatusFilter">
+                  <option value="all">All status</option>
+                  <option value="error">Errors</option>
+                  <option value="warn">Warnings</option>
+                  <option value="info">Info</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section id="nginx" class="panel log-panel" data-log-panel="access">
+            <div class="panel-header">
+              <div>
+                <h2>Nginx Access</h2>
+                <p>Requests, response codes, clients, and user agents.</p>
+              </div>
+              <span class="badge">tail</span>
+            </div>
+            <div id="accessLog" class="log-output">Loading access log...</div>
+          </section>
+
+          <section class="panel log-panel" data-log-panel="error">
+            <div class="panel-header">
+              <div>
+                <h2>Nginx Errors</h2>
+                <p>Recent warnings and errors reported by Nginx.</p>
+              </div>
+              <span class="badge">tail</span>
+            </div>
+            <div id="errorLog" class="log-output">Loading error log...</div>
+          </section>
+
+          <section id="docker" class="panel log-panel" data-log-panel="docker">
+            <div class="panel-header">
+              <div>
+                <h2>Docker Logs</h2>
+                <p id="dockerLogHelp">Preview from the first running container.</p>
+              </div>
+              <span id="dockerLogSource" class="badge">tail</span>
+            </div>
+            <div id="dockerLog" class="log-output">Loading Docker logs...</div>
+          </section>
+        </section>
+
+        <section id="settingsView" class="view" data-view="settings">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Settings</h2>
+                <p>Current read-only runtime configuration. Edit `.env` on the VPS to change these values.</p>
+              </div>
+              <span class="badge">local</span>
+            </div>
+            <div id="settingsGrid" class="settings-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Deployment Notes</h2>
+                <p>Operational checks for keeping the panel predictable.</p>
+              </div>
+            </div>
+            <div class="note-list">
+              <article>
+                <strong>Port</strong>
+                <span>Run behind Nginx on a private loopback port such as 3100.</span>
+              </article>
+              <article>
+                <strong>Permissions</strong>
+                <span>The app user needs Docker access and read access to Nginx logs.</span>
+              </article>
+              <article>
+                <strong>Security</strong>
+                <span>Add authentication before exposing server logs on a public domain.</span>
+              </article>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
 
     <script src="/app.js" type="module"></script>
   </body>
