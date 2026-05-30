@@ -496,10 +496,10 @@
         <section id="provisioningView" class="view" data-view="provisioning">
           <section class="notice notice-soft" aria-label="Provisioning safety">
             <div>
-              <strong>Admin-gated provisioning</strong>
-              <p>Requests are stored and planned here. The panel does not create Docker containers, edit Nginx, or issue SSL automatically.</p>
+              <strong>Provisioning pipeline</strong>
+              <p>Customers provide domain and container details. The system assigns infrastructure values and queues the launch plan.</p>
             </div>
-            <span id="provisioningBadge" class="status-dot">Approval required</span>
+            <span id="provisioningBadge" class="status-dot">Launch queue</span>
           </section>
 
           <section class="split-grid">
@@ -507,7 +507,7 @@
               <div class="panel-header">
                 <div>
                   <h2>New SGTM Instance</h2>
-                  <p>Collect the domain, port, Docker, Nginx, SSL, and health-check details.</p>
+                  <p>Collect the customer-facing details. Local ports are assigned automatically.</p>
                 </div>
                 <span class="badge">Request</span>
               </div>
@@ -519,10 +519,6 @@
                 <label>
                   Tracking domain
                   <input name="domain" placeholder="server.example.com" required />
-                </label>
-                <label>
-                  Local port
-                  <input name="port" type="number" min="1024" max="65535" value="8080" required />
                 </label>
                 <label>
                   Owner email
@@ -540,7 +536,7 @@
                   Notes
                   <textarea name="notes" placeholder="Plan, client, DNS, or launch notes"></textarea>
                 </label>
-                <button class="button button-primary" type="submit">Submit for Approval</button>
+                <button class="button button-primary" type="submit">Create Instance Request</button>
                 <p id="provisioningFormMessage" class="form-message"></p>
               </form>
             </article>
@@ -549,7 +545,7 @@
               <div class="panel-header">
                 <div>
                   <h2>Provisioning Queue</h2>
-                  <p>Pending requests and generated admin implementation plans.</p>
+                  <p>Queued requests with auto-assigned ports and generated implementation plans.</p>
                 </div>
                 <span id="provisioningQueueBadge" class="badge">0 requests</span>
               </div>

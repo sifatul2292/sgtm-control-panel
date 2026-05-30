@@ -1322,6 +1322,9 @@ function renderDeployment(data) {
     ["EVENT_LOG_LIMIT", text(data.config?.eventLogLimit, "500")],
     ["DATA_DIR", text(data.config?.dataDir, "/var/www/sgtm-control-panel/data")],
     ["HISTORY_RETENTION_DAYS", text(data.config?.historyRetentionDays, "90")],
+    ["PROVISION_PORT_START", text(data.config?.provisionPortStart, "8200")],
+    ["PROVISION_PORT_END", text(data.config?.provisionPortEnd, "8999")],
+    ["PROVISION_DNS_TARGET", text(data.config?.provisionDnsTarget, "server.example.com")],
     ["TRACKING_HOSTS", (data.config?.trackingHosts || []).join(",") || "sgtm.shobaz.com,server.shobaz.com,shobaz.com"],
     ["AUTH_ENABLED", "true"],
     ["AUTH_SECRET", "openssl rand -hex 32"]
@@ -1348,8 +1351,8 @@ function codeBlock(label, value) {
 
 function renderProvisioning(data) {
   const requests = data.provisioning?.requests || [];
-  const pending = requests.filter((item) => item.status === "pending_admin_approval").length;
-  els.provisioningBadge.textContent = pending ? `${pending} pending` : "Approval required";
+  const pending = requests.filter((item) => item.status === "pending_launch" || item.status === "pending_admin_approval").length;
+  els.provisioningBadge.textContent = pending ? `${pending} queued` : "Launch queue";
   els.provisioningQueueBadge.textContent = `${requests.length} request${requests.length === 1 ? "" : "s"}`;
 
   if (!requests.length) {
@@ -1366,7 +1369,7 @@ function renderProvisioning(data) {
         <div class="provisioning-card-head">
           <div>
             <strong>${escapeHtml(request.instanceName)}</strong>
-            <span>${escapeHtml(request.domain)} · port ${escapeHtml(request.port)}</span>
+            <span>${escapeHtml(request.domain)} · auto port ${escapeHtml(request.port)}</span>
           </div>
           <span class="state warning">${escapeHtml(request.status.replaceAll("_", " "))}</span>
         </div>
@@ -1451,8 +1454,7 @@ els.provisioningForm.addEventListener("submit", async (event) => {
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Request failed"]).join(" "));
     els.provisioningForm.reset();
-    els.provisioningForm.querySelector('[name="port"]').value = "8080";
-    els.provisioningFormMessage.textContent = "Provisioning request saved for admin approval.";
+    els.provisioningFormMessage.textContent = `Instance request queued. Auto-assigned port ${result.request.port}.`;
     await loadDashboard();
     setView("provisioning");
   } catch (error) {

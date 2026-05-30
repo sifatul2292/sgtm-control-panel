@@ -22,6 +22,9 @@ const config = {
   eventLogLimit: Number(process.env.EVENT_LOG_LIMIT || 500),
   dataDir: process.env.DATA_DIR ? resolve(rootDir, normalize(process.env.DATA_DIR)) : join(rootDir, "data"),
   historyRetentionDays: Number(process.env.HISTORY_RETENTION_DAYS || 90),
+  provisionPortStart: Number(process.env.PROVISION_PORT_START || 8200),
+  provisionPortEnd: Number(process.env.PROVISION_PORT_END || 8999),
+  provisionDnsTarget: process.env.PROVISION_DNS_TARGET || "",
   trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data"),
   trackingHosts: parseCsv(process.env.TRACKING_HOSTS || inferHostFromCertPath(process.env.SSL_CERT_PATH || "") || process.env.SSL_DOMAIN || ""),
   dockerLogExclude: parseCsv(process.env.DOCKER_LOG_EXCLUDE || "Sending aggregate usage beacon,googletagmanager.com/sgtm/a"),
@@ -820,14 +823,12 @@ function validateProvisioningRequest(input) {
   const errors = [];
   const domain = String(input.domain || "").trim().toLowerCase();
   const instanceName = sanitizeId(input.instanceName || domain.split(".")[0] || "sgtm");
-  const port = Number(input.port || 8080);
   const containerConfig = String(input.containerConfig || "").trim();
   const previewUrl = String(input.previewUrl || "").trim();
   const ownerEmail = String(input.ownerEmail || "").trim();
 
   if (!validDomain(domain)) errors.push("Enter a valid tracking subdomain.");
   if (!instanceName) errors.push("Enter an instance name.");
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) errors.push("Port must be between 1024 and 65535.");
   if (!containerConfig) errors.push("Container config is required before launch.");
   if (previewUrl && !/^https?:\/\//i.test(previewUrl)) errors.push("Preview URL must start with http:// or https://.");
   if (ownerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) errors.push("Owner email is not valid.");
@@ -837,7 +838,6 @@ function validateProvisioningRequest(input) {
     value: {
       instanceName,
       domain,
-      port,
       containerName: sanitizeId(`sgtm-${instanceName}`),
       ownerEmail,
       previewUrl,
@@ -845,6 +845,18 @@ function validateProvisioningRequest(input) {
       notes: String(input.notes || "").trim().slice(0, 1000)
     }
   };
+}
+
+function allocateProvisionPort(requests) {
+  const used = new Set(
+    (requests || [])
+      .map((request) => Number(request.port))
+      .filter((port) => Number.isInteger(port))
+  );
+  for (let port = config.provisionPortStart; port <= config.provisionPortEnd; port += 1) {
+    if (!used.has(port)) return port;
+  }
+  return null;
 }
 
 function provisioningPlan(request) {
@@ -855,10 +867,10 @@ function provisioningPlan(request) {
 
   return {
     summary: [
-      `Create Docker container ${request.containerName} on 127.0.0.1:${request.port}`,
+      `Auto-assigned ${request.containerName} to 127.0.0.1:${request.port}`,
       `Proxy ${request.domain} to the container through Nginx`,
       `Issue SSL with certbot after DNS points to the VPS`,
-      "Keep request pending until an admin runs the plan"
+      "Launch runner is not enabled yet, so this plan is queued for admin execution"
     ],
     envPath: safeEnvPath,
     env: `CONTAINER_CONFIG=${request.containerConfig}\n${previewLine}RUN_AS_PREVIEW_SERVER=false\nPORT=8080\n`,
@@ -876,8 +888,8 @@ function provisioningPlan(request) {
       `curl -I https://${request.domain}/healthy`
     ],
     checks: [
-      { label: "DNS", value: `${request.domain} must point to the target VPS before SSL`, status: "pending" },
-      { label: "Port", value: `127.0.0.1:${request.port} reserved for ${request.containerName}`, status: "pending" },
+      { label: "DNS", value: config.provisionDnsTarget ? `${request.domain} CNAME/A to ${config.provisionDnsTarget}` : `${request.domain} must point to the target VPS`, status: "pending" },
+      { label: "Port", value: `Auto-assigned 127.0.0.1:${request.port}`, status: "pending" },
       { label: "SSL", value: `certbot --nginx -d ${request.domain}`, status: "pending" },
       { label: "Health", value: `https://${request.domain}/healthy`, status: "pending" }
     ]
@@ -897,11 +909,17 @@ async function addProvisioningRequest(input) {
 
   const data = loaded.data;
   data.provisioning ||= { requests: [] };
+  const port = allocateProvisionPort(data.provisioning.requests);
+  if (!port) {
+    return { ok: false, errors: [`No available provisioning ports in ${config.provisionPortStart}-${config.provisionPortEnd}.`] };
+  }
   const request = {
     id: `req_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
-    status: "pending_admin_approval",
+    status: "pending_launch",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    port,
+    autoAssignedPort: true,
     ...validated.value
   };
   request.plan = provisioningPlan(request);
@@ -1274,6 +1292,9 @@ async function getDashboardData() {
       eventLogLimit: config.eventLogLimit,
       dataDir: config.dataDir,
       historyRetentionDays: config.historyRetentionDays,
+      provisionPortStart: config.provisionPortStart,
+      provisionPortEnd: config.provisionPortEnd,
+      provisionDnsTarget: config.provisionDnsTarget,
       trackingPaths: config.trackingPaths,
       trackingHosts: config.trackingHosts,
       alertWebhookEnabled: Boolean(config.alertWebhookUrl),
