@@ -5,6 +5,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(rootDir, "public");
@@ -20,10 +21,16 @@ const config = {
   trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data"),
   trackingHosts: parseCsv(process.env.TRACKING_HOSTS || inferHostFromCertPath(process.env.SSL_CERT_PATH || "") || process.env.SSL_DOMAIN || ""),
   dockerLogExclude: parseCsv(process.env.DOCKER_LOG_EXCLUDE || "Sending aggregate usage beacon,googletagmanager.com/sgtm/a"),
+  authEnabled: process.env.AUTH_ENABLED !== "false",
+  authUsername: process.env.AUTH_USERNAME || "admin",
+  authPassword: process.env.AUTH_PASSWORD || "",
+  authSecret: process.env.AUTH_SECRET || "",
   sslCertPath: process.env.SSL_CERT_PATH || "",
   sslDomain: process.env.SSL_DOMAIN || "",
   sslPort: Number(process.env.SSL_PORT || 443)
 };
+
+const authSecret = config.authSecret || config.authPassword || randomBytes(32).toString("hex");
 
 function parseCsv(value) {
   return String(value || "")
@@ -70,6 +77,126 @@ function jsonResponse(res, status, body) {
     "cache-control": "no-store"
   });
   res.end(JSON.stringify(body));
+}
+
+function htmlResponse(res, status, body, headers = {}) {
+  res.writeHead(status, {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-store",
+    ...headers
+  });
+  res.end(body);
+}
+
+function redirect(res, location) {
+  res.writeHead(302, {
+    location,
+    "cache-control": "no-store"
+  });
+  res.end();
+}
+
+function parseCookies(header = "") {
+  return Object.fromEntries(
+    header
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const index = part.indexOf("=");
+        return index === -1
+          ? [part, ""]
+          : [decodeURIComponent(part.slice(0, index)), decodeURIComponent(part.slice(index + 1))];
+      })
+  );
+}
+
+function signSession(value) {
+  return createHmac("sha256", authSecret).update(value).digest("hex");
+}
+
+function makeSessionCookie() {
+  const issuedAt = String(Date.now());
+  const payload = `${config.authUsername}:${issuedAt}`;
+  return `${Buffer.from(payload).toString("base64url")}.${signSession(payload)}`;
+}
+
+function safeEqual(a, b) {
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+function isAuthenticated(req) {
+  if (!config.authEnabled) return true;
+  if (!config.authPassword) return false;
+  const token = parseCookies(req.headers.cookie).sgtm_session;
+  if (!token || !token.includes(".")) return false;
+
+  const [encoded, signature] = token.split(".");
+  let payload = "";
+  try {
+    payload = Buffer.from(encoded, "base64url").toString("utf8");
+  } catch {
+    return false;
+  }
+
+  const [username, issuedAt] = payload.split(":");
+  const age = Date.now() - Number(issuedAt);
+  return (
+    username === config.authUsername &&
+    Number.isFinite(age) &&
+    age >= 0 &&
+    age < 1000 * 60 * 60 * 12 &&
+    safeEqual(signature, signSession(payload))
+  );
+}
+
+function readForm(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 10000) {
+        reject(new Error("Form body too large"));
+        req.destroy();
+      }
+    });
+    req.on("end", () => resolve(new URLSearchParams(body)));
+    req.on("error", reject);
+  });
+}
+
+function loginPage(error = "") {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login - SGTM Panel</title>
+    <link rel="stylesheet" href="/tokens.css" />
+    <link rel="stylesheet" href="/login.css" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <form class="login-card" method="post" action="/login">
+        <span class="brand-mark">S</span>
+        <h1>SGTM Panel</h1>
+        <p>Sign in to view Docker, Nginx, and tracking diagnostics.</p>
+        ${error ? `<div class="login-error">${error}</div>` : ""}
+        <label>
+          Username
+          <input name="username" autocomplete="username" required />
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit">Sign in</button>
+      </form>
+    </main>
+  </body>
+</html>`;
 }
 
 function command(commandName, args, options = {}) {
@@ -494,6 +621,59 @@ async function serveStatic(req, res) {
 
 const server = createServer(async (req, res) => {
   try {
+    const pathname = new URL(req.url || "/", `http://${req.headers.host}`).pathname;
+
+    if (pathname === "/login" && req.method === "GET") {
+      if (isAuthenticated(req)) {
+        redirect(res, "/");
+        return;
+      }
+      htmlResponse(res, 200, loginPage(config.authPassword ? "" : "Set AUTH_PASSWORD in .env before using the panel."));
+      return;
+    }
+
+    if (pathname === "/login" && req.method === "POST") {
+      const form = await readForm(req);
+      const username = form.get("username") || "";
+      const password = form.get("password") || "";
+      const ok =
+        config.authPassword &&
+        safeEqual(username, config.authUsername) &&
+        safeEqual(password, config.authPassword);
+
+      if (!ok) {
+        htmlResponse(res, 401, loginPage("Invalid username or password."));
+        return;
+      }
+
+      res.writeHead(302, {
+        location: "/",
+        "set-cookie": `sgtm_session=${makeSessionCookie()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`,
+        "cache-control": "no-store"
+      });
+      res.end();
+      return;
+    }
+
+    if (pathname === "/logout") {
+      res.writeHead(302, {
+        location: "/login",
+        "set-cookie": "sgtm_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
+        "cache-control": "no-store"
+      });
+      res.end();
+      return;
+    }
+
+    if (pathname !== "/login" && pathname !== "/tokens.css" && pathname !== "/login.css" && !isAuthenticated(req)) {
+      if (pathname.startsWith("/api/")) {
+        jsonResponse(res, 401, { error: "Authentication required." });
+        return;
+      }
+      redirect(res, "/login");
+      return;
+    }
+
     if (req.url?.startsWith("/api/dashboard")) {
       jsonResponse(res, 200, await getDashboardData());
       return;
