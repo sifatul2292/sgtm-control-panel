@@ -12,6 +12,8 @@ const publicDir = join(rootDir, "public");
 
 await loadDotEnv(join(rootDir, ".env"));
 
+const configuredDataDir = process.env.DATA_DIR ? resolve(rootDir, normalize(process.env.DATA_DIR)) : join(rootDir, "data");
+
 const config = {
   host: process.env.HOST || "127.0.0.1",
   port: Number(process.env.PORT || 3000),
@@ -20,11 +22,12 @@ const config = {
   usingDedicatedLogs: Boolean(process.env.SGTM_ACCESS_LOG || process.env.SGTM_ERROR_LOG),
   logTailLines: Number(process.env.LOG_TAIL_LINES || 80),
   eventLogLimit: Number(process.env.EVENT_LOG_LIMIT || 500),
-  dataDir: process.env.DATA_DIR ? resolve(rootDir, normalize(process.env.DATA_DIR)) : join(rootDir, "data"),
+  dataDir: configuredDataDir,
   historyRetentionDays: Number(process.env.HISTORY_RETENTION_DAYS || 90),
   provisionPortStart: Number(process.env.PROVISION_PORT_START || 8200),
   provisionPortEnd: Number(process.env.PROVISION_PORT_END || 8999),
   provisionDnsTarget: process.env.PROVISION_DNS_TARGET || "",
+  provisionOutputDir: process.env.PROVISION_OUTPUT_DIR ? resolve(rootDir, normalize(process.env.PROVISION_OUTPUT_DIR)) : join(configuredDataDir, "provisioning"),
   trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data"),
   trackingHosts: parseCsv(process.env.TRACKING_HOSTS || inferHostFromCertPath(process.env.SSL_CERT_PATH || "") || process.env.SSL_DOMAIN || ""),
   dockerLogExclude: parseCsv(process.env.DOCKER_LOG_EXCLUDE || "Sending aggregate usage beacon,googletagmanager.com/sgtm/a"),
@@ -860,7 +863,10 @@ function allocateProvisionPort(requests) {
 }
 
 function provisioningPlan(request) {
-  const safeEnvPath = `/var/www/sgtm-instances/${request.instanceName}/.env`;
+  const instanceDir = join(config.provisionOutputDir, request.instanceName);
+  const safeEnvPath = join(instanceDir, ".env");
+  const composePath = join(instanceDir, "docker-compose.yml");
+  const nginxPath = join(instanceDir, `${request.domain}.conf`);
   const accessLog = `/var/log/nginx/${request.instanceName}-sgtm-access.log`;
   const errorLog = `/var/log/nginx/${request.instanceName}-sgtm-error.log`;
   const previewLine = request.previewUrl ? `PREVIEW_SERVER_URL=${request.previewUrl}\n` : "";
@@ -872,19 +878,20 @@ function provisioningPlan(request) {
       `Issue SSL with certbot after DNS points to the VPS`,
       "Launch runner is not enabled yet, so this plan is queued for admin execution"
     ],
+    instanceDir,
+    composePath,
+    nginxPath,
     envPath: safeEnvPath,
     env: `CONTAINER_CONFIG=${request.containerConfig}\n${previewLine}RUN_AS_PREVIEW_SERVER=false\nPORT=8080\n`,
     dockerCompose: `services:\n  ${request.containerName}:\n    image: gcr.io/cloud-tagging-10302018/gtm-cloud-image:stable\n    container_name: ${request.containerName}\n    restart: unless-stopped\n    env_file:\n      - ${safeEnvPath}\n    ports:\n      - "127.0.0.1:${request.port}:8080"\n`,
     nginx: `server {\n    listen 80;\n    server_name ${request.domain};\n\n    access_log ${accessLog} sgtm_panel;\n    error_log ${errorLog} warn;\n\n    location / {\n        proxy_pass http://127.0.0.1:${request.port};\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n}\n`,
     commands: [
-      `sudo mkdir -p /var/www/sgtm-instances/${request.instanceName}`,
-      `sudo nano ${safeEnvPath}`,
-      `sudo nano /etc/nginx/sites-available/${request.domain}`,
+      `sudo cp ${nginxPath} /etc/nginx/sites-available/${request.domain}`,
       `sudo ln -s /etc/nginx/sites-available/${request.domain} /etc/nginx/sites-enabled/${request.domain}`,
       "sudo nginx -t",
       "sudo systemctl reload nginx",
       `sudo certbot --nginx -d ${request.domain}`,
-      `docker compose -f /var/www/sgtm-instances/${request.instanceName}/docker-compose.yml up -d`,
+      `docker compose -f ${composePath} up -d`,
       `curl -I https://${request.domain}/healthy`
     ],
     checks: [
@@ -925,6 +932,40 @@ async function addProvisioningRequest(input) {
   request.plan = provisioningPlan(request);
   data.provisioning.requests.unshift(request);
   data.provisioning.requests = data.provisioning.requests.slice(0, 100);
+  await writeDatabase(data);
+  return { ok: true, request };
+}
+
+async function prepareProvisioningFiles(id) {
+  const loaded = await readDatabase();
+  if (!loaded.available) {
+    return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  }
+
+  const data = loaded.data;
+  const requests = data.provisioning?.requests || [];
+  const request = requests.find((item) => item.id === id);
+  if (!request) return { ok: false, errors: ["Provisioning request was not found."] };
+
+  request.plan = provisioningPlan(request);
+  const plan = request.plan;
+  await mkdir(plan.instanceDir, { recursive: true });
+  await writeFile(plan.envPath, plan.env, { encoding: "utf8", mode: 0o600 });
+  await writeFile(plan.composePath, plan.dockerCompose, "utf8");
+  await writeFile(plan.nginxPath, plan.nginx, "utf8");
+  request.status = "files_prepared";
+  request.updatedAt = new Date().toISOString();
+  request.preparedAt = request.updatedAt;
+  request.preparedFiles = {
+    envPath: plan.envPath,
+    composePath: plan.composePath,
+    nginxPath: plan.nginxPath
+  };
+  request.plan.checks = request.plan.checks.map((check) =>
+    check.label === "Port"
+      ? { ...check, status: "prepared" }
+      : check
+  );
   await writeDatabase(data);
   return { ok: true, request };
 }
@@ -1295,6 +1336,7 @@ async function getDashboardData() {
       provisionPortStart: config.provisionPortStart,
       provisionPortEnd: config.provisionPortEnd,
       provisionDnsTarget: config.provisionDnsTarget,
+      provisionOutputDir: config.provisionOutputDir,
       trackingPaths: config.trackingPaths,
       trackingHosts: config.trackingHosts,
       alertWebhookEnabled: Boolean(config.alertWebhookUrl),
@@ -1393,6 +1435,13 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await addProvisioningRequest(body);
       jsonResponse(res, result.ok ? 201 : 400, result.ok ? { request: result.request } : { errors: result.errors });
+      return;
+    }
+
+    const prepareMatch = pathname.match(/^\/api\/provisioning\/requests\/([^/]+)\/prepare$/);
+    if (prepareMatch && req.method === "POST") {
+      const result = await prepareProvisioningFiles(decodeURIComponent(prepareMatch[1]));
+      jsonResponse(res, result.ok ? 200 : 400, result.ok ? { request: result.request } : { errors: result.errors });
       return;
     }
 

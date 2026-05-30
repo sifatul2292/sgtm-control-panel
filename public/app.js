@@ -1373,6 +1373,12 @@ function renderProvisioning(data) {
           </div>
           <span class="state warning">${escapeHtml(request.status.replaceAll("_", " "))}</span>
         </div>
+        ${request.preparedFiles ? `
+          <div class="summary-list compact-list">
+            <article class="summary-item"><strong>Docker files</strong><span class="state prepared">${escapeHtml(request.preparedFiles.composePath)}</span></article>
+            <article class="summary-item"><strong>Nginx draft</strong><span class="state prepared">${escapeHtml(request.preparedFiles.nginxPath)}</span></article>
+          </div>
+        ` : ""}
         <div class="summary-list compact-list">
           ${(plan.checks || []).map((check) => `
             <article class="summary-item">
@@ -1387,10 +1393,29 @@ function renderProvisioning(data) {
         ${codeBlock("Docker Compose", plan.dockerCompose)}
         ${codeBlock("Nginx server block", plan.nginx)}
         ${codeBlock("Admin commands", (plan.commands || []).join("\n"))}
+        <button class="button" type="button" data-provision-prepare="${escapeHtml(request.id)}">Prepare Docker + Nginx Files</button>
       `;
       return card;
     })
   );
+
+  els.provisioningRequests.querySelectorAll("[data-provision-prepare]").forEach((button) => {
+    button.addEventListener("click", () => prepareProvisioningFiles(button.dataset.provisionPrepare));
+  });
+}
+
+async function prepareProvisioningFiles(id) {
+  els.provisioningFormMessage.textContent = "Preparing Docker and Nginx draft files...";
+  try {
+    const response = await fetch(`/api/provisioning/requests/${encodeURIComponent(id)}/prepare`, { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Prepare failed"]).join(" "));
+    els.provisioningFormMessage.textContent = "Docker and Nginx draft files prepared.";
+    await loadDashboard();
+    setView("provisioning");
+  } catch (error) {
+    els.provisioningFormMessage.textContent = error.message;
+  }
 }
 
 function renderLogs(data) {

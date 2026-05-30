@@ -344,7 +344,8 @@ h2 {
 
 .badge.ok,
 .state.running,
-.state.healthy {
+.state.healthy,
+.state.prepared {
   border-color: color-mix(in oklch, var(--color-ok), transparent 45%);
   color: var(--color-ok);
 }
