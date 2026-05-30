@@ -9,6 +9,21 @@ access_log /var/log/nginx/sgtm-access.log;
 error_log /var/log/nginx/sgtm-error.log warn;
 ```
 
+For the panel's domain breakdown to identify `server.shobaz.com`, `sgtm.shobaz.com`, or other hosts, include `$host` in the access log format. One simple option in the `http` block is:
+
+```nginx
+log_format sgtm_panel '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
+                      'host="$host"';
+```
+
+Then use that format in the SGTM `server` block:
+
+```nginx
+access_log /var/log/nginx/sgtm-access.log sgtm_panel;
+error_log /var/log/nginx/sgtm-error.log warn;
+```
+
 Then test and reload Nginx:
 
 ```bash

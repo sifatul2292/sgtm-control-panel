@@ -585,6 +585,35 @@ function inferClient(pathname, agent) {
   return "Other";
 }
 
+function queryValue(pathname, keys) {
+  try {
+    const parsed = new URL(pathname, "https://sgtm.local");
+    for (const key of keys) {
+      const value = parsed.searchParams.get(key);
+      if (value !== null && value !== "") return value;
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function inferHost(line, pathname) {
+  try {
+    const parsed = new URL(pathname);
+    if (parsed.hostname) return parsed.hostname;
+  } catch {
+    // Relative SGTM paths are normal in Nginx logs.
+  }
+
+  const explicit = String(line || "").match(/\b(?:host|server_name)=["']?([^"'\s]+)|"host"\s*:\s*"([^"]+)"/i);
+  if (explicit) return explicit[1] || explicit[2] || "";
+
+  const lower = String(line || "").toLowerCase();
+  const configured = config.trackingHosts.find((host) => lower.includes(host.toLowerCase()));
+  return configured || "";
+}
+
 function parseNginxLogDate(value) {
   const match = String(value || "").match(/^(\d{2})\/([A-Za-z]{3})\/(\d{4}):(\d{2}):(\d{2}):(\d{2}) ([+-]\d{4})$/);
   if (!match) return null;
@@ -617,9 +646,11 @@ function parseTrackingAccessLine(line) {
   const date = parseNginxLogDate(time);
   const eventName = inferEventName(pathname, method, status);
   const client = inferClient(pathname, agent);
+  const host = inferHost(line, pathname);
   return {
     eventName,
     client,
+    host,
     status,
     date,
     method,
@@ -628,7 +659,11 @@ function parseTrackingAccessLine(line) {
     bytes: bytes === "-" ? null : Number(bytes),
     referer: referer === "-" ? "" : referer,
     agent: agent === "-" ? "" : agent,
-    ip
+    ip,
+    value: queryValue(pathname, ["value", "ep.value", "price", "revenue"]),
+    currency: queryValue(pathname, ["currency", "ep.currency", "cu"]),
+    eventId: queryValue(pathname, ["event_id", "eventId", "eid", "x-fb-event-id"]),
+    transactionId: queryValue(pathname, ["transaction_id", "transactionId", "tid", "ep.transaction_id"])
   };
 }
 
@@ -642,6 +677,7 @@ function serializeEventRow(item) {
   return {
     eventName: item.eventName,
     client: item.client,
+    host: item.host,
     status: item.status,
     method: item.method,
     path: item.path,
@@ -651,7 +687,11 @@ function serializeEventRow(item) {
     bytes: item.bytes,
     referer: item.referer,
     agent: item.agent,
-    ip: item.ip
+    ip: item.ip,
+    value: item.value,
+    currency: item.currency,
+    eventId: item.eventId,
+    transactionId: item.transactionId
   };
 }
 
@@ -663,6 +703,7 @@ async function summarizeRequestsToday(pathname) {
     let errors = 0;
     const events = new Map();
     const clients = new Map();
+    const hosts = new Map();
     const recentEvents = [];
     let settled = false;
     const stream = createReadStream(pathname, { encoding: "utf8" });
@@ -693,6 +734,13 @@ async function summarizeRequestsToday(pathname) {
       if (parsed.date && (!client.lastSeen || parsed.date > client.lastSeen)) client.lastSeen = parsed.date;
       clients.set(parsed.client, client);
 
+      const hostName = parsed.host || "Unknown host";
+      const host = hosts.get(hostName) || { count: 0, errors: 0, lastSeen: null };
+      host.count += 1;
+      if (Number(parsed.status) >= 400) host.errors += 1;
+      if (parsed.date && (!host.lastSeen || parsed.date > host.lastSeen)) host.lastSeen = parsed.date;
+      hosts.set(hostName, host);
+
       recentEvents.push(serializeEventRow(parsed));
       if (recentEvents.length > config.eventLogLimit) recentEvents.shift();
     });
@@ -707,6 +755,7 @@ async function summarizeRequestsToday(pathname) {
         trackingPaths: config.trackingPaths,
         events: serializeSummaryMap(events),
         clients: serializeSummaryMap(clients),
+        hosts: serializeSummaryMap(hosts),
         recentEvents: recentEvents.reverse(),
         eventLogLimit: config.eventLogLimit
       });
@@ -722,6 +771,7 @@ async function summarizeRequestsToday(pathname) {
         detail: error.message,
         events: [],
         clients: [],
+        hosts: [],
         recentEvents: [],
         eventLogLimit: config.eventLogLimit
       });
@@ -737,6 +787,7 @@ async function summarizeRequestsToday(pathname) {
         detail: error.message,
         events: [],
         clients: [],
+        hosts: [],
         recentEvents: [],
         eventLogLimit: config.eventLogLimit
       });

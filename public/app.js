@@ -21,6 +21,10 @@ const els = {
   funnelList: document.querySelector("#funnelList"),
   alertList: document.querySelector("#alertList"),
   alertBadge: document.querySelector("#alertBadge"),
+  hostBreakdown: document.querySelector("#hostBreakdown"),
+  hostBadge: document.querySelector("#hostBadge"),
+  qualityChecks: document.querySelector("#qualityChecks"),
+  qualityBadge: document.querySelector("#qualityBadge"),
   logModeBadge: document.querySelector("#logModeBadge"),
   accessLog: document.querySelector("#accessLog"),
   errorLog: document.querySelector("#errorLog"),
@@ -399,9 +403,14 @@ function serverEventRows(data) {
     date: item.date ? new Date(item.date) : null,
     displayDate: formatDate(item.date),
     client: item.client || "Other",
+    host: item.host || "Unknown host",
     requestUrl: item.requestUrl || item.path || "",
     tracking: true,
     eventName: item.eventName || "Other",
+    value: item.value,
+    currency: item.currency,
+    eventId: item.eventId,
+    transactionId: item.transactionId,
     detail: eventDetail(item)
   }));
 }
@@ -565,6 +574,10 @@ function reliableEventStats(data) {
   return todayEventStats(data) || eventStats(trackingEvents(data));
 }
 
+function todayRows(data) {
+  return serverEventRows(data).length ? serverEventRows(data) : trackingEvents(data);
+}
+
 function eventStats(items) {
   return items.reduce((stats, item) => {
     const key = canonicalEventName(item.eventName);
@@ -629,12 +642,22 @@ function renderEventHealth(data) {
 
 function collectAlerts(data) {
   const stats = reliableEventStats(data);
+  const rows = todayRows(data);
+  const purchaseRows = rows.filter((item) => canonicalEventName(item.eventName) === "Purchase");
+  const knownHosts = data.nginx?.todayEvents?.hosts?.filter((host) => host.name !== "Unknown host") || [];
   const alerts = [];
 
   if (!data.config?.usingDedicatedLogs) {
     alerts.push({
       label: "Shared Nginx log",
-      value: "Use SGTM_ACCESS_LOG for cleaner data",
+      value: "Use SGTM_ACCESS_LOG before trusting mixed-domain data",
+      status: "warning"
+    });
+  }
+  if (data.nginx?.todayEvents?.available && data.nginx.todayEvents.count > 0 && !knownHosts.length) {
+    alerts.push({
+      label: "Host not visible",
+      value: "Nginx log format does not expose the request host",
       status: "warning"
     });
   }
@@ -659,6 +682,13 @@ function collectAlerts(data) {
       status: "warning"
     });
   }
+  if (stats.get("PageView")?.count && !stats.get("ViewItem")?.count) {
+    alerts.push({
+      label: "ViewItem",
+      value: "PageView seen, product views missing",
+      status: "warning"
+    });
+  }
   if (stats.get("AddToCart")?.count && !stats.get("BeginCheckout")?.count) {
     alerts.push({
       label: "Checkout",
@@ -670,6 +700,20 @@ function collectAlerts(data) {
     alerts.push({
       label: "Purchase",
       value: "BeginCheckout seen, Purchase missing",
+      status: "warning"
+    });
+  }
+  if (purchaseRows.length && purchaseRows.some((item) => !item.value || !item.currency)) {
+    alerts.push({
+      label: "Purchase value",
+      value: "Some purchase requests are missing value or currency",
+      status: "warning"
+    });
+  }
+  if (purchaseRows.length && purchaseRows.some((item) => !item.eventId && !item.transactionId)) {
+    alerts.push({
+      label: "Deduplication",
+      value: "Some purchase requests are missing event ID or transaction ID",
       status: "warning"
     });
   }
@@ -687,6 +731,98 @@ function renderAlerts(data) {
     els.alertList,
     alerts.length ? alerts : [{ label: "Tracking health", value: "No immediate issues", status: "healthy" }]
   );
+}
+
+function renderHostBreakdown(data) {
+  const summary = data.nginx?.todayEvents;
+  const hosts = summary?.hosts || [];
+  const knownHosts = hosts.filter((item) => item.name !== "Unknown host");
+  const unknown = hosts.find((item) => item.name === "Unknown host");
+  const rows = (knownHosts.length ? knownHosts : hosts).slice(0, 6).map((item) => ({
+    label: item.name,
+    value: `${Number(item.count || 0).toLocaleString()} requests${item.errors ? `, ${Number(item.errors).toLocaleString()} errors` : ""}`,
+    status: item.name === "Unknown host" ? "warning" : Number(item.errors) ? "warning" : "healthy"
+  }));
+
+  els.hostBadge.className = "badge";
+  els.hostBadge.classList.add(!summary?.available ? "danger" : knownHosts.length ? "ok" : "warn");
+  els.hostBadge.textContent = knownHosts.length ? `${knownHosts.length} host${knownHosts.length === 1 ? "" : "s"}` : "Unverified";
+
+  renderSummaryList(
+    els.hostBreakdown,
+    rows.length
+      ? rows
+      : [{ label: "Host detection", value: summary?.available ? "No tracking requests today" : "Access log unavailable", status: summary?.available ? "healthy" : "error" }]
+  );
+
+  if (unknown && knownHosts.length) {
+    const note = document.createElement("article");
+    note.className = "summary-item";
+    note.innerHTML = `<strong>Unknown host</strong><span class="state warning">${Number(unknown.count || 0).toLocaleString()} requests need log host field</span>`;
+    els.hostBreakdown.append(note);
+  }
+}
+
+function qualityItems(data) {
+  const stats = reliableEventStats(data);
+  const rows = todayRows(data);
+  const purchaseRows = rows.filter((item) => canonicalEventName(item.eventName) === "Purchase");
+  const checks = [
+    {
+      label: "Dedicated logs",
+      pass: Boolean(data.config?.usingDedicatedLogs),
+      value: data.config?.usingDedicatedLogs ? "Enabled" : "Use SGTM_ACCESS_LOG"
+    },
+    {
+      label: "Host visibility",
+      pass: !data.nginx?.todayEvents?.count || Boolean(data.nginx?.todayEvents?.hosts?.some((host) => host.name !== "Unknown host")),
+      value: !data.nginx?.todayEvents?.count
+        ? "Waiting for requests"
+        : data.nginx.todayEvents.hosts?.some((host) => host.name !== "Unknown host")
+          ? "Host detected in logs"
+          : "Log format missing host"
+    },
+    {
+      label: "ViewItem",
+      pass: !stats.get("PageView")?.count || Boolean(stats.get("ViewItem")?.count),
+      value: stats.get("ViewItem")?.count ? `${stats.get("ViewItem").count.toLocaleString()} events` : "Missing after PageView"
+    },
+    {
+      label: "Checkout flow",
+      pass: !stats.get("AddToCart")?.count || Boolean(stats.get("BeginCheckout")?.count),
+      value: stats.get("BeginCheckout")?.count ? `${stats.get("BeginCheckout").count.toLocaleString()} BeginCheckout` : "No BeginCheckout after AddToCart"
+    },
+    {
+      label: "Purchase flow",
+      pass: !stats.get("BeginCheckout")?.count || Boolean(stats.get("Purchase")?.count),
+      value: stats.get("Purchase")?.count ? `${stats.get("Purchase").count.toLocaleString()} Purchase` : "No Purchase after BeginCheckout"
+    },
+    {
+      label: "Purchase metadata",
+      pass: !purchaseRows.length || purchaseRows.every((item) => item.value && item.currency),
+      value: purchaseRows.length ? "Value and currency checked" : "No purchase today"
+    },
+    {
+      label: "Deduplication IDs",
+      pass: !purchaseRows.length || purchaseRows.every((item) => item.eventId || item.transactionId),
+      value: purchaseRows.length ? "Event ID or transaction ID checked" : "No purchase today"
+    }
+  ];
+
+  return checks.map((check) => ({
+    label: check.label,
+    value: check.value,
+    status: check.pass ? "healthy" : "warning"
+  }));
+}
+
+function renderQualityChecks(data) {
+  const items = qualityItems(data);
+  const issues = items.filter((item) => item.status !== "healthy").length;
+  els.qualityBadge.className = "badge";
+  els.qualityBadge.classList.add(issues ? "warn" : "ok");
+  els.qualityBadge.textContent = issues ? `${issues} check${issues === 1 ? "" : "s"}` : "Clean";
+  renderSummaryList(els.qualityChecks, items);
 }
 
 function renderDashboard(data) {
@@ -731,6 +867,8 @@ function renderDashboard(data) {
   ]);
   renderEventHealth(data);
   renderAlerts(data);
+  renderHostBreakdown(data);
+  renderQualityChecks(data);
 }
 
 function eventCounts(items) {
