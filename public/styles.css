@@ -503,13 +503,19 @@ select {
 
 .log-message {
   color: var(--color-text);
-  line-height: 1.45;
+  font-size: var(--text-lg);
+  font-weight: 850;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
 .log-detail,
 .empty-log {
   overflow-wrap: anywhere;
+}
+
+.log-detail {
+  max-width: 110ch;
 }
 
 .empty-log {

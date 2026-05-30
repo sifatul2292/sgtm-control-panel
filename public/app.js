@@ -95,6 +95,102 @@ function levelFromMessage(message = "") {
   return "info";
 }
 
+function normalizeEventName(value) {
+  const compact = String(value || "")
+    .trim()
+    .replace(/[-_\s]+/g, "")
+    .toLowerCase();
+  const names = {
+    pageview: "PageView",
+    page_view: "PageView",
+    viewcontent: "ViewContent",
+    viewitem: "ViewContent",
+    productview: "ViewContent",
+    addtocart: "AddToCart",
+    initiatecheckout: "InitiateCheckout",
+    checkout: "InitiateCheckout",
+    purchase: "Purchase",
+    ordercomplete: "Purchase",
+    lead: "Lead",
+    signup: "Lead",
+    search: "Search"
+  };
+  return names[compact] || "";
+}
+
+function queryEventName(path) {
+  try {
+    const parsed = new URL(path, "https://sgtm.local");
+    const eventKeys = ["event", "event_name", "en", "e", "action", "type", "name"];
+    for (const key of eventKeys) {
+      const eventName = normalizeEventName(parsed.searchParams.get(key));
+      if (eventName) return eventName;
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function inferAccessEvent({ path, method, status }) {
+  const code = Number(status);
+  const raw = decodeURIComponent(String(path || "")).toLowerCase();
+  const queryEvent = queryEventName(path);
+  const suspiciousPhp = /\.php(?:[?#]|$)/.test(raw) && !raw.includes("index.php");
+  const blocked = code >= 400;
+
+  if (blocked && suspiciousPhp) {
+    return {
+      name: "Blocked Bot Request",
+      outcome: "Blocked",
+      description: "A likely automated scan hit a random PHP path and the server rejected it."
+    };
+  }
+
+  if (queryEvent) {
+    return {
+      name: queryEvent,
+      outcome: blocked ? "Not accepted" : "Tracked",
+      description: `The request explicitly reported a ${queryEvent} event.`
+    };
+  }
+
+  const checks = [
+    ["Purchase", ["purchase", "order", "thank_you", "payment_success", "complete"]],
+    ["InitiateCheckout", ["checkout", "initiate_checkout", "begin_checkout"]],
+    ["AddToCart", ["add_to_cart", "addtocart", "cart/add", "add-to-cart"]],
+    ["ViewContent", ["view_item", "viewcontent", "product", "item", "content"]],
+    ["Lead", ["lead", "signup", "register", "subscribe"]],
+    ["Search", ["search", "query="]]
+  ];
+
+  for (const [name, needles] of checks) {
+    if (needles.some((needle) => raw.includes(needle))) {
+      return {
+        name,
+        outcome: blocked ? "Not accepted" : "Tracked",
+        description: `This looks like a ${name} event based on the request URL.`
+      };
+    }
+  }
+
+  if (method === "GET" && !blocked) {
+    return {
+      name: "PageView",
+      outcome: "Tracked",
+      description: "A visitor or browser loaded a page or tracking endpoint."
+    };
+  }
+
+  return {
+    name: blocked ? "Rejected Request" : "Server Request",
+    outcome: blocked ? "Not accepted" : "Processed",
+    description: blocked
+      ? "The server rejected this request before it became a clean tracking event."
+      : "The server processed a request that does not map to a known marketing event yet."
+  };
+}
+
 function parseNginxAccess(line) {
   const match = line.match(/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*?) (HTTP\/[^"]+)" (\d{3}) (\S+) "([^"]*)" "([^"]*)"/);
   if (!match) {
@@ -104,15 +200,17 @@ function parseNginxAccess(line) {
   const [, ip, time, method, path, protocol, status, bytes, referer, agent] = match;
   const code = Number(status);
   const level = code >= 500 ? "error" : code >= 400 ? "warn" : "info";
+  const event = inferAccessEvent({ path, method, status });
   return {
     source: "access",
     level,
     status,
     method,
     path,
-    primary: `${method} ${path}`,
-    meta: `${status} - ${ip} - ${time}`,
-    detail: `${protocol} - ${bytes} bytes${referer !== "-" ? ` - from ${referer}` : ""}${agent !== "-" ? ` - ${agent}` : ""}`
+    eventName: event.name,
+    primary: event.name,
+    meta: `${event.outcome} - ${status} - ${time}`,
+    detail: `${event.description} Path: ${path}. Visitor IP: ${ip}. ${protocol} - ${bytes} bytes${referer !== "-" ? ` - from ${referer}` : ""}${agent !== "-" ? ` - ${agent}` : ""}`
   };
 }
 
@@ -258,14 +356,23 @@ function renderDashboard(data) {
   }
 
   const accessItems = parseLogLines(data.nginx.accessLog, "access");
-  const errors = accessItems.filter((item) => item.level === "error").length;
-  const warnings = accessItems.filter((item) => item.level === "warn").length;
-  const ok = accessItems.length - errors - warnings;
-  renderSummaryList(els.trafficSummary, [
-    { label: "Successful requests", value: String(ok), status: "healthy" },
-    { label: "Client warnings", value: String(warnings), status: warnings ? "warning" : "healthy" },
-    { label: "Server errors", value: String(errors), status: errors ? "error" : "healthy" }
-  ]);
+  const eventCounts = accessItems.reduce((counts, item) => {
+    const key = item.eventName || item.primary || "Other";
+    counts.set(key, (counts.get(key) || 0) + 1);
+    return counts;
+  }, new Map());
+  const topEvents = [...eventCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([label, value]) => ({
+      label,
+      value: value.toLocaleString(),
+      status: label.includes("Blocked") || label.includes("Rejected") ? "warning" : "healthy"
+    }));
+  renderSummaryList(
+    els.trafficSummary,
+    topEvents.length ? topEvents : [{ label: "Visitor events", value: "0", status: "healthy" }]
+  );
 
   renderSummaryList(els.runtimeChecks, [
     { label: "Docker collector", value: docker.available ? "Available" : "Unavailable", status: docker.available ? "healthy" : "error" },

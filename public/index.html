@@ -135,9 +135,9 @@
                 Source
                 <select id="logSourceFilter">
                   <option value="all">All logs</option>
-                  <option value="access">Nginx access</option>
-                  <option value="error">Nginx errors</option>
-                  <option value="docker">Docker</option>
+                  <option value="access">Visitor events</option>
+                  <option value="error">Server errors</option>
+                  <option value="docker">Docker system</option>
                 </select>
               </label>
               <label>
@@ -155,8 +155,8 @@
           <section id="nginx" class="panel log-panel" data-log-panel="access">
             <div class="panel-header">
               <div>
-                <h2>Nginx Access</h2>
-                <p>Requests, response codes, clients, and user agents.</p>
+                <h2>Visitor Events</h2>
+                <p>Readable event names inferred from Nginx traffic.</p>
               </div>
               <span class="badge">tail</span>
             </div>
