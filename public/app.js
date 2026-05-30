@@ -152,10 +152,7 @@ function isTrackingPath(path) {
     "/g/collect",
     "/collect",
     "/mp/collect",
-    "/data",
-    "/gtm.js",
-    "/gtag/js",
-    "/service_worker"
+    "/data"
   ].some((prefix) => endpoint.startsWith(prefix));
 }
 

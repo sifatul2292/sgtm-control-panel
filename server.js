@@ -17,7 +17,7 @@ const config = {
   accessLog: process.env.NGINX_ACCESS_LOG || "/var/log/nginx/access.log",
   errorLog: process.env.NGINX_ERROR_LOG || "/var/log/nginx/error.log",
   logTailLines: Number(process.env.LOG_TAIL_LINES || 80),
-  trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data,/gtm.js,/gtag/js,/service_worker"),
+  trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data"),
   sslCertPath: process.env.SSL_CERT_PATH || "",
   sslDomain: process.env.SSL_DOMAIN || "",
   sslPort: Number(process.env.SSL_PORT || 443)
