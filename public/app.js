@@ -499,6 +499,24 @@ function canonicalEventName(name) {
   return name || "Other";
 }
 
+function todayEventStats(data) {
+  const summary = data.nginx?.todayEvents;
+  if (!summary?.available || !Array.isArray(summary.events)) return null;
+
+  return summary.events.reduce((stats, item) => {
+    stats.set(canonicalEventName(item.name), {
+      count: Number(item.count) || 0,
+      errors: Number(item.errors) || 0,
+      lastSeen: item.lastSeen ? new Date(item.lastSeen) : null
+    });
+    return stats;
+  }, new Map());
+}
+
+function reliableEventStats(data) {
+  return todayEventStats(data) || eventStats(trackingEvents(data));
+}
+
 function eventStats(items) {
   return items.reduce((stats, item) => {
     const key = canonicalEventName(item.eventName);
@@ -523,7 +541,7 @@ function relativeTime(date) {
 
 function renderEventHealth(data) {
   const required = ["PageView", "ViewItem", "AddToCart", "BeginCheckout", "Purchase"];
-  const stats = eventStats(trackingEvents(data));
+  const stats = reliableEventStats(data);
   els.logModeBadge.textContent = data.config?.usingDedicatedLogs ? "Dedicated log" : "Shared log";
 
   els.eventHealthGrid.replaceChildren(
@@ -562,8 +580,7 @@ function renderEventHealth(data) {
 }
 
 function collectAlerts(data) {
-  const items = trackingEvents(data);
-  const stats = eventStats(items);
+  const stats = reliableEventStats(data);
   const alerts = [];
 
   if (!data.config?.usingDedicatedLogs) {
@@ -644,18 +661,13 @@ function renderDashboard(data) {
     els.sslDetail.textContent = text(data.ssl.detail, data.ssl.message);
   }
 
-  const accessItems = trackingEvents(data);
-  const eventCounts = accessItems.reduce((counts, item) => {
-    const key = item.eventName || item.primary || "Other";
-    counts.set(key, (counts.get(key) || 0) + 1);
-    return counts;
-  }, new Map());
-  const topEvents = [...eventCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
+  const stats = reliableEventStats(data);
+  const topEvents = [...stats.entries()]
+    .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 4)
     .map(([label, value]) => ({
       label,
-      value: value.toLocaleString(),
+      value: value.count.toLocaleString(),
       status: label.includes("Blocked") || label.includes("Rejected") ? "warning" : "healthy"
     }));
   renderSummaryList(

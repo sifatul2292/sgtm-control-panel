@@ -505,11 +505,140 @@ function isTrackingLogLine(line) {
   return config.trackingPaths.some((prefix) => path.startsWith(prefix.toLowerCase()));
 }
 
-async function countRequestsToday(pathname) {
+function normalizeEventName(value) {
+  const compact = String(value || "")
+    .trim()
+    .replace(/[-_\s]+/g, "")
+    .toLowerCase();
+  const names = {
+    pageview: "PageView",
+    page_view: "PageView",
+    viewcontent: "ViewItem",
+    viewitem: "ViewItem",
+    viewcart: "ViewCart",
+    productview: "ViewItem",
+    addtocart: "AddToCart",
+    initiatecheckout: "BeginCheckout",
+    begincheckout: "BeginCheckout",
+    checkout: "BeginCheckout",
+    purchase: "Purchase",
+    ordercomplete: "Purchase",
+    lead: "Lead",
+    signup: "Lead",
+    search: "Search",
+    scriptload: "ScriptLoad"
+  };
+  return names[compact] || "";
+}
+
+function queryEventName(pathname) {
+  try {
+    const parsed = new URL(pathname, "https://sgtm.local");
+    for (const key of ["event", "event_name", "en", "e", "action", "type", "name"]) {
+      const eventName = normalizeEventName(parsed.searchParams.get(key));
+      if (eventName) return eventName;
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function inferEventName(pathname, method, status) {
+  let raw = String(pathname || "").toLowerCase();
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    // Keep the raw URL when a bot or malformed client sends broken encoding.
+  }
+  const queryEvent = queryEventName(pathname);
+  const blocked = Number(status) >= 400;
+
+  if (queryEvent) return queryEvent;
+
+  const checks = [
+    ["Purchase", ["purchase", "order", "thank_you", "payment_success", "complete"]],
+    ["BeginCheckout", ["checkout", "initiate_checkout", "begin_checkout"]],
+    ["AddToCart", ["add_to_cart", "addtocart", "cart/add", "add-to-cart"]],
+    ["ViewCart", ["view_cart", "viewcart", "cart"]],
+    ["ViewItem", ["view_item", "viewitem", "product", "item"]],
+    ["Lead", ["lead", "signup", "register", "subscribe"]],
+    ["Search", ["search", "query="]],
+    ["ScriptLoad", ["service_worker", "sw.js", "gtm.js", "loader", "script"]]
+  ];
+
+  for (const [name, needles] of checks) {
+    if (needles.some((needle) => raw.includes(needle))) return name;
+  }
+
+  if (method === "GET" && !blocked) return "PageView";
+  return blocked ? "Rejected Request" : "Other";
+}
+
+function inferClient(pathname, agent) {
+  const lower = `${pathname || ""} ${agent || ""}`.toLowerCase();
+  if (lower.includes("/g/collect") || lower.includes("tid=g-") || lower.includes("gtag")) return "GA4";
+  if (lower.includes("/data") || lower.includes("data_client") || lower.includes("event=")) return "Data Client";
+  if (lower.includes("meta") || lower.includes("fbp") || lower.includes("facebook")) return "Meta";
+  if (lower.includes("tiktok") || lower.includes("ttclid")) return "TikTok";
+  return "Other";
+}
+
+function parseNginxLogDate(value) {
+  const match = String(value || "").match(/^(\d{2})\/([A-Za-z]{3})\/(\d{4}):(\d{2}):(\d{2}):(\d{2}) ([+-]\d{4})$/);
+  if (!match) return null;
+  const [, day, month, year, hour, minute, second, zone] = match;
+  const months = {
+    Jan: "01",
+    Feb: "02",
+    Mar: "03",
+    Apr: "04",
+    May: "05",
+    Jun: "06",
+    Jul: "07",
+    Aug: "08",
+    Sep: "09",
+    Oct: "10",
+    Nov: "11",
+    Dec: "12"
+  };
+  const date = new Date(`${year}-${months[month]}-${day}T${hour}:${minute}:${second}${zone.slice(0, 3)}:${zone.slice(3)}`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function parseTrackingAccessLine(line) {
+  const match = String(line || "").match(/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*?) (HTTP\/[^"]+)" (\d{3}) (\S+) "([^"]*)" "([^"]*)"/);
+  if (!match) return null;
+
+  const [, , time, method, pathname, , status, , , agent] = match;
+  if (!isTrackingLogLine(line)) return null;
+
+  const date = parseNginxLogDate(time);
+  const eventName = inferEventName(pathname, method, status);
+  const client = inferClient(pathname, agent);
+  return {
+    eventName,
+    client,
+    status,
+    date,
+    path: pathname
+  };
+}
+
+function serializeSummaryMap(map) {
+  return [...map.entries()]
+    .map(([name, value]) => ({ name, ...value, lastSeen: value.lastSeen ? value.lastSeen.toISOString() : null }))
+    .sort((a, b) => b.count - a.count);
+}
+
+async function summarizeRequestsToday(pathname) {
   const token = nginxDateToken();
 
   return new Promise((resolve) => {
     let count = 0;
+    let errors = 0;
+    const events = new Map();
+    const clients = new Map();
     let settled = false;
     const stream = createReadStream(pathname, { encoding: "utf8" });
     const reader = createInterface({ input: stream, crlfDelay: Infinity });
@@ -520,36 +649,62 @@ async function countRequestsToday(pathname) {
     };
 
     reader.on("line", (line) => {
-      if (line.includes(token) && isTrackingLogLine(line)) count += 1;
+      if (!line.includes(token)) return;
+      const parsed = parseTrackingAccessLine(line);
+      if (!parsed) return;
+
+      count += 1;
+      if (Number(parsed.status) >= 400) errors += 1;
+
+      const event = events.get(parsed.eventName) || { count: 0, errors: 0, lastSeen: null };
+      event.count += 1;
+      if (Number(parsed.status) >= 400) event.errors += 1;
+      if (parsed.date && (!event.lastSeen || parsed.date > event.lastSeen)) event.lastSeen = parsed.date;
+      events.set(parsed.eventName, event);
+
+      const client = clients.get(parsed.client) || { count: 0, errors: 0, lastSeen: null };
+      client.count += 1;
+      if (Number(parsed.status) >= 400) client.errors += 1;
+      if (parsed.date && (!client.lastSeen || parsed.date > client.lastSeen)) client.lastSeen = parsed.date;
+      clients.set(parsed.client, client);
     });
     reader.on("close", () => {
       resolveOnce({
         available: true,
         count,
+        errors,
         token,
         path: pathname,
         filter: "tracking-only",
-        trackingPaths: config.trackingPaths
+        trackingPaths: config.trackingPaths,
+        events: serializeSummaryMap(events),
+        clients: serializeSummaryMap(clients)
       });
     });
     reader.on("error", (error) => {
       resolveOnce({
         available: false,
         count: 0,
+        errors: 0,
         token,
         path: pathname,
         message: "Request count could not be calculated.",
-        detail: error.message
+        detail: error.message,
+        events: [],
+        clients: []
       });
     });
     stream.on("error", (error) => {
       resolveOnce({
         available: false,
         count: 0,
+        errors: 0,
         token,
         path: pathname,
         message: "Request count could not be calculated.",
-        detail: error.message
+        detail: error.message,
+        events: [],
+        clients: []
       });
     });
   });
@@ -613,9 +768,9 @@ async function getSslSummary() {
 }
 
 async function getDashboardData() {
-  const [docker, requestCount, accessLog, errorLog, ssl] = await Promise.all([
+  const [docker, requestSummary, accessLog, errorLog, ssl] = await Promise.all([
     getDockerSummary(),
-    countRequestsToday(config.accessLog),
+    summarizeRequestsToday(config.accessLog),
     tailFile(config.accessLog, config.logTailLines),
     tailFile(config.errorLog, config.logTailLines),
     getSslSummary()
@@ -631,7 +786,7 @@ async function getDashboardData() {
       ? errorLog.message
       : "No recent Nginx errors matched the configured tracking host filter.";
   }
-  const alerts = buildServerAlerts({ docker, requestCount, accessLog, errorLog, ssl });
+  const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   await sendAlertHooks(alerts);
 
   return {
@@ -639,7 +794,8 @@ async function getDashboardData() {
     readOnly: true,
     docker,
     nginx: {
-      requestCountToday: requestCount,
+      requestCountToday: requestSummary,
+      todayEvents: requestSummary,
       accessLog,
       errorLog
     },
