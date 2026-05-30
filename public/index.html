@@ -24,6 +24,10 @@
             <span class="nav-icon" aria-hidden="true">≡</span>
             <span>Event Logs</span>
           </button>
+          <button class="nav-item" type="button" data-view-target="analytics" aria-label="Analytics" title="Analytics">
+            <span class="nav-icon" aria-hidden="true">⌁</span>
+            <span>Analytics</span>
+          </button>
           <button class="nav-item" type="button" data-view-target="settings" aria-label="Settings" title="Settings">
             <span class="nav-icon" aria-hidden="true">⚙</span>
             <span>Settings</span>
@@ -128,26 +132,34 @@
             <div>
               <p class="breadcrumb">Containers / Event Logs</p>
               <h2>Event Logs</h2>
-              <p>Human-readable views over recent Nginx and Docker output.</p>
+              <p>Incoming requests translated into tracking events.</p>
             </div>
             <div class="filter-row" aria-label="Log filters">
               <label>
-                Source
-                <select id="logSourceFilter">
-                  <option value="all">All logs</option>
-                  <option value="access">Visitor events</option>
-                  <option value="error">Server errors</option>
-                  <option value="docker">Docker system</option>
+                Status
+                <select id="eventStatusFilter">
+                  <option value="all">All status</option>
+                  <option value="200">200</option>
+                  <option value="300">3xx</option>
+                  <option value="400">4xx</option>
+                  <option value="500">5xx</option>
                 </select>
               </label>
               <label>
-                Status
-                <select id="logStatusFilter">
-                  <option value="all">All status</option>
-                  <option value="error">Errors</option>
-                  <option value="warn">Warnings</option>
-                  <option value="info">Info</option>
+                Event type
+                <select id="eventTypeFilter">
+                  <option value="all">All events</option>
                 </select>
+              </label>
+              <label>
+                Client
+                <select id="clientFilter">
+                  <option value="all">All clients</option>
+                </select>
+              </label>
+              <label class="filter-wide">
+                Request URL
+                <input id="requestUrlFilter" type="search" placeholder="Search URL" />
               </label>
             </div>
           </section>
@@ -155,15 +167,34 @@
           <section id="nginx" class="panel log-panel" data-log-panel="access">
             <div class="panel-header">
               <div>
-                <h2>Visitor Events</h2>
-                <p>Readable event names inferred from Nginx traffic.</p>
+                <h2>Incoming Requests</h2>
+                <p id="eventLogSummary">Waiting for access logs.</p>
               </div>
-              <span class="badge">tail</span>
+              <span class="badge">Recent sample</span>
             </div>
-            <div id="accessLog" class="log-output">Loading access log...</div>
+            <div class="event-table-wrap">
+              <table class="event-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Event type</th>
+                    <th>Client</th>
+                    <th>Request URL</th>
+                    <th>More</th>
+                  </tr>
+                </thead>
+                <tbody id="accessLog">
+                  <tr>
+                    <td colspan="6">Loading incoming requests...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
 
-          <section class="panel log-panel" data-log-panel="error">
+          <section class="split-grid">
+            <article class="panel log-panel" data-log-panel="error">
             <div class="panel-header">
               <div>
                 <h2>Nginx Errors</h2>
@@ -172,9 +203,9 @@
               <span class="badge">tail</span>
             </div>
             <div id="errorLog" class="log-output">Loading error log...</div>
-          </section>
+            </article>
 
-          <section id="docker" class="panel log-panel" data-log-panel="docker">
+            <article id="docker" class="panel log-panel" data-log-panel="docker">
             <div class="panel-header">
               <div>
                 <h2>Docker Logs</h2>
@@ -183,6 +214,70 @@
               <span id="dockerLogSource" class="badge">tail</span>
             </div>
             <div id="dockerLog" class="log-output">Loading Docker logs...</div>
+            </article>
+          </section>
+        </section>
+
+        <section id="analyticsView" class="view" data-view="analytics">
+          <section class="notice notice-soft" aria-label="Tracking quality">
+            <div>
+              <strong>Tracking analytics</strong>
+              <p>Summaries are calculated from the recent Nginx access log sample available to this dashboard.</p>
+            </div>
+            <span class="status-dot">Read only</span>
+          </section>
+
+          <section class="panel analytics-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Analytics</h2>
+                <p id="analyticsSummary">Waiting for incoming requests.</p>
+              </div>
+              <span class="badge">Recent sample</span>
+            </div>
+            <div class="analytics-layout">
+              <div class="analytics-copy">
+                <label>
+                  Period
+                  <select id="analyticsPeriod">
+                    <option>Recent log tail</option>
+                  </select>
+                </label>
+                <strong id="analyticsTotal">Total requests: --</strong>
+                <div id="analyticsLegend" class="legend-list"></div>
+              </div>
+              <div id="analyticsChart" class="chart-box" aria-label="Request chart"></div>
+            </div>
+          </section>
+
+          <section class="panel analytics-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Requests by Client</h2>
+                <p>Event totals grouped by GA4, Data Client, or other clients.</p>
+              </div>
+              <span class="badge">Event types</span>
+            </div>
+            <div class="client-analytics">
+              <div class="event-table-wrap">
+                <table class="event-table">
+                  <thead>
+                    <tr>
+                      <th>Request</th>
+                      <th>Total</th>
+                      <th>Client</th>
+                      <th>Error rate</th>
+                    </tr>
+                  </thead>
+                  <tbody id="clientBreakdown">
+                    <tr>
+                      <td colspan="4">Waiting for request data...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="clientChart" class="chart-box small-chart" aria-label="Client request chart"></div>
+            </div>
           </section>
         </section>
 
