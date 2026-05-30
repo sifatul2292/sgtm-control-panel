@@ -586,6 +586,10 @@ input::placeholder {
   border-collapse: collapse;
 }
 
+.compact-table td {
+  height: 48px;
+}
+
 .event-table th,
 .event-table td {
   height: 58px;

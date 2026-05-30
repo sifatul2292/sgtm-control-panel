@@ -50,6 +50,8 @@ const els = {
   analyticsLegend: document.querySelector("#analyticsLegend"),
   analyticsChart: document.querySelector("#analyticsChart"),
   hourlyTrend: document.querySelector("#hourlyTrend"),
+  historyBadge: document.querySelector("#historyBadge"),
+  dailyHistory: document.querySelector("#dailyHistory"),
   clientBreakdown: document.querySelector("#clientBreakdown"),
   clientChart: document.querySelector("#clientChart"),
   deploymentBadge: document.querySelector("#deploymentBadge"),
@@ -1191,6 +1193,40 @@ function renderClientBreakdown(items) {
   );
 }
 
+function eventTotal(rows, name) {
+  return Number((rows || []).find((item) => canonicalEventName(item.name) === name)?.count || 0);
+}
+
+function renderDailyHistory(data) {
+  const history = data.history;
+  const rows = history?.daily || [];
+  els.historyBadge.className = "badge";
+  els.historyBadge.classList.add(history?.available ? "ok" : "danger");
+  els.historyBadge.textContent = history?.available
+    ? `${rows.length} day${rows.length === 1 ? "" : "s"}`
+    : "Unavailable";
+
+  if (!rows.length) {
+    els.dailyHistory.innerHTML = '<tr><td colspan="6">No persisted history yet.</td></tr>';
+    return;
+  }
+
+  els.dailyHistory.replaceChildren(
+    ...rows.slice(0, 30).map((item) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${escapeHtml(item.date)}</td>
+        <td>${Number(item.total || 0).toLocaleString()}</td>
+        <td>${eventTotal(item.events, "Purchase").toLocaleString()}</td>
+        <td>${Number(item.errors || 0).toLocaleString()}</td>
+        <td>${Number(item.noise || 0).toLocaleString()}</td>
+        <td>${escapeHtml(formatShortDate(item.updatedAt))}</td>
+      `;
+      return row;
+    })
+  );
+}
+
 function renderAnalytics(data) {
   const summary = data.nginx?.todayEvents;
   if (summary?.available) {
@@ -1219,6 +1255,7 @@ function renderAnalytics(data) {
     renderLegendRows(eventRows);
     renderBarChart(els.analyticsChart, eventRows);
     renderHourlyTrend(data);
+    renderDailyHistory(data);
     renderClientSummaryRows(clientRows);
     renderBarChart(els.clientChart, clientRows);
     return;
@@ -1234,6 +1271,7 @@ function renderAnalytics(data) {
   renderLegend(counts);
   renderChart(els.analyticsChart, items);
   renderHourlyTrend(data);
+  renderDailyHistory(data);
   renderClientBreakdown(items);
   renderChart(els.clientChart, items.filter((item) => Number(item.status) < 400 || errors === items.length), "client");
 }
@@ -1247,6 +1285,8 @@ function renderSettings(data) {
     ["SSL source", data.ssl?.source || data.config?.sslDomain || "Not configured"],
     ["Log tail lines", data.config?.logTailLines],
     ["Event log limit", data.config?.eventLogLimit],
+    ["Data directory", data.config?.dataDir],
+    ["History retention", `${text(data.config?.historyRetentionDays, "0")} days`],
     ["Dedicated logs", data.config?.usingDedicatedLogs ? "Enabled" : "Not enabled"],
     ["Alert webhook", data.config?.alertWebhookEnabled ? "Enabled" : "Disabled"]
   ];
@@ -1274,6 +1314,8 @@ function renderDeployment(data) {
     ["SGTM_ACCESS_LOG", "/var/log/nginx/sgtm-access.log"],
     ["SGTM_ERROR_LOG", "/var/log/nginx/sgtm-error.log"],
     ["EVENT_LOG_LIMIT", text(data.config?.eventLogLimit, "500")],
+    ["DATA_DIR", text(data.config?.dataDir, "/var/www/sgtm-control-panel/data")],
+    ["HISTORY_RETENTION_DAYS", text(data.config?.historyRetentionDays, "90")],
     ["TRACKING_HOSTS", (data.config?.trackingHosts || []).join(",") || "sgtm.shobaz.com,server.shobaz.com,shobaz.com"],
     ["AUTH_ENABLED", "true"],
     ["AUTH_SECRET", "openssl rand -hex 32"]

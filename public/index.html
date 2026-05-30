@@ -366,6 +366,35 @@
           <section class="panel analytics-panel">
             <div class="panel-header">
               <div>
+                <h2>Daily History</h2>
+                <p>Persisted summaries kept across restarts for longer-term reporting.</p>
+              </div>
+              <span id="historyBadge" class="badge">Database</span>
+            </div>
+            <div class="event-table-wrap">
+              <table class="event-table compact-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Requests</th>
+                    <th>Purchases</th>
+                    <th>Errors</th>
+                    <th>Noise</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody id="dailyHistory">
+                  <tr>
+                    <td colspan="6">Waiting for history...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel analytics-panel">
+            <div class="panel-header">
+              <div>
                 <h2>Requests by Client</h2>
                 <p>Event totals grouped by GA4, Data Client, or other clients.</p>
               </div>

@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -20,6 +20,8 @@ const config = {
   usingDedicatedLogs: Boolean(process.env.SGTM_ACCESS_LOG || process.env.SGTM_ERROR_LOG),
   logTailLines: Number(process.env.LOG_TAIL_LINES || 80),
   eventLogLimit: Number(process.env.EVENT_LOG_LIMIT || 500),
+  dataDir: process.env.DATA_DIR ? resolve(rootDir, normalize(process.env.DATA_DIR)) : join(rootDir, "data"),
+  historyRetentionDays: Number(process.env.HISTORY_RETENTION_DAYS || 90),
   trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data"),
   trackingHosts: parseCsv(process.env.TRACKING_HOSTS || inferHostFromCertPath(process.env.SSL_CERT_PATH || "") || process.env.SSL_DOMAIN || ""),
   dockerLogExclude: parseCsv(process.env.DOCKER_LOG_EXCLUDE || "Sending aggregate usage beacon,googletagmanager.com/sgtm/a"),
@@ -36,6 +38,7 @@ const config = {
 
 const authSecret = config.authSecret || config.authPassword || randomBytes(32).toString("hex");
 const alertMemory = new Map();
+const databasePath = join(config.dataDir, "history.json");
 
 function parseCsv(value) {
   return String(value || "")
@@ -499,6 +502,13 @@ function nginxDateToken(date = new Date()) {
   return `${day}/${month}/${year}`;
 }
 
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function isTrackingLogLine(line) {
   const request = String(line || "").match(/"([A-Z]+)\s+([^"]+?)\s+HTTP\/[^"]+"/);
   if (!request) return false;
@@ -723,6 +733,105 @@ function serializeEventRow(item) {
   };
 }
 
+async function readDatabase() {
+  try {
+    const content = await readFile(databasePath, "utf8");
+    const parsed = JSON.parse(content);
+    return {
+      available: true,
+      path: databasePath,
+      data: {
+        version: 1,
+        daily: {},
+        ...parsed,
+        daily: parsed.daily || {}
+      }
+    };
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return { available: true, path: databasePath, data: { version: 1, daily: {} } };
+    }
+    return {
+      available: false,
+      path: databasePath,
+      message: "Summary database could not be read.",
+      detail: error.message,
+      data: { version: 1, daily: {} }
+    };
+  }
+}
+
+async function writeDatabase(data) {
+  await mkdir(config.dataDir, { recursive: true });
+  const tempPath = `${databasePath}.${Date.now()}.tmp`;
+  await writeFile(tempPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  await rename(tempPath, databasePath);
+}
+
+function pruneDailyHistory(daily) {
+  const keys = Object.keys(daily).sort().reverse();
+  const keep = new Set(keys.slice(0, config.historyRetentionDays));
+  for (const key of keys) {
+    if (!keep.has(key)) delete daily[key];
+  }
+}
+
+function topRows(rows, limit = 12) {
+  return (rows || []).slice(0, limit).map((item) => ({ ...item }));
+}
+
+async function persistDailySummary(summary) {
+  const loaded = await readDatabase();
+  if (!loaded.available || !summary.available) {
+    return {
+      available: loaded.available,
+      path: databasePath,
+      message: loaded.message || "Summary database is available.",
+      detail: loaded.detail || "",
+      daily: Object.values(loaded.data.daily || {}).sort((a, b) => b.date.localeCompare(a.date))
+    };
+  }
+
+  const data = loaded.data;
+  const today = localDateKey();
+  const purchases = (summary.recentEvents || []).filter((item) => item.eventName === "Purchase").slice(0, 50);
+  data.daily[today] = {
+    date: today,
+    token: summary.token,
+    updatedAt: new Date().toISOString(),
+    total: summary.count,
+    errors: summary.errors,
+    totalLines: summary.totalLines,
+    noise: summary.noise,
+    botNoise: summary.botNoise,
+    events: topRows(summary.events),
+    clients: topRows(summary.clients),
+    hosts: topRows(summary.hosts),
+    noiseReasons: topRows(summary.noiseReasons),
+    hourly: summary.hourly || [],
+    purchases
+  };
+  pruneDailyHistory(data.daily);
+
+  try {
+    await writeDatabase(data);
+    return {
+      available: true,
+      path: databasePath,
+      retentionDays: config.historyRetentionDays,
+      daily: Object.values(data.daily).sort((a, b) => b.date.localeCompare(a.date))
+    };
+  } catch (error) {
+    return {
+      available: false,
+      path: databasePath,
+      message: "Summary database could not be written.",
+      detail: error.message,
+      daily: Object.values(data.daily).sort((a, b) => b.date.localeCompare(a.date))
+    };
+  }
+}
+
 async function summarizeRequestsToday(pathname) {
   const token = nginxDateToken();
 
@@ -916,7 +1025,7 @@ async function getSslSummary() {
   return unavailable("Set SSL_CERT_PATH or SSL_DOMAIN to enable SSL expiry checks.");
 }
 
-function buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl }) {
+function buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database }) {
   return [
     {
       label: "Panel bind",
@@ -959,6 +1068,11 @@ function buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ss
       status: requestSummary.available && requestSummary.count > 0 ? "healthy" : "warning"
     },
     {
+      label: "Summary database",
+      value: database.available ? "Persisting history" : "Write failed",
+      status: database.available ? "healthy" : "error"
+    },
+    {
       label: "Host field",
       value: requestSummary.hosts?.some((host) => host.name !== "Unknown host") ? "Detected" : "Missing from logs",
       status: !requestSummary.count || requestSummary.hosts?.some((host) => host.name !== "Unknown host") ? "healthy" : "warning"
@@ -985,8 +1099,9 @@ async function getDashboardData() {
       ? errorLog.message
       : "No recent Nginx errors matched the configured tracking host filter.";
   }
+  const history = await persistDailySummary(requestSummary);
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
-  const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl });
+  const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
   await sendAlertHooks(alerts);
 
   return {
@@ -1002,6 +1117,7 @@ async function getDashboardData() {
     dockerLogs,
     alerts,
     deploymentChecks,
+    history,
     ssl,
     config: {
       host: config.host,
@@ -1011,6 +1127,8 @@ async function getDashboardData() {
       usingDedicatedLogs: config.usingDedicatedLogs,
       logTailLines: config.logTailLines,
       eventLogLimit: config.eventLogLimit,
+      dataDir: config.dataDir,
+      historyRetentionDays: config.historyRetentionDays,
       trackingPaths: config.trackingPaths,
       trackingHosts: config.trackingHosts,
       alertWebhookEnabled: Boolean(config.alertWebhookUrl),
