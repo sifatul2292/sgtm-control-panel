@@ -529,6 +529,52 @@ input::placeholder {
   width: 100%;
 }
 
+.inspector-tools {
+  padding: var(--space-md);
+  border-top: var(--rule-thin) solid var(--color-line);
+}
+
+.inspector-tools input {
+  width: min(520px, 100%);
+}
+
+.inspector-list {
+  display: grid;
+  gap: var(--space-sm);
+  padding: 0 var(--space-md) var(--space-md);
+}
+
+.inspector-card {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.inspector-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.inspector-grid {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: var(--space-xs) var(--space-md);
+}
+
+.inspector-grid span {
+  color: var(--color-muted);
+  font-weight: 800;
+}
+
+.inspector-grid strong {
+  overflow-wrap: anywhere;
+}
+
 .event-table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -706,6 +752,68 @@ input::placeholder {
 
 .small-chart {
   min-height: 320px;
+}
+
+.trend-chart {
+  min-height: 300px;
+  place-items: stretch;
+}
+
+.hourly-chart {
+  width: 100%;
+  min-height: 280px;
+  display: grid;
+  grid-template-columns: repeat(24, minmax(14px, 1fr));
+  align-items: end;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+}
+
+.hourly-column {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(180px, 1fr) 18px;
+  gap: var(--space-xs);
+  align-items: end;
+}
+
+.hourly-bars {
+  position: relative;
+  height: 100%;
+  min-height: 180px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklch, var(--color-line), transparent 55%);
+  overflow: hidden;
+}
+
+.hourly-bars span {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+}
+
+.hourly-total {
+  background: color-mix(in oklch, var(--color-ok), transparent 25%);
+}
+
+.hourly-errors {
+  width: 55% !important;
+  background: var(--color-danger);
+}
+
+.hourly-purchases {
+  width: 28% !important;
+  background: var(--color-accent);
+}
+
+.hourly-column small {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  text-align: center;
 }
 
 .analytics-svg {

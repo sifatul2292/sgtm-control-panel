@@ -25,6 +25,10 @@ const els = {
   hostBadge: document.querySelector("#hostBadge"),
   qualityChecks: document.querySelector("#qualityChecks"),
   qualityBadge: document.querySelector("#qualityBadge"),
+  noiseSummary: document.querySelector("#noiseSummary"),
+  noiseBadge: document.querySelector("#noiseBadge"),
+  latestPurchase: document.querySelector("#latestPurchase"),
+  purchaseBadge: document.querySelector("#purchaseBadge"),
   logModeBadge: document.querySelector("#logModeBadge"),
   accessLog: document.querySelector("#accessLog"),
   errorLog: document.querySelector("#errorLog"),
@@ -37,20 +41,28 @@ const els = {
   eventTypeFilter: document.querySelector("#eventTypeFilter"),
   clientFilter: document.querySelector("#clientFilter"),
   requestUrlFilter: document.querySelector("#requestUrlFilter"),
+  purchaseSearch: document.querySelector("#purchaseSearch"),
+  purchaseInspector: document.querySelector("#purchaseInspector"),
+  purchaseInspectorBadge: document.querySelector("#purchaseInspectorBadge"),
   analyticsSummary: document.querySelector("#analyticsSummary"),
   analyticsTotal: document.querySelector("#analyticsTotal"),
   analyticsModeBadge: document.querySelector("#analyticsModeBadge"),
   analyticsLegend: document.querySelector("#analyticsLegend"),
   analyticsChart: document.querySelector("#analyticsChart"),
+  hourlyTrend: document.querySelector("#hourlyTrend"),
   clientBreakdown: document.querySelector("#clientBreakdown"),
-  clientChart: document.querySelector("#clientChart")
+  clientChart: document.querySelector("#clientChart"),
+  deploymentBadge: document.querySelector("#deploymentBadge"),
+  deploymentChecks: document.querySelector("#deploymentChecks"),
+  deploymentRecommendations: document.querySelector("#deploymentRecommendations")
 };
 
 const viewTitles = {
   dashboard: ["Dashboard", "Server Overview"],
   logs: ["Containers / Event Logs", "Event Logs"],
   analytics: ["Tracking / Analytics", "Analytics"],
-  settings: ["Account & Others / Settings", "Settings"]
+  settings: ["Account & Others / Settings", "Settings"],
+  deployment: ["Operations / Deployment", "Deployment Health"]
 };
 
 let latestData = null;
@@ -466,6 +478,53 @@ function renderEventRows(visibleItems, emptyMessage) {
   );
 }
 
+function renderPurchaseInspector(data) {
+  const query = els.purchaseSearch.value.trim().toLowerCase();
+  const rows = purchaseRows(data).filter((item) => {
+    const haystack = [
+      item.eventId,
+      item.transactionId,
+      item.value,
+      item.currency,
+      item.host,
+      item.path,
+      item.client
+    ].filter(Boolean).join(" ").toLowerCase();
+    return !query || haystack.includes(query);
+  });
+
+  els.purchaseInspectorBadge.className = "badge";
+  els.purchaseInspectorBadge.classList.add(rows.length ? "ok" : "warn");
+  els.purchaseInspectorBadge.textContent = `${rows.length} match${rows.length === 1 ? "" : "es"}`;
+
+  if (!rows.length) {
+    els.purchaseInspector.innerHTML = '<div class="empty-log">No purchase requests matched.</div>';
+    return;
+  }
+
+  els.purchaseInspector.replaceChildren(
+    ...rows.slice(0, 12).map((item) => {
+      const card = document.createElement("article");
+      card.className = "inspector-card";
+      card.innerHTML = `
+        <div class="inspector-card-top">
+          <strong>${escapeHtml(item.displayDate)}</strong>
+          <span class="status-code ${Number(item.status) >= 400 ? "bad" : "good"}">${escapeHtml(item.status)}</span>
+        </div>
+        <div class="inspector-grid">
+          <span>Client</span><strong>${escapeHtml(item.client || "Other")}</strong>
+          <span>Host</span><strong>${escapeHtml(item.host || "Unknown host")}</strong>
+          <span>Value</span><strong>${escapeHtml(item.value && item.currency ? `${item.value} ${item.currency}` : "Missing")}</strong>
+          <span>Event ID</span><strong>${escapeHtml(item.eventId || "Missing")}</strong>
+          <span>Transaction ID</span><strong>${escapeHtml(item.transactionId || "Missing")}</strong>
+          <span>URL</span><strong>${escapeHtml(item.path || "")}</strong>
+        </div>
+      `;
+      return card;
+    })
+  );
+}
+
 function setLog(el, log, kind) {
   if (!log?.available) {
     el.innerHTML = `<div class="empty-log">${escapeHtml(`${log?.message || "Unavailable"} ${log?.detail || ""}`.trim())}</div>`;
@@ -825,6 +884,52 @@ function renderQualityChecks(data) {
   renderSummaryList(els.qualityChecks, items);
 }
 
+function purchaseRows(data) {
+  return todayRows(data).filter((item) => canonicalEventName(item.eventName) === "Purchase");
+}
+
+function renderNoiseSummary(data) {
+  const summary = data.nginx?.todayEvents;
+  const noise = Number(summary?.noise || 0);
+  const clean = Number(summary?.count || 0);
+  const total = Number(summary?.totalLines || clean + noise);
+  const percent = total ? Math.round((noise / total) * 100) : 0;
+  const rows = [
+    { label: "Clean SGTM events", value: clean.toLocaleString(), status: clean ? "healthy" : "warning" },
+    { label: "Non-tracking traffic", value: `${noise.toLocaleString()} (${percent}%)`, status: noise ? "warning" : "healthy" },
+    { label: "Likely bot scans", value: Number(summary?.botNoise || 0).toLocaleString(), status: summary?.botNoise ? "warning" : "healthy" },
+    ...((summary?.noiseReasons || []).slice(0, 3).map((item) => ({
+      label: item.name,
+      value: Number(item.count || 0).toLocaleString(),
+      status: item.name?.includes("scan") || item.name === "Crawler" ? "warning" : "healthy"
+    })))
+  ];
+
+  els.noiseBadge.className = "badge";
+  els.noiseBadge.classList.add(noise ? "warn" : "ok");
+  els.noiseBadge.textContent = noise ? `${percent}% noise` : "Clean";
+  renderSummaryList(els.noiseSummary, rows);
+}
+
+function renderLatestPurchase(data) {
+  const latest = purchaseRows(data)[0];
+  if (!latest) {
+    els.purchaseBadge.className = "badge warn";
+    els.purchaseBadge.textContent = "No purchase";
+    renderSummaryList(els.latestPurchase, [{ label: "Purchase", value: "No purchase request found today", status: "warning" }]);
+    return;
+  }
+
+  els.purchaseBadge.className = "badge ok";
+  els.purchaseBadge.textContent = "Found";
+  renderSummaryList(els.latestPurchase, [
+    { label: "Time", value: latest.displayDate, status: "healthy" },
+    { label: "Value", value: latest.value && latest.currency ? `${latest.value} ${latest.currency}` : "Missing", status: latest.value && latest.currency ? "healthy" : "warning" },
+    { label: "ID", value: latest.eventId || latest.transactionId || "Missing", status: latest.eventId || latest.transactionId ? "healthy" : "warning" },
+    { label: "Host", value: latest.host || "Unknown host", status: latest.host && latest.host !== "Unknown host" ? "healthy" : "warning" }
+  ]);
+}
+
 function renderDashboard(data) {
   const docker = data.docker;
   const totals = docker.totals || { total: 0, running: 0, stopped: 0, unhealthy: 0 };
@@ -869,6 +974,8 @@ function renderDashboard(data) {
   renderAlerts(data);
   renderHostBreakdown(data);
   renderQualityChecks(data);
+  renderNoiseSummary(data);
+  renderLatestPurchase(data);
 }
 
 function eventCounts(items) {
@@ -1001,6 +1108,37 @@ function renderBarChart(el, rows) {
   `;
 }
 
+function renderHourlyTrend(data) {
+  const hourly = data.nginx?.todayEvents?.hourly || [];
+  const max = Math.max(1, ...hourly.map((item) => Number(item.total || 0)));
+  if (!hourly.length) {
+    els.hourlyTrend.innerHTML = '<div class="empty-log">No hourly data yet.</div>';
+    return;
+  }
+
+  els.hourlyTrend.innerHTML = `
+    <div class="hourly-chart" role="img" aria-label="Hourly event trend">
+      ${hourly.map((item) => {
+        const total = Number(item.total || 0);
+        const errors = Number(item.errors || 0);
+        const purchases = Number(item.purchases || 0);
+        const height = Math.max(3, Math.round((total / max) * 100));
+        const label = `${String(item.hour).padStart(2, "0")}:00`;
+        return `
+          <div class="hourly-column" title="${label}: ${total} events, ${errors} errors, ${purchases} purchases">
+            <div class="hourly-bars">
+              <span class="hourly-total" style="height: ${height}%"></span>
+              ${errors ? `<span class="hourly-errors" style="height: ${Math.max(3, Math.round((errors / max) * 100))}%"></span>` : ""}
+              ${purchases ? `<span class="hourly-purchases" style="height: ${Math.max(3, Math.round((purchases / max) * 100))}%"></span>` : ""}
+            </div>
+            <small>${item.hour % 3 === 0 ? escapeHtml(String(item.hour).padStart(2, "0")) : ""}</small>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function renderClientSummaryRows(rows) {
   if (!rows.length) {
     els.clientBreakdown.innerHTML = '<tr><td colspan="4">No request data available.</td></tr>';
@@ -1080,6 +1218,7 @@ function renderAnalytics(data) {
     els.analyticsTotal.textContent = `Total requests: ${summary.count.toLocaleString()}${summary.errors ? `, ${summary.errors.toLocaleString()} errors` : ""}`;
     renderLegendRows(eventRows);
     renderBarChart(els.analyticsChart, eventRows);
+    renderHourlyTrend(data);
     renderClientSummaryRows(clientRows);
     renderBarChart(els.clientChart, clientRows);
     return;
@@ -1094,6 +1233,7 @@ function renderAnalytics(data) {
   els.analyticsTotal.textContent = `Total requests: ${items.length.toLocaleString()}`;
   renderLegend(counts);
   renderChart(els.analyticsChart, items);
+  renderHourlyTrend(data);
   renderClientBreakdown(items);
   renderChart(els.clientChart, items.filter((item) => Number(item.status) < 400 || errors === items.length), "client");
 }
@@ -1121,8 +1261,37 @@ function renderSettings(data) {
   );
 }
 
+function renderDeployment(data) {
+  const checks = data.deploymentChecks || [];
+  const issues = checks.filter((item) => item.status === "warning" || item.status === "error" || item.status === "critical").length;
+  els.deploymentBadge.textContent = issues ? `${issues} issue${issues === 1 ? "" : "s"}` : "Ready";
+  els.deploymentBadge.className = `status-dot ${issues ? "warn" : ""}`;
+  renderSummaryList(els.deploymentChecks, checks.length ? checks : [{ label: "Deployment checks", value: "Unavailable", status: "warning" }]);
+
+  const recommendations = [
+    ["PORT", "3100"],
+    ["HOST", "127.0.0.1"],
+    ["SGTM_ACCESS_LOG", "/var/log/nginx/sgtm-access.log"],
+    ["SGTM_ERROR_LOG", "/var/log/nginx/sgtm-error.log"],
+    ["EVENT_LOG_LIMIT", text(data.config?.eventLogLimit, "500")],
+    ["TRACKING_HOSTS", (data.config?.trackingHosts || []).join(",") || "sgtm.shobaz.com,server.shobaz.com,shobaz.com"],
+    ["AUTH_ENABLED", "true"],
+    ["AUTH_SECRET", "openssl rand -hex 32"]
+  ];
+
+  els.deploymentRecommendations.replaceChildren(
+    ...recommendations.map(([label, value]) => {
+      const card = document.createElement("article");
+      card.className = "setting-card";
+      card.innerHTML = `<strong>${escapeHtml(label)}</strong><code>${escapeHtml(value)}</code><span>Recommended production value.</span>`;
+      return card;
+    })
+  );
+}
+
 function renderLogs(data) {
   renderEventTable(data);
+  renderPurchaseInspector(data);
   setLog(els.errorLog, data.nginx.errorLog, "error");
   setLog(els.dockerLog, data.dockerLogs, "docker");
   els.dockerLogSource.textContent = data.dockerLogs.container || "tail";
@@ -1138,6 +1307,7 @@ function renderAll(data) {
   renderLogs(data);
   renderAnalytics(data);
   renderSettings(data);
+  renderDeployment(data);
 }
 
 async function loadDashboard() {
@@ -1165,6 +1335,7 @@ els.eventStatusFilter.addEventListener("change", () => latestData && renderLogs(
 els.eventTypeFilter.addEventListener("change", () => latestData && renderLogs(latestData));
 els.clientFilter.addEventListener("change", () => latestData && renderLogs(latestData));
 els.requestUrlFilter.addEventListener("input", () => latestData && renderLogs(latestData));
+els.purchaseSearch.addEventListener("input", () => latestData && renderPurchaseInspector(latestData));
 window.addEventListener("hashchange", () => setView(window.location.hash.replace("#", "") || "dashboard"));
 
 setView(window.location.hash.replace("#", "") || "dashboard");

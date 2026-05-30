@@ -667,6 +667,34 @@ function parseTrackingAccessLine(line) {
   };
 }
 
+function parseAccessLine(line) {
+  const match = String(line || "").match(/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*?) (HTTP\/[^"]+)" (\d{3}) (\S+) "([^"]*)" "([^"]*)"/);
+  if (!match) return null;
+  const [, ip, time, method, pathname, protocol, status, bytes, referer, agent] = match;
+  return {
+    ip,
+    time,
+    method,
+    path: pathname,
+    protocol,
+    status,
+    bytes,
+    referer,
+    agent,
+    date: parseNginxLogDate(time)
+  };
+}
+
+function classifyNoise(line, parsed) {
+  const lower = `${parsed?.path || ""} ${parsed?.agent || ""} ${line || ""}`.toLowerCase();
+  if (/\.(php|env|git|bak|sql|zip)(?:[?#\s]|$)/.test(lower)) return "Bot scan";
+  if (lower.includes("wp-") || lower.includes("wordpress") || lower.includes("xmlrpc")) return "WordPress scan";
+  if (lower.includes("service_worker") || lower.includes("sw.js") || lower.includes("gtm.js")) return "Loader/script";
+  if (lower.includes("bot") || lower.includes("crawler") || lower.includes("spider")) return "Crawler";
+  if (Number(parsed?.status) >= 400) return "Rejected non-tracking";
+  return "Other non-tracking";
+}
+
 function serializeSummaryMap(map) {
   return [...map.entries()]
     .map(([name, value]) => ({ name, ...value, lastSeen: value.lastSeen ? value.lastSeen.toISOString() : null }))
@@ -701,9 +729,14 @@ async function summarizeRequestsToday(pathname) {
   return new Promise((resolve) => {
     let count = 0;
     let errors = 0;
+    let totalLines = 0;
+    let noise = 0;
+    let botNoise = 0;
     const events = new Map();
     const clients = new Map();
     const hosts = new Map();
+    const noiseReasons = new Map();
+    const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
     const recentEvents = [];
     let settled = false;
     const stream = createReadStream(pathname, { encoding: "utf8" });
@@ -716,11 +749,27 @@ async function summarizeRequestsToday(pathname) {
 
     reader.on("line", (line) => {
       if (!line.includes(token)) return;
+      totalLines += 1;
       const parsed = parseTrackingAccessLine(line);
-      if (!parsed) return;
+      if (!parsed) {
+        const generic = parseAccessLine(line);
+        const reason = classifyNoise(line, generic);
+        noise += 1;
+        if (reason.includes("scan") || reason === "Crawler") botNoise += 1;
+        const current = noiseReasons.get(reason) || { count: 0 };
+        current.count += 1;
+        noiseReasons.set(reason, current);
+        return;
+      }
 
       count += 1;
       if (Number(parsed.status) >= 400) errors += 1;
+      if (parsed.date) {
+        const bucket = hourly[parsed.date.getHours()];
+        bucket.total += 1;
+        if (Number(parsed.status) >= 400) bucket.errors += 1;
+        if (parsed.eventName === "Purchase") bucket.purchases += 1;
+      }
 
       const event = events.get(parsed.eventName) || { count: 0, errors: 0, lastSeen: null };
       event.count += 1;
@@ -749,6 +798,9 @@ async function summarizeRequestsToday(pathname) {
         available: true,
         count,
         errors,
+        totalLines,
+        noise,
+        botNoise,
         token,
         path: pathname,
         filter: "tracking-only",
@@ -756,6 +808,8 @@ async function summarizeRequestsToday(pathname) {
         events: serializeSummaryMap(events),
         clients: serializeSummaryMap(clients),
         hosts: serializeSummaryMap(hosts),
+        hourly,
+        noiseReasons: serializeSummaryMap(noiseReasons),
         recentEvents: recentEvents.reverse(),
         eventLogLimit: config.eventLogLimit
       });
@@ -765,6 +819,9 @@ async function summarizeRequestsToday(pathname) {
         available: false,
         count: 0,
         errors: 0,
+        totalLines: 0,
+        noise: 0,
+        botNoise: 0,
         token,
         path: pathname,
         message: "Request count could not be calculated.",
@@ -772,6 +829,8 @@ async function summarizeRequestsToday(pathname) {
         events: [],
         clients: [],
         hosts: [],
+        hourly: [],
+        noiseReasons: [],
         recentEvents: [],
         eventLogLimit: config.eventLogLimit
       });
@@ -781,6 +840,9 @@ async function summarizeRequestsToday(pathname) {
         available: false,
         count: 0,
         errors: 0,
+        totalLines: 0,
+        noise: 0,
+        botNoise: 0,
         token,
         path: pathname,
         message: "Request count could not be calculated.",
@@ -788,6 +850,8 @@ async function summarizeRequestsToday(pathname) {
         events: [],
         clients: [],
         hosts: [],
+        hourly: [],
+        noiseReasons: [],
         recentEvents: [],
         eventLogLimit: config.eventLogLimit
       });
@@ -852,6 +916,56 @@ async function getSslSummary() {
   return unavailable("Set SSL_CERT_PATH or SSL_DOMAIN to enable SSL expiry checks.");
 }
 
+function buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl }) {
+  return [
+    {
+      label: "Panel bind",
+      value: config.host === "127.0.0.1" ? `${config.host}:${config.port}` : `Public bind ${config.host}:${config.port}`,
+      status: config.host === "127.0.0.1" ? "healthy" : "warning"
+    },
+    {
+      label: "Authentication",
+      value: config.authEnabled && config.authPassword ? "Enabled" : "Missing",
+      status: config.authEnabled && config.authPassword ? "healthy" : "error"
+    },
+    {
+      label: "Dedicated SGTM logs",
+      value: config.usingDedicatedLogs ? "Enabled" : "Use SGTM_ACCESS_LOG",
+      status: config.usingDedicatedLogs ? "healthy" : "warning"
+    },
+    {
+      label: "Access log",
+      value: accessLog.available ? "Readable" : "Unreadable",
+      status: accessLog.available ? "healthy" : "error"
+    },
+    {
+      label: "Error log",
+      value: errorLog.available ? "Readable" : "Unreadable",
+      status: errorLog.available ? "healthy" : "error"
+    },
+    {
+      label: "Docker socket",
+      value: docker.available ? "Available" : "Unavailable",
+      status: docker.available ? "healthy" : "warning"
+    },
+    {
+      label: "SSL",
+      value: ssl.available ? `${ssl.daysRemaining} days remaining` : "Not configured",
+      status: ssl.available ? ssl.status : "warning"
+    },
+    {
+      label: "Tracking traffic",
+      value: requestSummary.available ? `${requestSummary.count.toLocaleString()} requests today` : "Unavailable",
+      status: requestSummary.available && requestSummary.count > 0 ? "healthy" : "warning"
+    },
+    {
+      label: "Host field",
+      value: requestSummary.hosts?.some((host) => host.name !== "Unknown host") ? "Detected" : "Missing from logs",
+      status: !requestSummary.count || requestSummary.hosts?.some((host) => host.name !== "Unknown host") ? "healthy" : "warning"
+    }
+  ];
+}
+
 async function getDashboardData() {
   const [docker, requestSummary, accessLog, errorLog, ssl] = await Promise.all([
     getDockerSummary(),
@@ -872,6 +986,7 @@ async function getDashboardData() {
       : "No recent Nginx errors matched the configured tracking host filter.";
   }
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
+  const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl });
   await sendAlertHooks(alerts);
 
   return {
@@ -886,6 +1001,7 @@ async function getDashboardData() {
     },
     dockerLogs,
     alerts,
+    deploymentChecks,
     ssl,
     config: {
       host: config.host,

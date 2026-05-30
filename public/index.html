@@ -32,6 +32,10 @@
             <span class="nav-icon" aria-hidden="true">⚙</span>
             <span>Settings</span>
           </button>
+          <button class="nav-item" type="button" data-view-target="deployment" aria-label="Deployment" title="Deployment">
+            <span class="nav-icon" aria-hidden="true">✓</span>
+            <span>Deployment</span>
+          </button>
         </nav>
 
         <div class="sidebar-group">
@@ -185,6 +189,30 @@
               <div id="runtimeChecks" class="summary-list"></div>
             </article>
           </section>
+
+          <section class="split-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Noise Filter</h2>
+                  <p>Non-tracking log traffic separated from clean SGTM events.</p>
+                </div>
+                <span id="noiseBadge" class="badge">Checking</span>
+              </div>
+              <div id="noiseSummary" class="summary-list"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Latest Purchase</h2>
+                  <p>Most recent purchase request and its key metadata.</p>
+                </div>
+                <span id="purchaseBadge" class="badge">Checking</span>
+              </div>
+              <div id="latestPurchase" class="summary-list"></div>
+            </article>
+          </section>
         </section>
 
         <section id="logsView" class="view" data-view="logs">
@@ -253,6 +281,20 @@
             </div>
           </section>
 
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Purchase Inspector</h2>
+                <p>Search recent purchase requests by event ID, transaction ID, value, URL, or host.</p>
+              </div>
+              <span id="purchaseInspectorBadge" class="badge">Recent purchases</span>
+            </div>
+            <div class="inspector-tools">
+              <input id="purchaseSearch" type="search" placeholder="Search purchase metadata" />
+            </div>
+            <div id="purchaseInspector" class="inspector-list"></div>
+          </section>
+
           <section class="split-grid">
             <article class="panel log-panel" data-log-panel="error">
             <div class="panel-header">
@@ -308,6 +350,17 @@
               </div>
               <div id="analyticsChart" class="chart-box" aria-label="Request chart"></div>
             </div>
+          </section>
+
+          <section class="panel analytics-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Hourly Trend</h2>
+                <p>Clean SGTM events by hour, with errors and purchases separated.</p>
+              </div>
+              <span class="badge">Today</span>
+            </div>
+            <div id="hourlyTrend" class="chart-box trend-chart" aria-label="Hourly tracking trend"></div>
           </section>
 
           <section class="panel analytics-panel">
@@ -374,6 +427,36 @@
                 <span>Add authentication before exposing server logs on a public domain.</span>
               </article>
             </div>
+          </section>
+        </section>
+
+        <section id="deploymentView" class="view" data-view="deployment">
+          <section class="notice notice-soft" aria-label="Deployment health">
+            <div>
+              <strong>Deployment Health</strong>
+              <p>Read-only checklist for panel security, Nginx logging, Docker access, SSL, and tracking visibility.</p>
+            </div>
+            <span id="deploymentBadge" class="status-dot">Checking</span>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Deployment Checklist</h2>
+                <p>Things that should be green before trusting production data.</p>
+              </div>
+            </div>
+            <div id="deploymentChecks" class="summary-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Recommended VPS Settings</h2>
+                <p>Keep these values in `.env` and Nginx for clean SGTM monitoring.</p>
+              </div>
+            </div>
+            <div id="deploymentRecommendations" class="settings-grid"></div>
           </section>
         </section>
       </main>
