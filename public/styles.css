@@ -385,7 +385,9 @@ h2 {
 
 .summary-list,
 .settings-grid,
-.note-list {
+.note-list,
+.health-grid,
+.funnel-list {
   display: grid;
   gap: var(--space-sm);
   padding: var(--space-md);
@@ -408,6 +410,69 @@ h2 {
 .setting-card strong,
 .note-list strong {
   color: var(--color-text);
+}
+
+.health-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.health-card {
+  display: grid;
+  gap: var(--space-xs);
+  min-height: 112px;
+  padding: var(--space-md);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.health-card span,
+.health-card small,
+.funnel-row span {
+  color: var(--color-muted);
+}
+
+.health-card strong {
+  font-size: var(--text-xl);
+}
+
+.health-card.healthy {
+  border-color: color-mix(in oklch, var(--color-ok), transparent 55%);
+}
+
+.health-card.warning {
+  border-color: color-mix(in oklch, var(--color-warn), transparent 55%);
+}
+
+.funnel-row {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.funnel-row > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.funnel-meter {
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+}
+
+.funnel-meter span {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  border-radius: inherit;
+  background: var(--color-accent);
 }
 
 .logs-hero {
@@ -774,6 +839,7 @@ input::placeholder {
   .metrics-grid,
   .split-grid,
   .settings-grid,
+  .health-grid,
   .analytics-layout,
   .client-analytics {
     grid-template-columns: 1fr;

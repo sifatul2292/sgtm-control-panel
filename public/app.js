@@ -17,6 +17,11 @@ const els = {
   containerCards: document.querySelector("#containerCards"),
   trafficSummary: document.querySelector("#trafficSummary"),
   runtimeChecks: document.querySelector("#runtimeChecks"),
+  eventHealthGrid: document.querySelector("#eventHealthGrid"),
+  funnelList: document.querySelector("#funnelList"),
+  alertList: document.querySelector("#alertList"),
+  alertBadge: document.querySelector("#alertBadge"),
+  logModeBadge: document.querySelector("#logModeBadge"),
   accessLog: document.querySelector("#accessLog"),
   errorLog: document.querySelector("#errorLog"),
   dockerLog: document.querySelector("#dockerLog"),
@@ -485,6 +490,140 @@ function renderSummaryList(el, items) {
   );
 }
 
+function trackingEvents(data) {
+  return parseLogLines(data.nginx.accessLog, "access").filter((item) => item.tracking);
+}
+
+function canonicalEventName(name) {
+  if (name === "ViewContent") return "ViewItem";
+  return name || "Other";
+}
+
+function eventStats(items) {
+  return items.reduce((stats, item) => {
+    const key = canonicalEventName(item.eventName);
+    const current = stats.get(key) || { count: 0, lastSeen: null };
+    current.count += 1;
+    if (item.date && (!current.lastSeen || item.date > current.lastSeen)) current.lastSeen = item.date;
+    stats.set(key, current);
+    return stats;
+  }, new Map());
+}
+
+function relativeTime(date) {
+  if (!date) return "Not seen";
+  const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+function renderEventHealth(data) {
+  const required = ["PageView", "ViewItem", "AddToCart", "BeginCheckout", "Purchase"];
+  const stats = eventStats(trackingEvents(data));
+  els.logModeBadge.textContent = data.config?.usingDedicatedLogs ? "Dedicated log" : "Shared log";
+
+  els.eventHealthGrid.replaceChildren(
+    ...required.map((name) => {
+      const stat = stats.get(name) || { count: 0, lastSeen: null };
+      const card = document.createElement("article");
+      card.className = `health-card ${stat.count ? "healthy" : "warning"}`;
+      card.innerHTML = `
+        <span>${escapeHtml(name)}</span>
+        <strong>${stat.count.toLocaleString()}</strong>
+        <small>${escapeHtml(relativeTime(stat.lastSeen))}</small>
+      `;
+      return card;
+    })
+  );
+
+  const base = Math.max(1, stats.get("PageView")?.count || 0);
+  els.funnelList.replaceChildren(
+    ...required.map((name) => {
+      const count = stats.get(name)?.count || 0;
+      const percent = Math.min(100, Math.round((count / base) * 100));
+      const row = document.createElement("article");
+      row.className = "funnel-row";
+      row.innerHTML = `
+        <div>
+          <strong>${escapeHtml(name)}</strong>
+          <span>${count.toLocaleString()} events</span>
+        </div>
+        <div class="funnel-meter" aria-label="${escapeHtml(name)} ${percent}%">
+          <span style="width: ${percent}%"></span>
+        </div>
+      `;
+      return row;
+    })
+  );
+}
+
+function collectAlerts(data) {
+  const items = trackingEvents(data);
+  const stats = eventStats(items);
+  const alerts = [];
+
+  if (!data.config?.usingDedicatedLogs) {
+    alerts.push({
+      label: "Shared Nginx log",
+      value: "Use SGTM_ACCESS_LOG for cleaner data",
+      status: "warning"
+    });
+  }
+  if (!data.docker.available || data.docker.totals?.unhealthy) {
+    alerts.push({
+      label: "Docker",
+      value: data.docker.available ? "Unhealthy container found" : "Docker unavailable",
+      status: "error"
+    });
+  }
+  if (data.ssl.available && data.ssl.daysRemaining <= 14) {
+    alerts.push({
+      label: "SSL",
+      value: `${data.ssl.daysRemaining} days remaining`,
+      status: data.ssl.daysRemaining <= 7 ? "error" : "warning"
+    });
+  }
+  if (!stats.get("PageView")?.count) {
+    alerts.push({
+      label: "PageView",
+      value: "No recent PageView event",
+      status: "warning"
+    });
+  }
+  if (stats.get("AddToCart")?.count && !stats.get("BeginCheckout")?.count) {
+    alerts.push({
+      label: "Checkout",
+      value: "AddToCart seen, BeginCheckout missing",
+      status: "warning"
+    });
+  }
+  if (stats.get("BeginCheckout")?.count && !stats.get("Purchase")?.count) {
+    alerts.push({
+      label: "Purchase",
+      value: "BeginCheckout seen, Purchase missing",
+      status: "warning"
+    });
+  }
+
+  return alerts;
+}
+
+function renderAlerts(data) {
+  const alerts = collectAlerts(data);
+  const hasError = alerts.some((alert) => alert.status === "error");
+  els.alertBadge.className = "badge";
+  els.alertBadge.classList.add(hasError ? "danger" : alerts.length ? "warn" : "ok");
+  els.alertBadge.textContent = alerts.length ? `${alerts.length} issue${alerts.length === 1 ? "" : "s"}` : "Clear";
+  renderSummaryList(
+    els.alertList,
+    alerts.length ? alerts : [{ label: "Tracking health", value: "No immediate issues", status: "healthy" }]
+  );
+}
+
 function renderDashboard(data) {
   const docker = data.docker;
   const totals = docker.totals || { total: 0, running: 0, stopped: 0, unhealthy: 0 };
@@ -505,7 +644,7 @@ function renderDashboard(data) {
     els.sslDetail.textContent = text(data.ssl.detail, data.ssl.message);
   }
 
-  const accessItems = parseLogLines(data.nginx.accessLog, "access").filter((item) => item.tracking);
+  const accessItems = trackingEvents(data);
   const eventCounts = accessItems.reduce((counts, item) => {
     const key = item.eventName || item.primary || "Other";
     counts.set(key, (counts.get(key) || 0) + 1);
@@ -530,6 +669,8 @@ function renderDashboard(data) {
     { label: "Nginx error log", value: data.nginx.errorLog.available ? "Readable" : "Blocked", status: data.nginx.errorLog.available ? "healthy" : "error" },
     { label: "SSL check", value: data.ssl.available ? "Configured" : "Missing", status: data.ssl.available ? "healthy" : "warning" }
   ]);
+  renderEventHealth(data);
+  renderAlerts(data);
 }
 
 function eventCounts(items) {
@@ -655,7 +796,7 @@ function renderClientBreakdown(items) {
 }
 
 function renderAnalytics(data) {
-  const items = parseLogLines(data.nginx.accessLog, "access").filter((item) => item.tracking);
+  const items = trackingEvents(data);
   const errors = items.filter((item) => Number(item.status) >= 400).length;
   const counts = eventCounts(items);
   const clients = clientCounts(items);
@@ -674,7 +815,9 @@ function renderSettings(data) {
     ["Nginx access log", data.config?.accessLog],
     ["Nginx error log", data.config?.errorLog],
     ["SSL source", data.ssl?.source || data.config?.sslDomain || "Not configured"],
-    ["Log tail lines", data.config?.logTailLines]
+    ["Log tail lines", data.config?.logTailLines],
+    ["Dedicated logs", data.config?.usingDedicatedLogs ? "Enabled" : "Not enabled"],
+    ["Alert webhook", data.config?.alertWebhookEnabled ? "Enabled" : "Disabled"]
   ];
 
   els.settingsGrid.replaceChildren(

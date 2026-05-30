@@ -15,8 +15,9 @@ await loadDotEnv(join(rootDir, ".env"));
 const config = {
   host: process.env.HOST || "127.0.0.1",
   port: Number(process.env.PORT || 3000),
-  accessLog: process.env.NGINX_ACCESS_LOG || "/var/log/nginx/access.log",
-  errorLog: process.env.NGINX_ERROR_LOG || "/var/log/nginx/error.log",
+  accessLog: process.env.SGTM_ACCESS_LOG || process.env.NGINX_ACCESS_LOG || "/var/log/nginx/access.log",
+  errorLog: process.env.SGTM_ERROR_LOG || process.env.NGINX_ERROR_LOG || "/var/log/nginx/error.log",
+  usingDedicatedLogs: Boolean(process.env.SGTM_ACCESS_LOG || process.env.SGTM_ERROR_LOG),
   logTailLines: Number(process.env.LOG_TAIL_LINES || 80),
   trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data"),
   trackingHosts: parseCsv(process.env.TRACKING_HOSTS || inferHostFromCertPath(process.env.SSL_CERT_PATH || "") || process.env.SSL_DOMAIN || ""),
@@ -25,12 +26,15 @@ const config = {
   authUsername: process.env.AUTH_USERNAME || "admin",
   authPassword: process.env.AUTH_PASSWORD || "",
   authSecret: process.env.AUTH_SECRET || "",
+  alertWebhookUrl: process.env.ALERT_WEBHOOK_URL || "",
+  alertMinIntervalMinutes: Number(process.env.ALERT_MIN_INTERVAL_MINUTES || 60),
   sslCertPath: process.env.SSL_CERT_PATH || "",
   sslDomain: process.env.SSL_DOMAIN || "",
   sslPort: Number(process.env.SSL_PORT || 443)
 };
 
 const authSecret = config.authSecret || config.authPassword || randomBytes(32).toString("hex");
+const alertMemory = new Map();
 
 function parseCsv(value) {
   return String(value || "")
@@ -260,6 +264,65 @@ function runWithInput(commandName, args, input) {
 
 function unavailable(message, detail = "") {
   return { available: false, message, detail };
+}
+
+function buildServerAlerts({ docker, requestCount, accessLog, errorLog, ssl }) {
+  const alerts = [];
+  if (!docker.available) {
+    alerts.push({ key: "docker-unavailable", severity: "error", title: "Docker unavailable", message: docker.detail || docker.message });
+  } else if (docker.totals.unhealthy) {
+    alerts.push({ key: "docker-unhealthy", severity: "error", title: "Docker unhealthy", message: `${docker.totals.unhealthy} unhealthy container(s)` });
+  }
+  if (!accessLog.available) {
+    alerts.push({ key: "access-log-unreadable", severity: "warning", title: "Access log unreadable", message: accessLog.detail || accessLog.message });
+  }
+  if (!errorLog.available) {
+    alerts.push({ key: "error-log-unreadable", severity: "warning", title: "Error log unreadable", message: errorLog.detail || errorLog.message });
+  }
+  if (ssl.available && ssl.daysRemaining <= 14) {
+    alerts.push({
+      key: "ssl-expiring",
+      severity: ssl.daysRemaining <= 7 ? "error" : "warning",
+      title: "SSL expiring soon",
+      message: `${ssl.daysRemaining} day(s) remaining`
+    });
+  }
+  if (requestCount.available && requestCount.count === 0) {
+    alerts.push({
+      key: "no-tracking-requests",
+      severity: "warning",
+      title: "No tracking requests today",
+      message: "No SGTM collection requests matched the configured tracking paths."
+    });
+  }
+  return alerts;
+}
+
+async function sendAlertHooks(alerts) {
+  if (!config.alertWebhookUrl || !alerts.length) return;
+  const now = Date.now();
+  const interval = config.alertMinIntervalMinutes * 60 * 1000;
+  const due = alerts.filter((alert) => {
+    const last = alertMemory.get(alert.key) || 0;
+    if (now - last < interval) return false;
+    alertMemory.set(alert.key, now);
+    return true;
+  });
+  if (!due.length) return;
+
+  try {
+    await fetch(config.alertWebhookUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        source: "sgtm-control-panel",
+        generatedAt: new Date().toISOString(),
+        alerts: due
+      })
+    });
+  } catch {
+    // Alert hooks must never break dashboard loading.
+  }
 }
 
 async function getDockerSummary() {
@@ -568,6 +631,8 @@ async function getDashboardData() {
       ? errorLog.message
       : "No recent Nginx errors matched the configured tracking host filter.";
   }
+  const alerts = buildServerAlerts({ docker, requestCount, accessLog, errorLog, ssl });
+  await sendAlertHooks(alerts);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -579,15 +644,18 @@ async function getDashboardData() {
       errorLog
     },
     dockerLogs,
+    alerts,
     ssl,
     config: {
       host: config.host,
       port: config.port,
       accessLog: config.accessLog,
       errorLog: config.errorLog,
+      usingDedicatedLogs: config.usingDedicatedLogs,
       logTailLines: config.logTailLines,
       trackingPaths: config.trackingPaths,
       trackingHosts: config.trackingHosts,
+      alertWebhookEnabled: Boolean(config.alertWebhookUrl),
       sslDomain: config.sslDomain,
       sslPort: config.sslPort
     }
