@@ -175,6 +175,27 @@ function readForm(req) {
   });
 }
 
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 50000) {
+        reject(new Error("JSON body too large"));
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch {
+        reject(new Error("Invalid JSON body"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
 function loginPage(error = "") {
   return `<!doctype html>
 <html lang="en">
@@ -743,20 +764,22 @@ async function readDatabase() {
       data: {
         version: 1,
         daily: {},
+        provisioning: { requests: [] },
         ...parsed,
-        daily: parsed.daily || {}
+        daily: parsed.daily || {},
+        provisioning: parsed.provisioning || { requests: [] }
       }
     };
   } catch (error) {
     if (error.code === "ENOENT") {
-      return { available: true, path: databasePath, data: { version: 1, daily: {} } };
+      return { available: true, path: databasePath, data: { version: 1, daily: {}, provisioning: { requests: [] } } };
     }
     return {
       available: false,
       path: databasePath,
       message: "Summary database could not be read.",
       detail: error.message,
-      data: { version: 1, daily: {} }
+      data: { version: 1, daily: {}, provisioning: { requests: [] } }
     };
   }
 }
@@ -778,6 +801,126 @@ function pruneDailyHistory(daily) {
 
 function topRows(rows, limit = 12) {
   return (rows || []).slice(0, limit).map((item) => ({ ...item }));
+}
+
+function sanitizeId(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
+function validDomain(value) {
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(String(value || ""));
+}
+
+function validateProvisioningRequest(input) {
+  const errors = [];
+  const domain = String(input.domain || "").trim().toLowerCase();
+  const instanceName = sanitizeId(input.instanceName || domain.split(".")[0] || "sgtm");
+  const port = Number(input.port || 8080);
+  const containerConfig = String(input.containerConfig || "").trim();
+  const previewUrl = String(input.previewUrl || "").trim();
+  const ownerEmail = String(input.ownerEmail || "").trim();
+
+  if (!validDomain(domain)) errors.push("Enter a valid tracking subdomain.");
+  if (!instanceName) errors.push("Enter an instance name.");
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) errors.push("Port must be between 1024 and 65535.");
+  if (!containerConfig) errors.push("Container config is required before launch.");
+  if (previewUrl && !/^https?:\/\//i.test(previewUrl)) errors.push("Preview URL must start with http:// or https://.");
+  if (ownerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) errors.push("Owner email is not valid.");
+
+  return {
+    errors,
+    value: {
+      instanceName,
+      domain,
+      port,
+      containerName: sanitizeId(`sgtm-${instanceName}`),
+      ownerEmail,
+      previewUrl,
+      containerConfig,
+      notes: String(input.notes || "").trim().slice(0, 1000)
+    }
+  };
+}
+
+function provisioningPlan(request) {
+  const safeEnvPath = `/var/www/sgtm-instances/${request.instanceName}/.env`;
+  const accessLog = `/var/log/nginx/${request.instanceName}-sgtm-access.log`;
+  const errorLog = `/var/log/nginx/${request.instanceName}-sgtm-error.log`;
+  const previewLine = request.previewUrl ? `PREVIEW_SERVER_URL=${request.previewUrl}\n` : "";
+
+  return {
+    summary: [
+      `Create Docker container ${request.containerName} on 127.0.0.1:${request.port}`,
+      `Proxy ${request.domain} to the container through Nginx`,
+      `Issue SSL with certbot after DNS points to the VPS`,
+      "Keep request pending until an admin runs the plan"
+    ],
+    envPath: safeEnvPath,
+    env: `CONTAINER_CONFIG=${request.containerConfig}\n${previewLine}RUN_AS_PREVIEW_SERVER=false\nPORT=8080\n`,
+    dockerCompose: `services:\n  ${request.containerName}:\n    image: gcr.io/cloud-tagging-10302018/gtm-cloud-image:stable\n    container_name: ${request.containerName}\n    restart: unless-stopped\n    env_file:\n      - ${safeEnvPath}\n    ports:\n      - "127.0.0.1:${request.port}:8080"\n`,
+    nginx: `server {\n    listen 80;\n    server_name ${request.domain};\n\n    access_log ${accessLog} sgtm_panel;\n    error_log ${errorLog} warn;\n\n    location / {\n        proxy_pass http://127.0.0.1:${request.port};\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n}\n`,
+    commands: [
+      `sudo mkdir -p /var/www/sgtm-instances/${request.instanceName}`,
+      `sudo nano ${safeEnvPath}`,
+      `sudo nano /etc/nginx/sites-available/${request.domain}`,
+      `sudo ln -s /etc/nginx/sites-available/${request.domain} /etc/nginx/sites-enabled/${request.domain}`,
+      "sudo nginx -t",
+      "sudo systemctl reload nginx",
+      `sudo certbot --nginx -d ${request.domain}`,
+      `docker compose -f /var/www/sgtm-instances/${request.instanceName}/docker-compose.yml up -d`,
+      `curl -I https://${request.domain}/healthy`
+    ],
+    checks: [
+      { label: "DNS", value: `${request.domain} must point to the target VPS before SSL`, status: "pending" },
+      { label: "Port", value: `127.0.0.1:${request.port} reserved for ${request.containerName}`, status: "pending" },
+      { label: "SSL", value: `certbot --nginx -d ${request.domain}`, status: "pending" },
+      { label: "Health", value: `https://${request.domain}/healthy`, status: "pending" }
+    ]
+  };
+}
+
+async function addProvisioningRequest(input) {
+  const validated = validateProvisioningRequest(input);
+  if (validated.errors.length) {
+    return { ok: false, errors: validated.errors };
+  }
+
+  const loaded = await readDatabase();
+  if (!loaded.available) {
+    return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  }
+
+  const data = loaded.data;
+  data.provisioning ||= { requests: [] };
+  const request = {
+    id: `req_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
+    status: "pending_admin_approval",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...validated.value
+  };
+  request.plan = provisioningPlan(request);
+  data.provisioning.requests.unshift(request);
+  data.provisioning.requests = data.provisioning.requests.slice(0, 100);
+  await writeDatabase(data);
+  return { ok: true, request };
+}
+
+async function getProvisioningSummary() {
+  const loaded = await readDatabase();
+  const requests = loaded.data.provisioning?.requests || [];
+  return {
+    available: loaded.available,
+    path: databasePath,
+    message: loaded.message || "",
+    detail: loaded.detail || "",
+    requests
+  };
 }
 
 async function persistDailySummary(summary) {
@@ -1100,6 +1243,7 @@ async function getDashboardData() {
       : "No recent Nginx errors matched the configured tracking host filter.";
   }
   const history = await persistDailySummary(requestSummary);
+  const provisioning = await getProvisioningSummary();
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
   await sendAlertHooks(alerts);
@@ -1118,6 +1262,7 @@ async function getDashboardData() {
     alerts,
     deploymentChecks,
     history,
+    provisioning,
     ssl,
     config: {
       host: config.host,
@@ -1220,6 +1365,13 @@ const server = createServer(async (req, res) => {
 
     if (req.url?.startsWith("/api/dashboard")) {
       jsonResponse(res, 200, await getDashboardData());
+      return;
+    }
+
+    if (pathname === "/api/provisioning/requests" && req.method === "POST") {
+      const body = await readJson(req);
+      const result = await addProvisioningRequest(body);
+      jsonResponse(res, result.ok ? 201 : 400, result.ok ? { request: result.request } : { errors: result.errors });
       return;
     }
 

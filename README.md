@@ -13,6 +13,7 @@ Read-only dashboard for an SGTM server. The first version intentionally avoids r
 - Noise filtering for bot scans and non-tracking traffic
 - Deployment health checklist for auth, logs, Docker, SSL, and host visibility
 - Local persisted daily/hourly summary history
+- Admin-gated SGTM container provisioning requests and launch plans
 - Recent Nginx error logs
 - Recent Docker logs from one available container
 - SSL expiry from either a certificate file or a public domain

@@ -36,6 +36,10 @@
             <span class="nav-icon" aria-hidden="true">✓</span>
             <span>Deployment</span>
           </button>
+          <button class="nav-item" type="button" data-view-target="provisioning" aria-label="Provisioning" title="Provisioning">
+            <span class="nav-icon" aria-hidden="true">+</span>
+            <span>Provisioning</span>
+          </button>
         </nav>
 
         <div class="sidebar-group">
@@ -486,6 +490,71 @@
               </div>
             </div>
             <div id="deploymentRecommendations" class="settings-grid"></div>
+          </section>
+        </section>
+
+        <section id="provisioningView" class="view" data-view="provisioning">
+          <section class="notice notice-soft" aria-label="Provisioning safety">
+            <div>
+              <strong>Admin-gated provisioning</strong>
+              <p>Requests are stored and planned here. The panel does not create Docker containers, edit Nginx, or issue SSL automatically.</p>
+            </div>
+            <span id="provisioningBadge" class="status-dot">Approval required</span>
+          </section>
+
+          <section class="split-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>New SGTM Instance</h2>
+                  <p>Collect the domain, port, Docker, Nginx, SSL, and health-check details.</p>
+                </div>
+                <span class="badge">Request</span>
+              </div>
+              <form id="provisioningForm" class="provisioning-form">
+                <label>
+                  Instance name
+                  <input name="instanceName" placeholder="client-name" required />
+                </label>
+                <label>
+                  Tracking domain
+                  <input name="domain" placeholder="server.example.com" required />
+                </label>
+                <label>
+                  Local port
+                  <input name="port" type="number" min="1024" max="65535" value="8080" required />
+                </label>
+                <label>
+                  Owner email
+                  <input name="ownerEmail" type="email" placeholder="client@example.com" />
+                </label>
+                <label>
+                  Preview URL
+                  <input name="previewUrl" placeholder="https://preview.example.com" />
+                </label>
+                <label class="form-wide">
+                  Container config
+                  <textarea name="containerConfig" placeholder="Paste the SGTM CONTAINER_CONFIG value" required></textarea>
+                </label>
+                <label class="form-wide">
+                  Notes
+                  <textarea name="notes" placeholder="Plan, client, DNS, or launch notes"></textarea>
+                </label>
+                <button class="button button-primary" type="submit">Submit for Approval</button>
+                <p id="provisioningFormMessage" class="form-message"></p>
+              </form>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Provisioning Queue</h2>
+                  <p>Pending requests and generated admin implementation plans.</p>
+                </div>
+                <span id="provisioningQueueBadge" class="badge">0 requests</span>
+              </div>
+              <div id="provisioningRequests" class="provisioning-list"></div>
+            </article>
           </section>
         </section>
       </main>

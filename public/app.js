@@ -56,7 +56,12 @@ const els = {
   clientChart: document.querySelector("#clientChart"),
   deploymentBadge: document.querySelector("#deploymentBadge"),
   deploymentChecks: document.querySelector("#deploymentChecks"),
-  deploymentRecommendations: document.querySelector("#deploymentRecommendations")
+  deploymentRecommendations: document.querySelector("#deploymentRecommendations"),
+  provisioningBadge: document.querySelector("#provisioningBadge"),
+  provisioningForm: document.querySelector("#provisioningForm"),
+  provisioningFormMessage: document.querySelector("#provisioningFormMessage"),
+  provisioningQueueBadge: document.querySelector("#provisioningQueueBadge"),
+  provisioningRequests: document.querySelector("#provisioningRequests")
 };
 
 const viewTitles = {
@@ -64,7 +69,8 @@ const viewTitles = {
   logs: ["Containers / Event Logs", "Event Logs"],
   analytics: ["Tracking / Analytics", "Analytics"],
   settings: ["Account & Others / Settings", "Settings"],
-  deployment: ["Operations / Deployment", "Deployment Health"]
+  deployment: ["Operations / Deployment", "Deployment Health"],
+  provisioning: ["Operations / Provisioning", "Container Provisioning"]
 };
 
 let latestData = null;
@@ -1331,6 +1337,59 @@ function renderDeployment(data) {
   );
 }
 
+function codeBlock(label, value) {
+  return `
+    <details class="plan-block">
+      <summary>${escapeHtml(label)}</summary>
+      <pre><code>${escapeHtml(value || "Not generated")}</code></pre>
+    </details>
+  `;
+}
+
+function renderProvisioning(data) {
+  const requests = data.provisioning?.requests || [];
+  const pending = requests.filter((item) => item.status === "pending_admin_approval").length;
+  els.provisioningBadge.textContent = pending ? `${pending} pending` : "Approval required";
+  els.provisioningQueueBadge.textContent = `${requests.length} request${requests.length === 1 ? "" : "s"}`;
+
+  if (!requests.length) {
+    els.provisioningRequests.innerHTML = '<div class="empty-log">No provisioning requests yet.</div>';
+    return;
+  }
+
+  els.provisioningRequests.replaceChildren(
+    ...requests.map((request) => {
+      const card = document.createElement("article");
+      card.className = "provisioning-card";
+      const plan = request.plan || {};
+      card.innerHTML = `
+        <div class="provisioning-card-head">
+          <div>
+            <strong>${escapeHtml(request.instanceName)}</strong>
+            <span>${escapeHtml(request.domain)} · port ${escapeHtml(request.port)}</span>
+          </div>
+          <span class="state warning">${escapeHtml(request.status.replaceAll("_", " "))}</span>
+        </div>
+        <div class="summary-list compact-list">
+          ${(plan.checks || []).map((check) => `
+            <article class="summary-item">
+              <strong>${escapeHtml(check.label)}</strong>
+              <span class="state ${stateClass(check.status)}">${escapeHtml(check.value)}</span>
+            </article>
+          `).join("")}
+        </div>
+        ${request.ownerEmail ? `<p class="provisioning-meta">Owner: ${escapeHtml(request.ownerEmail)}</p>` : ""}
+        ${request.notes ? `<p class="provisioning-meta">${escapeHtml(request.notes)}</p>` : ""}
+        ${codeBlock("Environment file", plan.env)}
+        ${codeBlock("Docker Compose", plan.dockerCompose)}
+        ${codeBlock("Nginx server block", plan.nginx)}
+        ${codeBlock("Admin commands", (plan.commands || []).join("\n"))}
+      `;
+      return card;
+    })
+  );
+}
+
 function renderLogs(data) {
   renderEventTable(data);
   renderPurchaseInspector(data);
@@ -1350,6 +1409,7 @@ function renderAll(data) {
   renderAnalytics(data);
   renderSettings(data);
   renderDeployment(data);
+  renderProvisioning(data);
 }
 
 async function loadDashboard() {
@@ -1378,6 +1438,27 @@ els.eventTypeFilter.addEventListener("change", () => latestData && renderLogs(la
 els.clientFilter.addEventListener("change", () => latestData && renderLogs(latestData));
 els.requestUrlFilter.addEventListener("input", () => latestData && renderLogs(latestData));
 els.purchaseSearch.addEventListener("input", () => latestData && renderPurchaseInspector(latestData));
+els.provisioningForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  els.provisioningFormMessage.textContent = "Submitting request...";
+  const payload = Object.fromEntries(new FormData(els.provisioningForm).entries());
+  try {
+    const response = await fetch("/api/provisioning/requests", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Request failed"]).join(" "));
+    els.provisioningForm.reset();
+    els.provisioningForm.querySelector('[name="port"]').value = "8080";
+    els.provisioningFormMessage.textContent = "Provisioning request saved for admin approval.";
+    await loadDashboard();
+    setView("provisioning");
+  } catch (error) {
+    els.provisioningFormMessage.textContent = error.message;
+  }
+});
 window.addEventListener("hashchange", () => setView(window.location.hash.replace("#", "") || "dashboard"));
 
 setView(window.location.hash.replace("#", "") || "dashboard");

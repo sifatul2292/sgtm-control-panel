@@ -517,8 +517,110 @@ input {
   color: var(--color-text);
 }
 
+textarea {
+  min-height: 96px;
+  resize: vertical;
+  border: var(--rule-thin) solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+}
+
 input::placeholder {
   color: var(--color-dim);
+}
+
+textarea::placeholder {
+  color: var(--color-dim);
+}
+
+.provisioning-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  padding: var(--space-md);
+}
+
+.provisioning-form label {
+  display: grid;
+  gap: var(--space-xs);
+  color: var(--color-muted);
+  font-weight: 800;
+}
+
+.provisioning-form input,
+.provisioning-form textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.form-wide,
+.form-message {
+  grid-column: 1 / -1;
+}
+
+.form-message {
+  color: var(--color-muted);
+  font-weight: 800;
+}
+
+.provisioning-list {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-md);
+}
+
+.provisioning-card {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.provisioning-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.provisioning-card-head div {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.provisioning-card-head span,
+.provisioning-meta {
+  color: var(--color-muted);
+}
+
+.compact-list {
+  padding: 0;
+}
+
+.plan-block {
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-page);
+}
+
+.plan-block summary {
+  cursor: pointer;
+  padding: var(--space-sm) var(--space-md);
+  font-weight: 900;
+}
+
+.plan-block pre {
+  margin: 0;
+  max-height: 280px;
+  overflow: auto;
+  padding: var(--space-md);
+  border-top: var(--rule-thin) solid var(--color-line);
+  color: var(--color-accent-2);
 }
 
 .filter-wide {
@@ -991,6 +1093,7 @@ input::placeholder {
   .split-grid,
   .settings-grid,
   .health-grid,
+  .provisioning-form,
   .analytics-layout,
   .client-analytics {
     grid-template-columns: 1fr;
