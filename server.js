@@ -19,6 +19,7 @@ const config = {
   errorLog: process.env.SGTM_ERROR_LOG || process.env.NGINX_ERROR_LOG || "/var/log/nginx/error.log",
   usingDedicatedLogs: Boolean(process.env.SGTM_ACCESS_LOG || process.env.SGTM_ERROR_LOG),
   logTailLines: Number(process.env.LOG_TAIL_LINES || 80),
+  eventLogLimit: Number(process.env.EVENT_LOG_LIMIT || 500),
   trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data"),
   trackingHosts: parseCsv(process.env.TRACKING_HOSTS || inferHostFromCertPath(process.env.SSL_CERT_PATH || "") || process.env.SSL_DOMAIN || ""),
   dockerLogExclude: parseCsv(process.env.DOCKER_LOG_EXCLUDE || "Sending aggregate usage beacon,googletagmanager.com/sgtm/a"),
@@ -492,9 +493,9 @@ async function tailFile(pathname, lineCount) {
 }
 
 function nginxDateToken(date = new Date()) {
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const month = date.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
-  const year = date.getUTCFullYear();
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = date.toLocaleString("en-US", { month: "short" });
+  const year = date.getFullYear();
   return `${day}/${month}/${year}`;
 }
 
@@ -610,7 +611,7 @@ function parseTrackingAccessLine(line) {
   const match = String(line || "").match(/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*?) (HTTP\/[^"]+)" (\d{3}) (\S+) "([^"]*)" "([^"]*)"/);
   if (!match) return null;
 
-  const [, , time, method, pathname, , status, , , agent] = match;
+  const [, ip, time, method, pathname, protocol, status, bytes, referer, agent] = match;
   if (!isTrackingLogLine(line)) return null;
 
   const date = parseNginxLogDate(time);
@@ -621,7 +622,13 @@ function parseTrackingAccessLine(line) {
     client,
     status,
     date,
-    path: pathname
+    method,
+    path: pathname,
+    protocol,
+    bytes: bytes === "-" ? null : Number(bytes),
+    referer: referer === "-" ? "" : referer,
+    agent: agent === "-" ? "" : agent,
+    ip
   };
 }
 
@@ -629,6 +636,23 @@ function serializeSummaryMap(map) {
   return [...map.entries()]
     .map(([name, value]) => ({ name, ...value, lastSeen: value.lastSeen ? value.lastSeen.toISOString() : null }))
     .sort((a, b) => b.count - a.count);
+}
+
+function serializeEventRow(item) {
+  return {
+    eventName: item.eventName,
+    client: item.client,
+    status: item.status,
+    method: item.method,
+    path: item.path,
+    requestUrl: item.path,
+    date: item.date ? item.date.toISOString() : null,
+    protocol: item.protocol,
+    bytes: item.bytes,
+    referer: item.referer,
+    agent: item.agent,
+    ip: item.ip
+  };
 }
 
 async function summarizeRequestsToday(pathname) {
@@ -639,6 +663,7 @@ async function summarizeRequestsToday(pathname) {
     let errors = 0;
     const events = new Map();
     const clients = new Map();
+    const recentEvents = [];
     let settled = false;
     const stream = createReadStream(pathname, { encoding: "utf8" });
     const reader = createInterface({ input: stream, crlfDelay: Infinity });
@@ -667,6 +692,9 @@ async function summarizeRequestsToday(pathname) {
       if (Number(parsed.status) >= 400) client.errors += 1;
       if (parsed.date && (!client.lastSeen || parsed.date > client.lastSeen)) client.lastSeen = parsed.date;
       clients.set(parsed.client, client);
+
+      recentEvents.push(serializeEventRow(parsed));
+      if (recentEvents.length > config.eventLogLimit) recentEvents.shift();
     });
     reader.on("close", () => {
       resolveOnce({
@@ -678,7 +706,9 @@ async function summarizeRequestsToday(pathname) {
         filter: "tracking-only",
         trackingPaths: config.trackingPaths,
         events: serializeSummaryMap(events),
-        clients: serializeSummaryMap(clients)
+        clients: serializeSummaryMap(clients),
+        recentEvents: recentEvents.reverse(),
+        eventLogLimit: config.eventLogLimit
       });
     });
     reader.on("error", (error) => {
@@ -691,7 +721,9 @@ async function summarizeRequestsToday(pathname) {
         message: "Request count could not be calculated.",
         detail: error.message,
         events: [],
-        clients: []
+        clients: [],
+        recentEvents: [],
+        eventLogLimit: config.eventLogLimit
       });
     });
     stream.on("error", (error) => {
@@ -704,7 +736,9 @@ async function summarizeRequestsToday(pathname) {
         message: "Request count could not be calculated.",
         detail: error.message,
         events: [],
-        clients: []
+        clients: [],
+        recentEvents: [],
+        eventLogLimit: config.eventLogLimit
       });
     });
   });
@@ -809,6 +843,7 @@ async function getDashboardData() {
       errorLog: config.errorLog,
       usingDedicatedLogs: config.usingDedicatedLogs,
       logTailLines: config.logTailLines,
+      eventLogLimit: config.eventLogLimit,
       trackingPaths: config.trackingPaths,
       trackingHosts: config.trackingHosts,
       alertWebhookEnabled: Boolean(config.alertWebhookUrl),

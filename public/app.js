@@ -376,7 +376,50 @@ function updateEventFilters(items) {
   setSelectOptions(els.clientFilter, clients, "All clients");
 }
 
-function renderEventTable(log) {
+function eventDetail(item) {
+  return [
+    item.method && item.path ? `${item.method} ${item.path}` : "",
+    item.protocol || "",
+    item.ip ? `Visitor IP: ${item.ip}` : "",
+    item.bytes !== undefined && item.bytes !== null ? `${item.bytes} bytes` : "",
+    item.referer ? `From: ${item.referer}` : "",
+    item.agent || ""
+  ].filter(Boolean).join(" - ");
+}
+
+function serverEventRows(data) {
+  const rows = data.nginx?.todayEvents?.recentEvents;
+  if (!Array.isArray(rows) || !rows.length) return [];
+  return rows.map((item) => ({
+    source: "access",
+    level: Number(item.status) >= 500 ? "error" : Number(item.status) >= 400 ? "warn" : "info",
+    status: item.status,
+    method: item.method,
+    path: item.path,
+    date: item.date ? new Date(item.date) : null,
+    displayDate: formatDate(item.date),
+    client: item.client || "Other",
+    requestUrl: item.requestUrl || item.path || "",
+    tracking: true,
+    eventName: item.eventName || "Other",
+    detail: eventDetail(item)
+  }));
+}
+
+function renderEventTable(data) {
+  const summary = data.nginx?.todayEvents;
+  const serverItems = serverEventRows(data);
+  const log = data.nginx?.accessLog;
+
+  if (summary?.available && serverItems.length) {
+    updateEventFilters(serverItems);
+    const visibleItems = serverItems.filter(visibleEvent);
+    const errors = visibleItems.filter((item) => Number(item.status) >= 400).length;
+    els.eventLogSummary.textContent = `Showing ${visibleItems.length.toLocaleString()} of the latest ${serverItems.length.toLocaleString()} tracking events today (${errors.toLocaleString()} errors).`;
+    renderEventRows(visibleItems, "No matching tracking events found for today's filters.");
+    return;
+  }
+
   if (!log?.available) {
     els.eventLogSummary.textContent = log?.detail || log?.message || "Access log unavailable.";
     els.accessLog.innerHTML = `<tr><td colspan="6">${escapeHtml(`${log?.message || "Unavailable"} ${log?.detail || ""}`.trim())}</td></tr>`;
@@ -389,8 +432,12 @@ function renderEventTable(log) {
   const errors = visibleItems.filter((item) => Number(item.status) >= 400).length;
   els.eventLogSummary.textContent = `Showing ${visibleItems.length.toLocaleString()} records (${errors.toLocaleString()} errors) from the recent access log sample.`;
 
+  renderEventRows(visibleItems, "No SGTM event collection requests found in the recent sample. The full-day summary may still have older events.");
+}
+
+function renderEventRows(visibleItems, emptyMessage) {
   if (!visibleItems.length) {
-    els.accessLog.innerHTML = '<tr><td colspan="6">No SGTM event collection requests found in the recent sample. If begin_checkout or purchase did not fire in GTM, this is expected.</td></tr>';
+    els.accessLog.innerHTML = `<tr><td colspan="6">${escapeHtml(emptyMessage)}</td></tr>`;
     return;
   }
 
@@ -921,6 +968,7 @@ function renderSettings(data) {
     ["Nginx error log", data.config?.errorLog],
     ["SSL source", data.ssl?.source || data.config?.sslDomain || "Not configured"],
     ["Log tail lines", data.config?.logTailLines],
+    ["Event log limit", data.config?.eventLogLimit],
     ["Dedicated logs", data.config?.usingDedicatedLogs ? "Enabled" : "Not enabled"],
     ["Alert webhook", data.config?.alertWebhookEnabled ? "Enabled" : "Disabled"]
   ];
@@ -936,7 +984,7 @@ function renderSettings(data) {
 }
 
 function renderLogs(data) {
-  renderEventTable(data.nginx.accessLog);
+  renderEventTable(data);
   setLog(els.errorLog, data.nginx.errorLog, "error");
   setLog(els.dockerLog, data.dockerLogs, "docker");
   els.dockerLogSource.textContent = data.dockerLogs.container || "tail";

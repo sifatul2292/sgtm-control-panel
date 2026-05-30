@@ -6,8 +6,9 @@ Read-only dashboard for an SGTM server. The first version intentionally avoids r
 
 - Docker container list
 - Docker running/stopped/unhealthy summary
-- Request count for today from the Nginx access log
-- Recent Nginx access and error logs
+- Request count and event mix for today from the Nginx access log
+- Readable SGTM event log table for the latest matching tracking requests
+- Recent Nginx error logs
 - Recent Docker logs from one available container
 - SSL expiry from either a certificate file or a public domain
 
