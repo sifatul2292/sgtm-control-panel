@@ -145,12 +145,27 @@ function queryEventName(path) {
   return "";
 }
 
+function isTrackingPath(path) {
+  const raw = String(path || "").toLowerCase();
+  const endpoint = raw.split("?")[0];
+  return [
+    "/g/collect",
+    "/collect",
+    "/mp/collect",
+    "/data",
+    "/gtm.js",
+    "/gtag/js",
+    "/service_worker"
+  ].some((prefix) => endpoint.startsWith(prefix));
+}
+
 function inferAccessEvent({ path, method, status }) {
   const code = Number(status);
   const raw = decodeURIComponent(String(path || "")).toLowerCase();
   const queryEvent = queryEventName(path);
   const suspiciousPhp = /\.php(?:[?#]|$)/.test(raw) && !raw.includes("index.php");
   const blocked = code >= 400;
+  const trackingPath = isTrackingPath(path);
 
   if (blocked && suspiciousPhp) {
     return {
@@ -160,7 +175,7 @@ function inferAccessEvent({ path, method, status }) {
     };
   }
 
-  if (queryEvent) {
+  if (queryEvent && trackingPath) {
     return {
       name: queryEvent,
       outcome: blocked ? "Not accepted" : "Tracked",
@@ -181,7 +196,7 @@ function inferAccessEvent({ path, method, status }) {
   ];
 
   for (const [name, needles] of checks) {
-    if (needles.some((needle) => raw.includes(needle))) {
+    if (trackingPath && needles.some((needle) => raw.includes(needle))) {
       return {
         name,
         outcome: blocked ? "Not accepted" : "Tracked",
@@ -190,7 +205,7 @@ function inferAccessEvent({ path, method, status }) {
     }
   }
 
-  if (method === "GET" && !blocked) {
+  if (method === "GET" && !blocked && trackingPath) {
     return {
       name: "PageView",
       outcome: "Tracked",
@@ -199,11 +214,11 @@ function inferAccessEvent({ path, method, status }) {
   }
 
   return {
-    name: blocked ? "Rejected Request" : "Server Request",
+    name: blocked ? "Rejected Request" : "Other",
     outcome: blocked ? "Not accepted" : "Processed",
     description: blocked
       ? "The server rejected this request before it became a clean tracking event."
-      : "The server processed a request that does not map to a known marketing event yet."
+      : "This is Nginx traffic, but it does not look like an SGTM tracking endpoint."
   };
 }
 
@@ -270,6 +285,7 @@ function parseNginxAccess(line) {
   const event = inferAccessEvent({ path, method, status });
   const client = inferClient(path, agent);
   const requestUrl = displayRequestUrl(path);
+  const tracking = isTrackingPath(path);
   return {
     source: "access",
     level,
@@ -281,6 +297,7 @@ function parseNginxAccess(line) {
     displayDate: displayRequestDate(time),
     client,
     requestUrl,
+    tracking,
     eventName: event.name,
     primary: event.name,
     meta: `${event.outcome} - ${status} - ${time}`,
@@ -363,7 +380,7 @@ function renderEventTable(log) {
     return;
   }
 
-  const items = parseLogLines(log, "access");
+  const items = parseLogLines(log, "access").filter((item) => item.tracking);
   updateEventFilters(items);
   const visibleItems = items.filter(visibleEvent);
   const errors = visibleItems.filter((item) => Number(item.status) >= 400).length;
@@ -491,7 +508,7 @@ function renderDashboard(data) {
     els.sslDetail.textContent = text(data.ssl.detail, data.ssl.message);
   }
 
-  const accessItems = parseLogLines(data.nginx.accessLog, "access");
+  const accessItems = parseLogLines(data.nginx.accessLog, "access").filter((item) => item.tracking);
   const eventCounts = accessItems.reduce((counts, item) => {
     const key = item.eventName || item.primary || "Other";
     counts.set(key, (counts.get(key) || 0) + 1);
@@ -641,7 +658,7 @@ function renderClientBreakdown(items) {
 }
 
 function renderAnalytics(data) {
-  const items = parseLogLines(data.nginx.accessLog, "access");
+  const items = parseLogLines(data.nginx.accessLog, "access").filter((item) => item.tracking);
   const errors = items.filter((item) => Number(item.status) >= 400).length;
   const counts = eventCounts(items);
   const clients = clientCounts(items);

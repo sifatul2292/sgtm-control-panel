@@ -17,10 +17,18 @@ const config = {
   accessLog: process.env.NGINX_ACCESS_LOG || "/var/log/nginx/access.log",
   errorLog: process.env.NGINX_ERROR_LOG || "/var/log/nginx/error.log",
   logTailLines: Number(process.env.LOG_TAIL_LINES || 80),
+  trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data,/gtm.js,/gtag/js,/service_worker"),
   sslCertPath: process.env.SSL_CERT_PATH || "",
   sslDomain: process.env.SSL_DOMAIN || "",
   sslPort: Number(process.env.SSL_PORT || 443)
 };
+
+function parseCsv(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 async function loadDotEnv(pathname) {
   try {
@@ -278,6 +286,13 @@ function nginxDateToken(date = new Date()) {
   return `${day}/${month}/${year}`;
 }
 
+function isTrackingLogLine(line) {
+  const request = String(line || "").match(/"([A-Z]+)\s+([^"]+?)\s+HTTP\/[^"]+"/);
+  if (!request) return false;
+  const path = request[2].toLowerCase();
+  return config.trackingPaths.some((prefix) => path.startsWith(prefix.toLowerCase()));
+}
+
 async function countRequestsToday(pathname) {
   const token = nginxDateToken();
 
@@ -293,10 +308,17 @@ async function countRequestsToday(pathname) {
     };
 
     reader.on("line", (line) => {
-      if (line.includes(token)) count += 1;
+      if (line.includes(token) && isTrackingLogLine(line)) count += 1;
     });
     reader.on("close", () => {
-      resolveOnce({ available: true, count, token, path: pathname });
+      resolveOnce({
+        available: true,
+        count,
+        token,
+        path: pathname,
+        filter: "tracking-only",
+        trackingPaths: config.trackingPaths
+      });
     });
     reader.on("error", (error) => {
       resolveOnce({
@@ -408,6 +430,7 @@ async function getDashboardData() {
       accessLog: config.accessLog,
       errorLog: config.errorLog,
       logTailLines: config.logTailLines,
+      trackingPaths: config.trackingPaths,
       sslDomain: config.sslDomain,
       sslPort: config.sslPort
     }

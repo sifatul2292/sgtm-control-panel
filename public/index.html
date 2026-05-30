@@ -82,7 +82,7 @@
               <small id="dockerDetail">Waiting for status</small>
             </article>
             <article class="metric-card">
-              <span class="metric-label">Requests today</span>
+              <span class="metric-label">Tracking requests today</span>
               <strong id="requestCount">--</strong>
               <small id="requestDetail">Waiting for Nginx</small>
             </article>
@@ -109,7 +109,7 @@
               <div class="panel-header">
                 <div>
                   <h2>Traffic Snapshot</h2>
-                  <p>Recent request mix from Nginx access logs.</p>
+                  <p>Recent SGTM endpoint mix from Nginx access logs.</p>
                 </div>
               </div>
               <div id="trafficSummary" class="summary-list"></div>
@@ -132,7 +132,7 @@
             <div>
               <p class="breadcrumb">Containers / Event Logs</p>
               <h2>Event Logs</h2>
-              <p>Incoming requests translated into tracking events.</p>
+              <p>Incoming SGTM endpoint requests translated into tracking events.</p>
             </div>
             <div class="filter-row" aria-label="Log filters">
               <label>
@@ -222,7 +222,7 @@
           <section class="notice notice-soft" aria-label="Tracking quality">
             <div>
               <strong>Tracking analytics</strong>
-              <p>Summaries are calculated from the recent Nginx access log sample available to this dashboard.</p>
+              <p>Summaries are calculated from recent SGTM endpoint requests in the Nginx access log.</p>
             </div>
             <span class="status-dot">Read only</span>
           </section>
