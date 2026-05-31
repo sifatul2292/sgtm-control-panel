@@ -388,7 +388,8 @@ h2 {
 .settings-grid,
 .note-list,
 .health-grid,
-.funnel-list {
+.funnel-list,
+.business-grid {
   display: grid;
   gap: var(--space-sm);
   padding: var(--space-md);
@@ -443,6 +444,31 @@ h2 {
 
 .health-card.warning {
   border-color: color-mix(in oklch, var(--color-warn), transparent 55%);
+}
+
+.business-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.business-item {
+  display: grid;
+  gap: var(--space-xs);
+  min-height: 116px;
+  padding: var(--space-md);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.business-item span,
+.business-item small {
+  color: var(--color-muted);
+}
+
+.business-item strong {
+  font-size: var(--text-xl);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .funnel-row {
@@ -1094,6 +1120,7 @@ textarea::placeholder {
   .split-grid,
   .settings-grid,
   .health-grid,
+  .business-grid,
   .provisioning-form,
   .analytics-layout,
   .client-analytics {

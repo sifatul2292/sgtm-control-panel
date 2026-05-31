@@ -724,6 +724,11 @@ function estimatedPurchaseIdentity(item) {
   return `estimated:${host}:${visitor}:${value}:${currency}:${timeBucket}`;
 }
 
+function parseMoney(value) {
+  const amount = Number(String(value || "").replace(/,/g, ""));
+  return Number.isFinite(amount) ? amount : null;
+}
+
 function parseAccessLine(line) {
   const match = String(line || "").match(/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*?) (HTTP\/[^"]+)" (\d{3}) (\S+) "([^"]*)" "([^"]*)"/);
   if (!match) return null;
@@ -1037,7 +1042,11 @@ async function persistDailySummary(summary) {
       duplicateCount: 0,
       keyedCount: 0,
       estimatedKeyCount: 0,
-      missingKeyCount: 0
+      missingKeyCount: 0,
+      uniqueRevenue: 0,
+      rawRevenue: 0,
+      averageOrderValue: 0,
+      currency: ""
     },
     purchases
   };
@@ -1077,7 +1086,9 @@ async function summarizeRequestsToday(pathname) {
     const noiseReasons = new Map();
     const purchaseKeys = new Set();
     const estimatedPurchaseKeys = new Set();
+    const purchaseOrders = new Map();
     let purchaseMissingKeys = 0;
+    let rawPurchaseRevenue = 0;
     const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
     const recentEvents = [];
     let settled = false;
@@ -1116,9 +1127,21 @@ async function summarizeRequestsToday(pathname) {
       if (parsed.eventName === "Purchase") {
         const key = purchaseIdentity(parsed);
         const estimatedKey = estimatedPurchaseIdentity(parsed);
+        const amount = parseMoney(parsed.value);
+        const currency = String(parsed.currency || "").trim().toUpperCase();
+        let orderKey = key;
+        if (amount !== null) rawPurchaseRevenue += amount;
         if (key) purchaseKeys.add(key);
-        else if (estimatedKey) estimatedPurchaseKeys.add(estimatedKey);
-        else purchaseMissingKeys += 1;
+        else if (estimatedKey) {
+          orderKey = estimatedKey;
+          estimatedPurchaseKeys.add(estimatedKey);
+        } else {
+          purchaseMissingKeys += 1;
+          orderKey = `missing:${purchaseMissingKeys}`;
+        }
+        if (!purchaseOrders.has(orderKey)) {
+          purchaseOrders.set(orderKey, { amount, currency });
+        }
       }
 
       const event = events.get(parsed.eventName) || { count: 0, errors: 0, lastSeen: null };
@@ -1145,9 +1168,15 @@ async function summarizeRequestsToday(pathname) {
     });
     reader.on("close", () => {
       const purchaseEvent = events.get("Purchase");
-      const uniquePurchaseCount = purchaseKeys.size + estimatedPurchaseKeys.size + purchaseMissingKeys;
+      const purchaseCurrencies = new Set([...purchaseOrders.values()].map((item) => item.currency).filter(Boolean));
+      const revenueCurrency = purchaseCurrencies.size === 1 ? [...purchaseCurrencies][0] : "";
+      const uniquePurchaseRevenue = [...purchaseOrders.values()].reduce((total, item) => (
+        item.amount === null ? total : total + item.amount
+      ), 0);
+      const uniquePurchaseCount = purchaseOrders.size;
       const rawPurchaseCount = Number(purchaseEvent?.count || 0);
       const duplicatePurchaseCount = Math.max(0, rawPurchaseCount - uniquePurchaseCount);
+      const averageOrderValue = uniquePurchaseCount ? uniquePurchaseRevenue / uniquePurchaseCount : 0;
       if (purchaseEvent) {
         purchaseEvent.uniqueCount = uniquePurchaseCount;
         purchaseEvent.rawCount = rawPurchaseCount;
@@ -1155,6 +1184,10 @@ async function summarizeRequestsToday(pathname) {
         purchaseEvent.keyedCount = purchaseKeys.size;
         purchaseEvent.estimatedKeyCount = estimatedPurchaseKeys.size;
         purchaseEvent.missingKeyCount = purchaseMissingKeys;
+        purchaseEvent.uniqueRevenue = uniquePurchaseRevenue;
+        purchaseEvent.rawRevenue = rawPurchaseRevenue;
+        purchaseEvent.averageOrderValue = averageOrderValue;
+        purchaseEvent.currency = revenueCurrency;
         events.set("Purchase", purchaseEvent);
       }
       resolveOnce({
@@ -1177,7 +1210,11 @@ async function summarizeRequestsToday(pathname) {
           duplicateCount: duplicatePurchaseCount,
           keyedCount: purchaseKeys.size,
           estimatedKeyCount: estimatedPurchaseKeys.size,
-          missingKeyCount: purchaseMissingKeys
+          missingKeyCount: purchaseMissingKeys,
+          uniqueRevenue: uniquePurchaseRevenue,
+          rawRevenue: rawPurchaseRevenue,
+          averageOrderValue,
+          currency: revenueCurrency
         },
         hourly,
         noiseReasons: serializeSummaryMap(noiseReasons),
@@ -1209,7 +1246,11 @@ async function summarizeRequestsToday(pathname) {
           duplicateCount: 0,
           keyedCount: 0,
           estimatedKeyCount: 0,
-          missingKeyCount: 0
+          missingKeyCount: 0,
+          uniqueRevenue: 0,
+          rawRevenue: 0,
+          averageOrderValue: 0,
+          currency: ""
         },
         eventLogLimit: config.eventLogLimit
       });
@@ -1238,7 +1279,11 @@ async function summarizeRequestsToday(pathname) {
           duplicateCount: 0,
           keyedCount: 0,
           estimatedKeyCount: 0,
-          missingKeyCount: 0
+          missingKeyCount: 0,
+          uniqueRevenue: 0,
+          rawRevenue: 0,
+          averageOrderValue: 0,
+          currency: ""
         },
         eventLogLimit: config.eventLogLimit
       });

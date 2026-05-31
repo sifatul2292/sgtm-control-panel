@@ -29,6 +29,15 @@ const els = {
   noiseBadge: document.querySelector("#noiseBadge"),
   latestPurchase: document.querySelector("#latestPurchase"),
   purchaseBadge: document.querySelector("#purchaseBadge"),
+  businessBadge: document.querySelector("#businessBadge"),
+  businessPurchases: document.querySelector("#businessPurchases"),
+  businessPurchaseDetail: document.querySelector("#businessPurchaseDetail"),
+  businessRevenue: document.querySelector("#businessRevenue"),
+  businessRevenueDetail: document.querySelector("#businessRevenueDetail"),
+  businessAov: document.querySelector("#businessAov"),
+  businessAovDetail: document.querySelector("#businessAovDetail"),
+  businessDuplicates: document.querySelector("#businessDuplicates"),
+  businessDuplicateDetail: document.querySelector("#businessDuplicateDetail"),
   logModeBadge: document.querySelector("#logModeBadge"),
   accessLog: document.querySelector("#accessLog"),
   errorLog: document.querySelector("#errorLog"),
@@ -636,6 +645,10 @@ function todayEventStats(data) {
       keyedCount: Number(item.keyedCount) || 0,
       estimatedKeyCount: Number(item.estimatedKeyCount) || 0,
       missingKeyCount: Number(item.missingKeyCount) || 0,
+      uniqueRevenue: Number(item.uniqueRevenue) || 0,
+      rawRevenue: Number(item.rawRevenue) || 0,
+      averageOrderValue: Number(item.averageOrderValue) || 0,
+      currency: item.currency || "",
       errors: Number(item.errors) || 0,
       lastSeen: item.lastSeen ? new Date(item.lastSeen) : null
     });
@@ -672,6 +685,32 @@ function eventDisplayCount(name, stat) {
 
 function eventRawCount(stat) {
   return Number(stat?.rawCount || stat?.count || 0);
+}
+
+function purchaseSummary(data) {
+  const summary = data.nginx?.todayEvents?.purchases;
+  const stat = reliableEventStats(data).get("Purchase");
+  return {
+    rawCount: Number(summary?.rawCount ?? eventRawCount(stat)) || 0,
+    uniqueCount: Number(summary?.uniqueCount ?? eventDisplayCount("Purchase", stat)) || 0,
+    duplicateCount: Number(summary?.duplicateCount ?? stat?.duplicateCount) || 0,
+    keyedCount: Number(summary?.keyedCount ?? stat?.keyedCount) || 0,
+    estimatedKeyCount: Number(summary?.estimatedKeyCount ?? stat?.estimatedKeyCount) || 0,
+    uniqueRevenue: Number(summary?.uniqueRevenue ?? stat?.uniqueRevenue) || 0,
+    rawRevenue: Number(summary?.rawRevenue ?? stat?.rawRevenue) || 0,
+    averageOrderValue: Number(summary?.averageOrderValue ?? stat?.averageOrderValue) || 0,
+    currency: summary?.currency || stat?.currency || ""
+  };
+}
+
+function formatMoney(amount, currency) {
+  const value = Number(amount || 0);
+  const rounded = Number.isInteger(value) ? value : Number(value.toFixed(2));
+  const formatted = rounded.toLocaleString(undefined, {
+    minimumFractionDigits: Number.isInteger(rounded) ? 0 : 2,
+    maximumFractionDigits: 2
+  });
+  return currency ? `${formatted} ${currency}` : formatted;
 }
 
 function eventStatusText(name, stat) {
@@ -974,6 +1013,36 @@ function renderLatestPurchase(data) {
   ]);
 }
 
+function renderBusinessSnapshot(data) {
+  const summary = purchaseSummary(data);
+  const hasPurchases = summary.rawCount > 0 || summary.uniqueCount > 0;
+  const exact = summary.keyedCount > 0;
+  const estimated = !exact && summary.estimatedKeyCount > 0;
+  const duplicateRate = summary.rawCount ? Math.round((summary.duplicateCount / summary.rawCount) * 100) : 0;
+
+  els.businessBadge.className = "badge";
+  els.businessBadge.classList.add(!hasPurchases ? "warn" : exact ? "ok" : "warn");
+  els.businessBadge.textContent = !hasPurchases ? "No purchases" : exact ? "Exact" : "Estimated";
+
+  els.businessPurchases.textContent = summary.uniqueCount.toLocaleString();
+  els.businessPurchaseDetail.textContent = summary.duplicateCount
+    ? `${summary.rawCount.toLocaleString()} raw purchase requests`
+    : "No duplicate purchase hits";
+
+  els.businessRevenue.textContent = summary.uniqueRevenue ? formatMoney(summary.uniqueRevenue, summary.currency) : "--";
+  els.businessRevenueDetail.textContent = summary.rawRevenue && summary.rawRevenue !== summary.uniqueRevenue
+    ? `${formatMoney(summary.rawRevenue, summary.currency)} before dedupe`
+    : "Deduped order value";
+
+  els.businessAov.textContent = summary.averageOrderValue ? formatMoney(summary.averageOrderValue, summary.currency) : "--";
+  els.businessAovDetail.textContent = summary.uniqueCount ? `${summary.uniqueCount.toLocaleString()} unique purchase${summary.uniqueCount === 1 ? "" : "s"}` : "Waiting for purchase value";
+
+  els.businessDuplicates.textContent = summary.duplicateCount.toLocaleString();
+  els.businessDuplicateDetail.textContent = summary.duplicateCount
+    ? `${duplicateRate}% duplicate rate${estimated ? " · estimated" : ""}`
+    : "No duplicate purchase hits";
+}
+
 function renderDashboard(data) {
   const docker = data.docker;
   const totals = docker.totals || { total: 0, running: 0, stopped: 0, unhealthy: 0 };
@@ -1020,6 +1089,7 @@ function renderDashboard(data) {
   renderQualityChecks(data);
   renderNoiseSummary(data);
   renderLatestPurchase(data);
+  renderBusinessSnapshot(data);
 }
 
 function eventCounts(items) {
