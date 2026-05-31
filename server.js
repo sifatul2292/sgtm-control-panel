@@ -43,7 +43,7 @@ const config = {
 };
 
 const authSecret = config.authSecret || config.authPassword || randomBytes(32).toString("hex");
-const PURCHASE_ESTIMATE_WINDOW_MS = 60 * 1000;
+const PURCHASE_ESTIMATE_WINDOW_MS = 5 * 60 * 1000;
 const alertMemory = new Map();
 const databasePath = join(config.dataDir, "history.json");
 
@@ -714,19 +714,41 @@ function purchaseIdentity(item) {
   return "";
 }
 
-function estimatedPurchaseIdentity(item) {
-  if (item.eventName !== "Purchase" || !item.date) return "";
-  const timeBucket = Math.floor(item.date.getTime() / PURCHASE_ESTIMATE_WINDOW_MS);
+function estimatedPurchaseSignature(item) {
   const value = String(item.value || "no-value").trim().toLowerCase();
   const currency = String(item.currency || "no-currency").trim().toLowerCase();
-  const visitor = String(item.ip || "unknown-ip").trim();
   const host = String(item.host || "unknown-host").trim().toLowerCase();
-  return `estimated:${host}:${visitor}:${value}:${currency}:${timeBucket}`;
+  return `${host}:${value}:${currency}`;
 }
 
 function parseMoney(value) {
   const amount = Number(String(value || "").replace(/,/g, ""));
   return Number.isFinite(amount) ? amount : null;
+}
+
+function estimatedPurchaseGroups(items) {
+  const groups = [];
+  const sorted = [...items]
+    .filter((item) => item.date)
+    .sort((a, b) => a.date - b.date);
+
+  for (const item of sorted) {
+    const signature = estimatedPurchaseSignature(item);
+    const timestamp = item.date.getTime();
+    const group = groups.find((candidate) => (
+      candidate.signature === signature &&
+      timestamp - candidate.lastSeen <= PURCHASE_ESTIMATE_WINDOW_MS
+    ));
+    const amount = parseMoney(item.value);
+    const currency = String(item.currency || "").trim().toUpperCase();
+    if (group) {
+      group.lastSeen = timestamp;
+      continue;
+    }
+    groups.push({ signature, firstSeen: timestamp, lastSeen: timestamp, amount, currency });
+  }
+
+  return groups;
 }
 
 function parseAccessLine(line) {
@@ -1085,8 +1107,8 @@ async function summarizeRequestsToday(pathname) {
     const hosts = new Map();
     const noiseReasons = new Map();
     const purchaseKeys = new Set();
-    const estimatedPurchaseKeys = new Set();
     const purchaseOrders = new Map();
+    const estimatedPurchases = [];
     let purchaseMissingKeys = 0;
     let rawPurchaseRevenue = 0;
     const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
@@ -1126,21 +1148,19 @@ async function summarizeRequestsToday(pathname) {
 
       if (parsed.eventName === "Purchase") {
         const key = purchaseIdentity(parsed);
-        const estimatedKey = estimatedPurchaseIdentity(parsed);
         const amount = parseMoney(parsed.value);
         const currency = String(parsed.currency || "").trim().toUpperCase();
-        let orderKey = key;
         if (amount !== null) rawPurchaseRevenue += amount;
-        if (key) purchaseKeys.add(key);
-        else if (estimatedKey) {
-          orderKey = estimatedKey;
-          estimatedPurchaseKeys.add(estimatedKey);
+        if (key) {
+          purchaseKeys.add(key);
+          if (!purchaseOrders.has(key)) {
+            purchaseOrders.set(key, { amount, currency });
+          }
+        } else if (parsed.date) {
+          estimatedPurchases.push(parsed);
         } else {
           purchaseMissingKeys += 1;
-          orderKey = `missing:${purchaseMissingKeys}`;
-        }
-        if (!purchaseOrders.has(orderKey)) {
-          purchaseOrders.set(orderKey, { amount, currency });
+          purchaseOrders.set(`missing:${purchaseMissingKeys}`, { amount, currency });
         }
       }
 
@@ -1168,6 +1188,13 @@ async function summarizeRequestsToday(pathname) {
     });
     reader.on("close", () => {
       const purchaseEvent = events.get("Purchase");
+      const estimatedGroups = estimatedPurchaseGroups(estimatedPurchases);
+      for (const [index, group] of estimatedGroups.entries()) {
+        purchaseOrders.set(`estimated:${index}:${group.signature}:${group.firstSeen}`, {
+          amount: group.amount,
+          currency: group.currency
+        });
+      }
       const purchaseCurrencies = new Set([...purchaseOrders.values()].map((item) => item.currency).filter(Boolean));
       const revenueCurrency = purchaseCurrencies.size === 1 ? [...purchaseCurrencies][0] : "";
       const uniquePurchaseRevenue = [...purchaseOrders.values()].reduce((total, item) => (
@@ -1182,7 +1209,7 @@ async function summarizeRequestsToday(pathname) {
         purchaseEvent.rawCount = rawPurchaseCount;
         purchaseEvent.duplicateCount = duplicatePurchaseCount;
         purchaseEvent.keyedCount = purchaseKeys.size;
-        purchaseEvent.estimatedKeyCount = estimatedPurchaseKeys.size;
+        purchaseEvent.estimatedKeyCount = estimatedGroups.length;
         purchaseEvent.missingKeyCount = purchaseMissingKeys;
         purchaseEvent.uniqueRevenue = uniquePurchaseRevenue;
         purchaseEvent.rawRevenue = rawPurchaseRevenue;
@@ -1209,7 +1236,7 @@ async function summarizeRequestsToday(pathname) {
           uniqueCount: uniquePurchaseCount,
           duplicateCount: duplicatePurchaseCount,
           keyedCount: purchaseKeys.size,
-          estimatedKeyCount: estimatedPurchaseKeys.size,
+          estimatedKeyCount: estimatedGroups.length,
           missingKeyCount: purchaseMissingKeys,
           uniqueRevenue: uniquePurchaseRevenue,
           rawRevenue: rawPurchaseRevenue,
