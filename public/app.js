@@ -630,6 +630,11 @@ function todayEventStats(data) {
   return summary.events.reduce((stats, item) => {
     stats.set(canonicalEventName(item.name), {
       count: Number(item.count) || 0,
+      rawCount: Number(item.rawCount || item.count) || 0,
+      uniqueCount: Number.isFinite(Number(item.uniqueCount)) ? Number(item.uniqueCount) : null,
+      duplicateCount: Number(item.duplicateCount) || 0,
+      keyedCount: Number(item.keyedCount) || 0,
+      missingKeyCount: Number(item.missingKeyCount) || 0,
       errors: Number(item.errors) || 0,
       lastSeen: item.lastSeen ? new Date(item.lastSeen) : null
     });
@@ -656,6 +661,25 @@ function eventStats(items) {
   }, new Map());
 }
 
+function eventDisplayCount(name, stat) {
+  const canonical = canonicalEventName(name);
+  if (canonical === "Purchase" && Number.isFinite(Number(stat?.uniqueCount))) {
+    return Number(stat.uniqueCount);
+  }
+  return Number(stat?.count || 0);
+}
+
+function eventRawCount(stat) {
+  return Number(stat?.rawCount || stat?.count || 0);
+}
+
+function eventStatusText(name, stat) {
+  if (canonicalEventName(name) === "Purchase" && Number(stat?.duplicateCount || 0) > 0) {
+    return `${eventRawCount(stat).toLocaleString()} raw requests · ${relativeTime(stat.lastSeen)}`;
+  }
+  return relativeTime(stat?.lastSeen);
+}
+
 function relativeTime(date) {
   if (!date) return "Not seen";
   const seconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
@@ -675,21 +699,22 @@ function renderEventHealth(data) {
   els.eventHealthGrid.replaceChildren(
     ...required.map((name) => {
       const stat = stats.get(name) || { count: 0, lastSeen: null };
+      const count = eventDisplayCount(name, stat);
       const card = document.createElement("article");
-      card.className = `health-card ${stat.count ? "healthy" : "warning"}`;
+      card.className = `health-card ${count ? "healthy" : "warning"}`;
       card.innerHTML = `
         <span>${escapeHtml(name)}</span>
-        <strong>${stat.count.toLocaleString()}</strong>
-        <small>${escapeHtml(relativeTime(stat.lastSeen))}</small>
+        <strong>${count.toLocaleString()}</strong>
+        <small>${escapeHtml(eventStatusText(name, stat))}</small>
       `;
       return card;
     })
   );
 
-  const base = Math.max(1, stats.get("PageView")?.count || 0);
+  const base = Math.max(1, eventDisplayCount("PageView", stats.get("PageView")));
   els.funnelList.replaceChildren(
     ...required.map((name) => {
-      const count = stats.get(name)?.count || 0;
+      const count = eventDisplayCount(name, stats.get(name));
       const percent = Math.min(100, Math.round((count / base) * 100));
       const row = document.createElement("article");
       row.className = "funnel-row";
@@ -711,6 +736,7 @@ function collectAlerts(data) {
   const stats = reliableEventStats(data);
   const rows = todayRows(data);
   const purchaseRows = rows.filter((item) => canonicalEventName(item.eventName) === "Purchase");
+  const purchaseStat = stats.get("Purchase");
   const knownHosts = data.nginx?.todayEvents?.hosts?.filter((host) => host.name !== "Unknown host") || [];
   const alerts = [];
 
@@ -763,7 +789,7 @@ function collectAlerts(data) {
       status: "warning"
     });
   }
-  if (stats.get("BeginCheckout")?.count && !stats.get("Purchase")?.count) {
+  if (stats.get("BeginCheckout")?.count && !eventDisplayCount("Purchase", purchaseStat)) {
     alerts.push({
       label: "Purchase",
       value: "BeginCheckout seen, Purchase missing",
@@ -784,7 +810,6 @@ function collectAlerts(data) {
       status: "warning"
     });
   }
-
   return alerts;
 }
 
@@ -834,6 +859,8 @@ function qualityItems(data) {
   const stats = reliableEventStats(data);
   const rows = todayRows(data);
   const purchaseRows = rows.filter((item) => canonicalEventName(item.eventName) === "Purchase");
+  const purchaseStat = stats.get("Purchase");
+  const purchaseCount = eventDisplayCount("Purchase", purchaseStat);
   const checks = [
     {
       label: "Dedicated logs",
@@ -861,8 +888,8 @@ function qualityItems(data) {
     },
     {
       label: "Purchase flow",
-      pass: !stats.get("BeginCheckout")?.count || Boolean(stats.get("Purchase")?.count),
-      value: stats.get("Purchase")?.count ? `${stats.get("Purchase").count.toLocaleString()} Purchase` : "No Purchase after BeginCheckout"
+      pass: !stats.get("BeginCheckout")?.count || Boolean(purchaseCount),
+      value: purchaseCount ? `${purchaseCount.toLocaleString()} Purchase` : "No Purchase after BeginCheckout"
     },
     {
       label: "Purchase metadata",
@@ -873,6 +900,13 @@ function qualityItems(data) {
       label: "Deduplication IDs",
       pass: !purchaseRows.length || purchaseRows.every((item) => item.eventId || item.transactionId),
       value: purchaseRows.length ? "Event ID or transaction ID checked" : "No purchase today"
+    },
+    {
+      label: "Purchase dedupe",
+      pass: !purchaseRows.length || Boolean(purchaseCount),
+      value: Number(purchaseStat?.duplicateCount || 0)
+        ? `${purchaseCount.toLocaleString()} orders from ${eventRawCount(purchaseStat).toLocaleString()} requests`
+        : "No duplicate purchase requests"
     }
   ];
 
@@ -960,11 +994,11 @@ function renderDashboard(data) {
 
   const stats = reliableEventStats(data);
   const topEvents = [...stats.entries()]
-    .sort((a, b) => b[1].count - a[1].count)
+    .sort((a, b) => eventDisplayCount(b[0], b[1]) - eventDisplayCount(a[0], a[1]))
     .slice(0, 4)
     .map(([label, value]) => ({
       label,
-      value: value.count.toLocaleString(),
+      value: eventDisplayCount(label, value).toLocaleString(),
       status: label.includes("Blocked") || label.includes("Rejected") ? "warning" : "healthy"
     }));
   renderSummaryList(
@@ -1200,7 +1234,11 @@ function renderClientBreakdown(items) {
 }
 
 function eventTotal(rows, name) {
-  return Number((rows || []).find((item) => canonicalEventName(item.name) === name)?.count || 0);
+  const item = (rows || []).find((row) => canonicalEventName(row.name) === name);
+  if (canonicalEventName(name) === "Purchase" && Number.isFinite(Number(item?.uniqueCount))) {
+    return Number(item.uniqueCount);
+  }
+  return Number(item?.count || 0);
 }
 
 function renderDailyHistory(data) {
@@ -1237,13 +1275,22 @@ function renderAnalytics(data) {
   const summary = data.nginx?.todayEvents;
   if (summary?.available) {
     const eventRows = (summary.events || [])
-      .map((item) => ({
-        label: canonicalEventName(item.name),
-        value: Number(item.count) || 0,
-        total: Number(item.count) || 0,
-        errors: Number(item.errors) || 0,
-        type: "Event"
-      }))
+      .map((item) => {
+        const label = canonicalEventName(item.name);
+        const stat = {
+          count: Number(item.count) || 0,
+          rawCount: Number(item.rawCount || item.count) || 0,
+          uniqueCount: Number.isFinite(Number(item.uniqueCount)) ? Number(item.uniqueCount) : null,
+          duplicateCount: Number(item.duplicateCount) || 0
+        };
+        return {
+          label,
+          value: eventDisplayCount(label, stat),
+          total: eventRawCount(stat),
+          errors: Number(item.errors) || 0,
+          type: label === "Purchase" && stat.duplicateCount ? "Unique orders" : "Event"
+        };
+      })
       .sort((a, b) => b.value - a.value);
     const clientRows = (summary.clients || [])
       .map((item) => ({

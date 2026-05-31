@@ -700,8 +700,17 @@ function parseTrackingAccessLine(line) {
     value: queryValue(pathname, ["value", "ep.value", "price", "revenue"]),
     currency: queryValue(pathname, ["currency", "ep.currency", "cu"]),
     eventId: queryValue(pathname, ["event_id", "eventId", "eid", "x-fb-event-id"]),
-    transactionId: queryValue(pathname, ["transaction_id", "transactionId", "tid", "ep.transaction_id"])
+    transactionId: queryValue(pathname, ["transaction_id", "transactionId", "ep.transaction_id", "tr", "order_id", "orderId"])
   };
+}
+
+function purchaseIdentity(item) {
+  if (item.eventName !== "Purchase") return "";
+  const transactionId = String(item.transactionId || "").trim();
+  if (transactionId) return `transaction:${transactionId}`;
+  const eventId = String(item.eventId || "").trim();
+  if (eventId) return `event:${eventId}`;
+  return "";
 }
 
 function parseAccessLine(line) {
@@ -1011,6 +1020,13 @@ async function persistDailySummary(summary) {
     hosts: topRows(summary.hosts),
     noiseReasons: topRows(summary.noiseReasons),
     hourly: summary.hourly || [],
+    purchaseSummary: summary.purchases || {
+      rawCount: 0,
+      uniqueCount: 0,
+      duplicateCount: 0,
+      keyedCount: 0,
+      missingKeyCount: 0
+    },
     purchases
   };
   pruneDailyHistory(data.daily);
@@ -1047,6 +1063,8 @@ async function summarizeRequestsToday(pathname) {
     const clients = new Map();
     const hosts = new Map();
     const noiseReasons = new Map();
+    const purchaseKeys = new Set();
+    let purchaseMissingKeys = 0;
     const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
     const recentEvents = [];
     let settled = false;
@@ -1082,6 +1100,12 @@ async function summarizeRequestsToday(pathname) {
         if (parsed.eventName === "Purchase") bucket.purchases += 1;
       }
 
+      if (parsed.eventName === "Purchase") {
+        const key = purchaseIdentity(parsed);
+        if (key) purchaseKeys.add(key);
+        else purchaseMissingKeys += 1;
+      }
+
       const event = events.get(parsed.eventName) || { count: 0, errors: 0, lastSeen: null };
       event.count += 1;
       if (Number(parsed.status) >= 400) event.errors += 1;
@@ -1105,6 +1129,18 @@ async function summarizeRequestsToday(pathname) {
       if (recentEvents.length > config.eventLogLimit) recentEvents.shift();
     });
     reader.on("close", () => {
+      const purchaseEvent = events.get("Purchase");
+      const uniquePurchaseCount = purchaseKeys.size + purchaseMissingKeys;
+      const rawPurchaseCount = Number(purchaseEvent?.count || 0);
+      const duplicatePurchaseCount = Math.max(0, rawPurchaseCount - uniquePurchaseCount);
+      if (purchaseEvent) {
+        purchaseEvent.uniqueCount = uniquePurchaseCount;
+        purchaseEvent.rawCount = rawPurchaseCount;
+        purchaseEvent.duplicateCount = duplicatePurchaseCount;
+        purchaseEvent.keyedCount = purchaseKeys.size;
+        purchaseEvent.missingKeyCount = purchaseMissingKeys;
+        events.set("Purchase", purchaseEvent);
+      }
       resolveOnce({
         available: true,
         count,
@@ -1119,6 +1155,13 @@ async function summarizeRequestsToday(pathname) {
         events: serializeSummaryMap(events),
         clients: serializeSummaryMap(clients),
         hosts: serializeSummaryMap(hosts),
+        purchases: {
+          rawCount: rawPurchaseCount,
+          uniqueCount: uniquePurchaseCount,
+          duplicateCount: duplicatePurchaseCount,
+          keyedCount: purchaseKeys.size,
+          missingKeyCount: purchaseMissingKeys
+        },
         hourly,
         noiseReasons: serializeSummaryMap(noiseReasons),
         recentEvents: recentEvents.reverse(),
@@ -1143,6 +1186,13 @@ async function summarizeRequestsToday(pathname) {
         hourly: [],
         noiseReasons: [],
         recentEvents: [],
+        purchases: {
+          rawCount: 0,
+          uniqueCount: 0,
+          duplicateCount: 0,
+          keyedCount: 0,
+          missingKeyCount: 0
+        },
         eventLogLimit: config.eventLogLimit
       });
     });
@@ -1164,6 +1214,13 @@ async function summarizeRequestsToday(pathname) {
         hourly: [],
         noiseReasons: [],
         recentEvents: [],
+        purchases: {
+          rawCount: 0,
+          uniqueCount: 0,
+          duplicateCount: 0,
+          keyedCount: 0,
+          missingKeyCount: 0
+        },
         eventLogLimit: config.eventLogLimit
       });
     });
