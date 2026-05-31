@@ -634,6 +634,7 @@ function todayEventStats(data) {
       uniqueCount: Number.isFinite(Number(item.uniqueCount)) ? Number(item.uniqueCount) : null,
       duplicateCount: Number(item.duplicateCount) || 0,
       keyedCount: Number(item.keyedCount) || 0,
+      estimatedKeyCount: Number(item.estimatedKeyCount) || 0,
       missingKeyCount: Number(item.missingKeyCount) || 0,
       errors: Number(item.errors) || 0,
       lastSeen: item.lastSeen ? new Date(item.lastSeen) : null
@@ -675,7 +676,8 @@ function eventRawCount(stat) {
 
 function eventStatusText(name, stat) {
   if (canonicalEventName(name) === "Purchase" && Number(stat?.duplicateCount || 0) > 0) {
-    return `${eventRawCount(stat).toLocaleString()} raw requests · ${relativeTime(stat.lastSeen)}`;
+    const mode = Number(stat?.keyedCount || 0) ? "" : "estimated · ";
+    return `${eventRawCount(stat).toLocaleString()} raw requests · ${mode}${relativeTime(stat.lastSeen)}`;
   }
   return relativeTime(stat?.lastSeen);
 }
@@ -905,7 +907,7 @@ function qualityItems(data) {
       label: "Purchase dedupe",
       pass: !purchaseRows.length || Boolean(purchaseCount),
       value: Number(purchaseStat?.duplicateCount || 0)
-        ? `${purchaseCount.toLocaleString()} orders from ${eventRawCount(purchaseStat).toLocaleString()} requests`
+        ? `${purchaseCount.toLocaleString()} orders from ${eventRawCount(purchaseStat).toLocaleString()} requests${Number(purchaseStat?.keyedCount || 0) ? "" : " (estimated)"}`
         : "No duplicate purchase requests"
     }
   ];
@@ -1281,14 +1283,17 @@ function renderAnalytics(data) {
           count: Number(item.count) || 0,
           rawCount: Number(item.rawCount || item.count) || 0,
           uniqueCount: Number.isFinite(Number(item.uniqueCount)) ? Number(item.uniqueCount) : null,
-          duplicateCount: Number(item.duplicateCount) || 0
+          duplicateCount: Number(item.duplicateCount) || 0,
+          keyedCount: Number(item.keyedCount) || 0
         };
         return {
           label,
           value: eventDisplayCount(label, stat),
           total: eventRawCount(stat),
           errors: Number(item.errors) || 0,
-          type: label === "Purchase" && stat.duplicateCount ? "Unique orders" : "Event"
+          type: label === "Purchase" && stat.duplicateCount
+            ? Number(stat.keyedCount || 0) ? "Unique orders" : "Estimated orders"
+            : "Event"
         };
       })
       .sort((a, b) => b.value - a.value);

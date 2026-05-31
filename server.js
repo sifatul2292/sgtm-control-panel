@@ -43,6 +43,7 @@ const config = {
 };
 
 const authSecret = config.authSecret || config.authPassword || randomBytes(32).toString("hex");
+const PURCHASE_ESTIMATE_WINDOW_MS = 60 * 1000;
 const alertMemory = new Map();
 const databasePath = join(config.dataDir, "history.json");
 
@@ -713,6 +714,16 @@ function purchaseIdentity(item) {
   return "";
 }
 
+function estimatedPurchaseIdentity(item) {
+  if (item.eventName !== "Purchase" || !item.date) return "";
+  const timeBucket = Math.floor(item.date.getTime() / PURCHASE_ESTIMATE_WINDOW_MS);
+  const value = String(item.value || "no-value").trim().toLowerCase();
+  const currency = String(item.currency || "no-currency").trim().toLowerCase();
+  const visitor = String(item.ip || "unknown-ip").trim();
+  const host = String(item.host || "unknown-host").trim().toLowerCase();
+  return `estimated:${host}:${visitor}:${value}:${currency}:${timeBucket}`;
+}
+
 function parseAccessLine(line) {
   const match = String(line || "").match(/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^"]*?) (HTTP\/[^"]+)" (\d{3}) (\S+) "([^"]*)" "([^"]*)"/);
   if (!match) return null;
@@ -1025,6 +1036,7 @@ async function persistDailySummary(summary) {
       uniqueCount: 0,
       duplicateCount: 0,
       keyedCount: 0,
+      estimatedKeyCount: 0,
       missingKeyCount: 0
     },
     purchases
@@ -1064,6 +1076,7 @@ async function summarizeRequestsToday(pathname) {
     const hosts = new Map();
     const noiseReasons = new Map();
     const purchaseKeys = new Set();
+    const estimatedPurchaseKeys = new Set();
     let purchaseMissingKeys = 0;
     const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
     const recentEvents = [];
@@ -1102,7 +1115,9 @@ async function summarizeRequestsToday(pathname) {
 
       if (parsed.eventName === "Purchase") {
         const key = purchaseIdentity(parsed);
+        const estimatedKey = estimatedPurchaseIdentity(parsed);
         if (key) purchaseKeys.add(key);
+        else if (estimatedKey) estimatedPurchaseKeys.add(estimatedKey);
         else purchaseMissingKeys += 1;
       }
 
@@ -1130,7 +1145,7 @@ async function summarizeRequestsToday(pathname) {
     });
     reader.on("close", () => {
       const purchaseEvent = events.get("Purchase");
-      const uniquePurchaseCount = purchaseKeys.size + purchaseMissingKeys;
+      const uniquePurchaseCount = purchaseKeys.size + estimatedPurchaseKeys.size + purchaseMissingKeys;
       const rawPurchaseCount = Number(purchaseEvent?.count || 0);
       const duplicatePurchaseCount = Math.max(0, rawPurchaseCount - uniquePurchaseCount);
       if (purchaseEvent) {
@@ -1138,6 +1153,7 @@ async function summarizeRequestsToday(pathname) {
         purchaseEvent.rawCount = rawPurchaseCount;
         purchaseEvent.duplicateCount = duplicatePurchaseCount;
         purchaseEvent.keyedCount = purchaseKeys.size;
+        purchaseEvent.estimatedKeyCount = estimatedPurchaseKeys.size;
         purchaseEvent.missingKeyCount = purchaseMissingKeys;
         events.set("Purchase", purchaseEvent);
       }
@@ -1160,6 +1176,7 @@ async function summarizeRequestsToday(pathname) {
           uniqueCount: uniquePurchaseCount,
           duplicateCount: duplicatePurchaseCount,
           keyedCount: purchaseKeys.size,
+          estimatedKeyCount: estimatedPurchaseKeys.size,
           missingKeyCount: purchaseMissingKeys
         },
         hourly,
@@ -1191,6 +1208,7 @@ async function summarizeRequestsToday(pathname) {
           uniqueCount: 0,
           duplicateCount: 0,
           keyedCount: 0,
+          estimatedKeyCount: 0,
           missingKeyCount: 0
         },
         eventLogLimit: config.eventLogLimit
@@ -1219,6 +1237,7 @@ async function summarizeRequestsToday(pathname) {
           uniqueCount: 0,
           duplicateCount: 0,
           keyedCount: 0,
+          estimatedKeyCount: 0,
           missingKeyCount: 0
         },
         eventLogLimit: config.eventLogLimit
