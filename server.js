@@ -1,10 +1,8 @@
 import { createServer } from "node:http";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { createReadStream } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
-import { createInterface } from "node:readline";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
@@ -21,6 +19,7 @@ const config = {
   errorLog: process.env.SGTM_ERROR_LOG || process.env.NGINX_ERROR_LOG || "/var/log/nginx/error.log",
   usingDedicatedLogs: Boolean(process.env.SGTM_ACCESS_LOG || process.env.SGTM_ERROR_LOG),
   logTailLines: Number(process.env.LOG_TAIL_LINES || 80),
+  summaryTailLines: Number(process.env.SUMMARY_TAIL_LINES || 50000),
   eventLogLimit: Number(process.env.EVENT_LOG_LIMIT || 500),
   dataDir: configuredDataDir,
   historyRetentionDays: Number(process.env.HISTORY_RETENTION_DAYS || 90),
@@ -715,10 +714,8 @@ function purchaseIdentity(item) {
 }
 
 function estimatedPurchaseSignature(item) {
-  const value = String(item.value || "no-value").trim().toLowerCase();
-  const currency = String(item.currency || "no-currency").trim().toLowerCase();
   const host = String(item.host || "unknown-host").trim().toLowerCase();
-  return `${host}:${value}:${currency}`;
+  return host;
 }
 
 function parseMoney(value) {
@@ -743,6 +740,8 @@ function estimatedPurchaseGroups(items) {
     const currency = String(item.currency || "").trim().toUpperCase();
     if (group) {
       group.lastSeen = timestamp;
+      if (group.amount === null && amount !== null) group.amount = amount;
+      if (!group.currency && currency) group.currency = currency;
       continue;
     }
     groups.push({ signature, firstSeen: timestamp, lastSeen: timestamp, amount, currency });
@@ -1095,227 +1094,193 @@ async function persistDailySummary(summary) {
 
 async function summarizeRequestsToday(pathname) {
   const token = nginxDateToken();
-
-  return new Promise((resolve) => {
-    let count = 0;
-    let errors = 0;
-    let totalLines = 0;
-    let noise = 0;
-    let botNoise = 0;
-    const events = new Map();
-    const clients = new Map();
-    const hosts = new Map();
-    const noiseReasons = new Map();
-    const purchaseKeys = new Set();
-    const purchaseOrders = new Map();
-    const estimatedPurchases = [];
-    let purchaseMissingKeys = 0;
-    let rawPurchaseRevenue = 0;
-    const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
-    const recentEvents = [];
-    let settled = false;
-    const stream = createReadStream(pathname, { encoding: "utf8" });
-    const reader = createInterface({ input: stream, crlfDelay: Infinity });
-    const resolveOnce = (result) => {
-      if (settled) return;
-      settled = true;
-      resolve(result);
-    };
-
-    reader.on("line", (line) => {
-      if (!line.includes(token)) return;
-      totalLines += 1;
-      const parsed = parseTrackingAccessLine(line);
-      if (!parsed) {
-        const generic = parseAccessLine(line);
-        const reason = classifyNoise(line, generic);
-        noise += 1;
-        if (reason.includes("scan") || reason === "Crawler") botNoise += 1;
-        const current = noiseReasons.get(reason) || { count: 0 };
-        current.count += 1;
-        noiseReasons.set(reason, current);
-        return;
-      }
-
-      count += 1;
-      if (Number(parsed.status) >= 400) errors += 1;
-      if (parsed.date) {
-        const bucket = hourly[parsed.date.getHours()];
-        bucket.total += 1;
-        if (Number(parsed.status) >= 400) bucket.errors += 1;
-        if (parsed.eventName === "Purchase") bucket.purchases += 1;
-      }
-
-      if (parsed.eventName === "Purchase") {
-        const key = purchaseIdentity(parsed);
-        const amount = parseMoney(parsed.value);
-        const currency = String(parsed.currency || "").trim().toUpperCase();
-        if (amount !== null) rawPurchaseRevenue += amount;
-        if (key) {
-          purchaseKeys.add(key);
-          if (!purchaseOrders.has(key)) {
-            purchaseOrders.set(key, { amount, currency });
-          }
-        } else if (parsed.date) {
-          estimatedPurchases.push(parsed);
-        } else {
-          purchaseMissingKeys += 1;
-          purchaseOrders.set(`missing:${purchaseMissingKeys}`, { amount, currency });
-        }
-      }
-
-      const event = events.get(parsed.eventName) || { count: 0, errors: 0, lastSeen: null };
-      event.count += 1;
-      if (Number(parsed.status) >= 400) event.errors += 1;
-      if (parsed.date && (!event.lastSeen || parsed.date > event.lastSeen)) event.lastSeen = parsed.date;
-      events.set(parsed.eventName, event);
-
-      const client = clients.get(parsed.client) || { count: 0, errors: 0, lastSeen: null };
-      client.count += 1;
-      if (Number(parsed.status) >= 400) client.errors += 1;
-      if (parsed.date && (!client.lastSeen || parsed.date > client.lastSeen)) client.lastSeen = parsed.date;
-      clients.set(parsed.client, client);
-
-      const hostName = parsed.host || "Unknown host";
-      const host = hosts.get(hostName) || { count: 0, errors: 0, lastSeen: null };
-      host.count += 1;
-      if (Number(parsed.status) >= 400) host.errors += 1;
-      if (parsed.date && (!host.lastSeen || parsed.date > host.lastSeen)) host.lastSeen = parsed.date;
-      hosts.set(hostName, host);
-
-      recentEvents.push(serializeEventRow(parsed));
-      if (recentEvents.length > config.eventLogLimit) recentEvents.shift();
-    });
-    reader.on("close", () => {
-      const purchaseEvent = events.get("Purchase");
-      const estimatedGroups = estimatedPurchaseGroups(estimatedPurchases);
-      for (const [index, group] of estimatedGroups.entries()) {
-        purchaseOrders.set(`estimated:${index}:${group.signature}:${group.firstSeen}`, {
-          amount: group.amount,
-          currency: group.currency
-        });
-      }
-      const purchaseCurrencies = new Set([...purchaseOrders.values()].map((item) => item.currency).filter(Boolean));
-      const revenueCurrency = purchaseCurrencies.size === 1 ? [...purchaseCurrencies][0] : "";
-      const uniquePurchaseRevenue = [...purchaseOrders.values()].reduce((total, item) => (
-        item.amount === null ? total : total + item.amount
-      ), 0);
-      const uniquePurchaseCount = purchaseOrders.size;
-      const rawPurchaseCount = Number(purchaseEvent?.count || 0);
-      const duplicatePurchaseCount = Math.max(0, rawPurchaseCount - uniquePurchaseCount);
-      const averageOrderValue = uniquePurchaseCount ? uniquePurchaseRevenue / uniquePurchaseCount : 0;
-      if (purchaseEvent) {
-        purchaseEvent.uniqueCount = uniquePurchaseCount;
-        purchaseEvent.rawCount = rawPurchaseCount;
-        purchaseEvent.duplicateCount = duplicatePurchaseCount;
-        purchaseEvent.keyedCount = purchaseKeys.size;
-        purchaseEvent.estimatedKeyCount = estimatedGroups.length;
-        purchaseEvent.missingKeyCount = purchaseMissingKeys;
-        purchaseEvent.uniqueRevenue = uniquePurchaseRevenue;
-        purchaseEvent.rawRevenue = rawPurchaseRevenue;
-        purchaseEvent.averageOrderValue = averageOrderValue;
-        purchaseEvent.currency = revenueCurrency;
-        events.set("Purchase", purchaseEvent);
-      }
-      resolveOnce({
-        available: true,
-        count,
-        errors,
-        totalLines,
-        noise,
-        botNoise,
-        token,
-        path: pathname,
-        filter: "tracking-only",
-        trackingPaths: config.trackingPaths,
-        events: serializeSummaryMap(events),
-        clients: serializeSummaryMap(clients),
-        hosts: serializeSummaryMap(hosts),
-        purchases: {
-          rawCount: rawPurchaseCount,
-          uniqueCount: uniquePurchaseCount,
-          duplicateCount: duplicatePurchaseCount,
-          keyedCount: purchaseKeys.size,
-          estimatedKeyCount: estimatedGroups.length,
-          missingKeyCount: purchaseMissingKeys,
-          uniqueRevenue: uniquePurchaseRevenue,
-          rawRevenue: rawPurchaseRevenue,
-          averageOrderValue,
-          currency: revenueCurrency
-        },
-        hourly,
-        noiseReasons: serializeSummaryMap(noiseReasons),
-        recentEvents: recentEvents.reverse(),
-        eventLogLimit: config.eventLogLimit
-      });
-    });
-    reader.on("error", (error) => {
-      resolveOnce({
-        available: false,
-        count: 0,
-        errors: 0,
-        totalLines: 0,
-        noise: 0,
-        botNoise: 0,
-        token,
-        path: pathname,
-        message: "Request count could not be calculated.",
-        detail: error.message,
-        events: [],
-        clients: [],
-        hosts: [],
-        hourly: [],
-        noiseReasons: [],
-        recentEvents: [],
-        purchases: {
-          rawCount: 0,
-          uniqueCount: 0,
-          duplicateCount: 0,
-          keyedCount: 0,
-          estimatedKeyCount: 0,
-          missingKeyCount: 0,
-          uniqueRevenue: 0,
-          rawRevenue: 0,
-          averageOrderValue: 0,
-          currency: ""
-        },
-        eventLogLimit: config.eventLogLimit
-      });
-    });
-    stream.on("error", (error) => {
-      resolveOnce({
-        available: false,
-        count: 0,
-        errors: 0,
-        totalLines: 0,
-        noise: 0,
-        botNoise: 0,
-        token,
-        path: pathname,
-        message: "Request count could not be calculated.",
-        detail: error.message,
-        events: [],
-        clients: [],
-        hosts: [],
-        hourly: [],
-        noiseReasons: [],
-        recentEvents: [],
-        purchases: {
-          rawCount: 0,
-          uniqueCount: 0,
-          duplicateCount: 0,
-          keyedCount: 0,
-          estimatedKeyCount: 0,
-          missingKeyCount: 0,
-          uniqueRevenue: 0,
-          rawRevenue: 0,
-          averageOrderValue: 0,
-          currency: ""
-        },
-        eventLogLimit: config.eventLogLimit
-      });
-    });
+  const emptyPurchases = {
+    rawCount: 0,
+    uniqueCount: 0,
+    duplicateCount: 0,
+    keyedCount: 0,
+    estimatedKeyCount: 0,
+    missingKeyCount: 0,
+    uniqueRevenue: 0,
+    rawRevenue: 0,
+    averageOrderValue: 0,
+    currency: ""
+  };
+  const tail = await command("tail", ["-n", String(config.summaryTailLines), pathname], {
+    maxBuffer: Math.max(5 * 1024 * 1024, config.summaryTailLines * 1024)
   });
+  if (!tail.ok) {
+    return {
+      available: false,
+      count: 0,
+      errors: 0,
+      totalLines: 0,
+      noise: 0,
+      botNoise: 0,
+      token,
+      path: pathname,
+      message: "Request count could not be calculated.",
+      detail: tail.stderr || tail.error,
+      events: [],
+      clients: [],
+      hosts: [],
+      hourly: [],
+      noiseReasons: [],
+      recentEvents: [],
+      purchases: emptyPurchases,
+      eventLogLimit: config.eventLogLimit,
+      summaryTailLines: config.summaryTailLines
+    };
+  }
+
+  let count = 0;
+  let errors = 0;
+  let totalLines = 0;
+  let noise = 0;
+  let botNoise = 0;
+  let rawPurchaseRevenue = 0;
+  let purchaseMissingKeys = 0;
+  const events = new Map();
+  const clients = new Map();
+  const hosts = new Map();
+  const noiseReasons = new Map();
+  const purchaseKeys = new Set();
+  const purchaseOrders = new Map();
+  const estimatedPurchases = [];
+  const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
+  const recentEvents = [];
+  const lines = splitLines(tail.stdout);
+
+  for (const line of lines) {
+    if (!line.includes(token)) continue;
+    totalLines += 1;
+    const parsed = parseTrackingAccessLine(line);
+    if (!parsed) {
+      const generic = parseAccessLine(line);
+      const reason = classifyNoise(line, generic);
+      noise += 1;
+      if (reason.includes("scan") || reason === "Crawler") botNoise += 1;
+      const current = noiseReasons.get(reason) || { count: 0 };
+      current.count += 1;
+      noiseReasons.set(reason, current);
+      continue;
+    }
+
+    count += 1;
+    if (Number(parsed.status) >= 400) errors += 1;
+    if (parsed.date) {
+      const bucket = hourly[parsed.date.getHours()];
+      bucket.total += 1;
+      if (Number(parsed.status) >= 400) bucket.errors += 1;
+      if (parsed.eventName === "Purchase") bucket.purchases += 1;
+    }
+
+    if (parsed.eventName === "Purchase") {
+      const key = purchaseIdentity(parsed);
+      const amount = parseMoney(parsed.value);
+      const currency = String(parsed.currency || "").trim().toUpperCase();
+      if (amount !== null) rawPurchaseRevenue += amount;
+      if (key) {
+        purchaseKeys.add(key);
+        if (!purchaseOrders.has(key)) purchaseOrders.set(key, { amount, currency });
+      } else if (parsed.date) {
+        estimatedPurchases.push(parsed);
+      } else {
+        purchaseMissingKeys += 1;
+        purchaseOrders.set(`missing:${purchaseMissingKeys}`, { amount, currency });
+      }
+    }
+
+    const event = events.get(parsed.eventName) || { count: 0, errors: 0, lastSeen: null };
+    event.count += 1;
+    if (Number(parsed.status) >= 400) event.errors += 1;
+    if (parsed.date && (!event.lastSeen || parsed.date > event.lastSeen)) event.lastSeen = parsed.date;
+    events.set(parsed.eventName, event);
+
+    const client = clients.get(parsed.client) || { count: 0, errors: 0, lastSeen: null };
+    client.count += 1;
+    if (Number(parsed.status) >= 400) client.errors += 1;
+    if (parsed.date && (!client.lastSeen || parsed.date > client.lastSeen)) client.lastSeen = parsed.date;
+    clients.set(parsed.client, client);
+
+    const hostName = parsed.host || "Unknown host";
+    const host = hosts.get(hostName) || { count: 0, errors: 0, lastSeen: null };
+    host.count += 1;
+    if (Number(parsed.status) >= 400) host.errors += 1;
+    if (parsed.date && (!host.lastSeen || parsed.date > host.lastSeen)) host.lastSeen = parsed.date;
+    hosts.set(hostName, host);
+
+    recentEvents.push(serializeEventRow(parsed));
+    if (recentEvents.length > config.eventLogLimit) recentEvents.shift();
+  }
+
+  const purchaseEvent = events.get("Purchase");
+  const estimatedGroups = estimatedPurchaseGroups(estimatedPurchases);
+  for (const [index, group] of estimatedGroups.entries()) {
+    purchaseOrders.set(`estimated:${index}:${group.signature}:${group.firstSeen}`, {
+      amount: group.amount,
+      currency: group.currency
+    });
+  }
+  const purchaseCurrencies = new Set([...purchaseOrders.values()].map((item) => item.currency).filter(Boolean));
+  const revenueCurrency = purchaseCurrencies.size === 1 ? [...purchaseCurrencies][0] : "";
+  const uniquePurchaseRevenue = [...purchaseOrders.values()].reduce((total, item) => (
+    item.amount === null ? total : total + item.amount
+  ), 0);
+  const uniquePurchaseCount = purchaseOrders.size;
+  const rawPurchaseCount = Number(purchaseEvent?.count || 0);
+  const duplicatePurchaseCount = Math.max(0, rawPurchaseCount - uniquePurchaseCount);
+  const averageOrderValue = uniquePurchaseCount ? uniquePurchaseRevenue / uniquePurchaseCount : 0;
+  const purchases = {
+    rawCount: rawPurchaseCount,
+    uniqueCount: uniquePurchaseCount,
+    duplicateCount: duplicatePurchaseCount,
+    keyedCount: purchaseKeys.size,
+    estimatedKeyCount: estimatedGroups.length,
+    missingKeyCount: purchaseMissingKeys,
+    uniqueRevenue: uniquePurchaseRevenue,
+    rawRevenue: rawPurchaseRevenue,
+    averageOrderValue,
+    currency: revenueCurrency
+  };
+  if (purchaseEvent) {
+    Object.assign(purchaseEvent, {
+      uniqueCount: uniquePurchaseCount,
+      rawCount: rawPurchaseCount,
+      duplicateCount: duplicatePurchaseCount,
+      keyedCount: purchaseKeys.size,
+      estimatedKeyCount: estimatedGroups.length,
+      missingKeyCount: purchaseMissingKeys,
+      uniqueRevenue: uniquePurchaseRevenue,
+      rawRevenue: rawPurchaseRevenue,
+      averageOrderValue,
+      currency: revenueCurrency
+    });
+    events.set("Purchase", purchaseEvent);
+  }
+
+  return {
+    available: true,
+    count,
+    errors,
+    totalLines,
+    noise,
+    botNoise,
+    token,
+    path: pathname,
+    filter: "tracking-only",
+    trackingPaths: config.trackingPaths,
+    sampledLines: lines.length,
+    summaryTailLines: config.summaryTailLines,
+    events: serializeSummaryMap(events),
+    clients: serializeSummaryMap(clients),
+    hosts: serializeSummaryMap(hosts),
+    purchases,
+    hourly,
+    noiseReasons: serializeSummaryMap(noiseReasons),
+    recentEvents: recentEvents.reverse(),
+    eventLogLimit: config.eventLogLimit
+  };
 }
 
 function parseOpenSslDate(value) {
@@ -1478,6 +1443,7 @@ async function getDashboardData() {
       errorLog: config.errorLog,
       usingDedicatedLogs: config.usingDedicatedLogs,
       logTailLines: config.logTailLines,
+      summaryTailLines: config.summaryTailLines,
       eventLogLimit: config.eventLogLimit,
       dataDir: config.dataDir,
       historyRetentionDays: config.historyRetentionDays,

@@ -1053,7 +1053,9 @@ function renderDashboard(data) {
 
   const requestCount = data.nginx.requestCountToday;
   els.requestCount.textContent = requestCount.available ? requestCount.count.toLocaleString() : "--";
-  els.requestDetail.textContent = requestCount.available ? `Matched ${requestCount.token}` : text(requestCount.detail, requestCount.message);
+  els.requestDetail.textContent = requestCount.available
+    ? `Matched ${requestCount.token} in latest ${Number(requestCount.sampledLines || requestCount.summaryTailLines || 0).toLocaleString()} lines`
+    : text(requestCount.detail, requestCount.message);
 
   if (data.ssl.available) {
     els.sslDays.textContent = `${data.ssl.daysRemaining}d`;
@@ -1412,6 +1414,7 @@ function renderSettings(data) {
     ["Nginx error log", data.config?.errorLog],
     ["SSL source", data.ssl?.source || data.config?.sslDomain || "Not configured"],
     ["Log tail lines", data.config?.logTailLines],
+    ["Summary scan lines", data.config?.summaryTailLines],
     ["Event log limit", data.config?.eventLogLimit],
     ["Data directory", data.config?.dataDir],
     ["History retention", `${text(data.config?.historyRetentionDays, "0")} days`],
