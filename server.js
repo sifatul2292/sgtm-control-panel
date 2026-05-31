@@ -704,12 +704,10 @@ function parseTrackingAccessLine(line) {
   };
 }
 
-function purchaseIdentity(item) {
+function purchaseTransactionIdentity(item) {
   if (item.eventName !== "Purchase") return "";
   const transactionId = String(item.transactionId || "").trim();
   if (transactionId) return `transaction:${transactionId}`;
-  const eventId = String(item.eventId || "").trim();
-  if (eventId) return `event:${eventId}`;
   return "";
 }
 
@@ -1176,7 +1174,7 @@ async function summarizeRequestsToday(pathname) {
     }
 
     if (parsed.eventName === "Purchase") {
-      const key = purchaseIdentity(parsed);
+      const key = purchaseTransactionIdentity(parsed);
       const amount = parseMoney(parsed.value);
       const currency = String(parsed.currency || "").trim().toUpperCase();
       if (amount !== null) rawPurchaseRevenue += amount;
