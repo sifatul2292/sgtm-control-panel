@@ -43,6 +43,10 @@ const config = {
 
 const authSecret = config.authSecret || config.authPassword || randomBytes(32).toString("hex");
 const PURCHASE_ESTIMATE_WINDOW_MS = 5 * 60 * 1000;
+const DASHBOARD_COMMAND_TIMEOUT_MS = 1000;
+const DOCKER_INSPECT_TIMEOUT_MS = 700;
+const DOCKER_LOG_TIMEOUT_MS = 600;
+const SSL_NETWORK_TIMEOUT_MS = 1000;
 const alertMemory = new Map();
 const databasePath = join(config.dataDir, "history.json");
 
@@ -260,7 +264,7 @@ function command(commandName, args, options = {}) {
   });
 }
 
-function runWithInput(commandName, args, input) {
+function runWithInput(commandName, args, input, timeout = 5000) {
   return new Promise((resolve) => {
     const child = spawn(commandName, args, { stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
@@ -270,7 +274,7 @@ function runWithInput(commandName, args, input) {
       settled = true;
       child.kill("SIGTERM");
       resolve({ ok: false, stdout, stderr, error: "Command timed out" });
-    }, 5000);
+    }, timeout);
 
     child.stdout.on("data", (chunk) => {
       stdout += chunk;
@@ -290,6 +294,25 @@ function runWithInput(commandName, args, input) {
     });
 
     child.stdin.end(input);
+  });
+}
+
+function timeoutResult(message, detail = "Collector timed out.") {
+  return unavailable(message, detail);
+}
+
+function withTimeout(promise, timeout, fallback) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), timeout);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        resolve(unavailable(fallback.message || "Collector failed.", error.message));
+      });
   });
 }
 
@@ -345,6 +368,7 @@ async function sendAlertHooks(alerts) {
     await fetch(config.alertWebhookUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
+      signal: AbortSignal.timeout(1000),
       body: JSON.stringify({
         source: "sgtm-control-panel",
         generatedAt: new Date().toISOString(),
@@ -362,7 +386,7 @@ async function getDockerSummary() {
     "-a",
     "--format",
     "{{json .}}"
-  ]);
+  ], { timeout: DASHBOARD_COMMAND_TIMEOUT_MS });
 
   if (!ps.ok) {
     return {
@@ -423,7 +447,7 @@ async function addDockerInspectState(containers) {
     "--format",
     "{{json .State}}",
     ...containers.map((container) => container.id)
-  ]);
+  ], { timeout: DOCKER_INSPECT_TIMEOUT_MS });
 
   if (!inspect.ok) return containers;
 
@@ -466,7 +490,7 @@ async function getDockerLogs(containers) {
     "--tail",
     String(config.logTailLines),
     running.id
-  ]);
+  ], { timeout: DOCKER_LOG_TIMEOUT_MS });
 
   if (!logs.ok) {
     return unavailable("Docker logs are not available.", logs.stderr || logs.error);
@@ -503,7 +527,7 @@ function filterLogLinesForHosts(lines) {
 }
 
 async function tailFile(pathname, lineCount) {
-  const result = await command("tail", ["-n", String(lineCount), pathname]);
+  const result = await command("tail", ["-n", String(lineCount), pathname], { timeout: DASHBOARD_COMMAND_TIMEOUT_MS });
   if (!result.ok) {
     return {
       available: false,
@@ -1105,6 +1129,7 @@ async function summarizeRequestsToday(pathname) {
     currency: ""
   };
   const tail = await command("tail", ["-n", String(config.summaryTailLines), pathname], {
+    timeout: DASHBOARD_COMMAND_TIMEOUT_MS,
     maxBuffer: Math.max(5 * 1024 * 1024, config.summaryTailLines * 1024)
   });
   if (!tail.ok) {
@@ -1296,7 +1321,9 @@ function parseOpenSslDate(value) {
 }
 
 async function getSslFromCertFile(pathname) {
-  const result = await command("openssl", ["x509", "-enddate", "-noout", "-in", pathname]);
+  const result = await command("openssl", ["x509", "-enddate", "-noout", "-in", pathname], {
+    timeout: DASHBOARD_COMMAND_TIMEOUT_MS
+  });
   if (!result.ok) {
     return unavailable("SSL certificate file could not be inspected.", result.stderr || result.error);
   }
@@ -1315,13 +1342,13 @@ async function getSslFromDomain(domain, port) {
     "-connect",
     `${domain}:${port}`,
     "-showcerts"
-  ]);
+  ], { timeout: SSL_NETWORK_TIMEOUT_MS });
 
   if (!sClient.ok && !sClient.stdout) {
     return unavailable("SSL domain could not be reached.", sClient.stderr || sClient.error);
   }
 
-  const x509 = await runWithInput("openssl", ["x509", "-enddate", "-noout"], sClient.stdout);
+  const x509 = await runWithInput("openssl", ["x509", "-enddate", "-noout"], sClient.stdout, DASHBOARD_COMMAND_TIMEOUT_MS);
   if (!x509.ok) {
     return unavailable("SSL expiry date could not be inspected.", x509.stderr || x509.error);
   }
@@ -1403,7 +1430,11 @@ async function getDashboardData() {
   ]);
 
   const dockerLogs = docker.available
-    ? await getDockerLogs(docker.containers)
+    ? await withTimeout(
+      getDockerLogs(docker.containers),
+      DOCKER_LOG_TIMEOUT_MS + 200,
+      timeoutResult("Docker logs are not available.", "Docker log collection timed out.")
+    )
     : unavailable("Docker logs are not available because Docker could not be queried.", docker.detail);
 
   if (errorLog.available) {
@@ -1416,7 +1447,7 @@ async function getDashboardData() {
   const provisioning = await getProvisioningSummary();
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
-  await sendAlertHooks(alerts);
+  void sendAlertHooks(alerts);
 
   return {
     generatedAt: new Date().toISOString(),
