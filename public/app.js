@@ -74,6 +74,13 @@ const els = {
   provisioningQueueBadge: document.querySelector("#provisioningQueueBadge"),
   provisioningRequests: document.querySelector("#provisioningRequests"),
   adminBadge: document.querySelector("#adminBadge"),
+  ownerMetricGrid: document.querySelector("#ownerMetricGrid"),
+  ownerWatchBadge: document.querySelector("#ownerWatchBadge"),
+  ownerIssueList: document.querySelector("#ownerIssueList"),
+  ownerInfraBadge: document.querySelector("#ownerInfraBadge"),
+  ownerInfraList: document.querySelector("#ownerInfraList"),
+  ownerCustomerBadge: document.querySelector("#ownerCustomerBadge"),
+  ownerCustomerTable: document.querySelector("#ownerCustomerTable"),
   customersBadge: document.querySelector("#customersBadge"),
   customersList: document.querySelector("#customersList"),
   adminActions: document.querySelector("#adminActions"),
@@ -1648,8 +1655,121 @@ function renderProvisioning(data) {
   });
 }
 
+function lifecycleStatusClass(status) {
+  const value = String(status || "").toLowerCase();
+  if (["active", "trial", "healthy", "paid"].includes(value)) return "healthy";
+  if (["cancelled", "canceled", "expired", "overdue", "unpaid", "over_limit", "purchase_attention"].includes(value)) return "error";
+  return "warning";
+}
+
+function renderMetricCards(el, items) {
+  el.replaceChildren(
+    ...items.map((item) => {
+      const card = document.createElement("article");
+      card.className = "metric-card";
+      card.innerHTML = `
+        <span class="metric-label">${escapeHtml(item.label)}</span>
+        <strong>${escapeHtml(item.value)}</strong>
+        <small>${escapeHtml(item.detail)}</small>
+      `;
+      return card;
+    })
+  );
+}
+
+function statusPill(label, status) {
+  return `<span class="state ${stateClass(status)}">${escapeHtml(label)}</span>`;
+}
+
+function trackingStatusLabel(customer) {
+  if (customer.brokenPurchaseTracking) return ["Purchase attention", "error"];
+  if (customer.noTrackingToday) return ["No tracking today", "warning"];
+  return ["Healthy", "healthy"];
+}
+
+function renderOwnerDashboard(data) {
+  const owner = data.owner || {};
+  const metrics = owner.metrics || {};
+  const customers = owner.customers || [];
+  const infra = owner.infrastructure || {};
+  const currency = owner.currency || "BDT";
+  const issueCount = (owner.issues || []).filter((issue) => issue.status !== "healthy").length;
+
+  renderMetricCards(els.ownerMetricGrid, [
+    { label: "Customers", value: Number(metrics.totalCustomers || 0).toLocaleString(), detail: `${Number(metrics.activeCustomers || 0)} active · ${Number(metrics.trialCustomers || 0)} trial` },
+    { label: "MRR", value: formatMoney(metrics.mrr || 0, currency), detail: `${Number(metrics.healthySubscriptions || 0)} paid or good subscriptions` },
+    { label: "Subscription issues", value: Number(metrics.overdueCustomers || 0).toLocaleString(), detail: `${Number(metrics.pendingCustomers || 0)} pending · ${Number(metrics.cancelledCustomers || 0)} cancelled` },
+    { label: "Requests today", value: Number(metrics.requestsToday || 0).toLocaleString(), detail: `${Number(metrics.requestsMonth || 0).toLocaleString()} requests this month` },
+    { label: "No tracking today", value: Number(metrics.noTrackingToday || 0).toLocaleString(), detail: "Active customers with zero requests" },
+    { label: "Purchase issues", value: Number(metrics.brokenPurchaseTracking || 0).toLocaleString(), detail: "Undertracked, overtracked, or waiting purchases" },
+    { label: "Unhealthy customers", value: Number(metrics.unhealthyCustomers || 0).toLocaleString(), detail: "Container health needs attention" },
+    { label: "SSL attention", value: Number(metrics.sslAttention || 0).toLocaleString(), detail: "Certificates expiring within 14 days" }
+  ]);
+
+  els.ownerWatchBadge.className = `badge ${issueCount ? "warn" : "ok"}`;
+  els.ownerWatchBadge.textContent = issueCount ? `${issueCount} issue${issueCount === 1 ? "" : "s"}` : "Clear";
+  renderSummaryList(els.ownerIssueList, owner.issues?.length ? owner.issues : [
+    { label: "Owner watchlist", value: "No owner dashboard data yet", status: "warning" }
+  ]);
+
+  const unhealthyContainers = Number(infra.unhealthyContainers || 0);
+  els.ownerInfraBadge.className = `badge ${unhealthyContainers ? "danger" : "ok"}`;
+  els.ownerInfraBadge.textContent = unhealthyContainers ? `${unhealthyContainers} unhealthy` : "Healthy";
+  renderSummaryList(els.ownerInfraList, [
+    { label: "Docker", value: infra.dockerAvailable ? "Available" : "Unavailable", status: infra.dockerAvailable ? "healthy" : "error" },
+    { label: "Containers", value: `${Number(infra.runningContainers || 0).toLocaleString()} running / ${Number(infra.totalContainers || 0).toLocaleString()} total`, status: unhealthyContainers ? "warning" : "healthy" },
+    { label: "Unhealthy containers", value: unhealthyContainers.toLocaleString(), status: unhealthyContainers ? "error" : "healthy" },
+    { label: "SSL", value: infra.sslAvailable ? `${infra.sslDaysRemaining} days remaining` : "Not configured", status: infra.sslAvailable && Number(infra.sslDaysRemaining) > 14 ? "healthy" : "warning" }
+  ]);
+
+  els.ownerCustomerBadge.className = `badge ${customers.length ? "ok" : "warn"}`;
+  els.ownerCustomerBadge.textContent = `${customers.length} customer${customers.length === 1 ? "" : "s"}`;
+  if (!customers.length) {
+    els.ownerCustomerTable.innerHTML = '<tr><td colspan="7">No customers yet.</td></tr>';
+    return;
+  }
+
+  els.ownerCustomerTable.innerHTML = customers.map((customer) => {
+    const [trackingLabel, trackingStatus] = trackingStatusLabel(customer);
+    const usagePercent = Number(customer.usagePercent || 0);
+    const containerText = `${Number(customer.containers?.running || 0)}/${Number(customer.containers?.total || 0)} running`;
+    const hasSslDays = customer.sslDaysRemaining !== null && customer.sslDaysRemaining !== undefined && customer.sslDaysRemaining !== "" && Number.isFinite(Number(customer.sslDaysRemaining));
+    const sslText = hasSslDays ? `${customer.sslDaysRemaining}d SSL` : "SSL n/a";
+    return `
+      <tr>
+        <td>
+          <strong>${escapeHtml(customer.name || customer.id)}</strong>
+          <span class="owner-subtext">${escapeHtml(customer.domain || "No domain")}</span>
+        </td>
+        <td>
+          ${statusPill(customer.subscriptionStatus || "unknown", lifecycleStatusClass(customer.subscriptionStatus))}
+          <span class="owner-subtext">${escapeHtml(customer.plan || "No plan")}${customer.renewalDate ? ` · renews ${escapeHtml(formatShortDate(customer.renewalDate))}` : ""}</span>
+        </td>
+        <td>
+          ${statusPill(customer.paymentStatus || "unknown", lifecycleStatusClass(customer.paymentStatus))}
+          <span class="owner-subtext">${customer.unpaid ? "Needs billing follow-up" : "Payment okay"}</span>
+        </td>
+        <td>${escapeHtml(formatMoney(customer.monthlyAmount || 0, currency))}</td>
+        <td>
+          <strong>${Number(customer.requestsMonth || 0).toLocaleString()}</strong>
+          <span class="owner-subtext">${usagePercent}% of ${Number(customer.requestLimit || 0).toLocaleString()}</span>
+        </td>
+        <td>
+          ${statusPill(trackingLabel, trackingStatus)}
+          <span class="owner-subtext">${Number(customer.requestsToday || 0).toLocaleString()} requests today${customer.purchaseCoverage !== null ? ` · ${customer.purchaseCoverage}% purchase coverage` : ""}</span>
+        </td>
+        <td>
+          ${statusPill(containerText, customer.containers?.unhealthy ? "error" : "healthy")}
+          <span class="owner-subtext">${escapeHtml(sslText)}</span>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
 function renderAdmin(data) {
-  const customers = data.customers?.tenants || [];
+  renderOwnerDashboard(data);
+  const customers = data.owner?.customers || data.customers?.tenants || [];
   els.adminBadge.textContent = customers.length ? `${customers.length} tenant${customers.length === 1 ? "" : "s"}` : "No tenants";
   els.customersBadge.className = `badge ${customers.length ? "ok" : "warn"}`;
   els.customersBadge.textContent = `${customers.length} customer${customers.length === 1 ? "" : "s"}`;
@@ -1659,8 +1779,8 @@ function renderAdmin(data) {
     customers.length
       ? customers.map((customer) => ({
         label: customer.name || customer.id,
-        value: `${customer.domain || "No domain"} · ${customer.plan || "No plan"} · ${String(customer.status || "unknown").replaceAll("_", " ")}`,
-        status: customer.status === "active" ? "healthy" : "warning"
+        value: `${customer.domain || "No domain"} · ${customer.plan || "No plan"} · ${String(customer.subscriptionStatus || customer.status || "unknown").replaceAll("_", " ")}`,
+        status: customer.subscriptionStatus === "active" && !customer.unpaid ? "healthy" : "warning"
       }))
       : [{ label: "Customer model", value: "Configure TENANT_* or create provisioning requests", status: "warning" }]
   );

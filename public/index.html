@@ -635,6 +635,62 @@
             <span id="adminBadge" class="status-dot">Checking</span>
           </section>
 
+          <section class="metrics-grid owner-metrics" id="ownerMetricGrid" aria-label="Owner metrics"></section>
+
+          <section class="split-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Owner Watchlist</h2>
+                  <p>Subscriptions, tracking gaps, SSL, and infrastructure issues that need attention.</p>
+                </div>
+                <span id="ownerWatchBadge" class="badge">Checking</span>
+              </div>
+              <div id="ownerIssueList" class="summary-list"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Infrastructure</h2>
+                  <p>Fleet-level Docker and SSL status across managed customer instances.</p>
+                </div>
+                <span id="ownerInfraBadge" class="badge">Checking</span>
+              </div>
+              <div id="ownerInfraList" class="summary-list"></div>
+            </article>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Customer Subscriptions</h2>
+                <p>Plan, payment, renewal, usage, container health, and tracking status for every customer.</p>
+              </div>
+              <span id="ownerCustomerBadge" class="badge">0 customers</span>
+            </div>
+            <div class="event-table-wrap">
+              <table class="event-table owner-table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Subscription</th>
+                    <th>Payment</th>
+                    <th>MRR</th>
+                    <th>Usage</th>
+                    <th>Tracking</th>
+                    <th>Infrastructure</th>
+                  </tr>
+                </thead>
+                <tbody id="ownerCustomerTable">
+                  <tr>
+                    <td colspan="7">Waiting for customers...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
           <section class="split-grid">
             <article class="panel">
               <div class="panel-header">

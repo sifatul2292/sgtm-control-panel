@@ -43,6 +43,10 @@ const config = {
   tenantName: process.env.TENANT_NAME || "Default Customer",
   tenantDomain: process.env.TENANT_DOMAIN || "",
   billingPlan: process.env.BILLING_PLAN || "Starter",
+  subscriptionStatus: process.env.SUBSCRIPTION_STATUS || "active",
+  paymentStatus: process.env.PAYMENT_STATUS || "paid",
+  renewalDate: process.env.RENEWAL_DATE || "",
+  monthlyAmount: Number(process.env.MONTHLY_AMOUNT || 0),
   monthlyRequestLimit: Number(process.env.MONTHLY_REQUEST_LIMIT || 100000),
   monthlyContainerLimit: Number(process.env.MONTHLY_CONTAINER_LIMIT || 1),
   customerSupportEmail: process.env.CUSTOMER_SUPPORT_EMAIL || "",
@@ -1056,6 +1060,199 @@ function orderBreakdown(orders, key) {
   return [...counts.values()].sort((a, b) => b.count - a.count);
 }
 
+const planMonthlyAmounts = {
+  Starter: 1500,
+  Growth: 3000,
+  Pro: 6000,
+  Agency: 12000
+};
+
+function monthlyAmountForPlan(planName) {
+  return planMonthlyAmounts[String(planName || "").trim()] || 0;
+}
+
+function normalizeLifecycleStatus(status) {
+  const value = String(status || "").toLowerCase();
+  if (["trial", "active", "cancelled", "canceled", "overdue", "expired"].includes(value)) {
+    return value === "canceled" ? "cancelled" : value;
+  }
+  if (value.includes("pending") || value.includes("prepared")) return "pending";
+  if (value.includes("active") || value.includes("healthy")) return "active";
+  if (value.includes("attention") || value.includes("warning")) return "attention";
+  return value || "unknown";
+}
+
+function normalizeHost(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .split("/")[0]
+    .replace(/:\d+$/, "");
+}
+
+function customerRequestCount(customer, requestSummary) {
+  const hostRows = requestSummary?.hosts || [];
+  const domain = normalizeHost(customer.domain);
+  if (!domain) return customer.source === "environment" ? Number(requestSummary?.count || 0) : 0;
+
+  const count = hostRows
+    .filter((host) => {
+      const name = normalizeHost(host.name);
+      return name === domain || name.endsWith(`.${domain}`) || domain.endsWith(`.${name}`);
+    })
+    .reduce((total, host) => total + Number(host.count || 0), 0);
+
+  return count || (customer.source === "environment" ? Number(requestSummary?.count || 0) : 0);
+}
+
+function customerContainerHealth(customer, docker) {
+  if (!docker?.available) return { total: 0, running: 0, unhealthy: 0 };
+  const terms = [
+    customer.id,
+    customer.name,
+    customer.domain,
+    normalizeHost(customer.domain).split(".")[0]
+  ]
+    .map((item) => sanitizeId(item))
+    .filter(Boolean);
+
+  const matched = (docker.containers || []).filter((container) => {
+    const haystack = sanitizeId(`${container.name || ""}-${container.image || ""}`);
+    return terms.some((term) => term && haystack.includes(term));
+  });
+  const containers = matched.length ? matched : customer.source === "environment" ? (docker.containers || []) : [];
+  return {
+    total: containers.length,
+    running: containers.filter((container) => container.state === "running").length,
+    unhealthy: containers.filter((container) => container.health === "unhealthy").length
+  };
+}
+
+function isPastDate(value) {
+  if (!value) return false;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date < new Date();
+}
+
+function hasNumericValue(value) {
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+}
+
+function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation }) {
+  const enrichedCustomers = (customers.tenants || []).map((customer) => {
+    const plan = customer.plan || config.billingPlan;
+    const requestLimit = Number(customer.requestLimit || config.monthlyRequestLimit || 0);
+    const requestsToday = customerRequestCount(customer, requestSummary);
+    const requestsMonth = customer.source === "environment" ? Number(usage.requestsMonth || requestsToday) : requestsToday;
+    const usagePercent = requestLimit ? Math.round((requestsMonth / requestLimit) * 100) : 0;
+    const containers = customerContainerHealth(customer, docker);
+    const subscriptionStatus = normalizeLifecycleStatus(customer.subscriptionStatus || customer.status || "active");
+    const paymentStatus = normalizeLifecycleStatus(customer.paymentStatus || "paid");
+    const renewalDate = customer.renewalDate || "";
+    const expired = isPastDate(renewalDate) && ["active", "trial"].includes(subscriptionStatus);
+    const unpaid = ["unpaid", "overdue", "expired"].includes(paymentStatus) || ["overdue", "expired"].includes(subscriptionStatus) || expired;
+    const isDefaultCustomer = customer.source === "environment";
+    const brokenPurchaseTracking = isDefaultCustomer && ["undertracked", "overtracked", "waiting"].includes(reconciliation.status);
+    const noTrackingToday = ["active", "trial"].includes(subscriptionStatus) && requestsToday === 0;
+
+    return {
+      ...customer,
+      plan,
+      subscriptionStatus,
+      paymentStatus: unpaid && paymentStatus === "paid" ? "expired" : paymentStatus,
+      renewalDate,
+      monthlyAmount: Number(customer.monthlyAmount || monthlyAmountForPlan(plan)),
+      requestsToday,
+      requestsMonth,
+      requestLimit,
+      usagePercent,
+      usageStatus: requestLimit && usagePercent >= 100 ? "over_limit" : requestLimit && usagePercent >= 80 ? "warning" : "healthy",
+      containers,
+      sslDaysRemaining: isDefaultCustomer ? customer.sslDaysRemaining : customer.sslDaysRemaining ?? null,
+      trackingStatus: brokenPurchaseTracking ? "purchase_attention" : noTrackingToday ? "no_tracking" : "healthy",
+      brokenPurchaseTracking,
+      noTrackingToday,
+      unpaid,
+      expired,
+      ordersToday: isDefaultCustomer ? Number(orders.today?.count || 0) : Number(customer.ordersToday || 0),
+      purchaseCoverage: isDefaultCustomer ? Number(reconciliation.coverage || 0) : null
+    };
+  });
+
+  const lifecycleCounts = enrichedCustomers.reduce((counts, customer) => {
+    const key = customer.subscriptionStatus || "unknown";
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+  const payingCustomers = enrichedCustomers.filter((customer) => ["active", "trial"].includes(customer.subscriptionStatus) && !customer.unpaid);
+  const mrr = payingCustomers.reduce((total, customer) => total + Number(customer.monthlyAmount || 0), 0);
+  const unpaidCustomers = enrichedCustomers.filter((customer) => customer.unpaid);
+  const noTrackingCustomers = enrichedCustomers.filter((customer) => customer.noTrackingToday);
+  const brokenPurchaseCustomers = enrichedCustomers.filter((customer) => customer.brokenPurchaseTracking);
+  const unhealthyCustomers = enrichedCustomers.filter((customer) => customer.containers.unhealthy > 0);
+  const sslAttention = enrichedCustomers.filter((customer) => hasNumericValue(customer.sslDaysRemaining) && Number(customer.sslDaysRemaining) <= 14);
+
+  const issues = [
+    {
+      label: "Unpaid or expired subscriptions",
+      value: unpaidCustomers.length ? unpaidCustomers.map((customer) => customer.name).join(", ") : "None",
+      status: unpaidCustomers.length ? "warning" : "healthy"
+    },
+    {
+      label: "Customers with no tracking today",
+      value: noTrackingCustomers.length ? noTrackingCustomers.map((customer) => customer.name).join(", ") : "None",
+      status: noTrackingCustomers.length ? "warning" : "healthy"
+    },
+    {
+      label: "Broken purchase tracking",
+      value: brokenPurchaseCustomers.length ? brokenPurchaseCustomers.map((customer) => customer.name).join(", ") : "None",
+      status: brokenPurchaseCustomers.length ? "warning" : "healthy"
+    },
+    {
+      label: "Unhealthy containers",
+      value: unhealthyCustomers.length ? unhealthyCustomers.map((customer) => customer.name).join(", ") : "None",
+      status: unhealthyCustomers.length ? "error" : "healthy"
+    },
+    {
+      label: "SSL expiring in 14 days",
+      value: sslAttention.length ? sslAttention.map((customer) => `${customer.name}: ${customer.sslDaysRemaining}d`).join(", ") : "None",
+      status: sslAttention.length ? "warning" : "healthy"
+    }
+  ];
+
+  return {
+    currency: "BDT",
+    metrics: {
+      totalCustomers: enrichedCustomers.length,
+      activeCustomers: lifecycleCounts.active || 0,
+      trialCustomers: lifecycleCounts.trial || 0,
+      pendingCustomers: (lifecycleCounts.pending || 0) + (customers.queued || 0),
+      cancelledCustomers: lifecycleCounts.cancelled || 0,
+      overdueCustomers: unpaidCustomers.length,
+      healthySubscriptions: payingCustomers.length,
+      mrr,
+      requestsToday: enrichedCustomers.reduce((total, customer) => total + Number(customer.requestsToday || 0), 0),
+      requestsMonth: enrichedCustomers.reduce((total, customer) => total + Number(customer.requestsMonth || 0), 0),
+      unhealthyCustomers: unhealthyCustomers.length,
+      sslAttention: sslAttention.length,
+      noTrackingToday: noTrackingCustomers.length,
+      brokenPurchaseTracking: brokenPurchaseCustomers.length
+    },
+    lifecycleCounts,
+    issues,
+    customers: enrichedCustomers,
+    infrastructure: {
+      dockerAvailable: Boolean(docker.available),
+      totalContainers: docker.totals?.total || 0,
+      runningContainers: docker.totals?.running || 0,
+      unhealthyContainers: docker.totals?.unhealthy || 0,
+      sslAvailable: Boolean(ssl.available),
+      sslDaysRemaining: ssl.available ? ssl.daysRemaining : null
+    }
+  };
+}
+
 async function getCustomerCatalog({ docker, ssl, orders }) {
   const loaded = await readDatabase();
   const provisioned = loaded.data.provisioning?.requests || [];
@@ -1066,6 +1263,10 @@ async function getCustomerCatalog({ docker, ssl, orders }) {
     name: config.tenantName,
     domain: defaultDomain,
     plan: config.billingPlan,
+    subscriptionStatus: config.subscriptionStatus,
+    paymentStatus: config.paymentStatus,
+    renewalDate: config.renewalDate,
+    monthlyAmount: config.monthlyAmount || monthlyAmountForPlan(config.billingPlan),
     status: docker.available && (!docker.totals?.unhealthy) ? "active" : "attention",
     requestLimit: config.monthlyRequestLimit,
     containerLimit: config.monthlyContainerLimit,
@@ -1080,6 +1281,10 @@ async function getCustomerCatalog({ docker, ssl, orders }) {
     name: request.instanceName,
     domain: request.domain,
     plan: request.planName || "Pending",
+    subscriptionStatus: "pending",
+    paymentStatus: "pending",
+    renewalDate: "",
+    monthlyAmount: monthlyAmountForPlan(request.planName),
     status: request.status,
     requestLimit: request.requestLimit || config.monthlyRequestLimit,
     containerLimit: 1,
@@ -1812,6 +2017,7 @@ async function getDashboardData() {
   const reconciliation = getReconciliationSummary({ requestSummary, orders });
   const integrations = getIntegrationSummary({ orders, requestSummary });
   const setupWizard = getSetupWizard({ customers, provisioning, integrations, ssl, requestSummary });
+  const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation });
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
   void sendAlertHooks(alerts);
@@ -1832,6 +2038,7 @@ async function getDashboardData() {
     history,
     orders,
     customers,
+    owner,
     usage,
     reconciliation,
     integrations,
@@ -1845,6 +2052,10 @@ async function getDashboardData() {
       tenantName: config.tenantName,
       tenantDomain: config.tenantDomain,
       billingPlan: config.billingPlan,
+      subscriptionStatus: config.subscriptionStatus,
+      paymentStatus: config.paymentStatus,
+      renewalDate: config.renewalDate,
+      monthlyAmount: config.monthlyAmount,
       monthlyRequestLimit: config.monthlyRequestLimit,
       monthlyContainerLimit: config.monthlyContainerLimit,
       customerSupportEmail: config.customerSupportEmail,
