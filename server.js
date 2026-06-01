@@ -53,6 +53,7 @@ const config = {
 
 const authSecret = config.authSecret || config.authPassword || randomBytes(32).toString("hex");
 const PURCHASE_ESTIMATE_WINDOW_MS = 5 * 60 * 1000;
+const EVENT_ESTIMATE_WINDOW_MS = 10 * 1000;
 const DASHBOARD_COMMAND_TIMEOUT_MS = 1000;
 const DOCKER_INSPECT_TIMEOUT_MS = 700;
 const DOCKER_LOG_TIMEOUT_MS = 600;
@@ -733,7 +734,10 @@ function parseTrackingAccessLine(line) {
     value: queryValue(pathname, ["value", "ep.value", "price", "revenue"]),
     currency: queryValue(pathname, ["currency", "ep.currency", "cu"]),
     eventId: queryValue(pathname, ["event_id", "eventId", "eid", "x-fb-event-id"]),
-    transactionId: queryValue(pathname, ["transaction_id", "transactionId", "ep.transaction_id", "tr", "order_id", "orderId"])
+    transactionId: queryValue(pathname, ["transaction_id", "transactionId", "ep.transaction_id", "tr", "order_id", "orderId"]),
+    pageLocation: queryValue(pathname, ["dl", "page_location", "ep.page_location", "url"]),
+    pagePath: queryValue(pathname, ["dp", "page_path", "ep.page_path"]),
+    eventKey: queryValue(pathname, ["_p", "cid", "client_id", "sid", "session_id"])
   };
 }
 
@@ -747,6 +751,46 @@ function purchaseTransactionIdentity(item) {
 function estimatedPurchaseSignature(item) {
   const host = String(item.host || "unknown-host").trim().toLowerCase();
   return host;
+}
+
+function isTrackedBusinessEvent(name) {
+  return ["PageView", "ViewItem", "ViewCart", "AddToCart", "BeginCheckout", "Purchase", "Lead", "Search"].includes(name);
+}
+
+function eventExactIdentity(item) {
+  if (!isTrackedBusinessEvent(item.eventName)) return "";
+  if (item.eventName === "Purchase") return purchaseTransactionIdentity(item);
+  if (item.eventId) return `event:${item.eventName}:${item.eventId}`;
+  if (item.eventKey) return `key:${item.eventName}:${item.eventKey}`;
+  return "";
+}
+
+function eventEstimateSignature(item) {
+  const host = String(item.host || "unknown-host").trim().toLowerCase();
+  const page = String(item.pageLocation || item.pagePath || "").trim().toLowerCase();
+  const ip = String(item.ip || "").trim();
+  return `${item.eventName}|${host}|${page || "no-page"}|${ip || "no-ip"}`;
+}
+
+function markUniqueEvent(item, state) {
+  if (!isTrackedBusinessEvent(item.eventName)) return false;
+  const exact = eventExactIdentity(item);
+  if (exact) {
+    if (state.exact.has(exact)) return false;
+    state.exact.add(exact);
+    return true;
+  }
+
+  if (!item.date) return true;
+  const signature = eventEstimateSignature(item);
+  const timestamp = item.date.getTime();
+  const lastSeen = state.estimated.get(signature);
+  if (lastSeen && timestamp - lastSeen <= EVENT_ESTIMATE_WINDOW_MS) {
+    state.estimated.set(signature, timestamp);
+    return false;
+  }
+  state.estimated.set(signature, timestamp);
+  return true;
 }
 
 function parseMoney(value) {
@@ -809,6 +853,15 @@ function classifyNoise(line, parsed) {
   return "Other non-tracking";
 }
 
+function classifyTrackingNoise(item) {
+  const lower = `${item.path || ""} ${item.agent || ""}`.toLowerCase();
+  if (lower.includes("gtm_debug") || lower.includes("gtm_preview") || lower.includes("tagassistant")) return "Preview/debug traffic";
+  if (/(bot|crawler|spider|headless|phantom|python|curl|wget|httpclient|scrapy|go-http-client|uptime|monitor)/i.test(lower)) {
+    return "Tracking bot";
+  }
+  return "";
+}
+
 function serializeSummaryMap(map) {
   return [...map.entries()]
     .map(([name, value]) => ({ name, ...value, lastSeen: value.lastSeen ? value.lastSeen.toISOString() : null }))
@@ -833,7 +886,10 @@ function serializeEventRow(item) {
     value: item.value,
     currency: item.currency,
     eventId: item.eventId,
-    transactionId: item.transactionId
+    transactionId: item.transactionId,
+    pageLocation: item.pageLocation,
+    pagePath: item.pagePath,
+    eventKey: item.eventKey
   };
 }
 
@@ -1459,6 +1515,7 @@ async function summarizeRequestsToday(pathname) {
   const purchaseKeys = new Set();
   const purchaseOrders = new Map();
   const estimatedPurchases = [];
+  const eventDedupe = { exact: new Set(), estimated: new Map() };
   const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
   const recentEvents = [];
   const lines = splitLines(tail.stdout);
@@ -1475,6 +1532,16 @@ async function summarizeRequestsToday(pathname) {
       const current = noiseReasons.get(reason) || { count: 0 };
       current.count += 1;
       noiseReasons.set(reason, current);
+      continue;
+    }
+
+    const trackingNoise = classifyTrackingNoise(parsed);
+    if (trackingNoise) {
+      noise += 1;
+      if (trackingNoise.includes("bot")) botNoise += 1;
+      const current = noiseReasons.get(trackingNoise) || { count: 0 };
+      current.count += 1;
+      noiseReasons.set(trackingNoise, current);
       continue;
     }
 
@@ -1503,8 +1570,13 @@ async function summarizeRequestsToday(pathname) {
       }
     }
 
-    const event = events.get(parsed.eventName) || { count: 0, errors: 0, lastSeen: null };
-    event.count += 1;
+    const uniqueBusinessEvent = isTrackedBusinessEvent(parsed.eventName)
+      ? markUniqueEvent(parsed, eventDedupe)
+      : true;
+    const event = events.get(parsed.eventName) || { count: 0, rawCount: 0, duplicateCount: 0, errors: 0, lastSeen: null };
+    event.rawCount += 1;
+    if (uniqueBusinessEvent) event.count += 1;
+    event.duplicateCount = Math.max(0, event.rawCount - event.count);
     if (Number(parsed.status) >= 400) event.errors += 1;
     if (parsed.date && (!event.lastSeen || parsed.date > event.lastSeen)) event.lastSeen = parsed.date;
     events.set(parsed.eventName, event);
@@ -1540,7 +1612,7 @@ async function summarizeRequestsToday(pathname) {
     item.amount === null ? total : total + item.amount
   ), 0);
   const uniquePurchaseCount = purchaseOrders.size;
-  const rawPurchaseCount = Number(purchaseEvent?.count || 0);
+  const rawPurchaseCount = Number(purchaseEvent?.rawCount || purchaseEvent?.count || 0);
   const duplicatePurchaseCount = Math.max(0, rawPurchaseCount - uniquePurchaseCount);
   const averageOrderValue = uniquePurchaseCount ? uniquePurchaseRevenue / uniquePurchaseCount : 0;
   const purchases = {

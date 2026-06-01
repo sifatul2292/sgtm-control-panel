@@ -785,8 +785,8 @@ function renderEventHealth(data) {
       const count = eventDisplayCount(name, stat);
       const raw = eventRawCount(stat);
       const label = name === "Purchase" ? "Tracked Purchase" : name;
-      const detail = name === "Purchase" && raw !== count
-        ? `${raw.toLocaleString()} platform hits · ${eventStatusText(name, stat)}`
+      const detail = raw !== count
+        ? `${raw.toLocaleString()} raw hit${raw === 1 ? "" : "s"} · ${eventStatusText(name, stat)}`
         : eventStatusText(name, stat);
       const card = document.createElement("article");
       card.className = `health-card ${count ? "healthy" : "warning"}`;
