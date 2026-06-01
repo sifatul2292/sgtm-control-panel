@@ -40,6 +40,22 @@
             <span class="nav-icon" aria-hidden="true">+</span>
             <span>Provisioning</span>
           </button>
+          <button class="nav-item" type="button" data-view-target="admin" aria-label="Admin" title="Admin">
+            <span class="nav-icon" aria-hidden="true">▣</span>
+            <span>Admin</span>
+          </button>
+          <button class="nav-item" type="button" data-view-target="integrations" aria-label="Integrations" title="Integrations">
+            <span class="nav-icon" aria-hidden="true">↔</span>
+            <span>Integrations</span>
+          </button>
+          <button class="nav-item" type="button" data-view-target="billing" aria-label="Billing" title="Billing">
+            <span class="nav-icon" aria-hidden="true">৳</span>
+            <span>Billing</span>
+          </button>
+          <button class="nav-item" type="button" data-view-target="docs" aria-label="Docs" title="Docs">
+            <span class="nav-icon" aria-hidden="true">□</span>
+            <span>Docs</span>
+          </button>
         </nav>
 
         <div class="sidebar-group">
@@ -105,8 +121,8 @@
           <section class="panel">
             <div class="panel-header">
               <div>
-                <h2>Business Snapshot</h2>
-                <p>Deduped purchase totals from today's SGTM requests.</p>
+                <h2>Actual Store Orders</h2>
+                <p>Real ecommerce orders from the store webhook, separated from tracking event hits.</p>
               </div>
               <span id="businessBadge" class="badge">Checking</span>
             </div>
@@ -134,12 +150,23 @@
             </div>
           </section>
 
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Purchase Reconciliation</h2>
+                <p>Compares actual store orders with deduped SGTM purchase tracking.</p>
+              </div>
+              <span id="reconciliationBadge" class="badge">Checking</span>
+            </div>
+            <div id="reconciliationGrid" class="business-grid"></div>
+          </section>
+
           <section class="split-grid">
             <article class="panel">
               <div class="panel-header">
                 <div>
                   <h2>Event Health</h2>
-                  <p>Recent visibility for the key ecommerce events.</p>
+                  <p>Tracked event hits seen in SGTM logs. Purchase hits can include Meta, GA4, and Data Client copies.</p>
                 </div>
                 <span id="logModeBadge" class="badge">Log mode</span>
               </div>
@@ -150,7 +177,7 @@
               <div class="panel-header">
                 <div>
                   <h2>Funnel</h2>
-                  <p>Recent SGTM event progression from page view to purchase.</p>
+                  <p>Deduped SGTM event progression from page view to tracked purchase.</p>
                 </div>
                 <span class="badge">Recent sample</span>
               </div>
@@ -557,6 +584,19 @@
                   <input name="ownerEmail" type="email" placeholder="client@example.com" />
                 </label>
                 <label>
+                  Plan
+                  <select name="planName">
+                    <option>Starter</option>
+                    <option>Growth</option>
+                    <option>Pro</option>
+                    <option>Agency</option>
+                  </select>
+                </label>
+                <label>
+                  Monthly request limit
+                  <input name="requestLimit" type="number" min="1" value="100000" />
+                </label>
+                <label>
                   Preview URL
                   <input name="previewUrl" placeholder="https://preview.example.com" />
                 </label>
@@ -583,6 +623,148 @@
               </div>
               <div id="provisioningRequests" class="provisioning-list"></div>
             </article>
+          </section>
+        </section>
+
+        <section id="adminView" class="view" data-view="admin">
+          <section class="notice notice-soft" aria-label="Admin overview">
+            <div>
+              <strong>Service Admin</strong>
+              <p>Customer, container, and operational overview for running this as a managed SGTM service.</p>
+            </div>
+            <span id="adminBadge" class="status-dot">Checking</span>
+          </section>
+
+          <section class="split-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Customers</h2>
+                  <p>Current tenant records and queued customer instances.</p>
+                </div>
+                <span id="customersBadge" class="badge">0 customers</span>
+              </div>
+              <div id="customersList" class="summary-list"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Admin Actions</h2>
+                  <p>Dangerous infrastructure actions remain gated behind generated plans and manual approval.</p>
+                </div>
+                <span class="badge">Guarded</span>
+              </div>
+              <div id="adminActions" class="summary-list"></div>
+            </article>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Setup Wizard</h2>
+                <p>Customer onboarding steps from workspace to verified order webhook.</p>
+              </div>
+              <span id="wizardBadge" class="badge">0/0</span>
+            </div>
+            <div id="setupWizard" class="wizard-list"></div>
+          </section>
+        </section>
+
+        <section id="integrationsView" class="view" data-view="integrations">
+          <section class="notice notice-soft" aria-label="Integrations">
+            <div>
+              <strong>Integrations</strong>
+              <p>Connect store orders and ad platform diagnostics without mixing them with raw SGTM traffic.</p>
+            </div>
+            <span id="integrationsBadge" class="status-dot">Checking</span>
+          </section>
+
+          <section class="split-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Store Webhooks</h2>
+                  <p>Reliable order source for revenue, AOV, and purchase reconciliation.</p>
+                </div>
+                <span id="storeWebhookBadge" class="badge">Webhook</span>
+              </div>
+              <div id="storeWebhookList" class="summary-list"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Meta & GA4 Checks</h2>
+                  <p>Tracking-health checks from SGTM purchase requests.</p>
+                </div>
+                <span id="adPlatformBadge" class="badge">Diagnostics</span>
+              </div>
+              <div id="adPlatformChecks" class="summary-list"></div>
+            </article>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Webhook Payloads</h2>
+                <p>Use these payloads for Shopify, WooCommerce, or custom stores.</p>
+              </div>
+              <span class="badge">Examples</span>
+            </div>
+            <div id="integrationExamples" class="docs-grid"></div>
+          </section>
+        </section>
+
+        <section id="billingView" class="view" data-view="billing">
+          <section class="notice notice-soft" aria-label="Billing">
+            <div>
+              <strong>Usage & Billing</strong>
+              <p>Request-based plan monitoring for customer billing and usage alerts.</p>
+            </div>
+            <span id="billingBadge" class="status-dot">Checking</span>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Current Plan</h2>
+                <p>Monthly request usage and limit status.</p>
+              </div>
+              <span id="planBadge" class="badge">Plan</span>
+            </div>
+            <div id="billingGrid" class="business-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Suggested Packages</h2>
+                <p>Plan structure ready for selling managed server-side tracking.</p>
+              </div>
+            </div>
+            <div id="packageGrid" class="docs-grid"></div>
+          </section>
+        </section>
+
+        <section id="docsView" class="view" data-view="docs">
+          <section class="hero-panel">
+            <div>
+              <p class="breadcrumb">Public site / Docs</p>
+              <h2>Server-side tracking hosting with order reconciliation</h2>
+              <p>Market this as managed SGTM hosting plus diagnostics that compare real store orders against tracked purchase events.</p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Customer Setup Docs</h2>
+                <p>Copy-ready steps for onboarding customers.</p>
+              </div>
+              <span class="badge">Docs</span>
+            </div>
+            <div id="docsList" class="docs-grid"></div>
           </section>
         </section>
       </main>

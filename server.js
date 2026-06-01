@@ -37,6 +37,15 @@ const config = {
   orderWebhookSecret: process.env.ORDER_WEBHOOK_SECRET || "",
   alertWebhookUrl: process.env.ALERT_WEBHOOK_URL || "",
   alertMinIntervalMinutes: Number(process.env.ALERT_MIN_INTERVAL_MINUTES || 60),
+  serviceName: process.env.SERVICE_NAME || "SGTM Panel",
+  publicBaseUrl: process.env.PUBLIC_BASE_URL || "",
+  tenantId: process.env.TENANT_ID || "default",
+  tenantName: process.env.TENANT_NAME || "Default Customer",
+  tenantDomain: process.env.TENANT_DOMAIN || "",
+  billingPlan: process.env.BILLING_PLAN || "Starter",
+  monthlyRequestLimit: Number(process.env.MONTHLY_REQUEST_LIMIT || 100000),
+  monthlyContainerLimit: Number(process.env.MONTHLY_CONTAINER_LIMIT || 1),
+  customerSupportEmail: process.env.CUSTOMER_SUPPORT_EMAIL || "",
   sslCertPath: process.env.SSL_CERT_PATH || "",
   sslDomain: process.env.SSL_DOMAIN || "",
   sslPort: Number(process.env.SSL_PORT || 443)
@@ -830,6 +839,15 @@ function serializeEventRow(item) {
 }
 
 async function readDatabase() {
+  const defaults = {
+    version: 2,
+    daily: {},
+    provisioning: { requests: [] },
+    orders: [],
+    tenants: [],
+    alerts: [],
+    integrations: []
+  };
   try {
     const content = await readFile(databasePath, "utf8");
     const parsed = JSON.parse(content);
@@ -837,26 +855,26 @@ async function readDatabase() {
       available: true,
       path: databasePath,
       data: {
-        version: 1,
-        daily: {},
-        provisioning: { requests: [] },
-        orders: [],
+        ...defaults,
         ...parsed,
         daily: parsed.daily || {},
         provisioning: parsed.provisioning || { requests: [] },
-        orders: parsed.orders || []
+        orders: parsed.orders || [],
+        tenants: parsed.tenants || [],
+        alerts: parsed.alerts || [],
+        integrations: parsed.integrations || []
       }
     };
   } catch (error) {
     if (error.code === "ENOENT") {
-      return { available: true, path: databasePath, data: { version: 1, daily: {}, provisioning: { requests: [] }, orders: [] } };
+      return { available: true, path: databasePath, data: defaults };
     }
     return {
       available: false,
       path: databasePath,
       message: "Summary database could not be read.",
       detail: error.message,
-      data: { version: 1, daily: {}, provisioning: { requests: [] }, orders: [] }
+      data: defaults
     };
   }
 }
@@ -898,12 +916,16 @@ function normalizeOrderPayload(body) {
   const amount = parseMoney(firstValue(body, ["amount", "total", "totalAmount", "total_amount", "value", "revenue"]));
   const currency = String(firstValue(body, ["currency", "currencyCode", "currency_code"]) || "BDT").trim().toUpperCase();
   const createdAt = orderDate(firstValue(body, ["created_at", "createdAt", "ordered_at", "orderedAt", "date", "time"]));
+  const tenantId = sanitizeId(firstValue(body, ["tenant_id", "tenantId", "customer_id", "customerId"]) || config.tenantId);
+  const orderType = sanitizeId(firstValue(body, ["order_type", "orderType", "channel", "source_type"]) || "store");
 
   return {
     id,
     amount,
     currency,
     createdAt: createdAt.toISOString(),
+    tenantId,
+    orderType,
     source: String(body.source || "webhook"),
     raw: body
   };
@@ -963,6 +985,168 @@ async function getOrderSummary() {
   };
 }
 
+function monthKey(date = new Date()) {
+  return localDateKey(date).slice(0, 7);
+}
+
+function orderBreakdown(orders, key) {
+  const counts = new Map();
+  for (const order of orders) {
+    const label = String(order[key] || "unknown");
+    const current = counts.get(label) || { name: label, count: 0, revenue: 0 };
+    current.count += 1;
+    current.revenue += Number(order.amount || 0);
+    counts.set(label, current);
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count);
+}
+
+async function getCustomerCatalog({ docker, ssl, orders }) {
+  const loaded = await readDatabase();
+  const provisioned = loaded.data.provisioning?.requests || [];
+  const storedTenants = loaded.data.tenants || [];
+  const defaultDomain = config.tenantDomain || config.trackingHosts[0] || config.sslDomain || inferHostFromCertPath(config.sslCertPath) || "";
+  const defaultTenant = {
+    id: config.tenantId,
+    name: config.tenantName,
+    domain: defaultDomain,
+    plan: config.billingPlan,
+    status: docker.available && (!docker.totals?.unhealthy) ? "active" : "attention",
+    requestLimit: config.monthlyRequestLimit,
+    containerLimit: config.monthlyContainerLimit,
+    containers: docker.totals?.total || 0,
+    ordersToday: orders.today?.count || 0,
+    sslDaysRemaining: ssl.available ? ssl.daysRemaining : null,
+    source: "environment"
+  };
+
+  const queuedTenants = provisioned.map((request) => ({
+    id: request.id,
+    name: request.instanceName,
+    domain: request.domain,
+    plan: request.planName || "Pending",
+    status: request.status,
+    requestLimit: request.requestLimit || config.monthlyRequestLimit,
+    containerLimit: 1,
+    containers: 0,
+    ordersToday: 0,
+    sslDaysRemaining: null,
+    source: "provisioning"
+  }));
+
+  const tenants = [
+    defaultTenant,
+    ...storedTenants,
+    ...queuedTenants
+  ].filter((tenant, index, all) => all.findIndex((item) => item.id === tenant.id) === index);
+
+  return {
+    available: loaded.available,
+    tenants,
+    active: tenants.filter((tenant) => tenant.status === "active").length,
+    queued: tenants.filter((tenant) => String(tenant.status || "").includes("pending") || String(tenant.status || "").includes("prepared")).length
+  };
+}
+
+function getUsageSummary({ requestSummary, history }) {
+  const currentMonth = monthKey();
+  const dailyRows = history?.daily || [];
+  const persistedMonthly = dailyRows
+    .filter((row) => String(row.date || "").startsWith(currentMonth))
+    .reduce((total, row) => total + Number(row.total || 0), 0);
+  const todayPersisted = dailyRows.find((row) => row.date === localDateKey());
+  const todayRequests = Number(requestSummary?.count || 0);
+  const monthlyRequests = persistedMonthly + (todayPersisted ? 0 : todayRequests);
+  const limit = Math.max(0, Number(config.monthlyRequestLimit || 0));
+  const percent = limit ? Math.round((monthlyRequests / limit) * 100) : 0;
+  return {
+    plan: config.billingPlan,
+    period: currentMonth,
+    requestLimit: limit,
+    requestsToday: todayRequests,
+    requestsMonth: monthlyRequests,
+    usagePercent: percent,
+    status: !limit ? "unmetered" : percent >= 100 ? "over_limit" : percent >= 80 ? "warning" : "healthy",
+    containerLimit: config.monthlyContainerLimit
+  };
+}
+
+function getReconciliationSummary({ requestSummary, orders }) {
+  const storeOrders = Number(orders.today?.count || 0);
+  const tracked = requestSummary?.purchases || {};
+  const trackedUnique = Number(tracked.uniqueCount || 0);
+  const trackedHits = Number(tracked.rawCount || 0);
+  const coverage = storeOrders ? Math.min(100, Math.round((trackedUnique / storeOrders) * 100)) : (trackedUnique ? 100 : 0);
+  const missing = Math.max(0, storeOrders - trackedUnique);
+  return {
+    available: Boolean(requestSummary?.available || orders.available),
+    storeOrders,
+    trackedUnique,
+    trackedHits,
+    missing,
+    coverage,
+    duplicateHits: Math.max(0, trackedHits - trackedUnique),
+    status: !storeOrders && !trackedUnique ? "waiting" : missing ? "attention" : "healthy",
+    explanation: storeOrders
+      ? "Store orders come from the ecommerce webhook. Tracked purchases come from SGTM logs."
+      : "Waiting for store order webhook data."
+  };
+}
+
+function getIntegrationSummary({ orders, requestSummary }) {
+  const purchaseRows = requestSummary?.recentEvents?.filter((item) => item.eventName === "Purchase") || [];
+  const hasValue = purchaseRows.some((item) => item.value && item.currency);
+  const hasId = purchaseRows.some((item) => item.transactionId || item.eventId);
+  return {
+    orderWebhook: {
+      enabled: Boolean(config.orderWebhookSecret),
+      status: orders.today?.count ? "healthy" : config.orderWebhookSecret ? "waiting" : "missing",
+      lastOrder: orders.today?.latest || null,
+      endpoint: "/api/orders/webhook"
+    },
+    shopify: {
+      status: "planned",
+      endpoint: "/api/orders/webhook",
+      fields: ["order_id", "total_price", "currency", "created_at", "order_type"]
+    },
+    woocommerce: {
+      status: "planned",
+      endpoint: "/api/orders/webhook",
+      fields: ["id", "total", "currency", "date_created_gmt", "order_type"]
+    },
+    metaCapi: {
+      status: purchaseRows.length ? "detected" : "waiting",
+      checks: [
+        { label: "Purchase event", status: purchaseRows.length ? "healthy" : "warning" },
+        { label: "Value and currency", status: !purchaseRows.length || hasValue ? "healthy" : "warning" },
+        { label: "Event or transaction ID", status: !purchaseRows.length || hasId ? "healthy" : "warning" }
+      ]
+    }
+  };
+}
+
+function getSetupWizard({ customers, provisioning, integrations, ssl, requestSummary }) {
+  const hasCustomer = customers.tenants.length > 0;
+  const hasProvisioning = (provisioning.requests || []).length > 0;
+  const hasDns = Boolean(config.provisionDnsTarget || config.publicBaseUrl || config.trackingHosts.length);
+  const hasSsl = Boolean(ssl.available);
+  const hasTraffic = Boolean(requestSummary.available && requestSummary.count);
+  const hasOrders = integrations.orderWebhook.status === "healthy";
+  const steps = [
+    { key: "account", title: "Create customer workspace", status: hasCustomer ? "complete" : "todo", detail: "Customer and tenant record exists." },
+    { key: "provision", title: "Provision SGTM instance", status: hasProvisioning ? "complete" : "todo", detail: "Generate Docker, Nginx, log, and SSL plan." },
+    { key: "dns", title: "Verify DNS", status: hasDns ? "complete" : "todo", detail: config.provisionDnsTarget || "Set PROVISION_DNS_TARGET." },
+    { key: "ssl", title: "Verify SSL", status: hasSsl ? "complete" : "todo", detail: hasSsl ? `${ssl.daysRemaining} days remaining` : "Configure SSL_CERT_PATH or SSL_DOMAIN." },
+    { key: "gtm", title: "Validate GTM/SGTM traffic", status: hasTraffic ? "complete" : "todo", detail: hasTraffic ? `${requestSummary.count} tracking requests today` : "Waiting for SGTM events." },
+    { key: "orders", title: "Connect order webhook", status: hasOrders ? "complete" : "todo", detail: hasOrders ? "Store orders received." : "Send real ecommerce orders to /api/orders/webhook." }
+  ];
+  return {
+    complete: steps.filter((step) => step.status === "complete").length,
+    total: steps.length,
+    steps
+  };
+}
+
 function sanitizeId(value) {
   return String(value || "")
     .trim()
@@ -983,12 +1167,15 @@ function validateProvisioningRequest(input) {
   const containerConfig = String(input.containerConfig || "").trim();
   const previewUrl = String(input.previewUrl || "").trim();
   const ownerEmail = String(input.ownerEmail || "").trim();
+  const planName = String(input.planName || config.billingPlan || "Starter").trim();
+  const requestLimit = Number(input.requestLimit || config.monthlyRequestLimit);
 
   if (!validDomain(domain)) errors.push("Enter a valid tracking subdomain.");
   if (!instanceName) errors.push("Enter an instance name.");
   if (!containerConfig) errors.push("Container config is required before launch.");
   if (previewUrl && !/^https?:\/\//i.test(previewUrl)) errors.push("Preview URL must start with http:// or https://.");
   if (ownerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) errors.push("Owner email is not valid.");
+  if (!Number.isFinite(requestLimit) || requestLimit <= 0) errors.push("Monthly request limit must be a positive number.");
 
   return {
     errors,
@@ -997,6 +1184,8 @@ function validateProvisioningRequest(input) {
       domain,
       containerName: sanitizeId(`sgtm-${instanceName}`),
       ownerEmail,
+      planName,
+      requestLimit,
       previewUrl,
       containerConfig,
       notes: String(input.notes || "").trim().slice(0, 1000)
@@ -1127,13 +1316,26 @@ async function prepareProvisioningFiles(id) {
 async function getProvisioningSummary() {
   const loaded = await readDatabase();
   const requests = loaded.data.provisioning?.requests || [];
+  const enriched = await Promise.all(requests.map(enrichProvisioningRequest));
   return {
     available: loaded.available,
     path: databasePath,
     message: loaded.message || "",
     detail: loaded.detail || "",
-    requests
+    requests: enriched
   };
+}
+
+async function enrichProvisioningRequest(request) {
+  const plan = request.plan || provisioningPlan(request);
+  const checks = [...(plan.checks || [])];
+  const dns = await command("getent", ["ahosts", request.domain], { timeout: 800, maxBuffer: 20000 });
+  checks.push({
+    label: "DNS live check",
+    value: dns.ok && dns.stdout ? dns.stdout.split("\n")[0].trim() : "No server-side DNS answer yet",
+    status: dns.ok && dns.stdout ? "healthy" : "warning"
+  });
+  return { ...request, plan: { ...plan, checks } };
 }
 
 async function persistDailySummary(summary) {
@@ -1532,6 +1734,11 @@ async function getDashboardData() {
   const history = await persistDailySummary(requestSummary);
   const provisioning = await getProvisioningSummary();
   const orders = await getOrderSummary();
+  const customers = await getCustomerCatalog({ docker, ssl, orders });
+  const usage = getUsageSummary({ requestSummary, history });
+  const reconciliation = getReconciliationSummary({ requestSummary, orders });
+  const integrations = getIntegrationSummary({ orders, requestSummary });
+  const setupWizard = getSetupWizard({ customers, provisioning, integrations, ssl, requestSummary });
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
   void sendAlertHooks(alerts);
@@ -1551,9 +1758,23 @@ async function getDashboardData() {
     deploymentChecks,
     history,
     orders,
+    customers,
+    usage,
+    reconciliation,
+    integrations,
+    setupWizard,
     provisioning,
     ssl,
     config: {
+      serviceName: config.serviceName,
+      publicBaseUrl: config.publicBaseUrl,
+      tenantId: config.tenantId,
+      tenantName: config.tenantName,
+      tenantDomain: config.tenantDomain,
+      billingPlan: config.billingPlan,
+      monthlyRequestLimit: config.monthlyRequestLimit,
+      monthlyContainerLimit: config.monthlyContainerLimit,
+      customerSupportEmail: config.customerSupportEmail,
       host: config.host,
       port: config.port,
       accessLog: config.accessLog,

@@ -38,6 +38,8 @@ const els = {
   businessAovDetail: document.querySelector("#businessAovDetail"),
   businessDuplicates: document.querySelector("#businessDuplicates"),
   businessDuplicateDetail: document.querySelector("#businessDuplicateDetail"),
+  reconciliationBadge: document.querySelector("#reconciliationBadge"),
+  reconciliationGrid: document.querySelector("#reconciliationGrid"),
   logModeBadge: document.querySelector("#logModeBadge"),
   accessLog: document.querySelector("#accessLog"),
   errorLog: document.querySelector("#errorLog"),
@@ -70,7 +72,24 @@ const els = {
   provisioningForm: document.querySelector("#provisioningForm"),
   provisioningFormMessage: document.querySelector("#provisioningFormMessage"),
   provisioningQueueBadge: document.querySelector("#provisioningQueueBadge"),
-  provisioningRequests: document.querySelector("#provisioningRequests")
+  provisioningRequests: document.querySelector("#provisioningRequests"),
+  adminBadge: document.querySelector("#adminBadge"),
+  customersBadge: document.querySelector("#customersBadge"),
+  customersList: document.querySelector("#customersList"),
+  adminActions: document.querySelector("#adminActions"),
+  wizardBadge: document.querySelector("#wizardBadge"),
+  setupWizard: document.querySelector("#setupWizard"),
+  integrationsBadge: document.querySelector("#integrationsBadge"),
+  storeWebhookBadge: document.querySelector("#storeWebhookBadge"),
+  storeWebhookList: document.querySelector("#storeWebhookList"),
+  adPlatformBadge: document.querySelector("#adPlatformBadge"),
+  adPlatformChecks: document.querySelector("#adPlatformChecks"),
+  integrationExamples: document.querySelector("#integrationExamples"),
+  billingBadge: document.querySelector("#billingBadge"),
+  planBadge: document.querySelector("#planBadge"),
+  billingGrid: document.querySelector("#billingGrid"),
+  packageGrid: document.querySelector("#packageGrid"),
+  docsList: document.querySelector("#docsList")
 };
 
 const viewTitles = {
@@ -79,7 +98,11 @@ const viewTitles = {
   analytics: ["Tracking / Analytics", "Analytics"],
   settings: ["Account & Others / Settings", "Settings"],
   deployment: ["Operations / Deployment", "Deployment Health"],
-  provisioning: ["Operations / Provisioning", "Container Provisioning"]
+  provisioning: ["Operations / Provisioning", "Container Provisioning"],
+  admin: ["Service / Admin", "Admin"],
+  integrations: ["Service / Integrations", "Integrations"],
+  billing: ["Service / Billing", "Usage & Billing"],
+  docs: ["Public / Docs", "Landing & Docs"]
 };
 
 let latestData = null;
@@ -758,12 +781,17 @@ function renderEventHealth(data) {
     ...required.map((name) => {
       const stat = stats.get(name) || { count: 0, lastSeen: null };
       const count = eventDisplayCount(name, stat);
+      const raw = eventRawCount(stat);
+      const label = name === "Purchase" ? "Tracked Purchase" : name;
+      const detail = name === "Purchase" && raw !== count
+        ? `${raw.toLocaleString()} platform hits · ${eventStatusText(name, stat)}`
+        : eventStatusText(name, stat);
       const card = document.createElement("article");
       card.className = `health-card ${count ? "healthy" : "warning"}`;
       card.innerHTML = `
-        <span>${escapeHtml(name)}</span>
+        <span>${escapeHtml(label)}</span>
         <strong>${count.toLocaleString()}</strong>
-        <small>${escapeHtml(eventStatusText(name, stat))}</small>
+        <small>${escapeHtml(detail)}</small>
       `;
       return card;
     })
@@ -776,10 +804,11 @@ function renderEventHealth(data) {
       const percent = Math.min(100, Math.round((count / base) * 100));
       const row = document.createElement("article");
       row.className = "funnel-row";
+      const label = name === "Purchase" ? "Tracked Purchase" : name;
       row.innerHTML = `
         <div>
-          <strong>${escapeHtml(name)}</strong>
-          <span>${count.toLocaleString()} events</span>
+          <strong>${escapeHtml(label)}</strong>
+          <span>${count.toLocaleString()} deduped event${count === 1 ? "" : "s"}</span>
         </div>
         <div class="funnel-meter" aria-label="${escapeHtml(name)} ${percent}%">
           <span style="width: ${percent}%"></span>
@@ -1012,6 +1041,19 @@ function renderNoiseSummary(data) {
 }
 
 function renderLatestPurchase(data) {
+  const latestOrder = data.orders?.today?.latest;
+  if (latestOrder) {
+    els.purchaseBadge.className = "badge ok";
+    els.purchaseBadge.textContent = "Store order";
+    renderSummaryList(els.latestPurchase, [
+      { label: "Time", value: formatDate(latestOrder.createdAt), status: "healthy" },
+      { label: "Value", value: latestOrder.amount !== null && latestOrder.amount !== undefined ? formatMoney(latestOrder.amount, latestOrder.currency) : "Missing", status: latestOrder.amount !== null && latestOrder.amount !== undefined ? "healthy" : "warning" },
+      { label: "Order ID", value: latestOrder.id || "Missing", status: latestOrder.id ? "healthy" : "warning" },
+      { label: "Order type", value: latestOrder.orderType || latestOrder.source || "store", status: "healthy" }
+    ]);
+    return;
+  }
+
   const latest = purchaseRows(data)[0];
   if (!latest) {
     els.purchaseBadge.className = "badge warn";
@@ -1059,6 +1101,50 @@ function renderBusinessSnapshot(data) {
   els.businessDuplicateDetail.textContent = summary.duplicateCount
     ? `${duplicateRate}% duplicate rate${estimated ? " · estimated" : ""}`
     : fromOrders ? "Tracking duplicates do not affect orders" : "No duplicate purchase hits";
+}
+
+function renderBusinessGrid(el, items) {
+  el.replaceChildren(
+    ...items.map((item) => {
+      const card = document.createElement("article");
+      card.className = "business-item";
+      card.innerHTML = `
+        <span>${escapeHtml(item.label)}</span>
+        <strong>${escapeHtml(item.value)}</strong>
+        <small>${escapeHtml(item.detail)}</small>
+      `;
+      return card;
+    })
+  );
+}
+
+function renderReconciliation(data) {
+  const rec = data.reconciliation || {};
+  const status = rec.status === "healthy" ? "ok" : rec.status === "waiting" ? "warn" : "warn";
+  els.reconciliationBadge.className = `badge ${status}`;
+  els.reconciliationBadge.textContent = rec.status === "healthy" ? "Covered" : rec.status === "waiting" ? "Waiting" : "Needs review";
+  renderBusinessGrid(els.reconciliationGrid, [
+    {
+      label: "Actual store orders",
+      value: Number(rec.storeOrders || 0).toLocaleString(),
+      detail: "From ecommerce order webhook"
+    },
+    {
+      label: "Deduped tracked purchases",
+      value: Number(rec.trackedUnique || 0).toLocaleString(),
+      detail: "Estimated unique purchases from SGTM logs"
+    },
+    {
+      label: "Tracked purchase hits",
+      value: Number(rec.trackedHits || 0).toLocaleString(),
+      detail: `${Number(rec.duplicateHits || 0).toLocaleString()} extra platform/tag copies`
+    },
+    {
+      label: "Tracking coverage",
+      value: `${Number(rec.coverage || 0).toLocaleString()}%`,
+      detail: Number(rec.missing || 0) ? `${Number(rec.missing || 0).toLocaleString()} order(s) not seen in SGTM purchases` : "Store and SGTM purchases line up"
+    }
+  ]);
 }
 
 function renderDashboard(data) {
@@ -1110,6 +1196,7 @@ function renderDashboard(data) {
   renderNoiseSummary(data);
   renderLatestPurchase(data);
   renderBusinessSnapshot(data);
+  renderReconciliation(data);
 }
 
 function eventCounts(items) {
@@ -1548,6 +1635,155 @@ function renderProvisioning(data) {
   });
 }
 
+function renderAdmin(data) {
+  const customers = data.customers?.tenants || [];
+  els.adminBadge.textContent = customers.length ? `${customers.length} tenant${customers.length === 1 ? "" : "s"}` : "No tenants";
+  els.customersBadge.className = `badge ${customers.length ? "ok" : "warn"}`;
+  els.customersBadge.textContent = `${customers.length} customer${customers.length === 1 ? "" : "s"}`;
+
+  renderSummaryList(
+    els.customersList,
+    customers.length
+      ? customers.map((customer) => ({
+        label: customer.name || customer.id,
+        value: `${customer.domain || "No domain"} · ${customer.plan || "No plan"} · ${String(customer.status || "unknown").replaceAll("_", " ")}`,
+        status: customer.status === "active" ? "healthy" : "warning"
+      }))
+      : [{ label: "Customer model", value: "Configure TENANT_* or create provisioning requests", status: "warning" }]
+  );
+
+  renderSummaryList(els.adminActions, [
+    { label: "Provisioning", value: "Generate plans and files before launch", status: "healthy" },
+    { label: "Docker/Nginx mutation", value: "Manual/admin approved only", status: "warning" },
+    { label: "Webhook secrets", value: data.config?.orderWebhookEnabled ? "Configured" : "Missing", status: data.config?.orderWebhookEnabled ? "healthy" : "warning" },
+    { label: "Log isolation", value: data.config?.usingDedicatedLogs ? "Dedicated SGTM logs" : "Shared log warning", status: data.config?.usingDedicatedLogs ? "healthy" : "warning" }
+  ]);
+
+  const wizard = data.setupWizard || { complete: 0, total: 0, steps: [] };
+  els.wizardBadge.className = `badge ${wizard.complete === wizard.total ? "ok" : "warn"}`;
+  els.wizardBadge.textContent = `${wizard.complete}/${wizard.total}`;
+  els.setupWizard.replaceChildren(
+    ...wizard.steps.map((step, index) => {
+      const row = document.createElement("article");
+      row.className = `wizard-step ${step.status}`;
+      row.innerHTML = `
+        <span>${index + 1}</span>
+        <div>
+          <strong>${escapeHtml(step.title)}</strong>
+          <p>${escapeHtml(step.detail)}</p>
+        </div>
+        <em>${escapeHtml(step.status)}</em>
+      `;
+      return row;
+    })
+  );
+}
+
+function renderIntegrations(data) {
+  const integrations = data.integrations || {};
+  const orderWebhook = integrations.orderWebhook || {};
+  const meta = integrations.metaCapi || { checks: [] };
+
+  els.integrationsBadge.textContent = orderWebhook.enabled ? "Configured" : "Needs setup";
+  els.storeWebhookBadge.className = `badge ${orderWebhook.status === "healthy" ? "ok" : "warn"}`;
+  els.storeWebhookBadge.textContent = orderWebhook.status || "Webhook";
+  renderSummaryList(els.storeWebhookList, [
+    { label: "Order webhook", value: orderWebhook.enabled ? "Enabled" : "Set ORDER_WEBHOOK_SECRET", status: orderWebhook.enabled ? "healthy" : "warning" },
+    { label: "Endpoint", value: orderWebhook.endpoint || "/api/orders/webhook", status: "healthy" },
+    { label: "Latest order", value: orderWebhook.lastOrder?.id || "Waiting", status: orderWebhook.lastOrder ? "healthy" : "warning" },
+    { label: "Supported stores", value: "Custom API, Shopify, WooCommerce", status: "healthy" }
+  ]);
+
+  els.adPlatformBadge.className = `badge ${meta.status === "detected" ? "ok" : "warn"}`;
+  els.adPlatformBadge.textContent = meta.status || "Waiting";
+  renderSummaryList(
+    els.adPlatformChecks,
+    (meta.checks || []).map((check) => ({
+      label: check.label,
+      value: check.status === "healthy" ? "OK" : "Needs attention",
+      status: check.status === "healthy" ? "healthy" : "warning"
+    }))
+  );
+
+  const examples = [
+    {
+      title: "Custom store",
+      body: `POST /api/orders/webhook\nHeaders: x-order-webhook-secret: <secret>\n\n{"order_id":"0478","total":359,"currency":"BDT","created_at":"2026-06-02T00:22:00+06:00","source":"store","order_type":"custom"}`
+    },
+    {
+      title: "Shopify mapping",
+      body: `order_id: order.name or order.id\ntotal: total_price\ncurrency: currency\ncreated_at: created_at\norder_type: shopify`
+    },
+    {
+      title: "WooCommerce mapping",
+      body: `order_id: id or number\ntotal: total\ncurrency: currency\ncreated_at: date_created_gmt\norder_type: woocommerce`
+    }
+  ];
+  renderDocsGrid(els.integrationExamples, examples);
+}
+
+function renderDocsGrid(el, items) {
+  el.replaceChildren(
+    ...items.map((item) => {
+      const card = document.createElement("article");
+      card.className = "doc-card";
+      card.innerHTML = `<strong>${escapeHtml(item.title)}</strong><pre>${escapeHtml(item.body)}</pre>`;
+      return card;
+    })
+  );
+}
+
+function renderBilling(data) {
+  const usage = data.usage || {};
+  const statusClass = usage.status === "healthy" ? "ok" : usage.status === "unmetered" ? "ok" : "warn";
+  els.billingBadge.textContent = usage.status === "over_limit" ? "Over limit" : usage.status === "warning" ? "Watch usage" : "Healthy";
+  els.planBadge.className = `badge ${statusClass}`;
+  els.planBadge.textContent = usage.plan || "Plan";
+  renderBusinessGrid(els.billingGrid, [
+    { label: "Plan", value: usage.plan || "--", detail: `${Number(usage.containerLimit || 0).toLocaleString()} container limit` },
+    { label: "Requests this month", value: Number(usage.requestsMonth || 0).toLocaleString(), detail: `${Number(usage.usagePercent || 0)}% of plan` },
+    { label: "Monthly limit", value: Number(usage.requestLimit || 0).toLocaleString(), detail: usage.period || "Current month" },
+    { label: "Requests today", value: Number(usage.requestsToday || 0).toLocaleString(), detail: "Clean SGTM event requests" }
+  ]);
+
+  renderDocsGrid(els.packageGrid, [
+    { title: "Starter", body: "1 container\n1 custom domain\n100k requests/month\nLogs + basic monitoring" },
+    { title: "Growth", body: "500k requests/month\nOrder reconciliation\nMeta/GA4 diagnostics\nEmail alerts" },
+    { title: "Pro", body: "1M requests/month\nMultiple domains\nAdvanced monitoring\nPriority support" },
+    { title: "Agency", body: "Multiple customers\nTeam access\nWhite-label reports\nCustom limits" }
+  ]);
+}
+
+function renderDocs(data) {
+  const base = data.config?.publicBaseUrl || window.location.origin;
+  renderDocsGrid(els.docsList, [
+    {
+      title: "Positioning",
+      body: "Managed server-side Google Tag Manager hosting with order reconciliation, tracking diagnostics, logs, monitoring, and customer setup support."
+    },
+    {
+      title: "Customer DNS",
+      body: `Create a subdomain such as server.customer.com and point it to ${data.config?.provisionDnsTarget || "your SGTM host"}. Wait for DNS, then issue SSL.`
+    },
+    {
+      title: "GTM install",
+      body: `Install web GTM globally and load the container from the customer SGTM domain. Verify Tag Assistant sees the web container and SGTM logs receive events.`
+    },
+    {
+      title: "Order webhook",
+      body: `POST ${base}/api/orders/webhook with x-order-webhook-secret. Send order_id, total, currency, created_at, source, and order_type.`
+    },
+    {
+      title: "Reliability promise",
+      body: "Do not promise 100% recovery. Promise hosted SGTM, first-party domain setup, diagnostics, monitoring, and clear reporting when tracking misses real store orders."
+    },
+    {
+      title: "Launch checklist",
+      body: "Auth enabled\nDedicated customer logs\nSSL healthy\nDocker healthy\nOrder webhook connected\nPurchase tracking coverage visible\nUsage limits configured"
+    }
+  ]);
+}
+
 async function prepareProvisioningFiles(id) {
   els.provisioningFormMessage.textContent = "Preparing Docker and Nginx draft files...";
   try {
@@ -1582,6 +1818,10 @@ function renderAll(data) {
   renderSettings(data);
   renderDeployment(data);
   renderProvisioning(data);
+  renderAdmin(data);
+  renderIntegrations(data);
+  renderBilling(data);
+  renderDocs(data);
 }
 
 async function loadDashboard() {
