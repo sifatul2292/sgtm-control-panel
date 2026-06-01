@@ -643,8 +643,7 @@ function inferEventName(pathname, method, status) {
     if (needles.some((needle) => raw.includes(needle))) return name;
   }
 
-  if (method === "GET" && !blocked) return "PageView";
-  return blocked ? "Rejected Request" : "Other";
+  return blocked ? "Rejected Request" : "Tracking Request";
 }
 
 function inferClient(pathname, agent) {
@@ -1076,17 +1075,19 @@ function getReconciliationSummary({ requestSummary, orders }) {
   const tracked = requestSummary?.purchases || {};
   const trackedUnique = Number(tracked.uniqueCount || 0);
   const trackedHits = Number(tracked.rawCount || 0);
-  const coverage = storeOrders ? Math.min(100, Math.round((trackedUnique / storeOrders) * 100)) : (trackedUnique ? 100 : 0);
+  const coverage = storeOrders ? Math.round((trackedUnique / storeOrders) * 100) : (trackedUnique ? 100 : 0);
   const missing = Math.max(0, storeOrders - trackedUnique);
+  const extraTracked = Math.max(0, trackedUnique - storeOrders);
   return {
     available: Boolean(requestSummary?.available || orders.available),
     storeOrders,
     trackedUnique,
     trackedHits,
     missing,
+    extraTracked,
     coverage,
     duplicateHits: Math.max(0, trackedHits - trackedUnique),
-    status: !storeOrders && !trackedUnique ? "waiting" : missing ? "attention" : "healthy",
+    status: !storeOrders && !trackedUnique ? "waiting" : missing ? "undertracked" : extraTracked ? "overtracked" : "healthy",
     explanation: storeOrders
       ? "Store orders come from the ecommerce webhook. Tracked purchases come from SGTM logs."
       : "Waiting for store order webhook data."

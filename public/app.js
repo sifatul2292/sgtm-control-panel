@@ -264,7 +264,7 @@ function inferAccessEvent({ path, method, status }) {
     }
   }
 
-  if (method === "GET" && !blocked && trackingPath) {
+  if (method === "GET" && !blocked && trackingPath && raw.includes("page_view")) {
     return {
       name: "PageView",
       outcome: "Tracked",
@@ -273,11 +273,13 @@ function inferAccessEvent({ path, method, status }) {
   }
 
   return {
-    name: blocked ? "Rejected Request" : "Other",
+    name: blocked ? "Rejected Request" : trackingPath ? "Tracking Request" : "Other",
     outcome: blocked ? "Not accepted" : "Processed",
     description: blocked
       ? "The server rejected this request before it became a clean tracking event."
-      : "This is Nginx traffic, but it does not look like an SGTM tracking endpoint."
+      : trackingPath
+        ? "This is an SGTM collection hit, but it did not declare a recognizable ecommerce event."
+        : "This is Nginx traffic, but it does not look like an SGTM tracking endpoint."
   };
 }
 
@@ -1122,7 +1124,18 @@ function renderReconciliation(data) {
   const rec = data.reconciliation || {};
   const status = rec.status === "healthy" ? "ok" : rec.status === "waiting" ? "warn" : "warn";
   els.reconciliationBadge.className = `badge ${status}`;
-  els.reconciliationBadge.textContent = rec.status === "healthy" ? "Covered" : rec.status === "waiting" ? "Waiting" : "Needs review";
+  els.reconciliationBadge.textContent = rec.status === "healthy"
+    ? "Matched"
+    : rec.status === "overtracked"
+      ? "Overtracked"
+      : rec.status === "undertracked"
+        ? "Missing tracking"
+        : rec.status === "waiting" ? "Waiting" : "Needs review";
+  const coverageDetail = Number(rec.missing || 0)
+    ? `${Number(rec.missing || 0).toLocaleString()} order(s) not seen in SGTM purchases`
+    : Number(rec.extraTracked || 0)
+      ? `${Number(rec.extraTracked || 0).toLocaleString()} extra tracked purchase(s) beyond store orders`
+      : "Store and SGTM purchases match";
   renderBusinessGrid(els.reconciliationGrid, [
     {
       label: "Actual store orders",
@@ -1132,7 +1145,7 @@ function renderReconciliation(data) {
     {
       label: "Deduped tracked purchases",
       value: Number(rec.trackedUnique || 0).toLocaleString(),
-      detail: "Estimated unique purchases from SGTM logs"
+      detail: "Unique/estimated purchases from SGTM logs"
     },
     {
       label: "Tracked purchase hits",
@@ -1142,7 +1155,7 @@ function renderReconciliation(data) {
     {
       label: "Tracking coverage",
       value: `${Number(rec.coverage || 0).toLocaleString()}%`,
-      detail: Number(rec.missing || 0) ? `${Number(rec.missing || 0).toLocaleString()} order(s) not seen in SGTM purchases` : "Store and SGTM purchases line up"
+      detail: coverageDetail
     }
   ]);
 }
