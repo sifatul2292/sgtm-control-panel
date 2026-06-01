@@ -34,6 +34,7 @@ const config = {
   authUsername: process.env.AUTH_USERNAME || "admin",
   authPassword: process.env.AUTH_PASSWORD || "",
   authSecret: process.env.AUTH_SECRET || "",
+  orderWebhookSecret: process.env.ORDER_WEBHOOK_SECRET || "",
   alertWebhookUrl: process.env.ALERT_WEBHOOK_URL || "",
   alertMinIntervalMinutes: Number(process.env.ALERT_MIN_INTERVAL_MINUTES || 60),
   sslCertPath: process.env.SSL_CERT_PATH || "",
@@ -839,21 +840,23 @@ async function readDatabase() {
         version: 1,
         daily: {},
         provisioning: { requests: [] },
+        orders: [],
         ...parsed,
         daily: parsed.daily || {},
-        provisioning: parsed.provisioning || { requests: [] }
+        provisioning: parsed.provisioning || { requests: [] },
+        orders: parsed.orders || []
       }
     };
   } catch (error) {
     if (error.code === "ENOENT") {
-      return { available: true, path: databasePath, data: { version: 1, daily: {}, provisioning: { requests: [] } } };
+      return { available: true, path: databasePath, data: { version: 1, daily: {}, provisioning: { requests: [] }, orders: [] } };
     }
     return {
       available: false,
       path: databasePath,
       message: "Summary database could not be read.",
       detail: error.message,
-      data: { version: 1, daily: {}, provisioning: { requests: [] } }
+      data: { version: 1, daily: {}, provisioning: { requests: [] }, orders: [] }
     };
   }
 }
@@ -875,6 +878,89 @@ function pruneDailyHistory(daily) {
 
 function topRows(rows, limit = 12) {
   return (rows || []).slice(0, limit).map((item) => ({ ...item }));
+}
+
+function firstValue(source, keys) {
+  for (const key of keys) {
+    const value = source?.[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
+}
+
+function orderDate(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function normalizeOrderPayload(body) {
+  const id = String(firstValue(body, ["order_id", "orderId", "orderNo", "order_no", "id", "transaction_id", "transactionId"])).trim();
+  const amount = parseMoney(firstValue(body, ["amount", "total", "totalAmount", "total_amount", "value", "revenue"]));
+  const currency = String(firstValue(body, ["currency", "currencyCode", "currency_code"]) || "BDT").trim().toUpperCase();
+  const createdAt = orderDate(firstValue(body, ["created_at", "createdAt", "ordered_at", "orderedAt", "date", "time"]));
+
+  return {
+    id,
+    amount,
+    currency,
+    createdAt: createdAt.toISOString(),
+    source: String(body.source || "webhook"),
+    raw: body
+  };
+}
+
+function isOrderWebhookAuthorized(req) {
+  if (!config.orderWebhookSecret) return false;
+  const bearer = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const secret = req.headers["x-order-webhook-secret"] || bearer;
+  return safeEqual(String(secret || ""), config.orderWebhookSecret);
+}
+
+async function addOrderWebhook(body) {
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+
+  const order = normalizeOrderPayload(body);
+  if (!order.id) return { ok: false, errors: ["Order id is required."] };
+
+  const data = loaded.data;
+  data.orders = data.orders || [];
+  const index = data.orders.findIndex((item) => item.id === order.id);
+  if (index === -1) data.orders.push(order);
+  else data.orders[index] = { ...data.orders[index], ...order, updatedAt: new Date().toISOString() };
+
+  await writeDatabase(data);
+  return { ok: true, order, created: index === -1 };
+}
+
+async function getOrderSummary() {
+  const loaded = await readDatabase();
+  const today = localDateKey();
+  const orders = (loaded.data.orders || []).filter((order) => localDateKey(orderDate(order.createdAt)) === today);
+  const currencies = new Set(orders.map((order) => order.currency).filter(Boolean));
+  const currency = currencies.size === 1 ? [...currencies][0] : "";
+  const revenue = orders.reduce((total, order) => (
+    order.amount === null || order.amount === undefined ? total : total + Number(order.amount || 0)
+  ), 0);
+  const latest = orders
+    .slice()
+    .sort((a, b) => orderDate(b.createdAt) - orderDate(a.createdAt))[0] || null;
+
+  return {
+    available: loaded.available,
+    configured: Boolean(config.orderWebhookSecret),
+    path: databasePath,
+    message: loaded.message || "",
+    detail: loaded.detail || "",
+    today: {
+      date: today,
+      count: orders.length,
+      revenue,
+      currency,
+      averageOrderValue: orders.length ? revenue / orders.length : 0,
+      latest
+    }
+  };
 }
 
 function sanitizeId(value) {
@@ -1445,6 +1531,7 @@ async function getDashboardData() {
   }
   const history = await persistDailySummary(requestSummary);
   const provisioning = await getProvisioningSummary();
+  const orders = await getOrderSummary();
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
   void sendAlertHooks(alerts);
@@ -1463,6 +1550,7 @@ async function getDashboardData() {
     alerts,
     deploymentChecks,
     history,
+    orders,
     provisioning,
     ssl,
     config: {
@@ -1482,6 +1570,7 @@ async function getDashboardData() {
       provisionOutputDir: config.provisionOutputDir,
       trackingPaths: config.trackingPaths,
       trackingHosts: config.trackingHosts,
+      orderWebhookEnabled: Boolean(config.orderWebhookSecret),
       alertWebhookEnabled: Boolean(config.alertWebhookUrl),
       sslDomain: config.sslDomain,
       sslPort: config.sslPort
@@ -1557,6 +1646,17 @@ const server = createServer(async (req, res) => {
         "cache-control": "no-store"
       });
       res.end();
+      return;
+    }
+
+    if (pathname === "/api/orders/webhook" && req.method === "POST") {
+      if (!isOrderWebhookAuthorized(req)) {
+        jsonResponse(res, 401, { error: "Order webhook is not authorized." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await addOrderWebhook(body);
+      jsonResponse(res, result.ok ? 202 : 400, result.ok ? { order: result.order, created: result.created } : { errors: result.errors });
       return;
     }
 

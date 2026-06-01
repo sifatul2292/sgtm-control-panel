@@ -688,6 +688,22 @@ function eventRawCount(stat) {
 }
 
 function purchaseSummary(data) {
+  const orderToday = data.orders?.today;
+  if (orderToday?.count) {
+    return {
+      rawCount: Number(orderToday.count) || 0,
+      uniqueCount: Number(orderToday.count) || 0,
+      duplicateCount: 0,
+      keyedCount: Number(orderToday.count) || 0,
+      estimatedKeyCount: 0,
+      uniqueRevenue: Number(orderToday.revenue) || 0,
+      rawRevenue: Number(orderToday.revenue) || 0,
+      averageOrderValue: Number(orderToday.averageOrderValue) || 0,
+      currency: orderToday.currency || "",
+      source: "orders"
+    };
+  }
+
   const summary = data.nginx?.todayEvents?.purchases;
   const stat = reliableEventStats(data).get("Purchase");
   return {
@@ -699,7 +715,8 @@ function purchaseSummary(data) {
     uniqueRevenue: Number(summary?.uniqueRevenue ?? stat?.uniqueRevenue) || 0,
     rawRevenue: Number(summary?.rawRevenue ?? stat?.rawRevenue) || 0,
     averageOrderValue: Number(summary?.averageOrderValue ?? stat?.averageOrderValue) || 0,
-    currency: summary?.currency || stat?.currency || ""
+    currency: summary?.currency || stat?.currency || "",
+    source: "tracking"
   };
 }
 
@@ -1016,23 +1033,24 @@ function renderLatestPurchase(data) {
 function renderBusinessSnapshot(data) {
   const summary = purchaseSummary(data);
   const hasPurchases = summary.rawCount > 0 || summary.uniqueCount > 0;
+  const fromOrders = summary.source === "orders";
   const exact = summary.keyedCount > 0;
   const estimated = !exact && summary.estimatedKeyCount > 0;
   const duplicateRate = summary.rawCount ? Math.round((summary.duplicateCount / summary.rawCount) * 100) : 0;
 
   els.businessBadge.className = "badge";
-  els.businessBadge.classList.add(!hasPurchases ? "warn" : exact ? "ok" : "warn");
-  els.businessBadge.textContent = !hasPurchases ? "No purchases" : exact ? "Exact" : "Estimated";
+  els.businessBadge.classList.add(!hasPurchases ? "warn" : fromOrders || exact ? "ok" : "warn");
+  els.businessBadge.textContent = !hasPurchases ? "No purchases" : fromOrders ? "Store orders" : exact ? "Exact" : "Estimated";
 
   els.businessPurchases.textContent = summary.uniqueCount.toLocaleString();
   els.businessPurchaseDetail.textContent = summary.duplicateCount
     ? `${summary.rawCount.toLocaleString()} raw purchase requests`
-    : "No duplicate purchase hits";
+    : fromOrders ? "From order webhook" : "No duplicate purchase hits";
 
   els.businessRevenue.textContent = summary.uniqueRevenue ? formatMoney(summary.uniqueRevenue, summary.currency) : "--";
   els.businessRevenueDetail.textContent = summary.rawRevenue && summary.rawRevenue !== summary.uniqueRevenue
     ? `${formatMoney(summary.rawRevenue, summary.currency)} before dedupe`
-    : "Deduped order value";
+    : fromOrders ? "Actual store order value" : "Deduped order value";
 
   els.businessAov.textContent = summary.averageOrderValue ? formatMoney(summary.averageOrderValue, summary.currency) : "--";
   els.businessAovDetail.textContent = summary.uniqueCount ? `${summary.uniqueCount.toLocaleString()} unique purchase${summary.uniqueCount === 1 ? "" : "s"}` : "Waiting for purchase value";
@@ -1040,7 +1058,7 @@ function renderBusinessSnapshot(data) {
   els.businessDuplicates.textContent = summary.duplicateCount.toLocaleString();
   els.businessDuplicateDetail.textContent = summary.duplicateCount
     ? `${duplicateRate}% duplicate rate${estimated ? " · estimated" : ""}`
-    : "No duplicate purchase hits";
+    : fromOrders ? "Tracking duplicates do not affect orders" : "No duplicate purchase hits";
 }
 
 function renderDashboard(data) {
@@ -1419,6 +1437,7 @@ function renderSettings(data) {
     ["Data directory", data.config?.dataDir],
     ["History retention", `${text(data.config?.historyRetentionDays, "0")} days`],
     ["Dedicated logs", data.config?.usingDedicatedLogs ? "Enabled" : "Not enabled"],
+    ["Order webhook", data.config?.orderWebhookEnabled ? "Enabled" : "Disabled"],
     ["Alert webhook", data.config?.alertWebhookEnabled ? "Enabled" : "Disabled"]
   ];
 
