@@ -771,6 +771,40 @@ textarea::placeholder {
   color: var(--color-accent-2);
 }
 
+.command-log-list {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border-top: var(--rule-thin) solid var(--color-line);
+}
+
+.command-log-item {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.command-log-item div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.command-log-item small {
+  color: var(--color-muted);
+}
+
+.command-log-item pre {
+  max-height: 180px;
+  padding: var(--space-sm);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
 .filter-wide {
   min-width: min(360px, 100%);
 }

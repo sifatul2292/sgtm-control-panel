@@ -1693,6 +1693,30 @@ function codeBlock(label, value) {
   `;
 }
 
+function commandLogBlock(label, entries = []) {
+  if (!entries.length) return "";
+  return `
+    <details class="plan-block command-log" open>
+      <summary>${escapeHtml(label)}</summary>
+      <div class="command-log-list">
+        ${entries.slice(-6).map((entry) => {
+          const output = [entry.error, entry.stderr, entry.stdout].filter(Boolean).join("\n").trim();
+          return `
+            <article class="command-log-item">
+              <div>
+                <strong>${escapeHtml(entry.label || "Command")}</strong>
+                <span class="state ${entry.ok ? "healthy" : "error"}">${entry.ok ? "ok" : "failed"}</span>
+              </div>
+              ${entry.at ? `<small>${escapeHtml(formatShortDate(entry.at))}</small>` : ""}
+              ${output ? `<pre><code>${escapeHtml(output)}</code></pre>` : ""}
+            </article>
+          `;
+        }).join("")}
+      </div>
+    </details>
+  `;
+}
+
 function renderProvisioning(data) {
   const requests = data.provisioning?.requests || [];
   const pending = requests.filter((item) => item.status === "pending_launch" || item.status === "pending_admin_approval").length;
@@ -1736,6 +1760,8 @@ function renderProvisioning(data) {
         ${codeBlock("Environment file", plan.env)}
         ${codeBlock("Docker Compose", plan.dockerCompose)}
         ${codeBlock("Nginx server block", plan.nginx)}
+        ${commandLogBlock("Launch log", request.launchLog || [])}
+        ${commandLogBlock("Delete log", request.deleteLog || [])}
         ${codeBlock("Admin commands", (plan.commands || []).join("\n"))}
         <div class="button-row">
           <button class="button" type="button" data-provision-launch="${escapeHtml(request.id)}">Launch Now</button>
