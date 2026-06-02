@@ -129,6 +129,8 @@ Generated Nginx configs use the default Nginx access log format. Only set `NGINX
 
 The launcher supports either Docker Compose v2 (`docker compose`) or classic Compose (`docker-compose`). At least one must be installed and available to the app user, with sudo access if `AUTO_LAUNCH_USE_SUDO=true`.
 
+If classic `docker-compose` hits the known `ContainerConfig` recreate error, the launcher removes the stale named container and retries once automatically.
+
 If a container was created before auto-launch was enabled, it can stay in `pending_launch`. After updating `.env` and restarting the app, open the owner Provisioning view and click **Launch Now** on that request.
 
 Customer containers require a tracking subdomain, such as `server.customer.com`, to point to the SGTM VPS before auto-launch can finish. Set `PROVISION_DNS_TARGET` to the value customers should use in DNS, such as the VPS IP address or a host like `sgtm.example.com`.

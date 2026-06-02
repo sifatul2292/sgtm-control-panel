@@ -441,6 +441,10 @@ async function dockerComposeCommand(args, options = {}) {
   };
 }
 
+function isDockerComposeContainerConfigError(result) {
+  return /ContainerConfig/.test(`${result?.error || ""}\n${result?.stderr || ""}\n${result?.stdout || ""}`);
+}
+
 async function dnsResolves(domain) {
   const dns = await command("getent", ["ahosts", domain], { timeout: 1000, maxBuffer: 20000 });
   return Boolean(dns.ok && dns.stdout);
@@ -2341,8 +2345,16 @@ async function launchProvisioningRequest(request) {
     return request;
   }
 
-  const dockerUp = await dockerComposeCommand(["-f", request.plan.composePath, "up", "-d"], { timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
+  let dockerUp = await dockerComposeCommand(["-f", request.plan.composePath, "up", "-d"], { timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
   recordLaunchStep(request, "Docker compose up", dockerUp);
+  if (!dockerUp.ok && isDockerComposeContainerConfigError(dockerUp)) {
+    const removeStale = await systemCommand("docker", ["rm", "-f", request.containerName], { timeout: 10000, maxBuffer: 1024 * 1024 });
+    recordLaunchStep(request, "Remove stale Docker container", removeStale);
+    if (removeStale.ok) {
+      dockerUp = await dockerComposeCommand(["-f", request.plan.composePath, "up", "-d"], { timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
+      recordLaunchStep(request, "Docker compose up retry", dockerUp);
+    }
+  }
   if (!dockerUp.ok) {
     request.status = "docker_failed";
     request.updatedAt = new Date().toISOString();
