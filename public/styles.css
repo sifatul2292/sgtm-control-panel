@@ -401,6 +401,12 @@ h2 {
   padding: var(--space-md);
 }
 
+.panel-action-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-md) var(--space-md) 0;
+}
+
 .summary-item,
 .setting-card,
 .doc-card,
@@ -817,6 +823,10 @@ textarea::placeholder {
 
 .owner-table {
   min-width: 1120px;
+}
+
+.customer-container-table {
+  min-width: 980px;
 }
 
 .compact-table td {

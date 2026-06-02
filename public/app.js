@@ -38,6 +38,12 @@ const els = {
   businessAovDetail: document.querySelector("#businessAovDetail"),
   businessDuplicates: document.querySelector("#businessDuplicates"),
   businessDuplicateDetail: document.querySelector("#businessDuplicateDetail"),
+  customerSetupBadge: document.querySelector("#customerSetupBadge"),
+  customerSetupForm: document.querySelector("#customerSetupForm"),
+  customerSetupFormMessage: document.querySelector("#customerSetupFormMessage"),
+  customerSetupList: document.querySelector("#customerSetupList"),
+  customerContainersBadge: document.querySelector("#customerContainersBadge"),
+  customerContainersTable: document.querySelector("#customerContainersTable"),
   reconciliationBadge: document.querySelector("#reconciliationBadge"),
   reconciliationGrid: document.querySelector("#reconciliationGrid"),
   logModeBadge: document.querySelector("#logModeBadge"),
@@ -107,6 +113,7 @@ const viewTitles = {
   dashboard: ["Dashboard", "Server Overview"],
   logs: ["Containers / Event Logs", "Event Logs"],
   analytics: ["Tracking / Analytics", "Analytics"],
+  customerContainers: ["Tracking / Containers", "Containers"],
   settings: ["Account & Others / Settings", "Settings"],
   deployment: ["Operations / Deployment", "Deployment Health"],
   provisioning: ["Operations / Provisioning", "Container Provisioning"],
@@ -119,6 +126,7 @@ const viewTitles = {
 let latestData = null;
 let currentSession = { role: "owner" };
 const ownerOnlyViews = new Set(["settings", "deployment", "provisioning", "admin"]);
+const customerOnlyViews = new Set(["customerContainers"]);
 
 function text(value, fallback = "--") {
   return value === undefined || value === null || value === "" ? fallback : String(value);
@@ -155,11 +163,15 @@ function formatShortDate(value) {
 
 function setView(name) {
   const requested = viewTitles[name] ? name : "dashboard";
-  const next = currentSession.role === "customer" && ownerOnlyViews.has(requested) ? "dashboard" : requested;
+  const next =
+    (currentSession.role === "customer" && ownerOnlyViews.has(requested)) ||
+    (currentSession.role !== "customer" && customerOnlyViews.has(requested))
+      ? "dashboard"
+      : requested;
   els.views.forEach((view) => view.classList.toggle("is-active", view.dataset.view === next));
   els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.viewTarget === next));
-  els.breadcrumb.textContent = viewTitles[next][0];
-  els.pageTitle.textContent = viewTitles[next][1];
+  els.breadcrumb.textContent = currentSession.role === "customer" && next === "dashboard" ? "Dashboard" : viewTitles[next][0];
+  els.pageTitle.textContent = currentSession.role === "customer" && next === "dashboard" ? "Tracking Overview" : viewTitles[next][1];
   window.location.hash = next;
 }
 
@@ -170,7 +182,11 @@ function applySessionAccess(data) {
   document.querySelectorAll("[data-owner-only]").forEach((element) => {
     element.hidden = customerMode;
   });
-  if (customerMode && ownerOnlyViews.has(window.location.hash.replace("#", ""))) {
+  document.querySelectorAll("[data-customer-only]").forEach((element) => {
+    element.hidden = !customerMode;
+  });
+  if ((customerMode && ownerOnlyViews.has(window.location.hash.replace("#", ""))) ||
+    (!customerMode && customerOnlyViews.has(window.location.hash.replace("#", "")))) {
     setView("dashboard");
   }
 }
@@ -1131,6 +1147,48 @@ function renderBusinessSnapshot(data) {
     : fromOrders ? "Tracking duplicates do not affect orders" : "No duplicate purchase hits";
 }
 
+function renderCustomerSetup(data) {
+  const requests = data.customerSetup?.requests || [];
+  const latest = requests[0];
+  els.customerSetupBadge.className = `badge ${latest ? "ok" : "warn"}`;
+  els.customerSetupBadge.textContent = latest ? `${requests.length} container${requests.length === 1 ? "" : "s"}` : "No container";
+  renderSummaryList(
+    els.customerSetupList,
+    requests.length
+      ? requests.slice(0, 3).map((request) => ({
+        label: request.containerName || request.websiteUrl,
+        value: `${request.websiteUrl} · ${request.trackingDomain} · ${String(request.status || "requested").replaceAll("_", " ")} · ${formatShortDate(request.createdAt)}`,
+        status: request.status === "complete" ? "healthy" : "warning"
+      }))
+      : [{ label: "No containers yet", value: "Create your first sGTM container to start onboarding", status: "warning" }]
+  );
+}
+
+function renderCustomerContainers(data) {
+  const requests = data.customerSetup?.requests || [];
+  els.customerContainersBadge.className = `badge ${requests.length ? "ok" : "warn"}`;
+  els.customerContainersBadge.textContent = `${requests.length} container${requests.length === 1 ? "" : "s"}`;
+  if (!requests.length) {
+    els.customerContainersTable.innerHTML = '<tr><td colspan="7">No containers yet. Use the create form below.</td></tr>';
+    return;
+  }
+
+  els.customerContainersTable.innerHTML = requests.map((request) => `
+    <tr>
+      <td>
+        <strong>${escapeHtml(request.containerName || request.tenantName || "sGTM Container")}</strong>
+        <span class="owner-subtext">${escapeHtml(request.notes || "Managed server-side tracking")}</span>
+      </td>
+      <td>${statusPill(request.containerType || "sGTM", "healthy")}</td>
+      <td>${escapeHtml(request.websiteUrl || "--")}</td>
+      <td>${escapeHtml(request.trackingDomain || "--")}</td>
+      <td>${statusPill(String(request.status || "requested").replaceAll("_", " "), request.status === "complete" ? "healthy" : "warning")}</td>
+      <td>${escapeHtml(request.serverLocation || "Bangladesh BDIX")}</td>
+      <td>${escapeHtml(formatShortDate(request.createdAt))}</td>
+    </tr>
+  `).join("");
+}
+
 function renderBusinessGrid(el, items) {
   el.replaceChildren(
     ...items.map((item) => {
@@ -1187,6 +1245,7 @@ function renderReconciliation(data) {
 }
 
 function renderDashboard(data) {
+  renderCustomerSetup(data);
   const docker = data.docker;
   const totals = docker.totals || { total: 0, running: 0, stopped: 0, unhealthy: 0 };
   els.containerTotal.textContent = text(totals.total, "0");
@@ -1989,6 +2048,7 @@ function renderAll(data) {
   renderDeployment(data);
   renderProvisioning(data);
   renderAdmin(data);
+  renderCustomerContainers(data);
   renderIntegrations(data);
   renderBilling(data);
   renderDocs(data);
@@ -2012,6 +2072,16 @@ async function loadDashboard() {
 
 els.navItems.forEach((item) => {
   item.addEventListener("click", () => setView(item.dataset.viewTarget));
+});
+
+document.querySelectorAll("[data-view-shortcut]").forEach((button) => {
+  button.addEventListener("click", () => setView(button.dataset.viewShortcut));
+});
+
+document.querySelectorAll("[data-scroll-target]").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelector(`#${CSS.escape(button.dataset.scrollTarget)}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 });
 
 els.refreshButton.addEventListener("click", loadDashboard);
@@ -2058,6 +2128,25 @@ els.customerAccountForm.addEventListener("submit", async (event) => {
     setView("admin");
   } catch (error) {
     els.customerAccountFormMessage.textContent = error.message;
+  }
+});
+els.customerSetupForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  els.customerSetupFormMessage.textContent = "Submitting setup request...";
+  const payload = Object.fromEntries(new FormData(els.customerSetupForm).entries());
+  try {
+    const response = await fetch("/api/customer/setup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Setup request failed"]).join(" "));
+    els.customerSetupFormMessage.textContent = `Container created for ${result.request.trackingDomain}.`;
+    await loadDashboard();
+    setView("customerContainers");
+  } catch (error) {
+    els.customerSetupFormMessage.textContent = error.message;
   }
 });
 window.addEventListener("hashchange", () => setView(window.location.hash.replace("#", "") || "dashboard"));

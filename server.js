@@ -988,6 +988,7 @@ async function readDatabase() {
     orders: [],
     tenants: [],
     customerAccounts: [],
+    customerSetupRequests: [],
     alerts: [],
     integrations: []
   };
@@ -1005,6 +1006,7 @@ async function readDatabase() {
         orders: parsed.orders || [],
         tenants: parsed.tenants || [],
         customerAccounts: parsed.customerAccounts || [],
+        customerSetupRequests: parsed.customerSetupRequests || [],
         alerts: parsed.alerts || [],
         integrations: parsed.integrations || []
       }
@@ -1250,6 +1252,134 @@ async function getCustomerAccountsSummary() {
     message: loaded.message || "",
     detail: loaded.detail || "",
     accounts: (loaded.data.customerAccounts || []).map(publicCustomerAccount)
+  };
+}
+
+function normalizeWebsiteUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(withProtocol);
+    return parsed.href.replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+function publicSetupRequest(request) {
+  return {
+    id: request.id,
+    tenantId: request.tenantId,
+    tenantName: request.tenantName,
+    containerName: request.containerName || request.tenantName || request.tenantId,
+    containerType: request.containerType || "sGTM",
+    websiteUrl: request.websiteUrl,
+    trackingDomain: request.trackingDomain,
+    platform: request.platform,
+    containerConfig: request.containerConfig ? "configured" : "",
+    serverLocation: request.serverLocation || "Bangladesh BDIX",
+    status: request.status,
+    notes: request.notes || "",
+    createdAt: request.createdAt,
+    updatedAt: request.updatedAt
+  };
+}
+
+function validateCustomerSetupInput(input, session) {
+  const tenantId = sanitizeId(session.role === "owner" ? input.tenantId || input.tenant_id || session.tenantId : session.tenantId);
+  const tenantName = String(input.tenantName || input.tenant_name || tenantId).trim().slice(0, 120);
+  const containerName = String(input.containerName || input.container_name || input.name || tenantName || tenantId).trim().slice(0, 120);
+  const containerType = String(input.containerType || input.container_type || "sGTM").trim().slice(0, 40);
+  const websiteUrl = normalizeWebsiteUrl(input.websiteUrl || input.website_url || input.siteUrl || input.site_url);
+  const trackingDomain = String(input.trackingDomain || input.tracking_domain || input.serverDomain || input.server_domain || "").trim().toLowerCase();
+  const platform = String(input.platform || "custom").trim().slice(0, 40);
+  const containerConfig = String(input.containerConfig || input.container_config || "").trim();
+  const serverLocation = String(input.serverLocation || input.server_location || "Bangladesh BDIX").trim().slice(0, 80);
+  const notes = String(input.notes || "").trim().slice(0, 1000);
+  const errors = [];
+
+  if (!tenantId) errors.push("Tenant ID is missing.");
+  if (!containerName) errors.push("Container name is required.");
+  if (!websiteUrl) errors.push("Enter a valid website URL.");
+  if (!validDomain(trackingDomain)) errors.push("Enter a valid tracking subdomain, such as server.example.com.");
+  if (!containerConfig) errors.push("Container Config is required. Copy it from Google Tag Manager server container settings.");
+
+  return {
+    errors,
+    value: { tenantId, tenantName, containerName, containerType, websiteUrl, trackingDomain, platform, containerConfig, serverLocation, notes }
+  };
+}
+
+async function addCustomerSetupRequest(input, session) {
+  const validated = validateCustomerSetupInput(input, session);
+  if (validated.errors.length) return { ok: false, errors: validated.errors };
+
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+
+  const data = loaded.data;
+  data.customerSetupRequests ||= [];
+  data.tenants ||= [];
+  const now = new Date().toISOString();
+  const tenantIndex = data.tenants.findIndex((tenant) => tenant.id === validated.value.tenantId);
+  const existingTenant = tenantIndex === -1 ? null : data.tenants[tenantIndex];
+  if (existingTenant?.name && validated.value.tenantName === validated.value.tenantId) {
+    validated.value.tenantName = existingTenant.name;
+  }
+  const request = {
+    id: `setup_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
+    status: "requested",
+    createdAt: now,
+    updatedAt: now,
+    ...validated.value
+  };
+  data.customerSetupRequests.unshift(request);
+  data.customerSetupRequests = data.customerSetupRequests.slice(0, 200);
+
+  const tenantUpdate = {
+    id: request.tenantId,
+    name: request.tenantName,
+    containerName: request.containerName,
+    websiteUrl: request.websiteUrl,
+    domain: request.trackingDomain,
+    platform: request.platform,
+    containerType: request.containerType,
+    serverLocation: request.serverLocation,
+    setupStatus: "requested",
+    updatedAt: now
+  };
+  if (tenantIndex === -1) {
+    data.tenants.push({
+      ...tenantUpdate,
+      plan: config.billingPlan,
+      subscriptionStatus: "active",
+      paymentStatus: "paid",
+      requestLimit: config.monthlyRequestLimit,
+      containerLimit: 1,
+      status: "setup_requested",
+      source: "customer_setup",
+      createdAt: now
+    });
+  } else {
+    data.tenants[tenantIndex] = {
+      ...data.tenants[tenantIndex],
+      ...tenantUpdate
+    };
+  }
+
+  await writeDatabase(data);
+  return { ok: true, request: publicSetupRequest(request) };
+}
+
+async function getCustomerSetupSummary() {
+  const loaded = await readDatabase();
+  return {
+    available: loaded.available,
+    path: databasePath,
+    message: loaded.message || "",
+    detail: loaded.detail || "",
+    requests: (loaded.data.customerSetupRequests || []).map(publicSetupRequest)
   };
 }
 
@@ -2222,6 +2352,7 @@ async function getDashboardData() {
   const provisioning = await getProvisioningSummary();
   const orders = await getOrderSummary();
   const customerAccounts = await getCustomerAccountsSummary();
+  const customerSetup = await getCustomerSetupSummary();
   const customers = await getCustomerCatalog({ docker, ssl, orders });
   const usage = getUsageSummary({ requestSummary, history });
   const reconciliation = getReconciliationSummary({ requestSummary, orders });
@@ -2249,6 +2380,7 @@ async function getDashboardData() {
     orders,
     customers,
     customerAccounts,
+    customerSetup,
     owner,
     usage,
     reconciliation,
@@ -2336,6 +2468,11 @@ function customerDashboardData(data, session) {
     session,
     owner: null,
     customerAccounts: { available: true, path: "", accounts: [] },
+    customerSetup: {
+      available: data.customerSetup.available,
+      path: "",
+      requests: (data.customerSetup.requests || []).filter((request) => request.tenantId === session.tenantId)
+    },
     customers: tenant
       ? {
         available: data.customers.available,
@@ -2577,6 +2714,18 @@ const server = createServer(async (req, res) => {
       const session = getSession(req);
       const dashboardData = await getDashboardData();
       jsonResponse(res, 200, session?.role === "customer" ? customerDashboardData(dashboardData, session) : { ...dashboardData, session });
+      return;
+    }
+
+    if (pathname === "/api/customer/setup" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session) {
+        jsonResponse(res, 401, { error: "Authentication required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await addCustomerSetupRequest(body, session);
+      jsonResponse(res, result.ok ? 201 : 400, result.ok ? { request: result.request } : { errors: result.errors });
       return;
     }
 
