@@ -407,6 +407,25 @@ function systemCommand(commandName, args, options = {}) {
     : command(commandName, args, options);
 }
 
+async function dockerComposeCommand(args, options = {}) {
+  const pluginCheck = await systemCommand("docker", ["compose", "version"], { timeout: 3000, maxBuffer: 20000 });
+  if (pluginCheck.ok) {
+    return systemCommand("docker", ["compose", ...args], options);
+  }
+
+  const classicCheck = await systemCommand("docker-compose", ["version"], { timeout: 3000, maxBuffer: 20000 });
+  if (classicCheck.ok) {
+    return systemCommand("docker-compose", args, options);
+  }
+
+  return {
+    ok: false,
+    stdout: "",
+    stderr: [pluginCheck.stderr, classicCheck.stderr].filter(Boolean).join("\n"),
+    error: "Neither `docker compose` nor `docker-compose` is available to the app user."
+  };
+}
+
 async function dnsResolves(domain) {
   const dns = await command("getent", ["ahosts", domain], { timeout: 1000, maxBuffer: 20000 });
   return Boolean(dns.ok && dns.stdout);
@@ -1939,6 +1958,7 @@ function provisioningPlan(request) {
       "sudo systemctl reload nginx",
       `sudo certbot --nginx -d ${request.domain}`,
       `docker compose -f ${composePath} up -d`,
+      `docker-compose -f ${composePath} up -d`,
       `curl -I https://${request.domain}/healthy`
     ],
     checks: [
@@ -2053,7 +2073,7 @@ async function launchProvisioningRequest(request) {
     return request;
   }
 
-  const dockerUp = await systemCommand("docker", ["compose", "-f", request.plan.composePath, "up", "-d"], { timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
+  const dockerUp = await dockerComposeCommand(["-f", request.plan.composePath, "up", "-d"], { timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
   recordLaunchStep(request, "Docker compose up", dockerUp);
   if (!dockerUp.ok) {
     request.status = "docker_failed";
@@ -2171,7 +2191,7 @@ async function deleteProvisionedContainer(request) {
     });
   };
 
-  const dockerDown = await systemCommand("docker", ["compose", "-f", request.plan.composePath, "down", "--remove-orphans"], {
+  const dockerDown = await dockerComposeCommand(["-f", request.plan.composePath, "down", "--remove-orphans"], {
     timeout: 15000,
     maxBuffer: 2 * 1024 * 1024
   });
