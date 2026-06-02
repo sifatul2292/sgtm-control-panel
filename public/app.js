@@ -84,6 +84,10 @@ const els = {
   customersBadge: document.querySelector("#customersBadge"),
   customersList: document.querySelector("#customersList"),
   adminActions: document.querySelector("#adminActions"),
+  customerAccountForm: document.querySelector("#customerAccountForm"),
+  customerAccountFormMessage: document.querySelector("#customerAccountFormMessage"),
+  customerAccountsBadge: document.querySelector("#customerAccountsBadge"),
+  customerAccountsList: document.querySelector("#customerAccountsList"),
   wizardBadge: document.querySelector("#wizardBadge"),
   setupWizard: document.querySelector("#setupWizard"),
   integrationsBadge: document.querySelector("#integrationsBadge"),
@@ -113,6 +117,8 @@ const viewTitles = {
 };
 
 let latestData = null;
+let currentSession = { role: "owner" };
+const ownerOnlyViews = new Set(["settings", "deployment", "provisioning", "admin"]);
 
 function text(value, fallback = "--") {
   return value === undefined || value === null || value === "" ? fallback : String(value);
@@ -148,12 +154,25 @@ function formatShortDate(value) {
 }
 
 function setView(name) {
-  const next = viewTitles[name] ? name : "dashboard";
+  const requested = viewTitles[name] ? name : "dashboard";
+  const next = currentSession.role === "customer" && ownerOnlyViews.has(requested) ? "dashboard" : requested;
   els.views.forEach((view) => view.classList.toggle("is-active", view.dataset.view === next));
   els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.viewTarget === next));
   els.breadcrumb.textContent = viewTitles[next][0];
   els.pageTitle.textContent = viewTitles[next][1];
   window.location.hash = next;
+}
+
+function applySessionAccess(data) {
+  currentSession = data.session || { role: "owner" };
+  const customerMode = currentSession.role === "customer";
+  document.body.classList.toggle("customer-session", customerMode);
+  document.querySelectorAll("[data-owner-only]").forEach((element) => {
+    element.hidden = customerMode;
+  });
+  if (customerMode && ownerOnlyViews.has(window.location.hash.replace("#", ""))) {
+    setView("dashboard");
+  }
 }
 
 function setBadge(el, status, label) {
@@ -1767,8 +1786,25 @@ function renderOwnerDashboard(data) {
   }).join("");
 }
 
+function renderCustomerAccounts(data) {
+  const accounts = data.customerAccounts?.accounts || [];
+  els.customerAccountsBadge.className = `badge ${accounts.length ? "ok" : "warn"}`;
+  els.customerAccountsBadge.textContent = `${accounts.length} login${accounts.length === 1 ? "" : "s"}`;
+  renderSummaryList(
+    els.customerAccountsList,
+    accounts.length
+      ? accounts.map((account) => ({
+        label: account.tenantName || account.tenantId,
+        value: `${account.username} · ${account.tenantId} · ${account.status}${account.lastLoginAt ? ` · last login ${formatShortDate(account.lastLoginAt)}` : ""}`,
+        status: account.status === "active" ? "healthy" : "warning"
+      }))
+      : [{ label: "Customer logins", value: "Create the first customer login from the form", status: "warning" }]
+  );
+}
+
 function renderAdmin(data) {
   renderOwnerDashboard(data);
+  renderCustomerAccounts(data);
   const customers = data.owner?.customers || data.customers?.tenants || [];
   els.adminBadge.textContent = customers.length ? `${customers.length} tenant${customers.length === 1 ? "" : "s"}` : "No tenants";
   els.customersBadge.className = `badge ${customers.length ? "ok" : "warn"}`;
@@ -1943,6 +1979,7 @@ function renderLogs(data) {
 }
 
 function renderAll(data) {
+  applySessionAccess(data);
   els.generatedAt.textContent = `Updated ${formatDate(data.generatedAt)}`;
   renderDashboard(data);
   renderContainers(data.docker);
@@ -2001,6 +2038,26 @@ els.provisioningForm.addEventListener("submit", async (event) => {
     setView("provisioning");
   } catch (error) {
     els.provisioningFormMessage.textContent = error.message;
+  }
+});
+els.customerAccountForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  els.customerAccountFormMessage.textContent = "Creating customer login...";
+  const payload = Object.fromEntries(new FormData(els.customerAccountForm).entries());
+  try {
+    const response = await fetch("/api/customer-accounts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Customer login failed"]).join(" "));
+    els.customerAccountForm.reset();
+    els.customerAccountFormMessage.textContent = `Login created for ${result.account.username}.`;
+    await loadDashboard();
+    setView("admin");
+  } catch (error) {
+    els.customerAccountFormMessage.textContent = error.message;
   }
 });
 window.addEventListener("hashchange", () => setView(window.location.hash.replace("#", "") || "dashboard"));

@@ -28,19 +28,19 @@
             <span class="nav-icon" aria-hidden="true">⌁</span>
             <span>Analytics</span>
           </button>
-          <button class="nav-item" type="button" data-view-target="settings" aria-label="Settings" title="Settings">
+          <button class="nav-item" type="button" data-view-target="settings" data-owner-only aria-label="Settings" title="Settings">
             <span class="nav-icon" aria-hidden="true">⚙</span>
             <span>Settings</span>
           </button>
-          <button class="nav-item" type="button" data-view-target="deployment" aria-label="Deployment" title="Deployment">
+          <button class="nav-item" type="button" data-view-target="deployment" data-owner-only aria-label="Deployment" title="Deployment">
             <span class="nav-icon" aria-hidden="true">✓</span>
             <span>Deployment</span>
           </button>
-          <button class="nav-item" type="button" data-view-target="provisioning" aria-label="Provisioning" title="Provisioning">
+          <button class="nav-item" type="button" data-view-target="provisioning" data-owner-only aria-label="Provisioning" title="Provisioning">
             <span class="nav-icon" aria-hidden="true">+</span>
             <span>Provisioning</span>
           </button>
-          <button class="nav-item" type="button" data-view-target="admin" aria-label="Admin" title="Admin">
+          <button class="nav-item" type="button" data-view-target="admin" data-owner-only aria-label="Admin" title="Admin">
             <span class="nav-icon" aria-hidden="true">▣</span>
             <span>Admin</span>
           </button>
@@ -58,7 +58,7 @@
           </button>
         </nav>
 
-        <div class="sidebar-group">
+        <div class="sidebar-group" data-owner-only>
           <p>Tracking</p>
           <a class="side-link" href="#containers">Containers</a>
           <a class="side-link" href="#nginx">Nginx Logs</a>
@@ -712,6 +712,62 @@
                 <span class="badge">Guarded</span>
               </div>
               <div id="adminActions" class="summary-list"></div>
+            </article>
+          </section>
+
+          <section class="split-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Create Customer Login</h2>
+                  <p>Create or update a tenant login with a hashed password.</p>
+                </div>
+                <span class="badge">Owner only</span>
+              </div>
+              <form id="customerAccountForm" class="provisioning-form">
+                <label>
+                  Tenant ID
+                  <input name="tenantId" placeholder="customer-slug" required />
+                </label>
+                <label>
+                  Customer name
+                  <input name="tenantName" placeholder="Customer Name" required />
+                </label>
+                <label>
+                  Username
+                  <input name="username" autocomplete="off" placeholder="customer-login" required />
+                </label>
+                <label>
+                  Password
+                  <input name="password" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" required />
+                </label>
+                <label>
+                  Plan
+                  <select name="plan">
+                    <option>Starter</option>
+                    <option>Growth</option>
+                    <option>Pro</option>
+                    <option>Agency</option>
+                  </select>
+                </label>
+                <label>
+                  Tracking domain
+                  <input name="domain" placeholder="server.customer.com" />
+                </label>
+                <button class="button button-primary" type="submit">Create Login</button>
+                <p id="customerAccountFormMessage" class="form-message"></p>
+              </form>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Customer Logins</h2>
+                  <p>Active login accounts mapped to tenant dashboards.</p>
+                </div>
+                <span id="customerAccountsBadge" class="badge">0 logins</span>
+              </div>
+              <div id="customerAccountsList" class="summary-list"></div>
             </article>
           </section>
 

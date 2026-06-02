@@ -90,6 +90,19 @@ MONTHLY_CONTAINER_LIMIT=1
 CUSTOMER_SUPPORT_EMAIL=support@example.com
 ```
 
+## Owner and Customer Login
+
+The owner/admin login uses:
+
+```bash
+AUTH_USERNAME=admin
+AUTH_PASSWORD=change-this-owner-password
+```
+
+Create customer logins from Admin. Customer account records are stored in `data/history.json` with salted password hashes, and each login maps to a tenant ID.
+
+Owner users can see Admin, Provisioning, Deployment, and Settings. Customer users see the customer dashboard views only and are scoped to their tenant.
+
 The panel separates:
 
 - Actual store orders from `/api/orders/webhook`

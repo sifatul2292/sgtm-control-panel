@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(rootDir, "public");
@@ -148,10 +148,39 @@ function signSession(value) {
   return createHmac("sha256", authSecret).update(value).digest("hex");
 }
 
-function makeSessionCookie() {
+function encodeSessionPayload(account) {
   const issuedAt = String(Date.now());
-  const payload = `${config.authUsername}:${issuedAt}`;
+  return JSON.stringify({
+    username: account.username,
+    role: account.role,
+    tenantId: account.tenantId || config.tenantId,
+    issuedAt
+  });
+}
+
+function makeSessionCookie(account) {
+  const payload = encodeSessionPayload(account);
   return `${Buffer.from(payload).toString("base64url")}.${signSession(payload)}`;
+}
+
+function parseSessionPayload(payload) {
+  try {
+    const parsed = JSON.parse(payload);
+    return {
+      username: String(parsed.username || ""),
+      role: parsed.role === "customer" ? "customer" : "owner",
+      tenantId: sanitizeId(parsed.tenantId || config.tenantId),
+      issuedAt: parsed.issuedAt
+    };
+  } catch {
+    const [username, issuedAt] = payload.split(":");
+    return {
+      username,
+      role: "owner",
+      tenantId: config.tenantId,
+      issuedAt
+    };
+  }
 }
 
 function safeEqual(a, b) {
@@ -160,29 +189,83 @@ function safeEqual(a, b) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-function isAuthenticated(req) {
-  if (!config.authEnabled) return true;
-  if (!config.authPassword) return false;
+function hashPassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(String(password), salt, 64).toString("hex");
+  return `scrypt:${salt}:${hash}`;
+}
+
+function verifyPassword(password, storedHash) {
+  const [scheme, salt, expected] = String(storedHash || "").split(":");
+  if (scheme !== "scrypt" || !salt || !expected) return false;
+  const actual = scryptSync(String(password), salt, 64);
+  const expectedBuffer = Buffer.from(expected, "hex");
+  return actual.length === expectedBuffer.length && timingSafeEqual(actual, expectedBuffer);
+}
+
+function getSession(req) {
+  if (!config.authEnabled) {
+    return {
+      username: config.authUsername,
+      role: "owner",
+      tenantId: config.tenantId
+    };
+  }
+  if (!config.authPassword && !config.customerPassword) return null;
   const token = parseCookies(req.headers.cookie).sgtm_session;
-  if (!token || !token.includes(".")) return false;
+  if (!token || !token.includes(".")) return null;
 
   const [encoded, signature] = token.split(".");
   let payload = "";
   try {
     payload = Buffer.from(encoded, "base64url").toString("utf8");
   } catch {
-    return false;
+    return null;
   }
 
-  const [username, issuedAt] = payload.split(":");
-  const age = Date.now() - Number(issuedAt);
-  return (
-    username === config.authUsername &&
+  const session = parseSessionPayload(payload);
+  const age = Date.now() - Number(session.issuedAt);
+  const knownUser =
+    (session.role === "owner" && Boolean(config.authPassword) && session.username === config.authUsername) ||
+    (session.role === "customer" && Boolean(session.username) && Boolean(session.tenantId));
+  const valid =
+    knownUser &&
     Number.isFinite(age) &&
     age >= 0 &&
     age < 1000 * 60 * 60 * 12 &&
-    safeEqual(signature, signSession(payload))
-  );
+    safeEqual(signature, signSession(payload));
+
+  return valid ? session : null;
+}
+
+function isAuthenticated(req) {
+  return Boolean(getSession(req));
+}
+
+function isOwner(req) {
+  return getSession(req)?.role === "owner";
+}
+
+async function authenticateLogin(username, password) {
+  if (config.authPassword && safeEqual(username, config.authUsername) && safeEqual(password, config.authPassword)) {
+    return {
+      username: config.authUsername,
+      role: "owner",
+      tenantId: config.tenantId
+    };
+  }
+
+  const account = await findCustomerAccountByUsername(username);
+  if (account && account.status === "active" && verifyPassword(password, account.passwordHash)) {
+    void markCustomerAccountLogin(account.id);
+    return {
+      username: account.username,
+      role: "customer",
+      tenantId: account.tenantId,
+      accountId: account.id
+    };
+  }
+  return null;
 }
 
 function readForm(req) {
@@ -236,7 +319,7 @@ function loginPage(error = "") {
       <form class="login-card" method="post" action="/login">
         <span class="brand-mark">S</span>
         <h1>SGTM Panel</h1>
-        <p>Sign in to view Docker, Nginx, and tracking diagnostics.</p>
+        <p>Sign in as owner or customer to view your tracking dashboard.</p>
         ${error ? `<div class="login-error">${error}</div>` : ""}
         <label>
           Username
@@ -904,6 +987,7 @@ async function readDatabase() {
     provisioning: { requests: [] },
     orders: [],
     tenants: [],
+    customerAccounts: [],
     alerts: [],
     integrations: []
   };
@@ -920,6 +1004,7 @@ async function readDatabase() {
         provisioning: parsed.provisioning || { requests: [] },
         orders: parsed.orders || [],
         tenants: parsed.tenants || [],
+        customerAccounts: parsed.customerAccounts || [],
         alerts: parsed.alerts || [],
         integrations: parsed.integrations || []
       }
@@ -1033,6 +1118,7 @@ async function getOrderSummary() {
     path: databasePath,
     message: loaded.message || "",
     detail: loaded.detail || "",
+    rawToday: orders,
     today: {
       date: today,
       count: orders.length,
@@ -1041,6 +1127,129 @@ async function getOrderSummary() {
       averageOrderValue: orders.length ? revenue / orders.length : 0,
       latest
     }
+  };
+}
+
+function publicCustomerAccount(account) {
+  return {
+    id: account.id,
+    tenantId: account.tenantId,
+    tenantName: account.tenantName || account.tenantId,
+    username: account.username,
+    status: account.status || "active",
+    createdAt: account.createdAt || "",
+    updatedAt: account.updatedAt || "",
+    lastLoginAt: account.lastLoginAt || ""
+  };
+}
+
+async function findCustomerAccountByUsername(username) {
+  const loaded = await readDatabase();
+  return (loaded.data.customerAccounts || []).find((account) => account.username === String(username || "").trim()) || null;
+}
+
+function validateCustomerAccountInput(input) {
+  const tenantId = sanitizeId(input.tenantId || input.tenant_id || "");
+  const tenantName = String(input.tenantName || input.tenant_name || tenantId).trim().slice(0, 120);
+  const username = String(input.username || "").trim().toLowerCase();
+  const password = String(input.password || "");
+  const plan = String(input.plan || input.planName || config.billingPlan || "Starter").trim();
+  const domain = String(input.domain || "").trim().toLowerCase();
+  const errors = [];
+
+  if (!tenantId) errors.push("Tenant ID is required.");
+  if (!/^[a-z0-9][a-z0-9._-]{2,63}$/i.test(username)) errors.push("Username must be at least 3 characters and use letters, numbers, dot, dash, or underscore.");
+  if (password.length < 8) errors.push("Password must be at least 8 characters.");
+  if (domain && !validDomain(domain)) errors.push("Domain must be a valid hostname.");
+
+  return {
+    errors,
+    value: {
+      tenantId,
+      tenantName,
+      username,
+      password,
+      plan,
+      domain,
+      status: String(input.status || "active").trim().toLowerCase()
+    }
+  };
+}
+
+async function addCustomerAccount(input) {
+  const validated = validateCustomerAccountInput(input);
+  if (validated.errors.length) return { ok: false, errors: validated.errors };
+
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+
+  const data = loaded.data;
+  data.customerAccounts ||= [];
+  data.tenants ||= [];
+  const duplicate = data.customerAccounts.find((account) =>
+    account.username === validated.value.username && account.tenantId !== validated.value.tenantId
+  );
+  if (duplicate) return { ok: false, errors: ["Username is already used by another customer."] };
+
+  const now = new Date().toISOString();
+  const accountIndex = data.customerAccounts.findIndex((account) => account.tenantId === validated.value.tenantId);
+  const account = {
+    id: accountIndex === -1 ? `acct_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}` : data.customerAccounts[accountIndex].id,
+    tenantId: validated.value.tenantId,
+    tenantName: validated.value.tenantName,
+    username: validated.value.username,
+    passwordHash: hashPassword(validated.value.password),
+    status: validated.value.status === "disabled" ? "disabled" : "active",
+    createdAt: accountIndex === -1 ? now : data.customerAccounts[accountIndex].createdAt,
+    updatedAt: now
+  };
+
+  if (accountIndex === -1) data.customerAccounts.push(account);
+  else data.customerAccounts[accountIndex] = { ...data.customerAccounts[accountIndex], ...account };
+
+  const tenantIndex = data.tenants.findIndex((tenant) => tenant.id === validated.value.tenantId);
+  const tenant = {
+    id: validated.value.tenantId,
+    name: validated.value.tenantName,
+    domain: validated.value.domain,
+    plan: validated.value.plan,
+    subscriptionStatus: "active",
+    paymentStatus: "paid",
+    requestLimit: config.monthlyRequestLimit,
+    containerLimit: 1,
+    monthlyAmount: monthlyAmountForPlan(validated.value.plan),
+    status: "active",
+    source: "customer_account",
+    updatedAt: now
+  };
+  if (tenantIndex === -1) data.tenants.push({ ...tenant, createdAt: now });
+  else data.tenants[tenantIndex] = { ...data.tenants[tenantIndex], ...tenant };
+
+  await writeDatabase(data);
+  return { ok: true, account: publicCustomerAccount(account) };
+}
+
+async function markCustomerAccountLogin(id) {
+  try {
+    const loaded = await readDatabase();
+    if (!loaded.available) return;
+    const account = (loaded.data.customerAccounts || []).find((item) => item.id === id);
+    if (!account) return;
+    account.lastLoginAt = new Date().toISOString();
+    await writeDatabase(loaded.data);
+  } catch {
+    // Login telemetry should never block authentication.
+  }
+}
+
+async function getCustomerAccountsSummary() {
+  const loaded = await readDatabase();
+  return {
+    available: loaded.available,
+    path: databasePath,
+    message: loaded.message || "",
+    detail: loaded.detail || "",
+    accounts: (loaded.data.customerAccounts || []).map(publicCustomerAccount)
   };
 }
 
@@ -2012,6 +2221,7 @@ async function getDashboardData() {
   const history = await persistDailySummary(requestSummary);
   const provisioning = await getProvisioningSummary();
   const orders = await getOrderSummary();
+  const customerAccounts = await getCustomerAccountsSummary();
   const customers = await getCustomerCatalog({ docker, ssl, orders });
   const usage = getUsageSummary({ requestSummary, history });
   const reconciliation = getReconciliationSummary({ requestSummary, orders });
@@ -2038,6 +2248,7 @@ async function getDashboardData() {
     history,
     orders,
     customers,
+    customerAccounts,
     owner,
     usage,
     reconciliation,
@@ -2079,6 +2290,197 @@ async function getDashboardData() {
       alertWebhookEnabled: Boolean(config.alertWebhookUrl),
       sslDomain: config.sslDomain,
       sslPort: config.sslPort
+    }
+  };
+}
+
+function publicCustomerConfig(data) {
+  return {
+    serviceName: data.config.serviceName,
+    publicBaseUrl: data.config.publicBaseUrl,
+    tenantId: data.config.tenantId,
+    tenantName: data.config.tenantName,
+    tenantDomain: data.config.tenantDomain,
+    billingPlan: data.config.billingPlan,
+    subscriptionStatus: data.config.subscriptionStatus,
+    paymentStatus: data.config.paymentStatus,
+    renewalDate: data.config.renewalDate,
+    monthlyAmount: data.config.monthlyAmount,
+    monthlyRequestLimit: data.config.monthlyRequestLimit,
+    monthlyContainerLimit: data.config.monthlyContainerLimit,
+    customerSupportEmail: data.config.customerSupportEmail,
+    trackingPaths: data.config.trackingPaths,
+    trackingHosts: data.config.trackingHosts,
+    orderWebhookEnabled: data.config.orderWebhookEnabled,
+    sslDomain: data.config.sslDomain,
+    sslPort: data.config.sslPort
+  };
+}
+
+function customerDashboardData(data, session) {
+  const customerRows = data.owner?.customers || data.customers?.tenants || [];
+  const tenant = customerRows.find((customer) => customer.id === session.tenantId) || customerRows[0] || null;
+  const tenantRequestSummary = filterRequestSummaryForTenant(data.nginx.todayEvents, tenant);
+  const tenantOrders = filterOrdersForTenant(data.orders, tenant);
+  const tenantUsage = {
+    ...data.usage,
+    requestsToday: tenantRequestSummary.count,
+    requestsMonth: tenant?.requestsMonth || tenantRequestSummary.count,
+    requestLimit: tenant?.requestLimit || data.usage.requestLimit,
+    usagePercent: tenant?.usagePercent || 0
+  };
+  const tenantReconciliation = getReconciliationSummary({ requestSummary: tenantRequestSummary, orders: tenantOrders });
+
+  return {
+    ...data,
+    session,
+    owner: null,
+    customerAccounts: { available: true, path: "", accounts: [] },
+    customers: tenant
+      ? {
+        available: data.customers.available,
+        active: tenant.subscriptionStatus === "active" ? 1 : 0,
+        queued: 0,
+        tenants: [tenant]
+      }
+      : { available: data.customers.available, active: 0, queued: 0, tenants: [] },
+    provisioning: { available: true, path: "", requests: [] },
+    deploymentChecks: [],
+    alerts: data.alerts.filter((alert) => ["no-tracking-requests", "ssl-expiring"].includes(alert.key)),
+    docker: {
+      available: data.docker.available,
+      message: data.docker.available ? "Customer infrastructure is monitored." : data.docker.message,
+      detail: "",
+      containers: [],
+      totals: {
+        running: tenant?.containers?.running || 0,
+        stopped: Math.max(0, Number(tenant?.containers?.total || 0) - Number(tenant?.containers?.running || 0)),
+        unhealthy: tenant?.containers?.unhealthy || 0,
+        total: tenant?.containers?.total || 0
+      }
+    },
+    dockerLogs: unavailable("Docker logs are owner-only."),
+    nginx: {
+      ...data.nginx,
+      requestCountToday: tenantRequestSummary,
+      todayEvents: tenantRequestSummary,
+      errorLog: unavailable("Nginx error logs are owner-only.")
+    },
+    orders: tenantOrders,
+    usage: tenantUsage,
+    reconciliation: tenantReconciliation,
+    integrations: getIntegrationSummary({ orders: tenantOrders, requestSummary: tenantRequestSummary }),
+    config: publicCustomerConfig(data)
+  };
+}
+
+function hostMatchesTenant(host, tenant) {
+  if (!tenant) return true;
+  const domain = normalizeHost(tenant.domain);
+  if (!domain) return tenant.source === "environment";
+  const hostName = normalizeHost(host);
+  return hostName === domain || hostName.endsWith(`.${domain}`) || domain.endsWith(`.${hostName}`);
+}
+
+function filterRequestSummaryForTenant(summary, tenant) {
+  if (!summary?.available || !tenant || (!tenant.domain && tenant.source === "environment")) return summary;
+
+  const recentEvents = (summary.recentEvents || []).filter((event) => hostMatchesTenant(event.host, tenant));
+  const eventCounts = new Map();
+  const clientCounts = new Map();
+  const hostCounts = new Map();
+  const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
+  const purchases = {
+    rawCount: 0,
+    uniqueCount: 0,
+    duplicateCount: 0,
+    keyedCount: 0,
+    estimatedKeyCount: 0,
+    missingKeyCount: 0,
+    uniqueRevenue: 0,
+    rawRevenue: 0,
+    averageOrderValue: 0,
+    currency: ""
+  };
+  const purchaseKeys = new Set();
+  const purchaseCurrencies = new Set();
+  let errors = 0;
+
+  for (const event of recentEvents) {
+    if (Number(event.status) >= 400) errors += 1;
+    const eventEntry = eventCounts.get(event.eventName) || { count: 0, rawCount: 0, duplicateCount: 0, errors: 0, lastSeen: null };
+    eventEntry.count += 1;
+    eventEntry.rawCount += 1;
+    if (Number(event.status) >= 400) eventEntry.errors += 1;
+    if (event.date && (!eventEntry.lastSeen || new Date(event.date) > eventEntry.lastSeen)) eventEntry.lastSeen = new Date(event.date);
+    eventCounts.set(event.eventName, eventEntry);
+
+    const clientEntry = clientCounts.get(event.client) || { count: 0, errors: 0, lastSeen: null };
+    clientEntry.count += 1;
+    if (Number(event.status) >= 400) clientEntry.errors += 1;
+    if (event.date && (!clientEntry.lastSeen || new Date(event.date) > clientEntry.lastSeen)) clientEntry.lastSeen = new Date(event.date);
+    clientCounts.set(event.client, clientEntry);
+
+    const hostName = event.host || "Unknown host";
+    const hostEntry = hostCounts.get(hostName) || { count: 0, errors: 0, lastSeen: null };
+    hostEntry.count += 1;
+    if (Number(event.status) >= 400) hostEntry.errors += 1;
+    if (event.date && (!hostEntry.lastSeen || new Date(event.date) > hostEntry.lastSeen)) hostEntry.lastSeen = new Date(event.date);
+    hostCounts.set(hostName, hostEntry);
+
+    const date = event.date ? new Date(event.date) : null;
+    if (date && !Number.isNaN(date.getTime())) {
+      const bucket = hourly[date.getHours()];
+      bucket.total += 1;
+      if (Number(event.status) >= 400) bucket.errors += 1;
+      if (event.eventName === "Purchase") bucket.purchases += 1;
+    }
+
+    if (event.eventName === "Purchase") {
+      purchases.rawCount += 1;
+      purchases.uniqueCount += 1;
+      const amount = parseMoney(event.value);
+      if (amount !== null) {
+        purchases.rawRevenue += amount;
+        purchases.uniqueRevenue += amount;
+      }
+      if (event.transactionId || event.eventId) purchaseKeys.add(event.transactionId || event.eventId);
+      if (event.currency) purchaseCurrencies.add(String(event.currency).toUpperCase());
+    }
+  }
+
+  purchases.keyedCount = purchaseKeys.size;
+  purchases.averageOrderValue = purchases.uniqueCount ? purchases.uniqueRevenue / purchases.uniqueCount : 0;
+  purchases.currency = purchaseCurrencies.size === 1 ? [...purchaseCurrencies][0] : "";
+
+  return {
+    ...summary,
+    count: recentEvents.length,
+    errors,
+    events: serializeSummaryMap(eventCounts),
+    clients: serializeSummaryMap(clientCounts),
+    hosts: serializeSummaryMap(hostCounts),
+    hourly,
+    recentEvents,
+    purchases
+  };
+}
+
+function filterOrdersForTenant(orders, tenant) {
+  if (!tenant || tenant.source === "environment") return orders;
+  const todayOrders = orders.today || {};
+  const rawOrders = (orders.rawToday || []).filter((order) => order.tenantId === tenant.id);
+  const revenue = rawOrders.reduce((total, order) => total + Number(order.amount || 0), 0);
+  const currencies = new Set(rawOrders.map((order) => order.currency).filter(Boolean));
+  return {
+    ...orders,
+    today: {
+      ...todayOrders,
+      count: rawOrders.length,
+      revenue,
+      currency: currencies.size === 1 ? [...currencies][0] : "",
+      averageOrderValue: rawOrders.length ? revenue / rawOrders.length : 0,
+      latest: rawOrders.slice().sort((a, b) => orderDate(b.createdAt) - orderDate(a.createdAt))[0] || null
     }
   };
 }
@@ -2125,19 +2527,16 @@ const server = createServer(async (req, res) => {
       const form = await readForm(req);
       const username = form.get("username") || "";
       const password = form.get("password") || "";
-      const ok =
-        config.authPassword &&
-        safeEqual(username, config.authUsername) &&
-        safeEqual(password, config.authPassword);
+      const account = await authenticateLogin(username, password);
 
-      if (!ok) {
+      if (!account) {
         htmlResponse(res, 401, loginPage("Invalid username or password."));
         return;
       }
 
       res.writeHead(302, {
         location: "/",
-        "set-cookie": `sgtm_session=${makeSessionCookie()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`,
+        "set-cookie": `sgtm_session=${makeSessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`,
         "cache-control": "no-store"
       });
       res.end();
@@ -2175,11 +2574,28 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.url?.startsWith("/api/dashboard")) {
-      jsonResponse(res, 200, await getDashboardData());
+      const session = getSession(req);
+      const dashboardData = await getDashboardData();
+      jsonResponse(res, 200, session?.role === "customer" ? customerDashboardData(dashboardData, session) : { ...dashboardData, session });
+      return;
+    }
+
+    if (pathname === "/api/customer-accounts" && req.method === "POST") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await addCustomerAccount(body);
+      jsonResponse(res, result.ok ? 201 : 400, result.ok ? { account: result.account } : { errors: result.errors });
       return;
     }
 
     if (pathname === "/api/provisioning/requests" && req.method === "POST") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
       const body = await readJson(req);
       const result = await addProvisioningRequest(body);
       jsonResponse(res, result.ok ? 201 : 400, result.ok ? { request: result.request } : { errors: result.errors });
@@ -2188,6 +2604,10 @@ const server = createServer(async (req, res) => {
 
     const prepareMatch = pathname.match(/^\/api\/provisioning\/requests\/([^/]+)\/prepare$/);
     if (prepareMatch && req.method === "POST") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
       const result = await prepareProvisioningFiles(decodeURIComponent(prepareMatch[1]));
       jsonResponse(res, result.ok ? 200 : 400, result.ok ? { request: result.request } : { errors: result.errors });
       return;
