@@ -215,6 +215,7 @@ function normalizeEventName(value) {
     .trim()
     .replace(/[-_\s]+/g, "")
     .toLowerCase();
+  const normalized = compact.endsWith("stape") ? compact.slice(0, -"stape".length) : compact;
   const names = {
     pageview: "PageView",
     page_view: "PageView",
@@ -233,7 +234,7 @@ function normalizeEventName(value) {
     search: "Search",
     scriptload: "ScriptLoad"
   };
-  return names[compact] || "";
+  return names[normalized] || "";
 }
 
 function queryEventName(path) {
