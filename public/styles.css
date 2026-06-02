@@ -241,6 +241,15 @@ h2 {
   background: var(--color-accent);
 }
 
+.button-danger {
+  border-color: color-mix(in oklch, var(--color-danger), transparent 45%);
+  color: var(--color-danger);
+}
+
+.button-danger:hover {
+  background: color-mix(in oklch, var(--color-danger), transparent 86%);
+}
+
 .view {
   display: none;
 }

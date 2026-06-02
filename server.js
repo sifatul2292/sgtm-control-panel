@@ -27,6 +27,12 @@ const config = {
   provisionPortEnd: Number(process.env.PROVISION_PORT_END || 8999),
   provisionDnsTarget: process.env.PROVISION_DNS_TARGET || "",
   provisionOutputDir: process.env.PROVISION_OUTPUT_DIR ? resolve(rootDir, normalize(process.env.PROVISION_OUTPUT_DIR)) : join(configuredDataDir, "provisioning"),
+  autoLaunchEnabled: process.env.AUTO_LAUNCH_ENABLED === "true",
+  autoLaunchUseSudo: process.env.AUTO_LAUNCH_USE_SUDO === "true",
+  autoLaunchRequireDns: process.env.AUTO_LAUNCH_REQUIRE_DNS !== "false",
+  autoLaunchCertbot: process.env.AUTO_LAUNCH_CERTBOT === "true",
+  nginxSitesAvailableDir: process.env.NGINX_SITES_AVAILABLE_DIR || "/etc/nginx/sites-available",
+  nginxSitesEnabledDir: process.env.NGINX_SITES_ENABLED_DIR || "/etc/nginx/sites-enabled",
   trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data"),
   trackingHosts: parseCsv(process.env.TRACKING_HOSTS || inferHostFromCertPath(process.env.SSL_CERT_PATH || "") || process.env.SSL_DOMAIN || ""),
   dockerLogExclude: parseCsv(process.env.DOCKER_LOG_EXCLUDE || "Sending aggregate usage beacon,googletagmanager.com/sgtm/a"),
@@ -393,6 +399,17 @@ function runWithInput(commandName, args, input, timeout = 5000) {
 
     child.stdin.end(input);
   });
+}
+
+function systemCommand(commandName, args, options = {}) {
+  return config.autoLaunchUseSudo
+    ? command("sudo", [commandName, ...args], options)
+    : command(commandName, args, options);
+}
+
+async function dnsResolves(domain) {
+  const dns = await command("getent", ["ahosts", domain], { timeout: 1000, maxBuffer: 20000 });
+  return Boolean(dns.ok && dns.stdout);
 }
 
 function timeoutResult(message, detail = "Collector timed out.") {
@@ -1279,6 +1296,7 @@ function publicSetupRequest(request) {
     platform: request.platform,
     containerConfig: request.containerConfig ? "configured" : "",
     serverLocation: request.serverLocation || "Bangladesh BDIX",
+    provisioningRequestId: request.provisioningRequestId || "",
     status: request.status,
     notes: request.notes || "",
     createdAt: request.createdAt,
@@ -1321,6 +1339,7 @@ async function addCustomerSetupRequest(input, session) {
   const data = loaded.data;
   data.customerSetupRequests ||= [];
   data.tenants ||= [];
+  data.provisioning ||= { requests: [] };
   const now = new Date().toISOString();
   const tenantIndex = data.tenants.findIndex((tenant) => tenant.id === validated.value.tenantId);
   const existingTenant = tenantIndex === -1 ? null : data.tenants[tenantIndex];
@@ -1329,13 +1348,48 @@ async function addCustomerSetupRequest(input, session) {
   }
   const request = {
     id: `setup_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
-    status: "requested",
+    status: "queued",
     createdAt: now,
     updatedAt: now,
     ...validated.value
   };
   data.customerSetupRequests.unshift(request);
   data.customerSetupRequests = data.customerSetupRequests.slice(0, 200);
+
+  const existingProvision = data.provisioning.requests.find((item) => item.sourceRequestId === request.id);
+  if (!existingProvision) {
+    const port = allocateProvisionPort(data.provisioning.requests);
+    if (!port) return { ok: false, errors: [`No available provisioning ports in ${config.provisionPortStart}-${config.provisionPortEnd}.`] };
+    const provisionRequest = {
+      id: `req_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
+      source: "customer_container",
+      sourceRequestId: request.id,
+      tenantId: request.tenantId,
+      websiteUrl: request.websiteUrl,
+      serverLocation: request.serverLocation,
+      status: "pending_launch",
+      createdAt: now,
+      updatedAt: now,
+      port,
+      autoAssignedPort: true,
+      instanceName: sanitizeId(request.containerName || request.tenantName || request.tenantId),
+      domain: request.trackingDomain,
+      containerName: sanitizeId(`sgtm-${request.containerName || request.tenantId}`),
+      ownerEmail: "",
+      planName: "Customer",
+      requestLimit: config.monthlyRequestLimit,
+      previewUrl: "",
+      containerConfig: request.containerConfig,
+      notes: `Customer-created container for ${request.websiteUrl}${request.notes ? `\n${request.notes}` : ""}`
+    };
+    provisionRequest.plan = provisioningPlan(provisionRequest);
+    data.provisioning.requests.unshift(provisionRequest);
+    data.provisioning.requests = data.provisioning.requests.slice(0, 100);
+    request.provisioningRequestId = provisionRequest.id;
+    await autoLaunchProvisioningRequest(data, provisionRequest);
+    request.status = provisionRequest.status;
+    request.updatedAt = provisionRequest.updatedAt;
+  }
 
   const tenantUpdate = {
     id: request.tenantId,
@@ -1478,8 +1532,49 @@ function hasNumericValue(value) {
   return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 }
 
-function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation }) {
+function getTenantContainers(tenantId, tenant = null, setupRequests = [], provisioningRequests = []) {
+  const requests = setupRequests || [];
+  const provisioning = provisioningRequests || [];
+  const provisioningBySource = new Map(provisioning.filter((request) => request.sourceRequestId).map((request) => [request.sourceRequestId, request]));
+  const setupContainers = requests
+    .filter((request) => request.tenantId === tenantId && request.status !== "deleted")
+    .map((request) => {
+      const provision = provisioningBySource.get(request.id);
+      return {
+        id: request.id,
+        provisioningRequestId: provision?.id || request.provisioningRequestId || "",
+        name: request.containerName || tenant?.containerName || tenant?.name || tenantId,
+        type: request.containerType || "sGTM",
+        websiteUrl: request.websiteUrl || tenant?.websiteUrl || "",
+        domain: request.trackingDomain || tenant?.domain || "",
+        status: provision?.status || request.status || "requested",
+        serverLocation: request.serverLocation || "Bangladesh BDIX",
+        createdAt: request.createdAt || "",
+        source: "customer"
+      };
+    });
+  const provisioningContainers = provisioning
+    .filter((request) => !request.sourceRequestId && request.tenantId === tenantId)
+    .map((request) => ({
+      id: request.id,
+      name: request.instanceName,
+      type: "sGTM",
+      websiteUrl: request.websiteUrl || "",
+      domain: request.domain,
+      status: request.status,
+      serverLocation: request.serverLocation || "Bangladesh BDIX",
+      createdAt: request.createdAt || "",
+      source: "provisioning"
+    }));
+  const merged = [...setupContainers, ...provisioningContainers];
+  return merged.filter((container, index, all) =>
+    all.findIndex((item) => item.domain === container.domain && item.name === container.name) === index
+  );
+}
+
+function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning }) {
   const enrichedCustomers = (customers.tenants || []).map((customer) => {
+    const customerContainers = getTenantContainers(customer.id, customer, customerSetup?.requests || [], provisioning?.requests || []);
     const plan = customer.plan || config.billingPlan;
     const requestLimit = Number(customer.requestLimit || config.monthlyRequestLimit || 0);
     const requestsToday = customerRequestCount(customer, requestSummary);
@@ -1502,6 +1597,8 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
       paymentStatus: unpaid && paymentStatus === "paid" ? "expired" : paymentStatus,
       renewalDate,
       monthlyAmount: Number(customer.monthlyAmount || monthlyAmountForPlan(plan)),
+      customerContainers,
+      requestedContainers: customerContainers.filter((container) => container.status === "requested").length,
       requestsToday,
       requestsMonth,
       requestLimit,
@@ -1531,6 +1628,10 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
   const brokenPurchaseCustomers = enrichedCustomers.filter((customer) => customer.brokenPurchaseTracking);
   const unhealthyCustomers = enrichedCustomers.filter((customer) => customer.containers.unhealthy > 0);
   const sslAttention = enrichedCustomers.filter((customer) => hasNumericValue(customer.sslDaysRemaining) && Number(customer.sslDaysRemaining) <= 14);
+  const totalCustomerContainers = enrichedCustomers.reduce((total, customer) => total + Number(customer.customerContainers?.length || 0), 0);
+  const pendingCustomerContainers = enrichedCustomers.reduce((total, customer) =>
+    total + (customer.customerContainers || []).filter((container) => ["requested", "queued", "pending_launch"].includes(container.status)).length, 0
+  );
 
   const issues = [
     {
@@ -1571,6 +1672,8 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
       overdueCustomers: unpaidCustomers.length,
       healthySubscriptions: payingCustomers.length,
       mrr,
+      totalCustomerContainers,
+      pendingCustomerContainers,
       requestsToday: enrichedCustomers.reduce((total, customer) => total + Number(customer.requestsToday || 0), 0),
       requestsMonth: enrichedCustomers.reduce((total, customer) => total + Number(customer.requestsMonth || 0), 0),
       unhealthyCustomers: unhealthyCustomers.length,
@@ -1615,7 +1718,7 @@ async function getCustomerCatalog({ docker, ssl, orders }) {
     source: "environment"
   };
 
-  const queuedTenants = provisioned.map((request) => ({
+  const queuedTenants = provisioned.filter((request) => request.source !== "customer_container").map((request) => ({
     id: request.id,
     name: request.instanceName,
     domain: request.domain,
@@ -1876,8 +1979,30 @@ async function addProvisioningRequest(input) {
   request.plan = provisioningPlan(request);
   data.provisioning.requests.unshift(request);
   data.provisioning.requests = data.provisioning.requests.slice(0, 100);
+  await autoLaunchProvisioningRequest(data, request);
   await writeDatabase(data);
   return { ok: true, request };
+}
+
+async function writeProvisioningFiles(request) {
+  request.plan = provisioningPlan(request);
+  const plan = request.plan;
+  await mkdir(plan.instanceDir, { recursive: true });
+  await writeFile(plan.envPath, plan.env, { encoding: "utf8", mode: 0o600 });
+  await writeFile(plan.composePath, plan.dockerCompose, "utf8");
+  await writeFile(plan.nginxPath, plan.nginx, "utf8");
+  request.preparedAt = new Date().toISOString();
+  request.preparedFiles = {
+    envPath: plan.envPath,
+    composePath: plan.composePath,
+    nginxPath: plan.nginxPath
+  };
+  request.plan.checks = request.plan.checks.map((check) =>
+    check.label === "Port"
+      ? { ...check, status: "prepared" }
+      : check
+  );
+  return request;
 }
 
 async function prepareProvisioningFiles(id) {
@@ -1891,27 +2016,205 @@ async function prepareProvisioningFiles(id) {
   const request = requests.find((item) => item.id === id);
   if (!request) return { ok: false, errors: ["Provisioning request was not found."] };
 
-  request.plan = provisioningPlan(request);
-  const plan = request.plan;
-  await mkdir(plan.instanceDir, { recursive: true });
-  await writeFile(plan.envPath, plan.env, { encoding: "utf8", mode: 0o600 });
-  await writeFile(plan.composePath, plan.dockerCompose, "utf8");
-  await writeFile(plan.nginxPath, plan.nginx, "utf8");
+  await writeProvisioningFiles(request);
   request.status = "files_prepared";
   request.updatedAt = new Date().toISOString();
-  request.preparedAt = request.updatedAt;
-  request.preparedFiles = {
-    envPath: plan.envPath,
-    composePath: plan.composePath,
-    nginxPath: plan.nginxPath
-  };
-  request.plan.checks = request.plan.checks.map((check) =>
-    check.label === "Port"
-      ? { ...check, status: "prepared" }
-      : check
-  );
   await writeDatabase(data);
   return { ok: true, request };
+}
+
+function recordLaunchStep(request, label, result) {
+  request.launchLog ||= [];
+  request.launchLog.push({
+    label,
+    ok: Boolean(result.ok),
+    stdout: result.stdout || "",
+    stderr: result.stderr || "",
+    error: result.error || "",
+    at: new Date().toISOString()
+  });
+}
+
+async function launchProvisioningRequest(request) {
+  await writeProvisioningFiles(request);
+  request.status = "launching";
+  request.updatedAt = new Date().toISOString();
+
+  if (config.autoLaunchRequireDns && !(await dnsResolves(request.domain))) {
+    request.status = "dns_pending";
+    request.updatedAt = new Date().toISOString();
+    request.launchLog ||= [];
+    request.launchLog.push({
+      label: "DNS check",
+      ok: false,
+      error: `${request.domain} does not resolve yet.`,
+      at: request.updatedAt
+    });
+    return request;
+  }
+
+  const dockerUp = await command("docker", ["compose", "-f", request.plan.composePath, "up", "-d"], { timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
+  recordLaunchStep(request, "Docker compose up", dockerUp);
+  if (!dockerUp.ok) {
+    request.status = "docker_failed";
+    request.updatedAt = new Date().toISOString();
+    return request;
+  }
+
+  const nginxTarget = join(config.nginxSitesAvailableDir, request.domain);
+  const nginxEnabled = join(config.nginxSitesEnabledDir, request.domain);
+  const copyNginx = await systemCommand("cp", [request.plan.nginxPath, nginxTarget], { timeout: 5000 });
+  recordLaunchStep(request, "Install Nginx site", copyNginx);
+  if (!copyNginx.ok) {
+    request.status = "nginx_failed";
+    request.updatedAt = new Date().toISOString();
+    return request;
+  }
+
+  const linkNginx = await systemCommand("ln", ["-sf", nginxTarget, nginxEnabled], { timeout: 5000 });
+  recordLaunchStep(request, "Enable Nginx site", linkNginx);
+  if (!linkNginx.ok) {
+    request.status = "nginx_failed";
+    request.updatedAt = new Date().toISOString();
+    return request;
+  }
+
+  const nginxTest = await systemCommand("nginx", ["-t"], { timeout: 5000, maxBuffer: 1024 * 1024 });
+  recordLaunchStep(request, "Nginx config test", nginxTest);
+  if (!nginxTest.ok) {
+    request.status = "nginx_failed";
+    request.updatedAt = new Date().toISOString();
+    return request;
+  }
+
+  const nginxReload = await systemCommand("systemctl", ["reload", "nginx"], { timeout: 7000 });
+  recordLaunchStep(request, "Reload Nginx", nginxReload);
+  if (!nginxReload.ok) {
+    request.status = "nginx_reload_failed";
+    request.updatedAt = new Date().toISOString();
+    return request;
+  }
+
+  if (config.autoLaunchCertbot) {
+    const certbot = await systemCommand("certbot", ["--nginx", "-d", request.domain, "--non-interactive", "--agree-tos", "--redirect"], {
+      timeout: 60000,
+      maxBuffer: 2 * 1024 * 1024
+    });
+    recordLaunchStep(request, "Issue SSL", certbot);
+    if (!certbot.ok) {
+      request.status = "ssl_failed";
+      request.updatedAt = new Date().toISOString();
+      return request;
+    }
+  }
+
+  request.status = config.autoLaunchCertbot ? "live" : "http_live";
+  request.launchedAt = new Date().toISOString();
+  request.updatedAt = request.launchedAt;
+  request.plan.checks = request.plan.checks.map((check) => {
+    if (check.label === "Port") return { ...check, status: "prepared" };
+    if (check.label === "DNS") return { ...check, status: "healthy" };
+    if (check.label === "SSL") return { ...check, status: config.autoLaunchCertbot ? "healthy" : "pending" };
+    if (check.label === "Health") return { ...check, status: "pending" };
+    return check;
+  });
+  return request;
+}
+
+async function autoLaunchProvisioningRequest(data, request) {
+  if (!config.autoLaunchEnabled) return request;
+  const launched = await launchProvisioningRequest(request);
+  if (request.sourceRequestId) {
+    const setup = (data.customerSetupRequests || []).find((item) => item.id === request.sourceRequestId);
+    if (setup) {
+      setup.status = launched.status;
+      setup.updatedAt = launched.updatedAt;
+      setup.provisioningRequestId = launched.id;
+    }
+  }
+  return launched;
+}
+
+async function removePath(pathname) {
+  if (!pathname) return { ok: true, stdout: "", stderr: "" };
+  return systemCommand("rm", ["-rf", pathname], { timeout: 5000, maxBuffer: 1024 * 1024 });
+}
+
+async function deleteProvisionedContainer(request) {
+  request.plan = request.plan || provisioningPlan(request);
+  request.deleteLog ||= [];
+  const logStep = (label, result) => {
+    request.deleteLog.push({
+      label,
+      ok: Boolean(result.ok),
+      stdout: result.stdout || "",
+      stderr: result.stderr || "",
+      error: result.error || "",
+      at: new Date().toISOString()
+    });
+  };
+
+  const dockerDown = await systemCommand("docker", ["compose", "-f", request.plan.composePath, "down", "--remove-orphans"], {
+    timeout: 15000,
+    maxBuffer: 2 * 1024 * 1024
+  });
+  logStep("Docker compose down", dockerDown);
+
+  const nginxTarget = join(config.nginxSitesAvailableDir, request.domain);
+  const nginxEnabled = join(config.nginxSitesEnabledDir, request.domain);
+  const removeEnabled = await removePath(nginxEnabled);
+  logStep("Disable Nginx site", removeEnabled);
+  const removeAvailable = await removePath(nginxTarget);
+  logStep("Remove Nginx site", removeAvailable);
+
+  const nginxTest = await systemCommand("nginx", ["-t"], { timeout: 5000, maxBuffer: 1024 * 1024 });
+  logStep("Nginx config test", nginxTest);
+  if (nginxTest.ok) {
+    const nginxReload = await systemCommand("systemctl", ["reload", "nginx"], { timeout: 7000 });
+    logStep("Reload Nginx", nginxReload);
+  }
+
+  const removeFiles = await removePath(request.plan.instanceDir);
+  logStep("Remove generated files", removeFiles);
+
+  request.status = "deleted";
+  request.deletedAt = new Date().toISOString();
+  request.updatedAt = request.deletedAt;
+  return request;
+}
+
+async function deleteCustomerContainer(id, session) {
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+
+  const data = loaded.data;
+  data.customerSetupRequests ||= [];
+  data.provisioning ||= { requests: [] };
+  const request = data.customerSetupRequests.find((item) => item.id === id);
+  if (!request) return { ok: false, errors: ["Container was not found."] };
+  if (session.role !== "owner" && request.tenantId !== session.tenantId) {
+    return { ok: false, status: 403, errors: ["You can only delete your own containers."] };
+  }
+
+  const provision = data.provisioning.requests.find((item) => item.id === request.provisioningRequestId || item.sourceRequestId === request.id);
+  request.status = "delete_requested";
+  request.updatedAt = new Date().toISOString();
+
+  if (provision && config.autoLaunchEnabled) {
+    await deleteProvisionedContainer(provision);
+    request.status = "deleted";
+    request.deletedAt = provision.deletedAt;
+    request.updatedAt = provision.updatedAt;
+  } else if (provision) {
+    provision.status = "delete_requested";
+    provision.updatedAt = request.updatedAt;
+  } else {
+    request.status = "deleted";
+    request.deletedAt = request.updatedAt;
+  }
+
+  await writeDatabase(data);
+  return { ok: true, request: publicSetupRequest(request), provisioning: provision || null };
 }
 
 async function getProvisioningSummary() {
@@ -2358,7 +2661,7 @@ async function getDashboardData() {
   const reconciliation = getReconciliationSummary({ requestSummary, orders });
   const integrations = getIntegrationSummary({ orders, requestSummary });
   const setupWizard = getSetupWizard({ customers, provisioning, integrations, ssl, requestSummary });
-  const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation });
+  const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning });
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
   void sendAlertHooks(alerts);
@@ -2416,6 +2719,12 @@ async function getDashboardData() {
       provisionPortEnd: config.provisionPortEnd,
       provisionDnsTarget: config.provisionDnsTarget,
       provisionOutputDir: config.provisionOutputDir,
+      autoLaunchEnabled: config.autoLaunchEnabled,
+      autoLaunchRequireDns: config.autoLaunchRequireDns,
+      autoLaunchCertbot: config.autoLaunchCertbot,
+      autoLaunchUseSudo: config.autoLaunchUseSudo,
+      nginxSitesAvailableDir: config.nginxSitesAvailableDir,
+      nginxSitesEnabledDir: config.nginxSitesEnabledDir,
       trackingPaths: config.trackingPaths,
       trackingHosts: config.trackingHosts,
       orderWebhookEnabled: Boolean(config.orderWebhookSecret),
@@ -2726,6 +3035,18 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await addCustomerSetupRequest(body, session);
       jsonResponse(res, result.ok ? 201 : 400, result.ok ? { request: result.request } : { errors: result.errors });
+      return;
+    }
+
+    const customerDeleteMatch = pathname.match(/^\/api\/customer\/containers\/([^/]+)$/);
+    if (customerDeleteMatch && req.method === "DELETE") {
+      const session = getSession(req);
+      if (!session) {
+        jsonResponse(res, 401, { error: "Authentication required." });
+        return;
+      }
+      const result = await deleteCustomerContainer(decodeURIComponent(customerDeleteMatch[1]), session);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { request: result.request } : { errors: result.errors });
       return;
     }
 

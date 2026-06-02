@@ -103,6 +103,27 @@ Create customer logins from Admin. Customer account records are stored in `data/
 
 Owner users can see Admin, Provisioning, Deployment, and Settings. Customer users see the customer dashboard views only and are scoped to their tenant.
 
+## Automatic Container Launch
+
+Customer-created containers automatically create an owner provisioning record. To let the panel also launch Docker and Nginx automatically on the VPS, enable:
+
+```bash
+AUTO_LAUNCH_ENABLED=true
+AUTO_LAUNCH_REQUIRE_DNS=true
+AUTO_LAUNCH_CERTBOT=true
+AUTO_LAUNCH_USE_SUDO=true
+NGINX_SITES_AVAILABLE_DIR=/etc/nginx/sites-available
+NGINX_SITES_ENABLED_DIR=/etc/nginx/sites-enabled
+```
+
+The server user must have permission to run Docker, copy Nginx site files, reload Nginx, and run certbot. If `AUTO_LAUNCH_ENABLED` is not true, containers are queued with generated Docker/Nginx files for owner approval.
+
+When a customer deletes a container, the panel marks the customer container as deleted. If auto-launch is enabled, it also runs Docker compose down, removes the generated Nginx site, reloads Nginx, removes generated files, and preserves historical request/order data.
+
+## Scaling Note
+
+One VPS is suitable for early customers and controlled traffic, but not thousands of customers. For larger scale, run multiple VPS nodes or a cluster, distribute customers by region/plan, store tenant/account data in a managed database, centralize logs/metrics, and put a provisioning scheduler in front of the worker servers.
+
 The panel separates:
 
 - Actual store orders from `/api/orders/webhook`

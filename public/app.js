@@ -1169,24 +1169,35 @@ function renderCustomerContainers(data) {
   els.customerContainersBadge.className = `badge ${requests.length ? "ok" : "warn"}`;
   els.customerContainersBadge.textContent = `${requests.length} container${requests.length === 1 ? "" : "s"}`;
   if (!requests.length) {
-    els.customerContainersTable.innerHTML = '<tr><td colspan="7">No containers yet. Use the create form below.</td></tr>';
+    els.customerContainersTable.innerHTML = '<tr><td colspan="8">No containers yet. Use the create form below.</td></tr>';
     return;
   }
 
-  els.customerContainersTable.innerHTML = requests.map((request) => `
-    <tr>
-      <td>
-        <strong>${escapeHtml(request.containerName || request.tenantName || "sGTM Container")}</strong>
-        <span class="owner-subtext">${escapeHtml(request.notes || "Managed server-side tracking")}</span>
-      </td>
-      <td>${statusPill(request.containerType || "sGTM", "healthy")}</td>
-      <td>${escapeHtml(request.websiteUrl || "--")}</td>
-      <td>${escapeHtml(request.trackingDomain || "--")}</td>
-      <td>${statusPill(String(request.status || "requested").replaceAll("_", " "), request.status === "complete" ? "healthy" : "warning")}</td>
-      <td>${escapeHtml(request.serverLocation || "Bangladesh BDIX")}</td>
-      <td>${escapeHtml(formatShortDate(request.createdAt))}</td>
-    </tr>
-  `).join("");
+  els.customerContainersTable.innerHTML = requests.map((request) => {
+    const status = String(request.status || "requested");
+    const canDelete = !["deleted", "delete_requested"].includes(status);
+    return `
+      <tr>
+        <td>
+          <strong>${escapeHtml(request.containerName || request.tenantName || "sGTM Container")}</strong>
+          <span class="owner-subtext">${escapeHtml(request.notes || "Managed server-side tracking")}</span>
+        </td>
+        <td>${statusPill(request.containerType || "sGTM", "healthy")}</td>
+        <td>${escapeHtml(request.websiteUrl || "--")}</td>
+        <td>${escapeHtml(request.trackingDomain || "--")}</td>
+        <td>${statusPill(status.replaceAll("_", " "), status === "complete" ? "healthy" : "warning")}</td>
+        <td>${escapeHtml(request.serverLocation || "Bangladesh BDIX")}</td>
+        <td>${escapeHtml(formatShortDate(request.createdAt))}</td>
+        <td>
+          ${canDelete ? `<button class="button button-danger" type="button" data-container-delete="${escapeHtml(request.id)}">Delete</button>` : ""}
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  els.customerContainersTable.querySelectorAll("[data-container-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteCustomerContainer(button.dataset.containerDelete));
+  });
 }
 
 function renderBusinessGrid(el, items) {
@@ -1654,6 +1665,10 @@ function renderDeployment(data) {
     ["PROVISION_PORT_START", text(data.config?.provisionPortStart, "8200")],
     ["PROVISION_PORT_END", text(data.config?.provisionPortEnd, "8999")],
     ["PROVISION_DNS_TARGET", text(data.config?.provisionDnsTarget, "server.example.com")],
+    ["AUTO_LAUNCH_ENABLED", text(data.config?.autoLaunchEnabled, "false")],
+    ["AUTO_LAUNCH_REQUIRE_DNS", text(data.config?.autoLaunchRequireDns, "true")],
+    ["AUTO_LAUNCH_CERTBOT", text(data.config?.autoLaunchCertbot, "false")],
+    ["AUTO_LAUNCH_USE_SUDO", text(data.config?.autoLaunchUseSudo, "false")],
     ["TRACKING_HOSTS", (data.config?.trackingHosts || []).join(",") || "sgtm.shobaz.com,server.shobaz.com,shobaz.com"],
     ["AUTH_ENABLED", "true"],
     ["AUTH_SECRET", "openssl rand -hex 32"]
@@ -1776,11 +1791,11 @@ function renderOwnerDashboard(data) {
   renderMetricCards(els.ownerMetricGrid, [
     { label: "Customers", value: Number(metrics.totalCustomers || 0).toLocaleString(), detail: `${Number(metrics.activeCustomers || 0)} active · ${Number(metrics.trialCustomers || 0)} trial` },
     { label: "MRR", value: formatMoney(metrics.mrr || 0, currency), detail: `${Number(metrics.healthySubscriptions || 0)} paid or good subscriptions` },
-    { label: "Subscription issues", value: Number(metrics.overdueCustomers || 0).toLocaleString(), detail: `${Number(metrics.pendingCustomers || 0)} pending · ${Number(metrics.cancelledCustomers || 0)} cancelled` },
-    { label: "Requests today", value: Number(metrics.requestsToday || 0).toLocaleString(), detail: `${Number(metrics.requestsMonth || 0).toLocaleString()} requests this month` },
-    { label: "No tracking today", value: Number(metrics.noTrackingToday || 0).toLocaleString(), detail: "Active customers with zero requests" },
-    { label: "Purchase issues", value: Number(metrics.brokenPurchaseTracking || 0).toLocaleString(), detail: "Undertracked, overtracked, or waiting purchases" },
-    { label: "Unhealthy customers", value: Number(metrics.unhealthyCustomers || 0).toLocaleString(), detail: "Container health needs attention" },
+    { label: "Containers", value: Number(metrics.totalCustomerContainers || 0).toLocaleString(), detail: `${Number(metrics.pendingCustomerContainers || 0)} waiting for provisioning` },
+    { label: "Requests month", value: Number(metrics.requestsMonth || 0).toLocaleString(), detail: `${Number(metrics.requestsToday || 0).toLocaleString()} requests today` },
+    { label: "Payment issues", value: Number(metrics.overdueCustomers || 0).toLocaleString(), detail: `${Number(metrics.cancelledCustomers || 0)} cancelled` },
+    { label: "Tracking issues", value: Number(metrics.noTrackingToday || 0).toLocaleString(), detail: "Active customers with zero requests" },
+    { label: "Purchase issues", value: Number(metrics.brokenPurchaseTracking || 0).toLocaleString(), detail: "Purchase tracking needs review" },
     { label: "SSL attention", value: Number(metrics.sslAttention || 0).toLocaleString(), detail: "Certificates expiring within 14 days" }
   ]);
 
@@ -1810,18 +1825,27 @@ function renderOwnerDashboard(data) {
   els.ownerCustomerTable.innerHTML = customers.map((customer) => {
     const [trackingLabel, trackingStatus] = trackingStatusLabel(customer);
     const usagePercent = Number(customer.usagePercent || 0);
-    const containerText = `${Number(customer.containers?.running || 0)}/${Number(customer.containers?.total || 0)} running`;
-    const hasSslDays = customer.sslDaysRemaining !== null && customer.sslDaysRemaining !== undefined && customer.sslDaysRemaining !== "" && Number.isFinite(Number(customer.sslDaysRemaining));
-    const sslText = hasSslDays ? `${customer.sslDaysRemaining}d SSL` : "SSL n/a";
+    const containers = customer.customerContainers || [];
+    const containerSummary = containers.length
+      ? containers.map((container) => `${container.name} (${container.domain || "no domain"} · ${String(container.status || "requested").replaceAll("_", " ")})`).join(" | ")
+      : "No containers";
     return `
       <tr>
         <td>
           <strong>${escapeHtml(customer.name || customer.id)}</strong>
-          <span class="owner-subtext">${escapeHtml(customer.domain || "No domain")}</span>
+          <span class="owner-subtext">${escapeHtml(customer.id || "No tenant id")}</span>
         </td>
         <td>
           ${statusPill(customer.subscriptionStatus || "unknown", lifecycleStatusClass(customer.subscriptionStatus))}
           <span class="owner-subtext">${escapeHtml(customer.plan || "No plan")}${customer.renewalDate ? ` · renews ${escapeHtml(formatShortDate(customer.renewalDate))}` : ""}</span>
+        </td>
+        <td>
+          <strong>${containers.length.toLocaleString()}</strong>
+          <span class="owner-subtext">${escapeHtml(containerSummary)}</span>
+        </td>
+        <td>
+          <strong>${Number(customer.requestsMonth || 0).toLocaleString()}</strong>
+          <span class="owner-subtext">${usagePercent}% of ${Number(customer.requestLimit || 0).toLocaleString()} · ${Number(customer.requestsToday || 0).toLocaleString()} today</span>
         </td>
         <td>
           ${statusPill(customer.paymentStatus || "unknown", lifecycleStatusClass(customer.paymentStatus))}
@@ -1829,16 +1853,8 @@ function renderOwnerDashboard(data) {
         </td>
         <td>${escapeHtml(formatMoney(customer.monthlyAmount || 0, currency))}</td>
         <td>
-          <strong>${Number(customer.requestsMonth || 0).toLocaleString()}</strong>
-          <span class="owner-subtext">${usagePercent}% of ${Number(customer.requestLimit || 0).toLocaleString()}</span>
-        </td>
-        <td>
           ${statusPill(trackingLabel, trackingStatus)}
           <span class="owner-subtext">${Number(customer.requestsToday || 0).toLocaleString()} requests today${customer.purchaseCoverage !== null ? ` · ${customer.purchaseCoverage}% purchase coverage` : ""}</span>
-        </td>
-        <td>
-          ${statusPill(containerText, customer.containers?.unhealthy ? "error" : "healthy")}
-          <span class="owner-subtext">${escapeHtml(sslText)}</span>
         </td>
       </tr>
     `;
@@ -2023,6 +2039,20 @@ async function prepareProvisioningFiles(id) {
     setView("provisioning");
   } catch (error) {
     els.provisioningFormMessage.textContent = error.message;
+  }
+}
+
+async function deleteCustomerContainer(id) {
+  const confirmed = window.confirm("Delete this container? This will stop and remove its generated server resources when auto-launch is enabled.");
+  if (!confirmed) return;
+  try {
+    const response = await fetch(`/api/customer/containers/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Delete failed"]).join(" "));
+    await loadDashboard();
+    setView("customerContainers");
+  } catch (error) {
+    els.customerSetupFormMessage.textContent = error.message;
   }
 }
 
