@@ -408,6 +408,7 @@ h2 {
 .docs-grid,
 .wizard-list,
 .note-list,
+.dns-guide,
 .health-grid,
 .funnel-list,
 .business-grid {
@@ -425,6 +426,7 @@ h2 {
 .summary-item,
 .setting-card,
 .doc-card,
+.dns-guide article,
 .note-list article {
   display: flex;
   align-items: center;
@@ -439,8 +441,32 @@ h2 {
 .summary-item strong,
 .setting-card strong,
 .doc-card strong,
+.dns-guide strong,
 .note-list strong {
   color: var(--color-text);
+}
+
+.dns-guide article {
+  justify-content: flex-start;
+}
+
+.dns-guide strong {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-page);
+}
+
+.dns-guide span {
+  color: var(--color-muted);
+}
+
+.dns-guide code {
+  color: var(--color-accent-2);
 }
 
 .docs-grid {

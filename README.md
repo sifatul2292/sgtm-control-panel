@@ -122,6 +122,8 @@ The launcher supports either Docker Compose v2 (`docker compose`) or classic Com
 
 If a container was created before auto-launch was enabled, it can stay in `pending_launch`. After updating `.env` and restarting the app, open the owner Provisioning view and click **Launch Now** on that request.
 
+Customer containers require a tracking subdomain, such as `server.customer.com`, to point to the SGTM VPS before auto-launch can finish. Set `PROVISION_DNS_TARGET` to the value customers should use in DNS, such as the VPS IP address or a host like `sgtm.example.com`.
+
 When a customer deletes a container, the panel marks the customer container as deleted. If auto-launch is enabled, it also runs Docker compose down, removes the generated Nginx site, reloads Nginx, removes generated files, and preserves historical request/order data.
 
 ## Scaling Note

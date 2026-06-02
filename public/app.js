@@ -44,6 +44,7 @@ const els = {
   customerSetupList: document.querySelector("#customerSetupList"),
   customerContainersBadge: document.querySelector("#customerContainersBadge"),
   customerContainersTable: document.querySelector("#customerContainersTable"),
+  customerDnsTarget: document.querySelector("#customerDnsTarget"),
   reconciliationBadge: document.querySelector("#reconciliationBadge"),
   reconciliationGrid: document.querySelector("#reconciliationGrid"),
   logModeBadge: document.querySelector("#logModeBadge"),
@@ -1166,6 +1167,8 @@ function renderCustomerSetup(data) {
 
 function renderCustomerContainers(data) {
   const requests = data.customerSetup?.requests || [];
+  const dnsTarget = data.config?.provisionDnsTarget || data.config?.publicBaseUrl || window.location.host || "the SGTM server";
+  if (els.customerDnsTarget) els.customerDnsTarget.textContent = dnsTarget;
   els.customerContainersBadge.className = `badge ${requests.length ? "ok" : "warn"}`;
   els.customerContainersBadge.textContent = `${requests.length} container${requests.length === 1 ? "" : "s"}`;
   if (!requests.length) {

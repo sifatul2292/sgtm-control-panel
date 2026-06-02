@@ -518,7 +518,7 @@
             <div class="panel-header">
               <div>
                 <h2>Container List</h2>
-                <p>Created containers stay pending until the owner provisions DNS, SSL, and SGTM hosting.</p>
+                <p>Created containers launch automatically after the tracking subdomain points to the SGTM server.</p>
               </div>
               <span id="customerContainersBadge" class="badge">0 containers</span>
             </div>
@@ -542,6 +542,30 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>DNS Setup</h2>
+                <p>Complete this in your domain provider before creating the container.</p>
+              </div>
+              <span class="badge">Required</span>
+            </div>
+            <div class="dns-guide">
+              <article>
+                <strong>1</strong>
+                <span>Choose a tracking subdomain, usually <code>server.yourdomain.com</code>.</span>
+              </article>
+              <article>
+                <strong>2</strong>
+                <span>Add a DNS record for that subdomain and point it to <code id="customerDnsTarget">the SGTM server</code>.</span>
+              </article>
+              <article>
+                <strong>3</strong>
+                <span>Use the same subdomain in the Tracking subdomain field below. If DNS is not ready yet, the container will show <code>dns_pending</code>.</span>
+              </article>
             </div>
           </section>
 
