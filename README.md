@@ -118,6 +118,8 @@ NGINX_SITES_ENABLED_DIR=/etc/nginx/sites-enabled
 
 The server user must have permission to run Docker, copy Nginx site files, reload Nginx, and run certbot. If `AUTO_LAUNCH_ENABLED` is not true, containers are queued with generated Docker/Nginx files for owner approval.
 
+If a container was created before auto-launch was enabled, it can stay in `pending_launch`. After updating `.env` and restarting the app, open the owner Provisioning view and click **Launch Now** on that request.
+
 When a customer deletes a container, the panel marks the customer container as deleted. If auto-launch is enabled, it also runs Docker compose down, removes the generated Nginx site, reloads Nginx, removes generated files, and preserves historical request/order data.
 
 ## Scaling Note

@@ -250,6 +250,12 @@ h2 {
   background: color-mix(in oklch, var(--color-danger), transparent 86%);
 }
 
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .view {
   display: none;
 }

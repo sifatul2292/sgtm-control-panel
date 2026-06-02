@@ -1737,11 +1737,18 @@ function renderProvisioning(data) {
         ${codeBlock("Docker Compose", plan.dockerCompose)}
         ${codeBlock("Nginx server block", plan.nginx)}
         ${codeBlock("Admin commands", (plan.commands || []).join("\n"))}
-        <button class="button" type="button" data-provision-prepare="${escapeHtml(request.id)}">Prepare Docker + Nginx Files</button>
+        <div class="button-row">
+          <button class="button" type="button" data-provision-launch="${escapeHtml(request.id)}">Launch Now</button>
+          <button class="button" type="button" data-provision-prepare="${escapeHtml(request.id)}">Prepare Docker + Nginx Files</button>
+        </div>
       `;
       return card;
     })
   );
+
+  els.provisioningRequests.querySelectorAll("[data-provision-launch]").forEach((button) => {
+    button.addEventListener("click", () => launchProvisioningRequest(button.dataset.provisionLaunch));
+  });
 
   els.provisioningRequests.querySelectorAll("[data-provision-prepare]").forEach((button) => {
     button.addEventListener("click", () => prepareProvisioningFiles(button.dataset.provisionPrepare));
@@ -2035,6 +2042,19 @@ async function prepareProvisioningFiles(id) {
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Prepare failed"]).join(" "));
     els.provisioningFormMessage.textContent = "Docker and Nginx draft files prepared.";
+    await loadDashboard();
+    setView("provisioning");
+  } catch (error) {
+    els.provisioningFormMessage.textContent = error.message;
+  }
+}
+
+async function launchProvisioningRequest(id) {
+  try {
+    const response = await fetch(`/api/provisioning/requests/${encodeURIComponent(id)}/launch`, { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Launch failed"]).join(" "));
+    els.provisioningFormMessage.textContent = `Launch status: ${String(result.request?.status || "updated").replaceAll("_", " ")}`;
     await loadDashboard();
     setView("provisioning");
   } catch (error) {

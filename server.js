@@ -2053,7 +2053,7 @@ async function launchProvisioningRequest(request) {
     return request;
   }
 
-  const dockerUp = await command("docker", ["compose", "-f", request.plan.composePath, "up", "-d"], { timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
+  const dockerUp = await systemCommand("docker", ["compose", "-f", request.plan.composePath, "up", "-d"], { timeout: 15000, maxBuffer: 2 * 1024 * 1024 });
   recordLaunchStep(request, "Docker compose up", dockerUp);
   if (!dockerUp.ok) {
     request.status = "docker_failed";
@@ -2133,6 +2133,23 @@ async function autoLaunchProvisioningRequest(data, request) {
     }
   }
   return launched;
+}
+
+async function launchExistingProvisioningRequest(id) {
+  if (!config.autoLaunchEnabled) {
+    return { ok: false, errors: ["AUTO_LAUNCH_ENABLED is not true for the running app process."] };
+  }
+
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+
+  const data = loaded.data;
+  const request = (data.provisioning?.requests || []).find((item) => item.id === id);
+  if (!request) return { ok: false, errors: ["Provisioning request was not found."] };
+
+  await autoLaunchProvisioningRequest(data, request);
+  await writeDatabase(data);
+  return { ok: true, request };
 }
 
 async function removePath(pathname) {
@@ -3079,6 +3096,17 @@ const server = createServer(async (req, res) => {
         return;
       }
       const result = await prepareProvisioningFiles(decodeURIComponent(prepareMatch[1]));
+      jsonResponse(res, result.ok ? 200 : 400, result.ok ? { request: result.request } : { errors: result.errors });
+      return;
+    }
+
+    const launchMatch = pathname.match(/^\/api\/provisioning\/requests\/([^/]+)\/launch$/);
+    if (launchMatch && req.method === "POST") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const result = await launchExistingProvisioningRequest(decodeURIComponent(launchMatch[1]));
       jsonResponse(res, result.ok ? 200 : 400, result.ok ? { request: result.request } : { errors: result.errors });
       return;
     }
