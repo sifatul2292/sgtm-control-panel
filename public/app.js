@@ -88,6 +88,10 @@ const els = {
   ownerInfraList: document.querySelector("#ownerInfraList"),
   ownerCustomerBadge: document.querySelector("#ownerCustomerBadge"),
   ownerCustomerTable: document.querySelector("#ownerCustomerTable"),
+  workerNodesBadge: document.querySelector("#workerNodesBadge"),
+  workerNodesList: document.querySelector("#workerNodesList"),
+  workerNodeForm: document.querySelector("#workerNodeForm"),
+  workerNodeFormMessage: document.querySelector("#workerNodeFormMessage"),
   customersBadge: document.querySelector("#customersBadge"),
   customersList: document.querySelector("#customersList"),
   adminActions: document.querySelector("#adminActions"),
@@ -1669,10 +1673,18 @@ function renderDeployment(data) {
     ["PROVISION_PORT_START", text(data.config?.provisionPortStart, "8200")],
     ["PROVISION_PORT_END", text(data.config?.provisionPortEnd, "8999")],
     ["PROVISION_DNS_TARGET", text(data.config?.provisionDnsTarget, "server.example.com")],
+    ["LOCAL_WORKER_ID", text(data.config?.localWorkerId, "bdix-worker-1")],
+    ["LOCAL_WORKER_NAME", text(data.config?.localWorkerName, "BDIX Worker 1")],
+    ["LOCAL_WORKER_REGION", text(data.config?.localWorkerRegion, "Bangladesh BDIX")],
+    ["LOCAL_WORKER_MAX_CONTAINERS", text(data.config?.localWorkerMaxContainers, "200")],
+    ["DEFAULT_CONTAINER_MEMORY_MB", text(data.config?.defaultContainerMemoryMb, "512")],
+    ["DEFAULT_CONTAINER_CPU_LIMIT", text(data.config?.defaultContainerCpuLimit, "0.50")],
     ["AUTO_LAUNCH_ENABLED", text(data.config?.autoLaunchEnabled, "false")],
     ["AUTO_LAUNCH_REQUIRE_DNS", text(data.config?.autoLaunchRequireDns, "true")],
     ["AUTO_LAUNCH_CERTBOT", text(data.config?.autoLaunchCertbot, "false")],
+    ["AUTO_LAUNCH_CERTBOT_EMAIL", text(data.config?.autoLaunchCertbotEmail, "optional")],
     ["AUTO_LAUNCH_USE_SUDO", text(data.config?.autoLaunchUseSudo, "false")],
+    ["NGINX_LOG_FORMAT", text(data.config?.nginxLogFormat, "default")],
     ["TRACKING_HOSTS", (data.config?.trackingHosts || []).join(",") || "sgtm.shobaz.com,server.shobaz.com,shobaz.com"],
     ["AUTH_ENABLED", "true"],
     ["AUTH_SECRET", "openssl rand -hex 32"]
@@ -1741,9 +1753,13 @@ function renderProvisioning(data) {
         <div class="provisioning-card-head">
           <div>
             <strong>${escapeHtml(request.instanceName)}</strong>
-            <span>${escapeHtml(request.domain)} · auto port ${escapeHtml(request.port)}</span>
+            <span>${escapeHtml(request.domain)} · ${escapeHtml(request.workerName || "local worker")} · auto port ${escapeHtml(request.port)}</span>
           </div>
           <span class="state warning">${escapeHtml(request.status.replaceAll("_", " "))}</span>
+        </div>
+        <div class="summary-list compact-list">
+          <article class="summary-item"><strong>Worker</strong><span class="state prepared">${escapeHtml(request.workerName || request.workerId || "Local worker")}</span></article>
+          <article class="summary-item"><strong>Resource limit</strong><span class="state prepared">${escapeHtml(`${request.resourceLimits?.memoryMb || "--"}MB / ${request.resourceLimits?.cpuLimit || "--"} CPU / ${Number(request.requestLimit || 0).toLocaleString()} requests`)}</span></article>
         </div>
         ${request.preparedFiles ? `
           <div class="summary-list compact-list">
@@ -1829,6 +1845,8 @@ function renderOwnerDashboard(data) {
     { label: "Customers", value: Number(metrics.totalCustomers || 0).toLocaleString(), detail: `${Number(metrics.activeCustomers || 0)} active · ${Number(metrics.trialCustomers || 0)} trial` },
     { label: "MRR", value: formatMoney(metrics.mrr || 0, currency), detail: `${Number(metrics.healthySubscriptions || 0)} paid or good subscriptions` },
     { label: "Containers", value: Number(metrics.totalCustomerContainers || 0).toLocaleString(), detail: `${Number(metrics.pendingCustomerContainers || 0)} waiting for provisioning` },
+    { label: "Workers", value: Number(metrics.activeWorkers || 0).toLocaleString(), detail: `${Number(metrics.workerCapacityPercent || 0)}% capacity used` },
+    { label: "Launch failures", value: Number(metrics.failedLaunches || 0).toLocaleString(), detail: `${Number(metrics.dnsPendingContainers || 0)} DNS pending` },
     { label: "Requests month", value: Number(metrics.requestsMonth || 0).toLocaleString(), detail: `${Number(metrics.requestsToday || 0).toLocaleString()} requests today` },
     { label: "Payment issues", value: Number(metrics.overdueCustomers || 0).toLocaleString(), detail: `${Number(metrics.cancelledCustomers || 0)} cancelled` },
     { label: "Tracking issues", value: Number(metrics.noTrackingToday || 0).toLocaleString(), detail: "Active customers with zero requests" },
@@ -1848,6 +1866,7 @@ function renderOwnerDashboard(data) {
   renderSummaryList(els.ownerInfraList, [
     { label: "Docker", value: infra.dockerAvailable ? "Available" : "Unavailable", status: infra.dockerAvailable ? "healthy" : "error" },
     { label: "Containers", value: `${Number(infra.runningContainers || 0).toLocaleString()} running / ${Number(infra.totalContainers || 0).toLocaleString()} total`, status: unhealthyContainers ? "warning" : "healthy" },
+    { label: "Worker pool", value: `${Number(infra.workerMetrics?.currentContainers || 0).toLocaleString()} assigned / ${Number(infra.workerMetrics?.totalCapacity || 0).toLocaleString()} capacity`, status: Number(infra.workerMetrics?.failedContainers || 0) ? "warning" : "healthy" },
     { label: "Unhealthy containers", value: unhealthyContainers.toLocaleString(), status: unhealthyContainers ? "error" : "healthy" },
     { label: "SSL", value: infra.sslAvailable ? `${infra.sslDaysRemaining} days remaining` : "Not configured", status: infra.sslAvailable && Number(infra.sslDaysRemaining) > 14 ? "healthy" : "warning" }
   ]);
@@ -1914,9 +1933,27 @@ function renderCustomerAccounts(data) {
   );
 }
 
+function renderWorkerNodes(data) {
+  const workers = data.workers?.nodes || data.owner?.infrastructure?.workers || [];
+  const metrics = data.workers?.metrics || data.owner?.infrastructure?.workerMetrics || {};
+  els.workerNodesBadge.className = `badge ${workers.length ? "ok" : "warn"}`;
+  els.workerNodesBadge.textContent = `${Number(metrics.activeWorkers || 0).toLocaleString()} active / ${workers.length.toLocaleString()} workers`;
+  renderSummaryList(
+    els.workerNodesList,
+    workers.length
+      ? workers.map((worker) => ({
+        label: worker.name || worker.id,
+        value: `${worker.region} · ${worker.role} · ${worker.currentContainers}/${worker.maxContainers} containers · ${worker.capacityPercent}% used · ${worker.memoryReservedMb}MB reserved${worker.failedContainers ? ` · ${worker.failedContainers} failed` : ""}`,
+        status: worker.health === "healthy" ? "healthy" : worker.health === "full" ? "warning" : "error"
+      }))
+      : [{ label: "Worker pool", value: "No workers configured", status: "warning" }]
+  );
+}
+
 function renderAdmin(data) {
   renderOwnerDashboard(data);
   renderCustomerAccounts(data);
+  renderWorkerNodes(data);
   const customers = data.owner?.customers || data.customers?.tenants || [];
   els.adminBadge.textContent = customers.length ? `${customers.length} tenant${customers.length === 1 ? "" : "s"}` : "No tenants";
   els.customersBadge.className = `badge ${customers.length ? "ok" : "warn"}`;
@@ -2208,6 +2245,26 @@ els.customerAccountForm.addEventListener("submit", async (event) => {
     setView("admin");
   } catch (error) {
     els.customerAccountFormMessage.textContent = error.message;
+  }
+});
+els.workerNodeForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  els.workerNodeFormMessage.textContent = "Saving worker node...";
+  const payload = Object.fromEntries(new FormData(els.workerNodeForm).entries());
+  try {
+    const response = await fetch("/api/worker-nodes", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Worker save failed"]).join(" "));
+    els.workerNodeForm.reset();
+    els.workerNodeFormMessage.textContent = `Worker saved: ${result.worker.name}.`;
+    await loadDashboard();
+    setView("admin");
+  } catch (error) {
+    els.workerNodeFormMessage.textContent = error.message;
   }
 });
 els.customerSetupForm.addEventListener("submit", async (event) => {

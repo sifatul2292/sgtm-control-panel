@@ -861,6 +861,87 @@
             <article class="panel">
               <div class="panel-header">
                 <div>
+                  <h2>Worker Nodes</h2>
+                  <p>Shared Docker/Nginx VPS capacity for customer SGTM containers.</p>
+                </div>
+                <span id="workerNodesBadge" class="badge">0 workers</span>
+              </div>
+              <div id="workerNodesList" class="summary-list"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Add Worker Node</h2>
+                  <p>Add or update a VPS that can receive customer container assignments.</p>
+                </div>
+                <span class="badge">Owner only</span>
+              </div>
+              <form id="workerNodeForm" class="provisioning-form">
+                <label>
+                  Worker ID
+                  <input name="id" placeholder="bdix-worker-1" required />
+                </label>
+                <label>
+                  Name
+                  <input name="name" placeholder="BDIX Worker 1" required />
+                </label>
+                <label>
+                  Region
+                  <input name="region" value="Bangladesh BDIX" required />
+                </label>
+                <label>
+                  Public host
+                  <input name="publicHost" placeholder="worker-1.yourdomain.com" />
+                </label>
+                <label>
+                  IP address
+                  <input name="ip" placeholder="123.123.123.123" />
+                </label>
+                <label>
+                  Role
+                  <select name="role">
+                    <option value="remote">Remote worker</option>
+                    <option value="local">Local worker</option>
+                  </select>
+                </label>
+                <label>
+                  Status
+                  <select name="status">
+                    <option value="active">Active</option>
+                    <option value="maintenance">Maintenance</option>
+                  </select>
+                </label>
+                <label>
+                  Max containers
+                  <input name="maxContainers" type="number" min="1" value="200" />
+                </label>
+                <label>
+                  CPU cores
+                  <input name="cpuCores" type="number" min="1" value="16" />
+                </label>
+                <label>
+                  Memory GB
+                  <input name="memoryGb" type="number" min="1" value="32" />
+                </label>
+                <label>
+                  Disk GB
+                  <input name="diskGb" type="number" min="1" value="400" />
+                </label>
+                <label class="form-wide">
+                  Notes
+                  <textarea name="notes" placeholder="Provider, SSH notes, BDIX/Singapore fallback, maintenance notes"></textarea>
+                </label>
+                <button class="button button-primary" type="submit">Save Worker</button>
+                <p id="workerNodeFormMessage" class="form-message"></p>
+              </form>
+            </article>
+          </section>
+
+          <section class="split-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
                   <h2>Create Customer Login</h2>
                   <p>Create or update a tenant login with a hashed password.</p>
                 </div>

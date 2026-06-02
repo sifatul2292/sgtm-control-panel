@@ -111,12 +111,21 @@ Customer-created containers automatically create an owner provisioning record. T
 AUTO_LAUNCH_ENABLED=true
 AUTO_LAUNCH_REQUIRE_DNS=true
 AUTO_LAUNCH_CERTBOT=true
+AUTO_LAUNCH_CERTBOT_EMAIL=admin@example.com
 AUTO_LAUNCH_USE_SUDO=true
 NGINX_SITES_AVAILABLE_DIR=/etc/nginx/sites-available
 NGINX_SITES_ENABLED_DIR=/etc/nginx/sites-enabled
+LOCAL_WORKER_ID=bdix-worker-1
+LOCAL_WORKER_NAME="BDIX Worker 1"
+LOCAL_WORKER_REGION="Bangladesh BDIX"
+LOCAL_WORKER_MAX_CONTAINERS=200
+LOCAL_WORKER_CPU_CORES=16
+LOCAL_WORKER_MEMORY_GB=32
 ```
 
 The server user must have permission to run Docker, copy Nginx site files, reload Nginx, and run certbot. If `AUTO_LAUNCH_ENABLED` is not true, containers are queued with generated Docker/Nginx files for owner approval.
+
+Generated Nginx configs use the default Nginx access log format. Only set `NGINX_LOG_FORMAT=sgtm_panel` if you have already defined `log_format sgtm_panel ...;` in Nginx; otherwise `nginx -t` will fail.
 
 The launcher supports either Docker Compose v2 (`docker compose`) or classic Compose (`docker-compose`). At least one must be installed and available to the app user, with sudo access if `AUTO_LAUNCH_USE_SUDO=true`.
 
@@ -128,7 +137,16 @@ When a customer deletes a container, the panel marks the customer container as d
 
 ## Scaling Note
 
-One VPS is suitable for early customers and controlled traffic, but not thousands of customers. For larger scale, run multiple VPS nodes or a cluster, distribute customers by region/plan, store tenant/account data in a managed database, centralize logs/metrics, and put a provisioning scheduler in front of the worker servers.
+One VPS is suitable for early customers and controlled traffic, but not thousands of customers. The Admin screen now supports worker-node records so new containers can be assigned to the least-loaded healthy worker. The default worker represents the current VPS; add remote workers from Admin as the fleet grows.
+
+For larger scale, run multiple VPS nodes or a cluster, distribute customers by region/plan, store tenant/account data in a managed database, centralize logs/metrics, and put a provisioning scheduler in front of the worker servers. Remote workers are assigned in the control panel in this version; local Docker/Nginx auto-launch still runs only on the local worker.
+
+Container provisioning records include worker assignment plus resource limits. Default plan profiles are:
+
+- Starter: 512MB RAM, 0.50 CPU, 100k requests/month, 1 container
+- Growth: 768MB RAM, 0.75 CPU, 500k requests/month, 2 containers
+- Pro: 1024MB RAM, 1.00 CPU, 1M requests/month, 4 containers
+- Agency: 1536MB RAM, 1.50 CPU, 3M requests/month, 10 containers
 
 The panel separates:
 

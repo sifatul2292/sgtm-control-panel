@@ -27,12 +27,27 @@ const config = {
   provisionPortEnd: Number(process.env.PROVISION_PORT_END || 8999),
   provisionDnsTarget: process.env.PROVISION_DNS_TARGET || "",
   provisionOutputDir: process.env.PROVISION_OUTPUT_DIR ? resolve(rootDir, normalize(process.env.PROVISION_OUTPUT_DIR)) : join(configuredDataDir, "provisioning"),
+  maxProvisioningRecords: Number(process.env.MAX_PROVISIONING_RECORDS || 2500),
+  maxCustomerSetupRecords: Number(process.env.MAX_CUSTOMER_SETUP_RECORDS || 2500),
+  localWorkerId: process.env.LOCAL_WORKER_ID || "local-bdix-1",
+  localWorkerName: process.env.LOCAL_WORKER_NAME || "Local BDIX Worker",
+  localWorkerRegion: process.env.LOCAL_WORKER_REGION || "Bangladesh BDIX",
+  localWorkerPublicHost: process.env.LOCAL_WORKER_PUBLIC_HOST || process.env.PROVISION_DNS_TARGET || "",
+  localWorkerIp: process.env.LOCAL_WORKER_IP || "",
+  localWorkerCpuCores: Number(process.env.LOCAL_WORKER_CPU_CORES || 16),
+  localWorkerMemoryGb: Number(process.env.LOCAL_WORKER_MEMORY_GB || 32),
+  localWorkerDiskGb: Number(process.env.LOCAL_WORKER_DISK_GB || 400),
+  localWorkerMaxContainers: Number(process.env.LOCAL_WORKER_MAX_CONTAINERS || 200),
+  defaultContainerMemoryMb: Number(process.env.DEFAULT_CONTAINER_MEMORY_MB || 512),
+  defaultContainerCpuLimit: process.env.DEFAULT_CONTAINER_CPU_LIMIT || "0.50",
   autoLaunchEnabled: process.env.AUTO_LAUNCH_ENABLED === "true",
   autoLaunchUseSudo: process.env.AUTO_LAUNCH_USE_SUDO === "true",
   autoLaunchRequireDns: process.env.AUTO_LAUNCH_REQUIRE_DNS !== "false",
   autoLaunchCertbot: process.env.AUTO_LAUNCH_CERTBOT === "true",
+  autoLaunchCertbotEmail: process.env.AUTO_LAUNCH_CERTBOT_EMAIL || "",
   nginxSitesAvailableDir: process.env.NGINX_SITES_AVAILABLE_DIR || "/etc/nginx/sites-available",
   nginxSitesEnabledDir: process.env.NGINX_SITES_ENABLED_DIR || "/etc/nginx/sites-enabled",
+  nginxLogFormat: process.env.NGINX_LOG_FORMAT || "",
   trackingPaths: parseCsv(process.env.TRACKING_PATHS || "/g/collect,/collect,/mp/collect,/data"),
   trackingHosts: parseCsv(process.env.TRACKING_HOSTS || inferHostFromCertPath(process.env.SSL_CERT_PATH || "") || process.env.SSL_DOMAIN || ""),
   dockerLogExclude: parseCsv(process.env.DOCKER_LOG_EXCLUDE || "Sending aggregate usage beacon,googletagmanager.com/sgtm/a"),
@@ -1019,9 +1034,10 @@ function serializeEventRow(item) {
 
 async function readDatabase() {
   const defaults = {
-    version: 2,
+    version: 3,
     daily: {},
     provisioning: { requests: [] },
+    workerNodes: [],
     orders: [],
     tenants: [],
     customerAccounts: [],
@@ -1040,6 +1056,7 @@ async function readDatabase() {
         ...parsed,
         daily: parsed.daily || {},
         provisioning: parsed.provisioning || { requests: [] },
+        workerNodes: parsed.workerNodes || [],
         orders: parsed.orders || [],
         tenants: parsed.tenants || [],
         customerAccounts: parsed.customerAccounts || [],
@@ -1317,6 +1334,9 @@ function publicSetupRequest(request) {
     containerConfig: request.containerConfig ? "configured" : "",
     serverLocation: request.serverLocation || "Bangladesh BDIX",
     provisioningRequestId: request.provisioningRequestId || "",
+    workerId: request.workerId || "",
+    workerName: request.workerName || "",
+    resourceLimits: request.resourceLimits || null,
     status: request.status,
     notes: request.notes || "",
     createdAt: request.createdAt,
@@ -1360,9 +1380,12 @@ async function addCustomerSetupRequest(input, session) {
   data.customerSetupRequests ||= [];
   data.tenants ||= [];
   data.provisioning ||= { requests: [] };
+  ensureWorkerNodes(data);
   const now = new Date().toISOString();
   const tenantIndex = data.tenants.findIndex((tenant) => tenant.id === validated.value.tenantId);
   const existingTenant = tenantIndex === -1 ? null : data.tenants[tenantIndex];
+  const planName = existingTenant?.plan || config.billingPlan || "Starter";
+  const resourceLimits = resourceProfileForPlan(planName);
   if (existingTenant?.name && validated.value.tenantName === validated.value.tenantId) {
     validated.value.tenantName = existingTenant.name;
   }
@@ -1373,13 +1396,16 @@ async function addCustomerSetupRequest(input, session) {
     updatedAt: now,
     ...validated.value
   };
-  data.customerSetupRequests.unshift(request);
-  data.customerSetupRequests = data.customerSetupRequests.slice(0, 200);
 
   const existingProvision = data.provisioning.requests.find((item) => item.sourceRequestId === request.id);
   if (!existingProvision) {
-    const port = allocateProvisionPort(data.provisioning.requests);
+    const worker = selectWorkerNode(data, request.serverLocation);
+    if (!worker) return { ok: false, errors: ["No healthy worker node has available capacity. Add a worker or increase worker capacity from Admin."] };
+    const port = allocateProvisionPort(data.provisioning.requests, worker.id);
     if (!port) return { ok: false, errors: [`No available provisioning ports in ${config.provisionPortStart}-${config.provisionPortEnd}.`] };
+    request.workerId = worker.id;
+    request.workerName = worker.name;
+    request.resourceLimits = resourceLimits;
     const provisionRequest = {
       id: `req_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
       source: "customer_container",
@@ -1390,26 +1416,33 @@ async function addCustomerSetupRequest(input, session) {
       status: "pending_launch",
       createdAt: now,
       updatedAt: now,
+      workerId: worker.id,
+      workerName: worker.name,
+      workerRegion: worker.region,
+      workerHost: worker.publicHost || worker.ip || "",
       port,
       autoAssignedPort: true,
       instanceName: sanitizeId(request.containerName || request.tenantName || request.tenantId),
       domain: request.trackingDomain,
       containerName: sanitizeId(`sgtm-${request.containerName || request.tenantId}`),
       ownerEmail: "",
-      planName: "Customer",
-      requestLimit: config.monthlyRequestLimit,
+      planName,
+      requestLimit: resourceLimits.monthlyRequestLimit,
+      resourceLimits,
       previewUrl: "",
       containerConfig: request.containerConfig,
       notes: `Customer-created container for ${request.websiteUrl}${request.notes ? `\n${request.notes}` : ""}`
     };
     provisionRequest.plan = provisioningPlan(provisionRequest);
     data.provisioning.requests.unshift(provisionRequest);
-    data.provisioning.requests = data.provisioning.requests.slice(0, 100);
+    data.provisioning.requests = data.provisioning.requests.slice(0, config.maxProvisioningRecords);
     request.provisioningRequestId = provisionRequest.id;
     await autoLaunchProvisioningRequest(data, provisionRequest);
     request.status = provisionRequest.status;
     request.updatedAt = provisionRequest.updatedAt;
   }
+  data.customerSetupRequests.unshift(request);
+  data.customerSetupRequests = data.customerSetupRequests.slice(0, config.maxCustomerSetupRecords);
 
   const tenantUpdate = {
     id: request.tenantId,
@@ -1421,6 +1454,9 @@ async function addCustomerSetupRequest(input, session) {
     containerType: request.containerType,
     serverLocation: request.serverLocation,
     setupStatus: "requested",
+    workerId: request.workerId,
+    workerName: request.workerName,
+    resourceLimits: request.resourceLimits,
     updatedAt: now
   };
   if (tenantIndex === -1) {
@@ -1429,8 +1465,8 @@ async function addCustomerSetupRequest(input, session) {
       plan: config.billingPlan,
       subscriptionStatus: "active",
       paymentStatus: "paid",
-      requestLimit: config.monthlyRequestLimit,
-      containerLimit: 1,
+      requestLimit: resourceLimits.monthlyRequestLimit,
+      containerLimit: resourceLimits.containerLimit,
       status: "setup_requested",
       source: "customer_setup",
       createdAt: now
@@ -1457,6 +1493,169 @@ async function getCustomerSetupSummary() {
   };
 }
 
+function activeProvisioningRequests(requests = []) {
+  return requests.filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "")));
+}
+
+function defaultWorkerNode() {
+  return {
+    id: sanitizeId(config.localWorkerId) || "local-bdix-1",
+    name: config.localWorkerName,
+    region: config.localWorkerRegion,
+    ip: config.localWorkerIp,
+    publicHost: config.localWorkerPublicHost,
+    role: "local",
+    status: "active",
+    maxContainers: config.localWorkerMaxContainers,
+    cpuCores: config.localWorkerCpuCores,
+    memoryGb: config.localWorkerMemoryGb,
+    diskGb: config.localWorkerDiskGb,
+    notes: "Default worker for the current VPS. Add more workers from Admin as you scale.",
+    createdAt: "",
+    updatedAt: ""
+  };
+}
+
+function ensureWorkerNodes(data) {
+  data.workerNodes ||= [];
+  if (!data.workerNodes.length) data.workerNodes.push(defaultWorkerNode());
+  return data.workerNodes;
+}
+
+function publicWorkerNode(node, requests = []) {
+  const activeRequests = activeProvisioningRequests(requests);
+  const assigned = activeRequests.filter((request) => (request.workerId || config.localWorkerId) === node.id);
+  const failed = assigned.filter((request) => String(request.status || "").includes("failed")).length;
+  const dnsPending = assigned.filter((request) => request.status === "dns_pending").length;
+  const live = assigned.filter((request) => ["live", "http_live"].includes(request.status)).length;
+  const memoryReservedMb = assigned.reduce((total, request) => total + Number(request.resourceLimits?.memoryMb || 0), 0);
+  const cpuReserved = assigned.reduce((total, request) => total + Number(request.resourceLimits?.cpuLimit || 0), 0);
+  const maxContainers = Math.max(0, Number(node.maxContainers || 0));
+  const capacityPercent = maxContainers ? Math.round((assigned.length / maxContainers) * 100) : 0;
+  const health = node.status === "active" && (!maxContainers || assigned.length < maxContainers) ? "healthy" : node.status === "active" ? "full" : "offline";
+
+  return {
+    id: node.id,
+    name: node.name || node.id,
+    region: node.region || "Bangladesh BDIX",
+    ip: node.ip || "",
+    publicHost: node.publicHost || "",
+    role: node.role || "remote",
+    status: node.status || "active",
+    maxContainers,
+    cpuCores: Number(node.cpuCores || 0),
+    memoryGb: Number(node.memoryGb || 0),
+    diskGb: Number(node.diskGb || 0),
+    notes: node.notes || "",
+    currentContainers: assigned.length,
+    liveContainers: live,
+    failedContainers: failed,
+    dnsPendingContainers: dnsPending,
+    memoryReservedMb,
+    cpuReserved,
+    capacityPercent,
+    health,
+    createdAt: node.createdAt || "",
+    updatedAt: node.updatedAt || ""
+  };
+}
+
+function getWorkerSummaryFromData(data) {
+  const nodes = ensureWorkerNodes(data);
+  const requests = data.provisioning?.requests || [];
+  const publicNodes = nodes.map((node) => publicWorkerNode(node, requests));
+  const activeNodes = publicNodes.filter((node) => node.status === "active");
+  return {
+    available: true,
+    nodes: publicNodes,
+    metrics: {
+      totalWorkers: publicNodes.length,
+      activeWorkers: activeNodes.length,
+      totalCapacity: publicNodes.reduce((total, node) => total + Number(node.maxContainers || 0), 0),
+      currentContainers: publicNodes.reduce((total, node) => total + Number(node.currentContainers || 0), 0),
+      failedContainers: publicNodes.reduce((total, node) => total + Number(node.failedContainers || 0), 0),
+      dnsPendingContainers: publicNodes.reduce((total, node) => total + Number(node.dnsPendingContainers || 0), 0)
+    }
+  };
+}
+
+async function getWorkerSummary() {
+  const loaded = await readDatabase();
+  return {
+    available: loaded.available,
+    path: databasePath,
+    message: loaded.message || "",
+    detail: loaded.detail || "",
+    ...getWorkerSummaryFromData(loaded.data)
+  };
+}
+
+function selectWorkerNode(data, preferredRegion = "") {
+  const requests = data.provisioning?.requests || [];
+  const nodes = getWorkerSummaryFromData(data).nodes.filter((node) => node.status === "active" && node.health !== "full");
+  if (!nodes.length) return null;
+  const preferred = preferredRegion
+    ? nodes.filter((node) => node.region.toLowerCase() === String(preferredRegion).toLowerCase())
+    : [];
+  return (preferred.length ? preferred : nodes)
+    .sort((a, b) => a.capacityPercent - b.capacityPercent || a.currentContainers - b.currentContainers || a.name.localeCompare(b.name))[0] || null;
+}
+
+function findWorkerNode(data, id) {
+  return ensureWorkerNodes(data).find((node) => node.id === id) || ensureWorkerNodes(data)[0] || defaultWorkerNode();
+}
+
+function validateWorkerNodeInput(input) {
+  const id = sanitizeId(input.id || input.workerId || input.name || "");
+  const name = String(input.name || id).trim().slice(0, 120);
+  const region = String(input.region || "Bangladesh BDIX").trim().slice(0, 80);
+  const ip = String(input.ip || "").trim();
+  const publicHost = String(input.publicHost || input.public_host || "").trim().toLowerCase();
+  const role = String(input.role || "remote").trim().toLowerCase() === "local" ? "local" : "remote";
+  const status = String(input.status || "active").trim().toLowerCase() === "maintenance" ? "maintenance" : "active";
+  const maxContainers = Number(input.maxContainers || input.max_containers || 200);
+  const cpuCores = Number(input.cpuCores || input.cpu_cores || 16);
+  const memoryGb = Number(input.memoryGb || input.memory_gb || 32);
+  const diskGb = Number(input.diskGb || input.disk_gb || 400);
+  const notes = String(input.notes || "").trim().slice(0, 1000);
+  const errors = [];
+
+  if (!id) errors.push("Worker ID is required.");
+  if (!name) errors.push("Worker name is required.");
+  if (publicHost && !validDomain(publicHost)) errors.push("Public host must be a valid hostname.");
+  if (!Number.isFinite(maxContainers) || maxContainers <= 0) errors.push("Max containers must be a positive number.");
+  if (!Number.isFinite(cpuCores) || cpuCores <= 0) errors.push("CPU cores must be a positive number.");
+  if (!Number.isFinite(memoryGb) || memoryGb <= 0) errors.push("Memory GB must be a positive number.");
+  if (!Number.isFinite(diskGb) || diskGb <= 0) errors.push("Disk GB must be a positive number.");
+
+  return {
+    errors,
+    value: { id, name, region, ip, publicHost, role, status, maxContainers, cpuCores, memoryGb, diskGb, notes }
+  };
+}
+
+async function addWorkerNode(input) {
+  const validated = validateWorkerNodeInput(input);
+  if (validated.errors.length) return { ok: false, errors: validated.errors };
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+
+  const data = loaded.data;
+  ensureWorkerNodes(data);
+  const now = new Date().toISOString();
+  const index = data.workerNodes.findIndex((node) => node.id === validated.value.id);
+  const node = {
+    ...(index === -1 ? {} : data.workerNodes[index]),
+    ...validated.value,
+    createdAt: index === -1 ? now : data.workerNodes[index].createdAt || now,
+    updatedAt: now
+  };
+  if (index === -1) data.workerNodes.push(node);
+  else data.workerNodes[index] = node;
+  await writeDatabase(data);
+  return { ok: true, worker: publicWorkerNode(node, data.provisioning?.requests || []) };
+}
+
 function monthKey(date = new Date()) {
   return localDateKey(date).slice(0, 7);
 }
@@ -1480,8 +1679,29 @@ const planMonthlyAmounts = {
   Agency: 12000
 };
 
+const planResourceProfiles = {
+  Starter: { memoryMb: 512, cpuLimit: "0.50", monthlyRequestLimit: 100000, containerLimit: 1 },
+  Growth: { memoryMb: 768, cpuLimit: "0.75", monthlyRequestLimit: 500000, containerLimit: 2 },
+  Pro: { memoryMb: 1024, cpuLimit: "1.00", monthlyRequestLimit: 1000000, containerLimit: 4 },
+  Agency: { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 3000000, containerLimit: 10 },
+  Customer: { memoryMb: 512, cpuLimit: "0.50", monthlyRequestLimit: 100000, containerLimit: 1 }
+};
+
 function monthlyAmountForPlan(planName) {
   return planMonthlyAmounts[String(planName || "").trim()] || 0;
+}
+
+function resourceProfileForPlan(planName, overrides = {}) {
+  const profile = planResourceProfiles[String(planName || "").trim()] || planResourceProfiles.Customer;
+  const memoryMb = Number(overrides.memoryMb || overrides.memory_mb || profile.memoryMb || config.defaultContainerMemoryMb);
+  const monthlyRequestLimit = Number(overrides.requestLimit || overrides.request_limit || overrides.monthlyRequestLimit || profile.monthlyRequestLimit || config.monthlyRequestLimit);
+  const containerLimit = Number(overrides.containerLimit || overrides.container_limit || profile.containerLimit || config.monthlyContainerLimit);
+  return {
+    memoryMb: Number.isFinite(memoryMb) && memoryMb > 0 ? memoryMb : config.defaultContainerMemoryMb,
+    cpuLimit: String(overrides.cpuLimit || overrides.cpu_limit || profile.cpuLimit || config.defaultContainerCpuLimit),
+    monthlyRequestLimit: Number.isFinite(monthlyRequestLimit) && monthlyRequestLimit > 0 ? monthlyRequestLimit : config.monthlyRequestLimit,
+    containerLimit: Number.isFinite(containerLimit) && containerLimit > 0 ? containerLimit : config.monthlyContainerLimit
+  };
 }
 
 function normalizeLifecycleStatus(status) {
@@ -1569,6 +1789,8 @@ function getTenantContainers(tenantId, tenant = null, setupRequests = [], provis
         domain: request.trackingDomain || tenant?.domain || "",
         status: provision?.status || request.status || "requested",
         serverLocation: request.serverLocation || "Bangladesh BDIX",
+        workerName: provision?.workerName || request.workerName || "",
+        resourceLimits: provision?.resourceLimits || request.resourceLimits || null,
         createdAt: request.createdAt || "",
         source: "customer"
       };
@@ -1583,6 +1805,8 @@ function getTenantContainers(tenantId, tenant = null, setupRequests = [], provis
       domain: request.domain,
       status: request.status,
       serverLocation: request.serverLocation || "Bangladesh BDIX",
+      workerName: request.workerName || "",
+      resourceLimits: request.resourceLimits || null,
       createdAt: request.createdAt || "",
       source: "provisioning"
     }));
@@ -1592,7 +1816,7 @@ function getTenantContainers(tenantId, tenant = null, setupRequests = [], provis
   );
 }
 
-function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning }) {
+function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers }) {
   const enrichedCustomers = (customers.tenants || []).map((customer) => {
     const customerContainers = getTenantContainers(customer.id, customer, customerSetup?.requests || [], provisioning?.requests || []);
     const plan = customer.plan || config.billingPlan;
@@ -1650,8 +1874,11 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
   const sslAttention = enrichedCustomers.filter((customer) => hasNumericValue(customer.sslDaysRemaining) && Number(customer.sslDaysRemaining) <= 14);
   const totalCustomerContainers = enrichedCustomers.reduce((total, customer) => total + Number(customer.customerContainers?.length || 0), 0);
   const pendingCustomerContainers = enrichedCustomers.reduce((total, customer) =>
-    total + (customer.customerContainers || []).filter((container) => ["requested", "queued", "pending_launch"].includes(container.status)).length, 0
+    total + (customer.customerContainers || []).filter((container) => ["requested", "queued", "pending_launch", "worker_assigned"].includes(container.status)).length, 0
   );
+  const workerCapacityPercent = workers?.metrics?.totalCapacity
+    ? Math.round((Number(workers.metrics.currentContainers || 0) / Number(workers.metrics.totalCapacity || 1)) * 100)
+    : 0;
 
   const issues = [
     {
@@ -1699,7 +1926,11 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
       unhealthyCustomers: unhealthyCustomers.length,
       sslAttention: sslAttention.length,
       noTrackingToday: noTrackingCustomers.length,
-      brokenPurchaseTracking: brokenPurchaseCustomers.length
+      brokenPurchaseTracking: brokenPurchaseCustomers.length,
+      activeWorkers: workers?.metrics?.activeWorkers || 0,
+      workerCapacityPercent: workers?.metrics?.currentContainers && workerCapacityPercent === 0 ? 1 : workerCapacityPercent,
+      failedLaunches: workers?.metrics?.failedContainers || 0,
+      dnsPendingContainers: workers?.metrics?.dnsPendingContainers || 0
     },
     lifecycleCounts,
     issues,
@@ -1710,7 +1941,9 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
       runningContainers: docker.totals?.running || 0,
       unhealthyContainers: docker.totals?.unhealthy || 0,
       sslAvailable: Boolean(ssl.available),
-      sslDaysRemaining: ssl.available ? ssl.daysRemaining : null
+      sslDaysRemaining: ssl.available ? ssl.daysRemaining : null,
+      workers: workers?.nodes || [],
+      workerMetrics: workers?.metrics || {}
     }
   };
 }
@@ -1893,6 +2126,12 @@ function validateProvisioningRequest(input) {
   const ownerEmail = String(input.ownerEmail || "").trim();
   const planName = String(input.planName || config.billingPlan || "Starter").trim();
   const requestLimit = Number(input.requestLimit || config.monthlyRequestLimit);
+  const resourceLimits = resourceProfileForPlan(planName, {
+    requestLimit,
+    memoryMb: input.memoryMb || input.memory_mb,
+    cpuLimit: input.cpuLimit || input.cpu_limit,
+    containerLimit: input.containerLimit || input.container_limit
+  });
 
   if (!validDomain(domain)) errors.push("Enter a valid tracking subdomain.");
   if (!instanceName) errors.push("Enter an instance name.");
@@ -1909,7 +2148,8 @@ function validateProvisioningRequest(input) {
       containerName: sanitizeId(`sgtm-${instanceName}`),
       ownerEmail,
       planName,
-      requestLimit,
+      requestLimit: resourceLimits.monthlyRequestLimit,
+      resourceLimits,
       previewUrl,
       containerConfig,
       notes: String(input.notes || "").trim().slice(0, 1000)
@@ -1917,9 +2157,10 @@ function validateProvisioningRequest(input) {
   };
 }
 
-function allocateProvisionPort(requests) {
+function allocateProvisionPort(requests, workerId = "") {
   const used = new Set(
     (requests || [])
+      .filter((request) => !workerId || (request.workerId || config.localWorkerId) === workerId)
       .map((request) => Number(request.port))
       .filter((port) => Number.isInteger(port))
   );
@@ -1937,10 +2178,20 @@ function provisioningPlan(request) {
   const accessLog = `/var/log/nginx/${request.instanceName}-sgtm-access.log`;
   const errorLog = `/var/log/nginx/${request.instanceName}-sgtm-error.log`;
   const previewLine = request.previewUrl ? `PREVIEW_SERVER_URL=${request.previewUrl}\n` : "";
+  const memoryMb = Number(request.resourceLimits?.memoryMb || config.defaultContainerMemoryMb);
+  const cpuLimit = String(request.resourceLimits?.cpuLimit || config.defaultContainerCpuLimit);
+  const accessLogLine = config.nginxLogFormat
+    ? `    access_log ${accessLog} ${config.nginxLogFormat};`
+    : `    access_log ${accessLog};`;
+  const workerSummary = request.workerName
+    ? `Assigned to ${request.workerName}${request.workerRegion ? ` (${request.workerRegion})` : ""}`
+    : "Assigned to the local worker";
 
   return {
     summary: [
       `Auto-assigned ${request.containerName} to 127.0.0.1:${request.port}`,
+      workerSummary,
+      `Resource limit ${memoryMb}MB RAM / ${cpuLimit} CPU`,
       `Proxy ${request.domain} to the container through Nginx`,
       `Issue SSL with certbot after DNS points to the VPS`,
       "Launch runner is not enabled yet, so this plan is queued for admin execution"
@@ -1950,8 +2201,8 @@ function provisioningPlan(request) {
     nginxPath,
     envPath: safeEnvPath,
     env: `CONTAINER_CONFIG=${request.containerConfig}\n${previewLine}RUN_AS_PREVIEW_SERVER=false\nPORT=8080\n`,
-    dockerCompose: `services:\n  ${request.containerName}:\n    image: gcr.io/cloud-tagging-10302018/gtm-cloud-image:stable\n    container_name: ${request.containerName}\n    restart: unless-stopped\n    env_file:\n      - ${safeEnvPath}\n    ports:\n      - "127.0.0.1:${request.port}:8080"\n`,
-    nginx: `server {\n    listen 80;\n    server_name ${request.domain};\n\n    access_log ${accessLog} sgtm_panel;\n    error_log ${errorLog} warn;\n\n    location / {\n        proxy_pass http://127.0.0.1:${request.port};\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n}\n`,
+    dockerCompose: `services:\n  ${request.containerName}:\n    image: gcr.io/cloud-tagging-10302018/gtm-cloud-image:stable\n    container_name: ${request.containerName}\n    restart: unless-stopped\n    mem_limit: ${memoryMb}m\n    cpus: "${cpuLimit}"\n    env_file:\n      - ${safeEnvPath}\n    ports:\n      - "127.0.0.1:${request.port}:8080"\n`,
+    nginx: `server {\n    listen 80;\n    server_name ${request.domain};\n\n${accessLogLine}\n    error_log ${errorLog} warn;\n\n    location / {\n        proxy_pass http://127.0.0.1:${request.port};\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n        proxy_set_header Upgrade $http_upgrade;\n        proxy_set_header Connection \"upgrade\";\n    }\n}\n`,
     commands: [
       `sudo cp ${nginxPath} /etc/nginx/sites-available/${request.domain}`,
       `sudo ln -s /etc/nginx/sites-available/${request.domain} /etc/nginx/sites-enabled/${request.domain}`,
@@ -1964,6 +2215,8 @@ function provisioningPlan(request) {
     ],
     checks: [
       { label: "DNS", value: config.provisionDnsTarget ? `${request.domain} CNAME/A to ${config.provisionDnsTarget}` : `${request.domain} must point to the target VPS`, status: "pending" },
+      { label: "Worker", value: workerSummary, status: request.workerId ? "prepared" : "pending" },
+      { label: "Resources", value: `${memoryMb}MB RAM / ${cpuLimit} CPU / ${Number(request.requestLimit || 0).toLocaleString()} requests`, status: "prepared" },
       { label: "Port", value: `Auto-assigned 127.0.0.1:${request.port}`, status: "pending" },
       { label: "SSL", value: `certbot --nginx -d ${request.domain}`, status: "pending" },
       { label: "Health", value: `https://${request.domain}/healthy`, status: "pending" }
@@ -1984,7 +2237,10 @@ async function addProvisioningRequest(input) {
 
   const data = loaded.data;
   data.provisioning ||= { requests: [] };
-  const port = allocateProvisionPort(data.provisioning.requests);
+  ensureWorkerNodes(data);
+  const worker = selectWorkerNode(data, validated.value.serverLocation || "");
+  if (!worker) return { ok: false, errors: ["No healthy worker node has available capacity. Add a worker or increase worker capacity from Admin."] };
+  const port = allocateProvisionPort(data.provisioning.requests, worker.id);
   if (!port) {
     return { ok: false, errors: [`No available provisioning ports in ${config.provisionPortStart}-${config.provisionPortEnd}.`] };
   }
@@ -1993,13 +2249,17 @@ async function addProvisioningRequest(input) {
     status: "pending_launch",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    workerId: worker.id,
+    workerName: worker.name,
+    workerRegion: worker.region,
+    workerHost: worker.publicHost || worker.ip || "",
     port,
     autoAssignedPort: true,
     ...validated.value
   };
   request.plan = provisioningPlan(request);
   data.provisioning.requests.unshift(request);
-  data.provisioning.requests = data.provisioning.requests.slice(0, 100);
+  data.provisioning.requests = data.provisioning.requests.slice(0, config.maxProvisioningRecords);
   await autoLaunchProvisioningRequest(data, request);
   await writeDatabase(data);
   return { ok: true, request };
@@ -2056,6 +2316,13 @@ function recordLaunchStep(request, label, result) {
   });
 }
 
+function certbotArgs(domain) {
+  const args = ["--nginx", "-d", domain, "--non-interactive", "--agree-tos", "--redirect"];
+  if (config.autoLaunchCertbotEmail) args.push("-m", config.autoLaunchCertbotEmail);
+  else args.push("--register-unsafely-without-email");
+  return args;
+}
+
 async function launchProvisioningRequest(request) {
   await writeProvisioningFiles(request);
   request.status = "launching";
@@ -2084,6 +2351,22 @@ async function launchProvisioningRequest(request) {
 
   const nginxTarget = join(config.nginxSitesAvailableDir, request.domain);
   const nginxEnabled = join(config.nginxSitesEnabledDir, request.domain);
+  const makeAvailableDir = await systemCommand("mkdir", ["-p", config.nginxSitesAvailableDir], { timeout: 5000 });
+  recordLaunchStep(request, "Ensure Nginx sites-available directory", makeAvailableDir);
+  if (!makeAvailableDir.ok) {
+    request.status = "nginx_failed";
+    request.updatedAt = new Date().toISOString();
+    return request;
+  }
+
+  const makeEnabledDir = await systemCommand("mkdir", ["-p", config.nginxSitesEnabledDir], { timeout: 5000 });
+  recordLaunchStep(request, "Ensure Nginx sites-enabled directory", makeEnabledDir);
+  if (!makeEnabledDir.ok) {
+    request.status = "nginx_failed";
+    request.updatedAt = new Date().toISOString();
+    return request;
+  }
+
   const copyNginx = await systemCommand("cp", [request.plan.nginxPath, nginxTarget], { timeout: 5000 });
   recordLaunchStep(request, "Install Nginx site", copyNginx);
   if (!copyNginx.ok) {
@@ -2117,7 +2400,7 @@ async function launchProvisioningRequest(request) {
   }
 
   if (config.autoLaunchCertbot) {
-    const certbot = await systemCommand("certbot", ["--nginx", "-d", request.domain, "--non-interactive", "--agree-tos", "--redirect"], {
+    const certbot = await systemCommand("certbot", certbotArgs(request.domain), {
       timeout: 60000,
       maxBuffer: 2 * 1024 * 1024
     });
@@ -2144,6 +2427,27 @@ async function launchProvisioningRequest(request) {
 
 async function autoLaunchProvisioningRequest(data, request) {
   if (!config.autoLaunchEnabled) return request;
+  const worker = findWorkerNode(data, request.workerId || config.localWorkerId);
+  if (worker.role !== "local") {
+    request.status = "worker_assigned";
+    request.updatedAt = new Date().toISOString();
+    request.launchLog ||= [];
+    request.launchLog.push({
+      label: "Worker assignment",
+      ok: true,
+      stdout: `${worker.name || worker.id} is remote. Container is assigned and waiting for worker-side launch automation.`,
+      at: request.updatedAt
+    });
+    if (request.sourceRequestId) {
+      const setup = (data.customerSetupRequests || []).find((item) => item.id === request.sourceRequestId);
+      if (setup) {
+        setup.status = request.status;
+        setup.updatedAt = request.updatedAt;
+        setup.provisioningRequestId = request.id;
+      }
+    }
+    return request;
+  }
   const launched = await launchProvisioningRequest(request);
   if (request.sourceRequestId) {
     const setup = (data.customerSetupRequests || []).find((item) => item.id === request.sourceRequestId);
@@ -2691,6 +2995,7 @@ async function getDashboardData() {
   }
   const history = await persistDailySummary(requestSummary);
   const provisioning = await getProvisioningSummary();
+  const workers = await getWorkerSummary();
   const orders = await getOrderSummary();
   const customerAccounts = await getCustomerAccountsSummary();
   const customerSetup = await getCustomerSetupSummary();
@@ -2699,7 +3004,7 @@ async function getDashboardData() {
   const reconciliation = getReconciliationSummary({ requestSummary, orders });
   const integrations = getIntegrationSummary({ orders, requestSummary });
   const setupWizard = getSetupWizard({ customers, provisioning, integrations, ssl, requestSummary });
-  const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning });
+  const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers });
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
   void sendAlertHooks(alerts);
@@ -2728,6 +3033,7 @@ async function getDashboardData() {
     integrations,
     setupWizard,
     provisioning,
+    workers,
     ssl,
     config: {
       serviceName: config.serviceName,
@@ -2757,12 +3063,22 @@ async function getDashboardData() {
       provisionPortEnd: config.provisionPortEnd,
       provisionDnsTarget: config.provisionDnsTarget,
       provisionOutputDir: config.provisionOutputDir,
+      maxProvisioningRecords: config.maxProvisioningRecords,
+      maxCustomerSetupRecords: config.maxCustomerSetupRecords,
+      localWorkerId: config.localWorkerId,
+      localWorkerName: config.localWorkerName,
+      localWorkerRegion: config.localWorkerRegion,
+      localWorkerMaxContainers: config.localWorkerMaxContainers,
+      defaultContainerMemoryMb: config.defaultContainerMemoryMb,
+      defaultContainerCpuLimit: config.defaultContainerCpuLimit,
       autoLaunchEnabled: config.autoLaunchEnabled,
       autoLaunchRequireDns: config.autoLaunchRequireDns,
       autoLaunchCertbot: config.autoLaunchCertbot,
+      autoLaunchCertbotEmail: config.autoLaunchCertbotEmail,
       autoLaunchUseSudo: config.autoLaunchUseSudo,
       nginxSitesAvailableDir: config.nginxSitesAvailableDir,
       nginxSitesEnabledDir: config.nginxSitesEnabledDir,
+      nginxLogFormat: config.nginxLogFormat,
       trackingPaths: config.trackingPaths,
       trackingHosts: config.trackingHosts,
       orderWebhookEnabled: Boolean(config.orderWebhookSecret),
@@ -2788,6 +3104,7 @@ function publicCustomerConfig(data) {
     monthlyRequestLimit: data.config.monthlyRequestLimit,
     monthlyContainerLimit: data.config.monthlyContainerLimit,
     customerSupportEmail: data.config.customerSupportEmail,
+    provisionDnsTarget: data.config.provisionDnsTarget,
     trackingPaths: data.config.trackingPaths,
     trackingHosts: data.config.trackingHosts,
     orderWebhookEnabled: data.config.orderWebhookEnabled,
@@ -2814,6 +3131,7 @@ function customerDashboardData(data, session) {
     ...data,
     session,
     owner: null,
+    workers: { available: true, nodes: [], metrics: {} },
     customerAccounts: { available: true, path: "", accounts: [] },
     customerSetup: {
       available: data.customerSetup.available,
@@ -3096,6 +3414,17 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await addCustomerAccount(body);
       jsonResponse(res, result.ok ? 201 : 400, result.ok ? { account: result.account } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/worker-nodes" && req.method === "POST") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await addWorkerNode(body);
+      jsonResponse(res, result.ok ? 201 : 400, result.ok ? { worker: result.worker } : { errors: result.errors });
       return;
     }
 
