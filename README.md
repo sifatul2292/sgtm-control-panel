@@ -2,6 +2,8 @@
 
 Read-only dashboard for an SGTM server. The first version intentionally avoids restart, create, delete, or shell-action controls.
 
+Tagioo landing page and new-server setup notes are included. For the `tagioo.com` VPS, follow [docs/tagioo-vps-setup.md](docs/tagioo-vps-setup.md).
+
 ## Features
 
 - Docker container list

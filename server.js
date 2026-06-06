@@ -331,15 +331,15 @@ function loginPage(error = "") {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Login - SGTM Panel</title>
+    <title>Login - Tagioo</title>
     <link rel="stylesheet" href="/tokens.css" />
     <link rel="stylesheet" href="/login.css" />
   </head>
   <body>
     <main class="login-shell">
       <form class="login-card" method="post" action="/login">
-        <span class="brand-mark">S</span>
-        <h1>SGTM Panel</h1>
+        <span class="brand-mark">T</span>
+        <h1>Tagioo</h1>
         <p>Sign in as owner or customer to view your tracking dashboard.</p>
         ${error ? `<div class="login-error">${error}</div>` : ""}
         <label>
@@ -3324,9 +3324,38 @@ async function serveStatic(req, res) {
   }
 }
 
+async function servePublicPage(res, filename) {
+  try {
+    const content = await readFile(join(publicDir, filename));
+    res.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store"
+    });
+    res.end(content);
+  } catch {
+    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+    res.end("Not found");
+  }
+}
+
 const server = createServer(async (req, res) => {
   try {
     const pathname = new URL(req.url || "/", `http://${req.headers.host}`).pathname;
+    const hostname = String(req.headers.host || "").split(":")[0].toLowerCase();
+
+    if (pathname === "/" && !isAuthenticated(req)) {
+      if (hostname.startsWith("app.")) {
+        redirect(res, "/login");
+        return;
+      }
+      await servePublicPage(res, "landing.html");
+      return;
+    }
+
+    if (pathname === "/landing.css" || pathname.startsWith("/assets/")) {
+      await serveStatic(req, res);
+      return;
+    }
 
     if (pathname === "/login" && req.method === "GET") {
       if (isAuthenticated(req)) {

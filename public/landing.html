@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Tagioo is managed server-side tracking for ecommerce teams that need hosted sGTM containers, first-party domains, and event diagnostics." />
+    <title>Tagioo - Server-side tracking, made simple</title>
+    <link rel="stylesheet" href="/landing.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Tagioo home">
+        <span class="brand-mark">T</span>
+        <span>Tagioo</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a class="nav-cta" href="/login">Sign in</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <img class="hero-image" src="/assets/tagioo-hero.png" alt="" />
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <p class="eyebrow">Managed server-side tracking</p>
+          <h1>Server-side tracking, made simple.</h1>
+          <p class="hero-copy">Launch hosted sGTM containers, connect first-party tracking domains, and monitor ecommerce events without operating the infrastructure yourself.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="/login">Open dashboard</a>
+            <a class="button button-secondary" href="#how">See setup flow</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="how" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Simple launch flow</p>
+          <h2>From domain to live container in a few steps.</h2>
+        </div>
+        <div class="step-grid">
+          <article>
+            <span>01</span>
+            <h3>Create a container</h3>
+            <p>Customers paste their GTM server container config and website details into Tagioo.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Point DNS</h3>
+            <p>They add a CNAME such as <code>server.store.com</code> to <code>in.tagioo.com</code>.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Tagioo launches</h3>
+            <p>The platform provisions Docker, Nginx, SSL, and health checks for the assigned worker.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="features" class="section feature-band">
+        <div class="section-heading">
+          <p class="eyebrow">Built for ecommerce data</p>
+          <h2>Cleaner tracking infrastructure with owner visibility.</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <h3>Hosted sGTM containers</h3>
+            <p>Isolated Docker-based server-side GTM containers with automatic launch and cleanup.</p>
+          </article>
+          <article>
+            <h3>First-party domains</h3>
+            <p>Use customer-owned tracking subdomains with SSL and Nginx routing.</p>
+          </article>
+          <article>
+            <h3>Event diagnostics</h3>
+            <p>Monitor PageView, AddToCart, Checkout, Purchase, dedupe, and metadata health.</p>
+          </article>
+          <article>
+            <h3>Worker pool ready</h3>
+            <p>Assign containers to shared worker VPS nodes as the customer base grows.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="pricing" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Starter packages</p>
+          <h2>Plans for stores, teams, and agencies.</h2>
+        </div>
+        <div class="pricing-grid">
+          <article>
+            <h3>Starter</h3>
+            <strong>1 container</strong>
+            <p>For small stores starting with first-party server-side tracking.</p>
+          </article>
+          <article class="featured">
+            <h3>Growth</h3>
+            <strong>2 containers</strong>
+            <p>For stores running serious ad campaigns and purchase diagnostics.</p>
+          </article>
+          <article>
+            <h3>Agency</h3>
+            <strong>Multiple clients</strong>
+            <p>For teams managing tracking infrastructure across customer accounts.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>Tagioo</span>
+      <span>First-party tracking infrastructure for modern commerce.</span>
+    </footer>
+  </body>
+</html>
