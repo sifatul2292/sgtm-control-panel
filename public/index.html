@@ -121,6 +121,8 @@
               </div>
             </article>
 
+            <section id="customerPerformanceGrid" class="business-grid customer-performance-grid" aria-label="Customer performance"></section>
+
             <section class="customer-home-grid">
               <article class="panel">
                 <div class="panel-header">
@@ -540,11 +542,51 @@
         <section id="customerContainersView" class="view" data-view="customerContainers" data-customer-only hidden>
           <section class="customer-page-head">
             <div>
-              <p class="breadcrumb">Tracking / Containers</p>
-              <h2>Containers</h2>
-              <p>Create and manage your server-side GTM tracking domains.</p>
+              <p class="breadcrumb">Containers / Create</p>
+              <h2>Create Container</h2>
+              <p>Add your website, tracking subdomain, and GTM server container config. Tagioo launches the server automatically.</p>
             </div>
-            <button class="button button-primary" type="button" data-scroll-target="customerContainerCreate">New Container</button>
+            <span class="badge">sGTM</span>
+          </section>
+
+          <section id="customerContainerCreate" class="panel create-container-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Container Details</h2>
+                <p>Use a first-party tracking subdomain such as server.yourdomain.com.</p>
+              </div>
+              <span class="badge">Automatic launch</span>
+            </div>
+            <form id="customerSetupForm" class="provisioning-form customer-create-form">
+              <label>
+                Name
+                <input name="containerName" placeholder="My Website Tracker" required />
+              </label>
+              <label>
+                Website domain
+                <input name="websiteUrl" placeholder="https://example.com" required />
+              </label>
+              <label>
+                Tracking subdomain
+                <input name="trackingDomain" placeholder="server.example.com" required />
+              </label>
+              <label>
+                Server Location
+                <select name="serverLocation">
+                  <option value="Bangladesh BDIX">Bangladesh BDIX</option>
+                  <option value="Singapore">Singapore</option>
+                </select>
+              </label>
+              <input name="containerType" type="hidden" value="sGTM" />
+              <input name="platform" type="hidden" value="custom" />
+              <label class="form-wide">
+                Container Config
+                <textarea name="containerConfig" placeholder="Paste the Container Config from Google Tag Manager > Admin > Container Settings > Manually provision tagging server" required></textarea>
+                <span class="field-help">Tagioo will use this to create the Docker container and connect Nginx/SSL automatically.</span>
+              </label>
+              <button class="button button-primary" type="submit">Create Container</button>
+              <p id="customerSetupFormMessage" class="form-message"></p>
+            </form>
           </section>
 
           <section class="customer-two-col">
@@ -614,64 +656,6 @@
             <div id="customerContainersTable" class="customer-card-list">
               <div class="empty-log">No containers yet.</div>
             </div>
-          </section>
-
-          <section id="customerContainerCreate" class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Create Container</h2>
-                <p>Configure your Google Tag Manager Server Container for managed provisioning.</p>
-              </div>
-              <span class="badge">sGTM</span>
-            </div>
-            <form id="customerSetupForm" class="provisioning-form">
-              <label>
-                Name
-                <input name="containerName" placeholder="My Website Tracker" required />
-              </label>
-              <label>
-                Website domain
-                <input name="websiteUrl" placeholder="https://example.com" required />
-              </label>
-              <label>
-                Tracking subdomain
-                <input name="trackingDomain" placeholder="server.example.com" required />
-              </label>
-              <label>
-                Container Type
-                <select name="containerType">
-                  <option value="sGTM">sGTM (Server-Side GTM)</option>
-                </select>
-              </label>
-              <label>
-                Platform
-                <select name="platform">
-                  <option value="shopify">Shopify</option>
-                  <option value="woocommerce">WooCommerce</option>
-                  <option value="custom">Custom website</option>
-                  <option value="other">Other</option>
-                </select>
-              </label>
-              <label>
-                Server Location
-                <select name="serverLocation">
-                  <option value="Bangladesh BDIX">Bangladesh BDIX</option>
-                  <option value="Singapore">Singapore</option>
-                  <option value="USA">USA</option>
-                  <option value="UK">UK</option>
-                </select>
-              </label>
-              <label class="form-wide">
-                Container Config
-                <textarea name="containerConfig" placeholder="Paste the Container Config from Google Tag Manager > Admin > Container Settings > Manually provision tagging server" required></textarea>
-              </label>
-              <label class="form-wide">
-                Notes
-                <textarea name="notes" placeholder="Store platform, developer contact, existing GTM details, or anything we should know"></textarea>
-              </label>
-              <button class="button button-primary" type="submit">Create Container</button>
-              <p id="customerSetupFormMessage" class="form-message"></p>
-            </form>
           </section>
         </section>
 

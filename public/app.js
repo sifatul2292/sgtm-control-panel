@@ -46,6 +46,7 @@ const els = {
   customerMonthEvents: document.querySelector("#customerMonthEvents"),
   customerNextStepBadge: document.querySelector("#customerNextStepBadge"),
   customerNextStepList: document.querySelector("#customerNextStepList"),
+  customerPerformanceGrid: document.querySelector("#customerPerformanceGrid"),
   customerSetupForm: document.querySelector("#customerSetupForm"),
   customerSetupFormMessage: document.querySelector("#customerSetupFormMessage"),
   customerSetupList: document.querySelector("#customerSetupList"),
@@ -125,7 +126,7 @@ const viewTitles = {
   dashboard: ["Dashboard", "Server Overview"],
   logs: ["Containers / Event Logs", "Event Logs"],
   analytics: ["Tracking / Analytics", "Analytics"],
-  customerContainers: ["Tracking / Containers", "Containers"],
+  customerContainers: ["Containers / Create", "Create Container"],
   settings: ["Account & Others / Settings", "Settings"],
   deployment: ["Operations / Deployment", "Deployment Health"],
   provisioning: ["Operations / Provisioning", "Container Provisioning"],
@@ -136,7 +137,7 @@ const viewTitles = {
 };
 
 let latestData = null;
-let currentSession = { role: "owner" };
+let currentSession = { role: "pending" };
 const ownerOnlyViews = new Set(["logs", "analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
 const customerOnlyViews = new Set(["customerContainers"]);
 const customerNavViews = new Set(["dashboard", "customerContainers", "billing"]);
@@ -177,9 +178,10 @@ function formatShortDate(value) {
 
 function setView(name) {
   const requested = viewTitles[name] ? name : "dashboard";
+  const roleKnown = currentSession.role === "customer" || currentSession.role === "owner";
   const next =
-    (currentSession.role === "customer" && ownerOnlyViews.has(requested)) ||
-    (currentSession.role !== "customer" && customerOnlyViews.has(requested))
+    (roleKnown && currentSession.role === "customer" && ownerOnlyViews.has(requested)) ||
+    (roleKnown && currentSession.role !== "customer" && customerOnlyViews.has(requested))
       ? "dashboard"
       : requested;
   els.views.forEach((view) => view.classList.toggle("is-active", view.dataset.view === next));
@@ -1181,19 +1183,21 @@ function renderCustomerSetup(data) {
 
   if (els.customerHeroTitle) {
     els.customerHeroTitle.textContent = latest
-      ? latest.containerName || latest.websiteUrl || "Your sGTM container"
+      ? latest.containerName || latest.websiteUrl || "Pixel Containers"
       : "Create your first sGTM container";
   }
   if (els.customerHeroDomain) {
     els.customerHeroDomain.textContent = latest
-      ? `${latest.websiteUrl || "Website"} -> ${latest.trackingDomain || "tracking domain"} · ${latestStatus || "requested"}`
-      : `Point a tracking subdomain to ${dnsTarget}, paste your GTM server container config, and Tagioo will launch it automatically.`;
+      ? `${latest.websiteUrl || "Website"} · ${latest.trackingDomain || "tracking domain"} · ${latestStatus || "requested"}`
+      : `Create a container, then point CNAME to ${dnsTarget}. Tagioo handles Docker, Nginx, SSL, and launch status automatically.`;
   }
   if (els.customerUsagePercent) els.customerUsagePercent.textContent = `${usagePercent}%`;
   if (els.customerPlanName) els.customerPlanName.textContent = usage.plan || "Starter";
   if (els.customerMonthEvents) {
     els.customerMonthEvents.textContent = `${Number(usage.requestsMonth || 0).toLocaleString()} of ${Number(usage.requestLimit || 0).toLocaleString()} requests`;
   }
+
+  if (els.customerPerformanceGrid) renderCustomerPerformance(data);
 
   if (els.customerSetupList) {
     els.customerSetupList.innerHTML = requests.length
@@ -1203,7 +1207,7 @@ function renderCustomerSetup(data) {
             <strong>No containers yet</strong>
             <p>Create your first hosted server-side GTM container.</p>
           </div>
-          <button class="button button-primary" type="button" data-view-shortcut="customerContainers">Create</button>
+          <button class="button button-primary" type="button" data-view-shortcut="customerContainers">Create Container</button>
         </article>`;
   }
 
@@ -1219,6 +1223,21 @@ function renderCustomerSetup(data) {
   }
 }
 
+function renderCustomerPerformance(data) {
+  const summary = data.nginx?.todayEvents || {};
+  const purchases = purchaseSummary(data);
+  const totalEvents = Number(summary.count || 0);
+  const purchaseCount = Number(purchases.uniqueCount || 0);
+  const conversion = totalEvents ? Math.round((purchaseCount / totalEvents) * 100) : 0;
+  renderBusinessGrid(els.customerPerformanceGrid, [
+    { label: "Events", value: totalEvents.toLocaleString(), detail: `${Number(data.usage?.usagePercent || 0)}% used` },
+    { label: "Today", value: Number(data.usage?.requestsToday || totalEvents || 0).toLocaleString(), detail: "Clean tracking requests" },
+    { label: "Revenue", value: purchases.uniqueRevenue ? formatMoney(purchases.uniqueRevenue, purchases.currency) : "0", detail: "Tracked purchase value" },
+    { label: "Conversion", value: `${conversion}%`, detail: `${purchaseCount.toLocaleString()} / ${totalEvents.toLocaleString()}` },
+    { label: "Purchases", value: purchaseCount.toLocaleString(), detail: "This month" }
+  ]);
+}
+
 function renderCustomerContainers(data) {
   const requests = data.customerSetup?.requests || [];
   const dnsTarget = data.config?.provisionDnsTarget || data.config?.publicBaseUrl || window.location.host || "the SGTM server";
@@ -1229,7 +1248,7 @@ function renderCustomerContainers(data) {
     els.customerContainersTable.innerHTML = `<article class="customer-container-card empty-customer-card">
       <div>
         <strong>No containers yet</strong>
-        <p>Create one below. If DNS is not ready, Tagioo will keep checking and show DNS pending.</p>
+        <p>Use the form above. If DNS is not ready, Tagioo will show DNS pending and keep the launch status simple.</p>
       </div>
     </article>`;
     return;
@@ -2048,8 +2067,8 @@ function renderCustomerAccounts(data) {
     els.customerAccountsList,
     accounts.length
       ? accounts.map((account) => ({
-        label: account.tenantName || account.tenantId,
-        value: `${account.username} · ${account.tenantId} · ${account.status}${account.lastLoginAt ? ` · last login ${formatShortDate(account.lastLoginAt)}` : ""}`,
+        label: account.fullName || account.tenantName || account.tenantId,
+        value: `${account.email || account.username} · ${account.phone || "No phone"} · ${account.country || "No country"} · ${account.referral || "No source"} · ${account.status}${account.lastLoginAt ? ` · last login ${formatShortDate(account.lastLoginAt)}` : ""}`,
         status: account.status === "active" ? "healthy" : "warning"
       }))
       : [{ label: "Customer logins", value: "Create the first customer login from the form", status: "warning" }]
@@ -2405,7 +2424,7 @@ els.customerSetupForm.addEventListener("submit", async (event) => {
     if (!response.ok) throw new Error((result.errors || [result.error || "Setup request failed"]).join(" "));
     els.customerSetupFormMessage.textContent = `Container created for ${result.request.trackingDomain}.`;
     await loadDashboard();
-    setView("customerContainers");
+    setView("dashboard");
   } catch (error) {
     els.customerSetupFormMessage.textContent = error.message;
   }

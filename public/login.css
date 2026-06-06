@@ -33,6 +33,16 @@ body {
 
 .signup-card {
   width: min(560px, 100%);
+  gap: var(--space-lg);
+}
+
+.login-brand-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  font-size: var(--text-xl);
+  font-weight: 900;
 }
 
 .brand-mark {
@@ -51,9 +61,19 @@ p {
   margin: 0;
 }
 
+h1 {
+  text-align: center;
+}
+
 p {
   color: var(--color-muted);
   line-height: 1.45;
+  text-align: center;
+}
+
+p a {
+  color: var(--color-accent);
+  font-weight: 900;
 }
 
 label {
@@ -65,13 +85,19 @@ label {
 
 input,
 select {
-  min-height: 44px;
+  min-height: 48px;
   border: var(--rule-thin) solid var(--color-line-strong);
   border-radius: var(--radius-md);
   padding: 0 var(--space-sm);
   background: var(--color-surface-2);
   color: var(--color-text);
   font: inherit;
+}
+
+.signup-row {
+  display: grid;
+  grid-template-columns: 0.7fr 1fr;
+  gap: var(--space-md);
 }
 
 input:focus-visible,
@@ -107,4 +133,18 @@ button {
 .login-links a {
   color: var(--color-accent);
   font-weight: 900;
+}
+
+@media (max-width: 620px) {
+  .login-shell {
+    padding: var(--space-sm);
+  }
+
+  .login-card {
+    padding: var(--space-lg);
+  }
+
+  .signup-row {
+    grid-template-columns: 1fr;
+  }
 }

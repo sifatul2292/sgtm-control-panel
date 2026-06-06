@@ -367,9 +367,19 @@ function loginPage(error = "") {
 }
 
 function signupPage(error = "", values = {}) {
-  const selectedPlan = values.plan || "Starter";
-  const planOptions = ["Starter", "Growth", "Pro", "Agency"]
-    .map((plan) => `<option${selectedPlan === plan ? " selected" : ""}>${plan}</option>`)
+  const selectedCountry = values.country || "BD";
+  const countryOptions = [
+    ["BD", "Bangladesh (+880)"],
+    ["IN", "India (+91)"],
+    ["PK", "Pakistan (+92)"],
+    ["SG", "Singapore (+65)"],
+    ["US", "United States (+1)"],
+    ["GB", "United Kingdom (+44)"],
+    ["OTHER", "Other"]
+  ].map(([value, label]) => `<option value="${value}"${selectedCountry === value ? " selected" : ""}>${label}</option>`)
+    .join("");
+  const referralOptions = ["", "Google Search", "Facebook", "YouTube", "Friend or colleague", "Agency", "Other"]
+    .map((item) => `<option value="${escapeHtml(item)}"${values.referral === item ? " selected" : ""}>${item || "Select an option (optional)"}</option>`)
     .join("");
   return `<!doctype html>
 <html lang="en">
@@ -383,36 +393,45 @@ function signupPage(error = "", values = {}) {
   <body>
     <main class="login-shell">
       <form class="login-card signup-card" method="post" action="/signup">
-        <span class="brand-mark">T</span>
-        <h1>Create your Tagioo account</h1>
-        <p>Start with a customer dashboard. You can create your sGTM container after signup.</p>
+        <div class="login-brand-row">
+          <span class="brand-mark">T</span>
+          <strong>Tagioo</strong>
+        </div>
+        <h1>Sign up</h1>
+        <p>or <a href="/login">sign in to your account</a></p>
         ${error ? `<div class="login-error">${escapeHtml(error)}</div>` : ""}
         <label>
-          Business name
-          <input name="tenantName" autocomplete="organization" value="${escapeHtml(values.tenantName)}" placeholder="Your store or company" required />
+          Full Name
+          <input name="fullName" autocomplete="name" value="${escapeHtml(values.fullName)}" required />
         </label>
         <label>
-          Email / username
-          <input name="username" autocomplete="username" value="${escapeHtml(values.username)}" placeholder="you@example.com" required />
+          Email Address
+          <input name="email" type="email" autocomplete="email" value="${escapeHtml(values.email || values.username)}" required />
         </label>
+        <div class="signup-row">
+          <label>
+            Country
+            <select name="country">${countryOptions}</select>
+          </label>
+          <label>
+            Phone Number
+            <input name="phone" autocomplete="tel" value="${escapeHtml(values.phone)}" placeholder="1712345678" required />
+          </label>
+        </div>
         <label>
           Password
-          <input name="password" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" required />
+          <input name="password" type="password" autocomplete="new-password" required />
         </label>
         <label>
-          Website
-          <input name="websiteUrl" autocomplete="url" value="${escapeHtml(values.websiteUrl)}" placeholder="https://example.com" required />
+          Confirm Password
+          <input name="confirmPassword" type="password" autocomplete="new-password" required />
         </label>
         <label>
-          Tracking subdomain
-          <input name="trackingDomain" value="${escapeHtml(values.trackingDomain)}" placeholder="server.example.com" />
-        </label>
-        <label>
-          Plan
-          <select name="plan">${planOptions}</select>
+          Where did you hear about us?
+          <select name="referral">${referralOptions}</select>
         </label>
         <button type="submit">Create account</button>
-        <p class="login-links">Already have an account? <a href="/login">Sign in</a></p>
+        <p class="login-links"><a href="/">Back to homepage</a></p>
       </form>
     </main>
   </body>
@@ -1258,6 +1277,11 @@ function publicCustomerAccount(account) {
     tenantId: account.tenantId,
     tenantName: account.tenantName || account.tenantId,
     username: account.username,
+    fullName: account.fullName || account.tenantName || "",
+    email: account.email || account.username || "",
+    country: account.country || "",
+    phone: account.phone || "",
+    referral: account.referral || "",
     status: account.status || "active",
     createdAt: account.createdAt || "",
     updatedAt: account.updatedAt || "",
@@ -1281,6 +1305,11 @@ function validateCustomerAccountInput(input) {
   const source = String(input.source || "customer_account").trim().toLowerCase();
   const subscriptionStatus = String(input.subscriptionStatus || input.subscription_status || "active").trim().toLowerCase();
   const paymentStatus = String(input.paymentStatus || input.payment_status || "paid").trim().toLowerCase();
+  const fullName = String(input.fullName || input.full_name || tenantName).trim().slice(0, 120);
+  const email = String(input.email || username).trim().toLowerCase();
+  const country = String(input.country || "").trim().slice(0, 40);
+  const phone = String(input.phone || "").trim().slice(0, 40);
+  const referral = String(input.referral || "").trim().slice(0, 120);
   const errors = [];
 
   if (!tenantId) errors.push("Tenant ID is required.");
@@ -1302,6 +1331,11 @@ function validateCustomerAccountInput(input) {
       source,
       subscriptionStatus,
       paymentStatus,
+      fullName,
+      email,
+      country,
+      phone,
+      referral,
       status: String(input.status || "active").trim().toLowerCase()
     }
   };
@@ -1331,6 +1365,11 @@ async function addCustomerAccount(input, options = {}) {
     tenantId: validated.value.tenantId,
     tenantName: validated.value.tenantName,
     username: validated.value.username,
+    fullName: validated.value.fullName,
+    email: validated.value.email,
+    country: validated.value.country,
+    phone: validated.value.phone,
+    referral: validated.value.referral,
     passwordHash: hashPassword(validated.value.password),
     status: validated.value.status === "disabled" ? "disabled" : "active",
     createdAt: accountIndex === -1 ? now : data.customerAccounts[accountIndex].createdAt,
@@ -1344,6 +1383,11 @@ async function addCustomerAccount(input, options = {}) {
   const tenant = {
     id: validated.value.tenantId,
     name: validated.value.tenantName,
+    fullName: validated.value.fullName,
+    email: validated.value.email,
+    country: validated.value.country,
+    phone: validated.value.phone,
+    referral: validated.value.referral,
     domain: validated.value.domain,
     websiteUrl: validated.value.websiteUrl,
     plan: validated.value.plan,
@@ -1364,10 +1408,9 @@ async function addCustomerAccount(input, options = {}) {
 }
 
 function signupTenantBase(input) {
-  const tenantName = String(input.tenantName || "").trim();
-  const websiteHost = normalizeHost(input.websiteUrl || "");
-  const usernameBase = String(input.username || "").split("@")[0];
-  return sanitizeId(tenantName || websiteHost.split(".")[0] || usernameBase || "customer") || "customer";
+  const fullName = String(input.fullName || input.tenantName || "").trim();
+  const usernameBase = String(input.email || input.username || "").split("@")[0];
+  return sanitizeId(fullName || usernameBase || "customer") || "customer";
 }
 
 function uniqueTenantId(base, data) {
@@ -1390,22 +1433,37 @@ async function addCustomerSignup(input) {
   const data = loaded.data;
   data.customerAccounts ||= [];
   data.tenants ||= [];
-  const username = String(input.username || "").trim().toLowerCase();
+  const fullName = String(input.fullName || "").trim();
+  const email = String(input.email || input.username || "").trim().toLowerCase();
+  const phone = String(input.phone || "").trim();
+  const password = String(input.password || "");
+  const confirmPassword = String(input.confirmPassword || input.confirm_password || "");
+  const errors = [];
+
+  if (!fullName) errors.push("Full name is required.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("Enter a valid email address.");
+  if (!phone) errors.push("Phone number is required.");
+  if (password.length < 8) errors.push("Password must be at least 8 characters.");
+  if (password !== confirmPassword) errors.push("Passwords do not match.");
+  if (errors.length) return { ok: false, errors };
+
+  const username = email;
   if (data.customerAccounts.some((account) => account.username === username)) {
     return { ok: false, errors: ["An account already exists with this email or username."] };
   }
 
-  const websiteUrl = normalizeWebsiteUrl(input.websiteUrl || "");
-  const trackingDomain = String(input.trackingDomain || input.tracking_domain || "").trim().toLowerCase();
   const tenantId = uniqueTenantId(signupTenantBase(input), data);
   const result = await addCustomerAccount({
     tenantId,
-    tenantName: input.tenantName,
+    tenantName: fullName,
+    fullName,
+    email,
     username,
-    password: input.password,
-    plan: input.plan || "Starter",
-    websiteUrl,
-    domain: trackingDomain || normalizeHost(websiteUrl),
+    password,
+    phone,
+    country: input.country || "BD",
+    referral: input.referral || "",
+    plan: "Starter",
     source: "self_signup",
     subscriptionStatus: "trial",
     paymentStatus: "pending",
