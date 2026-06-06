@@ -2422,6 +2422,8 @@ function provisioningPlan(request) {
     instanceDir,
     composePath,
     nginxPath,
+    accessLog,
+    errorLog,
     envPath: safeEnvPath,
     env: `CONTAINER_CONFIG=${request.containerConfig}\n${previewLine}RUN_AS_PREVIEW_SERVER=false\nPORT=8080\n`,
     dockerCompose: `services:\n  ${request.containerName}:\n    image: gcr.io/cloud-tagging-10302018/gtm-cloud-image:stable\n    container_name: ${request.containerName}\n    restart: unless-stopped\n    mem_limit: ${memoryMb}m\n    cpus: "${cpuLimit}"\n    env_file:\n      - ${safeEnvPath}\n    ports:\n      - "127.0.0.1:${request.port}:8080"\n`,
@@ -3386,16 +3388,32 @@ function publicCustomerConfig(data) {
 
 function provisioningRequestsForTenant(data, tenantId) {
   const setupIds = new Set((data.customerSetup?.requests || [])
-    .filter((request) => request.tenantId === tenantId)
+    .filter((request) => request.tenantId === tenantId && !isDeletedStatus(request.status))
     .map((request) => request.id));
   return (data.provisioning?.requests || []).filter((request) =>
-    request.tenantId === tenantId || setupIds.has(request.sourceRequestId)
+    !isDeletedStatus(request.status) && (request.tenantId === tenantId || setupIds.has(request.sourceRequestId))
   );
 }
 
-async function customerAccessLogForTenant(data, tenantId) {
+function logPathsForProvisioningRequest(request) {
+  const plan = request.plan || provisioningPlan(request);
+  const instanceName = sanitizeId(request.instanceName || request.containerName || String(request.domain || "").split(".")[0]);
+  return {
+    accessLog: plan.accessLog || (instanceName ? `/var/log/nginx/${instanceName}-sgtm-access.log` : ""),
+    errorLog: plan.errorLog || (instanceName ? `/var/log/nginx/${instanceName}-sgtm-error.log` : "")
+  };
+}
+
+function customerAccessLogPaths(data, tenantId) {
   const requests = provisioningRequestsForTenant(data, tenantId);
-  const paths = [...new Set(requests.map((request) => request.plan?.accessLog).filter(Boolean))];
+  const paths = requests
+    .map((request) => logPathsForProvisioningRequest(request).accessLog)
+    .filter(Boolean);
+  return [...new Set(paths)];
+}
+
+async function customerAccessLogForTenant(data, tenantId) {
+  const paths = customerAccessLogPaths(data, tenantId);
   if (!paths.length) {
     return unavailable("No container access log is available yet.", "Create a live container first.");
   }
