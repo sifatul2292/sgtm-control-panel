@@ -47,6 +47,9 @@ const els = {
   customerNextStepBadge: document.querySelector("#customerNextStepBadge"),
   customerNextStepList: document.querySelector("#customerNextStepList"),
   customerPerformanceGrid: document.querySelector("#customerPerformanceGrid"),
+  customerEventChart: document.querySelector("#customerEventChart"),
+  customerTopEvents: document.querySelector("#customerTopEvents"),
+  customerEventDistribution: document.querySelector("#customerEventDistribution"),
   customerSetupForm: document.querySelector("#customerSetupForm"),
   customerSetupFormMessage: document.querySelector("#customerSetupFormMessage"),
   customerSetupList: document.querySelector("#customerSetupList"),
@@ -119,6 +122,7 @@ const els = {
   planBadge: document.querySelector("#planBadge"),
   billingGrid: document.querySelector("#billingGrid"),
   packageGrid: document.querySelector("#packageGrid"),
+  subscriptionPlans: document.querySelector("#subscriptionPlans"),
   docsList: document.querySelector("#docsList")
 };
 
@@ -132,7 +136,7 @@ const viewTitles = {
   provisioning: ["Operations / Provisioning", "Container Provisioning"],
   admin: ["Service / Admin", "Admin"],
   integrations: ["Service / Integrations", "Integrations"],
-  billing: ["Service / Billing", "Usage & Billing"],
+  billing: ["Account & Billing", "My Subscription"],
   docs: ["Public / Docs", "Landing & Docs"]
 };
 
@@ -142,6 +146,50 @@ const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisio
 const customerOnlyViews = new Set(["customerContainers"]);
 const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "billing"]);
 const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs"]);
+
+const subscriptionPlans = [
+  {
+    name: "Free",
+    price: "Free",
+    requests: 15000,
+    containers: 2,
+    domains: 1,
+    receivers: 5,
+    retention: "3 days log retention",
+    features: ["Email Support", "Consent Mode V2 (GDPR)", "Bot Detection & Filtering", "Custom Loader", "Custom Domain", "First-Party Domain", "Event Logs"]
+  },
+  {
+    name: "Starter",
+    price: "৳1,200",
+    requests: 500000,
+    containers: 5,
+    domains: 1,
+    receivers: 5,
+    retention: "7 days log retention",
+    features: ["Live Chat", "Free Migration", "Consent Mode V2 (GDPR)", "Custom Loader", "Custom Domain", "First-Party Domain", "Cookie Life Extension", "Advanced Reports", "Event Logs"]
+  },
+  {
+    name: "Pro",
+    price: "৳2,900",
+    requests: 2000000,
+    containers: 15,
+    domains: 2,
+    receivers: 5,
+    retention: "15 days log retention",
+    popular: true,
+    features: ["Live Chat, Call & Google Meet", "Video & Files Provided", "Consent Mode V2 (GDPR)", "Custom Loader", "Traffic Filtering", "300+ CDN Locations", "Click ID Restorer", "Delay Purchase System", "WordPress Plugin"]
+  },
+  {
+    name: "Enterprise",
+    price: "৳5,900",
+    requests: 5000000,
+    containers: 100,
+    domains: 10,
+    receivers: 5,
+    retention: "30 days log retention",
+    features: ["Priority Migration", "Dedicated Support", "Multi-Domain Support", "Advanced Reports", "Traffic Filtering, IP, Country Block", "Bot Detection & Filtering", "Event Logs", "WordPress Plugin"]
+  }
+];
 
 function text(value, fallback = "--") {
   return value === undefined || value === null || value === "" ? fallback : String(value);
@@ -270,6 +318,52 @@ function queryEventName(path) {
     return "";
   }
   return "";
+}
+
+function queryValue(path, keys) {
+  try {
+    const parsed = new URL(path, "https://sgtm.local");
+    for (const key of keys) {
+      const value = parsed.searchParams.get(key);
+      if (value !== null && value !== "") return value;
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function firstValue(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
+}
+
+function decodeBase64Json(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+  try {
+    const decoded = atob(padded);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+function payloadValue(payload, keys) {
+  if (!payload || typeof payload !== "object") return "";
+  for (const key of keys) {
+    const value = payload[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
+}
+
+function dataTagPayload(path) {
+  return decodeBase64Json(queryValue(path, ["dtdc", "data", "payload"])) || {};
 }
 
 function isTrackingPath(path) {
@@ -412,6 +506,23 @@ function parseNginxAccess(line) {
   const client = inferClient(path, agent);
   const requestUrl = displayRequestUrl(path);
   const tracking = isTrackingPath(path);
+  const payload = dataTagPayload(path);
+  const value = firstValue(
+    queryValue(path, ["value", "ep.value", "epn.value", "epn.ecomm_totalvalue", "price", "revenue"]),
+    payloadValue(payload, ["value", "revenue", "total", "amount", "ecomm_totalvalue"])
+  );
+  const currency = firstValue(
+    queryValue(path, ["currency", "ep.currency", "cu"]),
+    payloadValue(payload, ["currency", "currencyCode"])
+  );
+  const eventId = firstValue(
+    queryValue(path, ["event_id", "eventId", "eid", "x-fb-event-id"]),
+    payloadValue(payload, ["event_id", "eventId", "fb_event_id"])
+  );
+  const transactionId = firstValue(
+    queryValue(path, ["transaction_id", "transactionId", "ep.transaction_id", "ep.order_id", "tr", "order_id", "orderId"]),
+    payloadValue(payload, ["transaction_id", "transactionId", "order_id", "orderId", "order_number"])
+  );
   return {
     source: "access",
     level,
@@ -425,9 +536,13 @@ function parseNginxAccess(line) {
     requestUrl,
     tracking,
     eventName: event.name,
+    value,
+    currency,
+    eventId,
+    transactionId,
     primary: event.name,
     meta: `${event.outcome} - ${status} - ${time}`,
-    detail: `${event.description} Path: ${path}. Visitor IP: ${ip}. ${protocol} - ${bytes} bytes${referer !== "-" ? ` - from ${referer}` : ""}${agent !== "-" ? ` - ${agent}` : ""}`
+    detail: `${event.description} Path: ${path}. Visitor IP: ${ip}. ${protocol} - ${bytes} bytes${value ? ` - value ${formatMoney(value, currency)}` : ""}${transactionId ? ` - transaction ${transactionId}` : ""}${referer !== "-" ? ` - from ${referer}` : ""}${agent !== "-" ? ` - ${agent}` : ""}`
   };
 }
 
@@ -1236,6 +1351,61 @@ function renderCustomerPerformance(data) {
     { label: "Conversion", value: `${conversion}%`, detail: `${purchaseCount.toLocaleString()} / ${totalEvents.toLocaleString()}` },
     { label: "Purchases", value: purchaseCount.toLocaleString(), detail: "This month" }
   ]);
+  renderCustomerAnalytics(summary);
+}
+
+function renderCustomerAnalytics(summary) {
+  if (els.customerEventChart) {
+    const hourly = Array.isArray(summary.hourly) ? summary.hourly : [];
+    const points = hourly.length ? hourly.map((row) => Number(row.total || 0)) : Array.from({ length: 12 }, () => 0);
+    const max = Math.max(1, ...points);
+    const width = 640;
+    const height = 180;
+    const step = points.length > 1 ? width / (points.length - 1) : width;
+    const coords = points.map((value, index) => {
+      const x = index * step;
+      const y = height - (value / max) * (height - 28) - 14;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(" ");
+    els.customerEventChart.innerHTML = `
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Hourly event trend">
+        <defs>
+          <linearGradient id="customerChartFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stop-color="currentColor" stop-opacity=".22" />
+            <stop offset="1" stop-color="currentColor" stop-opacity=".02" />
+          </linearGradient>
+        </defs>
+        <polyline class="chart-grid-line" points="0,${height - 16} ${width},${height - 16}" />
+        <polygon class="chart-area" points="0,${height - 16} ${coords} ${width},${height - 16}" />
+        <polyline class="chart-line" points="${coords}" />
+      </svg>
+    `;
+  }
+
+  const events = (summary.events || []).filter((row) => Number(row.count || 0) > 0);
+  if (els.customerTopEvents) {
+    els.customerTopEvents.innerHTML = events.length
+      ? events.slice(0, 5).map((event) => `
+          <div class="top-event-row">
+            <span>${escapeHtml(event.name || "Other")}</span>
+            <strong>${Number(event.count || 0).toLocaleString()}</strong>
+          </div>
+        `).join("")
+      : `<div class="empty-log">No server events yet.</div>`;
+  }
+
+  if (els.customerEventDistribution) {
+    const total = events.reduce((sum, event) => sum + Number(event.count || 0), 0);
+    els.customerEventDistribution.innerHTML = events.length
+      ? events.slice(0, 5).map((event) => {
+        const percent = total ? Math.round((Number(event.count || 0) / total) * 100) : 0;
+        return `<div class="distribution-row">
+          <div><span>${escapeHtml(event.name || "Other")}</span><strong>${percent}%</strong></div>
+          <div class="usage-progress"><span style="width:${percent}%"></span></div>
+        </div>`;
+      }).join("")
+      : `<div class="empty-log">Event distribution appears after the first tracking request.</div>`;
+  }
 }
 
 function renderCustomerContainers(data) {
@@ -2204,25 +2374,104 @@ function renderDocsGrid(el, items) {
   );
 }
 
+function planFeatureList(features) {
+  return `<ul class="subscription-feature-list">${features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join("")}</ul>`;
+}
+
+function formatPlanPrice(plan) {
+  return plan.price === "Free" ? "Free" : `${plan.price}<small>/month</small>`;
+}
+
+function renewalText(value) {
+  if (!value) return "Renews monthly";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return `Renews ${value}`;
+  const daysLeft = Math.max(0, Math.ceil((date.getTime() - Date.now()) / 86400000));
+  return `Valid until ${new Intl.DateTimeFormat(undefined, { month: "short", day: "2-digit", year: "numeric" }).format(date)} (${daysLeft} days left)`;
+}
+
 function renderBilling(data) {
   const usage = data.usage || {};
+  const activePlanName = usage.plan || "Starter";
+  const activePlan = subscriptionPlans.find((plan) => plan.name === activePlanName) || subscriptionPlans[1];
+  const requestsMonth = Number(usage.requestsMonth || 0);
+  const requestLimit = Number(usage.requestLimit || activePlan.requests || 0);
+  const usagePercent = requestLimit ? Math.min(100, Math.round((requestsMonth / requestLimit) * 1000) / 10) : 0;
+  const containersUsed = (data.customerSetup?.requests || []).filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase())).length;
   const statusClass = usage.status === "healthy" ? "ok" : usage.status === "unmetered" ? "ok" : "warn";
   els.billingBadge.textContent = usage.status === "over_limit" ? "Over limit" : usage.status === "warning" ? "Watch usage" : "Healthy";
   els.planBadge.className = `badge ${statusClass}`;
-  els.planBadge.textContent = usage.plan || "Plan";
-  renderBusinessGrid(els.billingGrid, [
-    { label: "Plan", value: usage.plan || "--", detail: `${Number(usage.containerLimit || 0).toLocaleString()} container limit` },
-    { label: "Requests this month", value: Number(usage.requestsMonth || 0).toLocaleString(), detail: `${Number(usage.usagePercent || 0)}% of plan` },
-    { label: "Monthly limit", value: Number(usage.requestLimit || 0).toLocaleString(), detail: usage.period || "Current month" },
-    { label: "Requests today", value: Number(usage.requestsToday || 0).toLocaleString(), detail: "Clean SGTM event requests" }
-  ]);
+  els.planBadge.textContent = activePlanName;
 
-  renderDocsGrid(els.packageGrid, [
-    { title: "Starter", body: "1 container\n1 custom domain\n100k requests/month\nLogs + basic monitoring" },
-    { title: "Growth", body: "500k requests/month\nOrder reconciliation\nMeta/GA4 diagnostics\nEmail alerts" },
-    { title: "Pro", body: "1M requests/month\nMultiple domains\nAdvanced monitoring\nPriority support" },
-    { title: "Agency", body: "Multiple customers\nTeam access\nWhite-label reports\nCustom limits" }
-  ]);
+  els.billingGrid.innerHTML = `
+    <div class="subscription-plan-name">
+      <span>Current Plan</span>
+      <strong>${escapeHtml(activePlanName)}</strong>
+      <small>${escapeHtml(String(usage.subscriptionStatus || "Monthly billing"))}</small>
+      <p>${escapeHtml(renewalText(usage.renewalDate))}</p>
+      <div class="subscription-feature-heading">Plan Features</div>
+      ${planFeatureList([`${activePlan.requests.toLocaleString()} / month requests`, `${activePlan.containers} containers`, `${activePlan.domains} domain${activePlan.domains === 1 ? "" : "s"}`, `${activePlan.receivers} receivers / container`, activePlan.retention, ...activePlan.features])}
+    </div>
+    <div class="subscription-price-block">
+      <strong>${formatPlanPrice(activePlan)}</strong>
+      <span>${activePlan.price === "Free" ? "per month" : "BDT per month"}</span>
+    </div>
+  `;
+
+  els.packageGrid.innerHTML = `
+    <div class="usage-progress-row">
+      <div>
+        <span>Events</span>
+        <strong>${requestsMonth.toLocaleString()} / ${requestLimit.toLocaleString()}</strong>
+      </div>
+      <div class="usage-progress"><span style="width:${usagePercent}%"></span></div>
+      <small>${usagePercent}% used</small>
+    </div>
+    <div class="subscription-usage-list">
+      <div><span>Containers</span><strong>${containersUsed} / ${Number(usage.containerLimit || activePlan.containers).toLocaleString()}</strong></div>
+      <div><span>Domains</span><strong>${activePlan.domains} / ${activePlan.domains}</strong></div>
+      <div><span>Receivers per Container</span><strong>${activePlan.receivers}</strong></div>
+      <div><span>Requests today</span><strong>${Number(usage.requestsToday || 0).toLocaleString()}</strong></div>
+    </div>
+  `;
+
+  if (els.subscriptionPlans) {
+    els.subscriptionPlans.innerHTML = subscriptionPlans
+      .filter((plan) => plan.name !== "Free")
+      .map((plan) => `
+        <article class="subscription-plan-card ${plan.popular ? "is-popular" : ""}">
+          ${plan.popular ? `<span class="popular-label">Most Popular</span>` : ""}
+          <h3>${escapeHtml(plan.name)}</h3>
+          <div class="plan-price">${formatPlanPrice(plan)}</div>
+          ${planFeatureList([`${plan.requests.toLocaleString()} events/month`, `${plan.containers} containers`, `${plan.domains} domain${plan.domains === 1 ? "" : "s"}`, `${plan.receivers} receivers/container`, plan.retention, ...plan.features])}
+          <button class="button ${plan.name === activePlanName ? "" : "button-primary"}" type="button" data-plan-select="${escapeHtml(plan.name)}">
+            ${plan.name === activePlanName ? "Current Plan" : "Select Plan"}
+          </button>
+        </article>
+      `).join("");
+    els.subscriptionPlans.querySelectorAll("[data-plan-select]").forEach((button) => {
+      button.addEventListener("click", () => selectSubscriptionPlan(button.dataset.planSelect));
+    });
+  }
+  document.querySelectorAll("[data-plan-action]").forEach((button) => {
+    button.onclick = () => selectSubscriptionPlan(button.dataset.planAction);
+  });
+}
+
+async function selectSubscriptionPlan(planName) {
+  try {
+    const response = await fetch("/api/customer/subscription", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ planName })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Plan update failed."]).join(" "));
+    await loadDashboard();
+    setView("billing");
+  } catch (error) {
+    if (els.billingBadge) els.billingBadge.textContent = error.message;
+  }
 }
 
 function renderDocs(data) {

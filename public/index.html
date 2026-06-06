@@ -52,9 +52,9 @@
             <span class="nav-icon" aria-hidden="true">↔</span>
             <span>Integrations</span>
           </button>
-          <button class="nav-item" type="button" data-view-target="billing" aria-label="Billing" title="Billing">
+          <button class="nav-item" type="button" data-view-target="billing" aria-label="My Subscription" title="My Subscription">
             <span class="nav-icon" aria-hidden="true">৳</span>
-            <span>Billing</span>
+            <span>My Subscription</span>
           </button>
           <button class="nav-item" type="button" data-view-target="docs" data-owner-only aria-label="Docs" title="Docs">
             <span class="nav-icon" aria-hidden="true">□</span>
@@ -122,6 +122,41 @@
             </article>
 
             <section id="customerPerformanceGrid" class="business-grid customer-performance-grid" aria-label="Customer performance"></section>
+
+            <section class="customer-analytics-grid">
+              <article class="panel customer-chart-panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Event Analytics</h2>
+                    <p>Recent server-side request trend from your tracking container.</p>
+                  </div>
+                  <span class="badge">Last 24 hours</span>
+                </div>
+                <div id="customerEventChart" class="customer-event-chart"></div>
+              </article>
+
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Top Events</h2>
+                    <p>Most common event types today.</p>
+                  </div>
+                  <span class="badge">Today</span>
+                </div>
+                <div id="customerTopEvents" class="top-events-list"></div>
+              </article>
+
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Event Distribution</h2>
+                    <p>Clean request mix by event type.</p>
+                  </div>
+                  <span class="badge">Live</span>
+                </div>
+                <div id="customerEventDistribution" class="event-distribution"></div>
+              </article>
+            </section>
 
             <section class="customer-home-grid">
               <article class="panel">
@@ -1084,33 +1119,40 @@
         </section>
 
         <section id="billingView" class="view" data-view="billing">
-          <section class="notice notice-soft" aria-label="Billing">
-            <div>
-              <strong>Usage & Billing</strong>
-              <p>Request-based plan monitoring for customer billing and usage alerts.</p>
-            </div>
-            <span id="billingBadge" class="status-dot">Checking</span>
-          </section>
-
-          <section class="panel">
+          <section class="panel subscription-panel">
             <div class="panel-header">
               <div>
                 <h2>Current Plan</h2>
-                <p>Monthly request usage and limit status.</p>
+                <p>Your active Tagioo plan, renewal date, and included features.</p>
               </div>
-              <span id="planBadge" class="badge">Plan</span>
+              <div class="subscription-actions">
+                <button class="button" type="button" data-plan-action="Free">Extend Free Plan</button>
+                <button class="button button-primary" type="button" data-plan-action="Pro">Upgrade Plan</button>
+                <span id="billingBadge" class="status-dot">Checking</span>
+                <span id="planBadge" class="badge">Plan</span>
+              </div>
             </div>
-            <div id="billingGrid" class="business-grid"></div>
+            <div id="billingGrid" class="subscription-current"></div>
           </section>
 
-          <section class="panel">
+          <section class="panel subscription-panel">
             <div class="panel-header">
               <div>
-                <h2>Suggested Packages</h2>
-                <p>Plan structure ready for selling managed server-side tracking.</p>
+                <h2>Monthly Usage</h2>
+                <p>Live usage against your current billing period.</p>
               </div>
             </div>
-            <div id="packageGrid" class="docs-grid"></div>
+            <div id="packageGrid" class="subscription-usage"></div>
+          </section>
+
+          <section class="panel subscription-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Upgrade Your Plan</h2>
+                <p>Choose the package that fits your monthly traffic and number of containers.</p>
+              </div>
+            </div>
+            <div id="subscriptionPlans" class="subscription-plan-grid"></div>
           </section>
         </section>
 

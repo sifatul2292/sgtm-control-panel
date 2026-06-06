@@ -893,6 +893,40 @@ function queryValue(pathname, keys) {
   return "";
 }
 
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
+}
+
+function decodeBase64Json(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+  try {
+    const decoded = Buffer.from(padded, "base64").toString("utf8");
+    const parsed = JSON.parse(decoded);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function payloadValue(payload, keys) {
+  if (!payload || typeof payload !== "object") return "";
+  for (const key of keys) {
+    const value = payload[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return "";
+}
+
+function dataTagPayload(pathname) {
+  return decodeBase64Json(queryValue(pathname, ["dtdc", "data", "payload"])) || {};
+}
+
 function inferHost(line, pathname) {
   try {
     const parsed = new URL(pathname);
@@ -942,6 +976,7 @@ function parseTrackingAccessLine(line) {
   const eventName = inferEventName(pathname, method, status);
   const client = inferClient(pathname, agent);
   const host = inferHost(line, pathname);
+  const payload = dataTagPayload(pathname);
   return {
     eventName,
     client,
@@ -955,13 +990,34 @@ function parseTrackingAccessLine(line) {
     referer: referer === "-" ? "" : referer,
     agent: agent === "-" ? "" : agent,
     ip,
-    value: queryValue(pathname, ["value", "ep.value", "price", "revenue"]),
-    currency: queryValue(pathname, ["currency", "ep.currency", "cu"]),
-    eventId: queryValue(pathname, ["event_id", "eventId", "eid", "x-fb-event-id"]),
-    transactionId: queryValue(pathname, ["transaction_id", "transactionId", "ep.transaction_id", "tr", "order_id", "orderId"]),
-    pageLocation: queryValue(pathname, ["dl", "page_location", "ep.page_location", "url"]),
-    pagePath: queryValue(pathname, ["dp", "page_path", "ep.page_path"]),
-    eventKey: queryValue(pathname, ["_p", "cid", "client_id", "sid", "session_id"])
+    value: firstNonEmpty(
+      queryValue(pathname, ["value", "ep.value", "epn.value", "epn.ecomm_totalvalue", "price", "revenue"]),
+      payloadValue(payload, ["value", "revenue", "total", "amount", "ecomm_totalvalue"])
+    ),
+    currency: firstNonEmpty(
+      queryValue(pathname, ["currency", "ep.currency", "cu"]),
+      payloadValue(payload, ["currency", "currencyCode"])
+    ),
+    eventId: firstNonEmpty(
+      queryValue(pathname, ["event_id", "eventId", "eid", "x-fb-event-id"]),
+      payloadValue(payload, ["event_id", "eventId", "fb_event_id"])
+    ),
+    transactionId: firstNonEmpty(
+      queryValue(pathname, ["transaction_id", "transactionId", "ep.transaction_id", "ep.order_id", "tr", "order_id", "orderId"]),
+      payloadValue(payload, ["transaction_id", "transactionId", "order_id", "orderId", "order_number"])
+    ),
+    pageLocation: firstNonEmpty(
+      queryValue(pathname, ["dl", "page_location", "ep.page_location", "url"]),
+      payloadValue(payload, ["page_location", "url", "source_url"])
+    ),
+    pagePath: firstNonEmpty(
+      queryValue(pathname, ["dp", "page_path", "ep.page_path"]),
+      payloadValue(payload, ["page_path", "path"])
+    ),
+    eventKey: firstNonEmpty(
+      queryValue(pathname, ["_p", "cid", "client_id", "sid", "session_id"]),
+      payloadValue(payload, ["client_id", "session_id", "fbp", "fbc"])
+    )
   };
 }
 
@@ -1380,6 +1436,7 @@ async function addCustomerAccount(input, options = {}) {
   else data.customerAccounts[accountIndex] = { ...data.customerAccounts[accountIndex], ...account };
 
   const tenantIndex = data.tenants.findIndex((tenant) => tenant.id === validated.value.tenantId);
+  const tenantProfile = resourceProfileForPlan(validated.value.plan);
   const tenant = {
     id: validated.value.tenantId,
     name: validated.value.tenantName,
@@ -1393,8 +1450,8 @@ async function addCustomerAccount(input, options = {}) {
     plan: validated.value.plan,
     subscriptionStatus: validated.value.subscriptionStatus,
     paymentStatus: validated.value.paymentStatus,
-    requestLimit: config.monthlyRequestLimit,
-    containerLimit: 1,
+    requestLimit: tenantProfile.monthlyRequestLimit,
+    containerLimit: tenantProfile.containerLimit,
     monthlyAmount: monthlyAmountForPlan(validated.value.plan),
     status: "active",
     source: validated.value.source,
@@ -1471,6 +1528,42 @@ async function addCustomerSignup(input) {
   }, { allowUpdate: false });
 
   return result;
+}
+
+async function selectCustomerPlan(input, session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  const planName = String(input.plan || input.planName || "").trim();
+  if (!planResourceProfiles[planName] || planName === "Customer") {
+    return { ok: false, status: 400, errors: ["Choose a valid plan."] };
+  }
+
+  const loaded = await readDatabase();
+  if (!loaded.available) {
+    return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  }
+
+  const data = loaded.data;
+  data.tenants ||= [];
+  const tenantIndex = data.tenants.findIndex((tenant) => tenant.id === session.tenantId);
+  if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+
+  const profile = resourceProfileForPlan(planName);
+  const now = new Date();
+  const renewalDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+  data.tenants[tenantIndex] = {
+    ...data.tenants[tenantIndex],
+    plan: planName,
+    requestLimit: profile.monthlyRequestLimit,
+    containerLimit: profile.containerLimit,
+    monthlyAmount: monthlyAmountForPlan(planName),
+    subscriptionStatus: planName === "Free" ? "trial" : "active",
+    paymentStatus: planName === "Free" ? "free" : "pending",
+    renewalDate,
+    updatedAt: now.toISOString()
+  };
+
+  await writeDatabase(data);
+  return { ok: true, tenant: data.tenants[tenantIndex] };
 }
 
 async function markCustomerAccountLogin(id) {
@@ -1870,16 +1963,20 @@ function orderBreakdown(orders, key) {
 }
 
 const planMonthlyAmounts = {
-  Starter: 1500,
+  Free: 0,
+  Starter: 1200,
   Growth: 3000,
-  Pro: 6000,
+  Pro: 2900,
+  Enterprise: 5900,
   Agency: 12000
 };
 
 const planResourceProfiles = {
+  Free: { memoryMb: 512, cpuLimit: "0.50", monthlyRequestLimit: 15000, containerLimit: 2 },
   Starter: { memoryMb: 512, cpuLimit: "0.50", monthlyRequestLimit: 100000, containerLimit: 1 },
   Growth: { memoryMb: 768, cpuLimit: "0.75", monthlyRequestLimit: 500000, containerLimit: 2 },
-  Pro: { memoryMb: 1024, cpuLimit: "1.00", monthlyRequestLimit: 1000000, containerLimit: 4 },
+  Pro: { memoryMb: 1024, cpuLimit: "1.00", monthlyRequestLimit: 2000000, containerLimit: 15 },
+  Enterprise: { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 5000000, containerLimit: 100 },
   Agency: { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 3000000, containerLimit: 10 },
   Customer: { memoryMb: 512, cpuLimit: "0.50", monthlyRequestLimit: 100000, containerLimit: 1 }
 };
@@ -3530,6 +3627,7 @@ async function customerDashboardData(data, session) {
     plan: tenant?.plan || data.usage.plan,
     subscriptionStatus: tenant?.subscriptionStatus || data.usage.subscriptionStatus,
     paymentStatus: tenant?.paymentStatus || data.usage.paymentStatus,
+    renewalDate: tenant?.renewalDate || data.usage.renewalDate,
     monthlyAmount: tenant?.monthlyAmount ?? data.usage.monthlyAmount,
     containerLimit: tenant?.containerLimit || data.usage.containerLimit,
     requestsToday: tenantRequestSummary.count,
@@ -3879,6 +3977,18 @@ const server = createServer(async (req, res) => {
       }
       const result = await deleteCustomerContainer(decodeURIComponent(customerDeleteMatch[1]), session);
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { request: result.request } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/subscription" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await selectCustomerPlan(body, session);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { tenant: result.tenant } : { errors: result.errors });
       return;
     }
 
