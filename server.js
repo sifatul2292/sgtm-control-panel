@@ -3129,6 +3129,81 @@ async function summarizeRequestsToday(pathname) {
   };
 }
 
+function mergeSummaryRows(summaries, key) {
+  const rows = new Map();
+  for (const summary of summaries) {
+    for (const row of summary[key] || []) {
+      const name = row.name || "Other";
+      const current = rows.get(name) || { name, lastSeen: null };
+      for (const [field, value] of Object.entries(row)) {
+        if (field === "name" || field === "lastSeen") continue;
+        if (typeof value === "number") current[field] = Number(current[field] || 0) + value;
+        else if (current[field] === undefined) current[field] = value;
+      }
+      if (row.lastSeen && (!current.lastSeen || new Date(row.lastSeen) > new Date(current.lastSeen))) {
+        current.lastSeen = row.lastSeen;
+      }
+      rows.set(name, current);
+    }
+  }
+  return [...rows.values()].sort((a, b) => Number(b.count || 0) - Number(a.count || 0));
+}
+
+function mergePurchaseSummaries(summaries) {
+  const purchaseRows = summaries.map((summary) => summary.purchases || {});
+  const currencies = new Set(purchaseRows.map((row) => row.currency).filter(Boolean));
+  const uniqueCount = purchaseRows.reduce((total, row) => total + Number(row.uniqueCount || 0), 0);
+  const uniqueRevenue = purchaseRows.reduce((total, row) => total + Number(row.uniqueRevenue || 0), 0);
+  return {
+    rawCount: purchaseRows.reduce((total, row) => total + Number(row.rawCount || 0), 0),
+    uniqueCount,
+    duplicateCount: purchaseRows.reduce((total, row) => total + Number(row.duplicateCount || 0), 0),
+    keyedCount: purchaseRows.reduce((total, row) => total + Number(row.keyedCount || 0), 0),
+    estimatedKeyCount: purchaseRows.reduce((total, row) => total + Number(row.estimatedKeyCount || 0), 0),
+    missingKeyCount: purchaseRows.reduce((total, row) => total + Number(row.missingKeyCount || 0), 0),
+    uniqueRevenue,
+    rawRevenue: purchaseRows.reduce((total, row) => total + Number(row.rawRevenue || 0), 0),
+    averageOrderValue: uniqueCount ? uniqueRevenue / uniqueCount : 0,
+    currency: currencies.size === 1 ? [...currencies][0] : ""
+  };
+}
+
+async function summarizeRequestsTodayForPaths(paths) {
+  const uniquePaths = [...new Set((paths || []).filter(Boolean))];
+  if (!uniquePaths.length) return unavailable("No container access log is available yet.", "Create a live container first.");
+  const summaries = await Promise.all(uniquePaths.map((pathname) => summarizeRequestsToday(pathname)));
+  const readable = summaries.filter((summary) => summary.available);
+  if (!readable.length) {
+    return {
+      ...summaries[0],
+      path: uniquePaths.join(", "),
+      message: "Container request count could not be calculated.",
+      detail: summaries.map((summary) => `${summary.path}: ${summary.detail || summary.message}`).join(" | ")
+    };
+  }
+  const recentEvents = readable
+    .flatMap((summary) => summary.recentEvents || [])
+    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+    .slice(0, config.eventLogLimit);
+  return {
+    ...readable[0],
+    path: uniquePaths.join(", "),
+    count: readable.reduce((total, summary) => total + Number(summary.count || 0), 0),
+    errors: readable.reduce((total, summary) => total + Number(summary.errors || 0), 0),
+    totalLines: readable.reduce((total, summary) => total + Number(summary.totalLines || 0), 0),
+    noise: readable.reduce((total, summary) => total + Number(summary.noise || 0), 0),
+    botNoise: readable.reduce((total, summary) => total + Number(summary.botNoise || 0), 0),
+    sampledLines: readable.reduce((total, summary) => total + Number(summary.sampledLines || 0), 0),
+    events: mergeSummaryRows(readable, "events"),
+    clients: mergeSummaryRows(readable, "clients"),
+    hosts: mergeSummaryRows(readable, "hosts"),
+    noiseReasons: mergeSummaryRows(readable, "noiseReasons"),
+    purchases: mergePurchaseSummaries(readable),
+    recentEvents,
+    message: "Customer container request summary loaded."
+  };
+}
+
 function parseOpenSslDate(value) {
   const raw = value.replace("notAfter=", "").trim();
   const expiresAt = new Date(raw);
@@ -3441,9 +3516,15 @@ async function customerAccessLogForTenant(data, tenantId) {
 async function customerDashboardData(data, session) {
   const customerRows = data.owner?.customers || data.customers?.tenants || [];
   const tenant = customerRows.find((customer) => customer.id === session.tenantId) || customerRows[0] || null;
-  const tenantRequestSummary = filterRequestSummaryForTenant(data.nginx.todayEvents, tenant);
   const tenantOrders = filterOrdersForTenant(data.orders, tenant);
   const tenantAccessLog = await customerAccessLogForTenant(data, session.tenantId);
+  const tenantLogPaths = customerAccessLogPaths(data, session.tenantId);
+  const tenantRequestSummary = tenantLogPaths.length
+    ? await summarizeRequestsTodayForPaths(tenantLogPaths)
+    : filterRequestSummaryForTenant(data.nginx.todayEvents, tenant);
+  const requestLimit = tenant?.requestLimit || data.usage.requestLimit;
+  const requestsMonth = tenant?.requestsMonth || tenantRequestSummary.count;
+  const usagePercent = requestLimit ? Math.round((requestsMonth / requestLimit) * 100) : 0;
   const tenantUsage = {
     ...data.usage,
     plan: tenant?.plan || data.usage.plan,
@@ -3452,9 +3533,10 @@ async function customerDashboardData(data, session) {
     monthlyAmount: tenant?.monthlyAmount ?? data.usage.monthlyAmount,
     containerLimit: tenant?.containerLimit || data.usage.containerLimit,
     requestsToday: tenantRequestSummary.count,
-    requestsMonth: tenant?.requestsMonth || tenantRequestSummary.count,
-    requestLimit: tenant?.requestLimit || data.usage.requestLimit,
-    usagePercent: tenant?.usagePercent || 0
+    requestsMonth,
+    requestLimit,
+    usagePercent,
+    status: !requestLimit ? "unmetered" : usagePercent >= 100 ? "over_limit" : usagePercent >= 80 ? "warning" : "healthy"
   };
   const tenantReconciliation = getReconciliationSummary({ requestSummary: tenantRequestSummary, orders: tenantOrders });
 
