@@ -1171,7 +1171,7 @@ function renderBusinessSnapshot(data) {
 }
 
 function renderCustomerSetup(data) {
-  const requests = data.customerSetup?.requests || [];
+  const requests = (data.customerSetup?.requests || []).filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()));
   const latest = requests[0];
   const usage = data.usage || {};
   const dnsTarget = data.config?.provisionDnsTarget || data.config?.publicBaseUrl || window.location.host || "bd.tagioo.com";
@@ -1239,7 +1239,7 @@ function renderCustomerPerformance(data) {
 }
 
 function renderCustomerContainers(data) {
-  const requests = data.customerSetup?.requests || [];
+  const requests = (data.customerSetup?.requests || []).filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()));
   const dnsTarget = data.config?.provisionDnsTarget || data.config?.publicBaseUrl || window.location.host || "the SGTM server";
   if (els.customerDnsTarget) els.customerDnsTarget.textContent = dnsTarget;
   els.customerContainersBadge.className = `badge ${requests.length ? "ok" : "warn"}`;
@@ -2285,10 +2285,12 @@ async function launchProvisioningRequest(id) {
 async function deleteCustomerContainer(id) {
   const confirmed = window.confirm("Delete this container? This will stop and remove its generated server resources when auto-launch is enabled.");
   if (!confirmed) return;
+  if (els.customerSetupFormMessage) els.customerSetupFormMessage.textContent = "Deleting container and generated server resources...";
   try {
     const response = await fetch(`/api/customer/containers/${encodeURIComponent(id)}`, { method: "DELETE" });
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Delete failed"]).join(" "));
+    if (els.customerSetupFormMessage) els.customerSetupFormMessage.textContent = "Container deleted.";
     await loadDashboard();
     setView("customerContainers");
   } catch (error) {

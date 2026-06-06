@@ -1526,6 +1526,7 @@ function publicSetupRequest(request) {
     workerName: request.workerName || "",
     resourceLimits: request.resourceLimits || null,
     status: request.status,
+    statusDetail: request.statusDetail || "",
     notes: request.notes || "",
     createdAt: request.createdAt,
     updatedAt: request.updatedAt
@@ -1687,6 +1688,10 @@ async function getCustomerSetupSummary() {
 
 function activeProvisioningRequests(requests = []) {
   return requests.filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "")));
+}
+
+function isDeletedStatus(status) {
+  return ["deleted", "delete_requested"].includes(String(status || "").toLowerCase());
 }
 
 function defaultWorkerNode() {
@@ -1969,7 +1974,7 @@ function getTenantContainers(tenantId, tenant = null, setupRequests = [], provis
   const provisioning = provisioningRequests || [];
   const provisioningBySource = new Map(provisioning.filter((request) => request.sourceRequestId).map((request) => [request.sourceRequestId, request]));
   const setupContainers = requests
-    .filter((request) => request.tenantId === tenantId && request.status !== "deleted")
+    .filter((request) => request.tenantId === tenantId && !isDeletedStatus(request.status))
     .map((request) => {
       const provision = provisioningBySource.get(request.id);
       return {
@@ -2708,6 +2713,11 @@ async function removePath(pathname) {
   return systemCommand("rm", ["-rf", pathname], { timeout: 5000, maxBuffer: 1024 * 1024 });
 }
 
+function commandMissingTarget(result, patterns = []) {
+  const output = `${result.stdout || ""}\n${result.stderr || ""}\n${result.error || ""}`.toLowerCase();
+  return patterns.some((pattern) => output.includes(pattern));
+}
+
 async function deleteProvisionedContainer(request) {
   request.plan = request.plan || provisioningPlan(request);
   request.deleteLog ||= [];
@@ -2728,6 +2738,12 @@ async function deleteProvisionedContainer(request) {
   });
   logStep("Docker compose down", dockerDown);
 
+  const removeContainer = await systemCommand("docker", ["rm", "-f", request.containerName], {
+    timeout: 10000,
+    maxBuffer: 1024 * 1024
+  });
+  logStep("Force remove Docker container", removeContainer);
+
   const nginxTarget = join(config.nginxSitesAvailableDir, request.domain);
   const nginxEnabled = join(config.nginxSitesEnabledDir, request.domain);
   const removeEnabled = await removePath(nginxEnabled);
@@ -2742,12 +2758,30 @@ async function deleteProvisionedContainer(request) {
     logStep("Reload Nginx", nginxReload);
   }
 
+  if (config.autoLaunchCertbot) {
+    const removeCert = await systemCommand("certbot", ["delete", "--cert-name", request.domain, "--non-interactive"], {
+      timeout: 30000,
+      maxBuffer: 1024 * 1024
+    });
+    logStep("Remove SSL certificate", removeCert);
+  }
+
   const removeFiles = await removePath(request.plan.instanceDir);
   logStep("Remove generated files", removeFiles);
 
-  request.status = "deleted";
-  request.deletedAt = new Date().toISOString();
-  request.updatedAt = request.deletedAt;
+  const dockerRemoved = dockerDown.ok || removeContainer.ok || commandMissingTarget(removeContainer, ["no such container", "no such object"]);
+  const nginxRemoved = removeEnabled.ok && removeAvailable.ok && nginxTest.ok;
+  const filesRemoved = removeFiles.ok;
+  request.updatedAt = new Date().toISOString();
+  if (dockerRemoved && nginxRemoved && filesRemoved) {
+    request.status = "deleted";
+    request.statusDetail = "";
+    request.deletedAt = request.updatedAt;
+  } else {
+    const failed = request.deleteLog.filter((entry) => !entry.ok).map((entry) => entry.label).join(", ");
+    request.status = "delete_failed";
+    request.statusDetail = failed ? `Delete needs attention: ${failed}` : "Delete needs attention.";
+  }
   return request;
 }
 
@@ -2770,9 +2804,20 @@ async function deleteCustomerContainer(id, session) {
 
   if (provision && config.autoLaunchEnabled) {
     await deleteProvisionedContainer(provision);
-    request.status = "deleted";
+    request.status = provision.status;
+    request.statusDetail = provision.statusDetail || "";
     request.deletedAt = provision.deletedAt;
     request.updatedAt = provision.updatedAt;
+    if (provision.status !== "deleted") {
+      await writeDatabase(data);
+      return {
+        ok: false,
+        status: 500,
+        errors: [provision.statusDetail || "Container deletion did not complete. Check the provisioning delete log."],
+        request: publicSetupRequest(request),
+        provisioning: provision
+      };
+    }
   } else if (provision) {
     provision.status = "delete_requested";
     provision.updatedAt = request.updatedAt;
@@ -3404,7 +3449,7 @@ async function customerDashboardData(data, session) {
     customerSetup: {
       available: data.customerSetup.available,
       path: "",
-      requests: (data.customerSetup.requests || []).filter((request) => request.tenantId === session.tenantId)
+      requests: (data.customerSetup.requests || []).filter((request) => request.tenantId === session.tenantId && !isDeletedStatus(request.status))
     },
     customers: tenant
       ? {
