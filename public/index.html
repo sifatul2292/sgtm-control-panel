@@ -20,11 +20,11 @@
             <span class="nav-icon" aria-hidden="true">▦</span>
             <span>Dashboard</span>
           </button>
-          <button class="nav-item" type="button" data-view-target="logs" aria-label="Event Logs" title="Event Logs">
+          <button class="nav-item" type="button" data-view-target="logs" data-owner-only aria-label="Event Logs" title="Event Logs">
             <span class="nav-icon" aria-hidden="true">≡</span>
             <span>Event Logs</span>
           </button>
-          <button class="nav-item" type="button" data-view-target="analytics" aria-label="Analytics" title="Analytics">
+          <button class="nav-item" type="button" data-view-target="analytics" data-owner-only aria-label="Analytics" title="Analytics">
             <span class="nav-icon" aria-hidden="true">⌁</span>
             <span>Analytics</span>
           </button>
@@ -48,7 +48,7 @@
             <span class="nav-icon" aria-hidden="true">▣</span>
             <span>Admin</span>
           </button>
-          <button class="nav-item" type="button" data-view-target="integrations" aria-label="Integrations" title="Integrations">
+          <button class="nav-item" type="button" data-view-target="integrations" data-owner-only aria-label="Integrations" title="Integrations">
             <span class="nav-icon" aria-hidden="true">↔</span>
             <span>Integrations</span>
           </button>
@@ -56,7 +56,7 @@
             <span class="nav-icon" aria-hidden="true">৳</span>
             <span>Billing</span>
           </button>
-          <button class="nav-item" type="button" data-view-target="docs" aria-label="Docs" title="Docs">
+          <button class="nav-item" type="button" data-view-target="docs" data-owner-only aria-label="Docs" title="Docs">
             <span class="nav-icon" aria-hidden="true">□</span>
             <span>Docs</span>
           </button>
@@ -99,18 +99,51 @@
             <span id="systemMode" class="status-dot">Live</span>
           </section>
 
-          <section class="panel" data-customer-only hidden>
-            <div class="panel-header">
-              <div>
-                <h2>Tracking Containers</h2>
-                <p>Create a server-side GTM container request, then monitor events, purchases, and setup status here.</p>
+          <section class="customer-home" data-customer-only hidden>
+            <article class="customer-hero-card">
+              <div class="customer-hero-main">
+                <span id="customerSetupBadge" class="status-pill">No container</span>
+                <h2 id="customerHeroTitle">Create your first sGTM container</h2>
+                <p id="customerHeroDomain">Add your website, tracking subdomain, and GTM server container config. Tagioo handles Docker, Nginx, SSL, and launch status.</p>
+                <div class="customer-hero-actions">
+                  <button class="button button-primary" type="button" data-view-shortcut="customerContainers">Create Container</button>
+                  <button class="button" type="button" data-view-shortcut="billing">View Plan</button>
+                </div>
               </div>
-              <span id="customerSetupBadge" class="badge">Setup</span>
-            </div>
-            <div class="panel-action-row">
-              <button class="button button-primary" type="button" data-view-shortcut="customerContainers">New Container</button>
-            </div>
-            <div id="customerSetupList" class="summary-list"></div>
+              <div class="usage-ring" aria-label="Monthly usage">
+                <strong id="customerUsagePercent">0%</strong>
+                <span>used</span>
+              </div>
+              <div class="customer-plan-box">
+                <span>Current plan</span>
+                <strong id="customerPlanName">Starter</strong>
+                <small id="customerMonthEvents">0 requests this month</small>
+              </div>
+            </article>
+
+            <section class="customer-home-grid">
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Your Containers</h2>
+                    <p>Live status and setup progress for your tracking domains.</p>
+                  </div>
+                  <button class="button button-primary" type="button" data-view-shortcut="customerContainers">New</button>
+                </div>
+                <div id="customerSetupList" class="customer-card-list"></div>
+              </article>
+
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Next Step</h2>
+                    <p>The one thing to do before tracking can be trusted.</p>
+                  </div>
+                  <span id="customerNextStepBadge" class="badge">Setup</span>
+                </div>
+                <div id="customerNextStepList" class="summary-list"></div>
+              </article>
+            </section>
           </section>
 
           <section class="metrics-grid" aria-label="Server summary">
@@ -505,67 +538,81 @@
         </section>
 
         <section id="customerContainersView" class="view" data-view="customerContainers" data-customer-only hidden>
-          <section class="logs-hero">
+          <section class="customer-page-head">
             <div>
               <p class="breadcrumb">Tracking / Containers</p>
               <h2>Containers</h2>
-              <p>Your server-side GTM containers and setup requests.</p>
+              <p>Create and manage your server-side GTM tracking domains.</p>
             </div>
             <button class="button button-primary" type="button" data-scroll-target="customerContainerCreate">New Container</button>
           </section>
 
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Container List</h2>
-                <p>Created containers launch automatically after the tracking subdomain points to the SGTM server.</p>
+          <section class="customer-two-col">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>DNS Setup</h2>
+                  <p>Point your tracking subdomain to Tagioo before launch.</p>
+                </div>
+                <span class="badge">Required</span>
               </div>
-              <span id="customerContainersBadge" class="badge">0 containers</span>
-            </div>
-            <div class="event-table-wrap">
-              <table class="event-table customer-container-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Website</th>
-                    <th>Tracking Domain</th>
-                    <th>Status</th>
-                    <th>Server</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="customerContainersTable">
-                  <tr>
-                    <td colspan="8">No containers yet.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+              <div class="dns-record-card">
+                <div>
+                  <span>Type</span>
+                  <strong>CNAME</strong>
+                </div>
+                <div>
+                  <span>Host</span>
+                  <strong>server.yourdomain.com</strong>
+                </div>
+                <div>
+                  <span>Value</span>
+                  <strong id="customerDnsTarget">bd.tagioo.com</strong>
+                </div>
+              </div>
+              <div class="dns-guide compact-dns-guide">
+                <article>
+                  <strong>1</strong>
+                  <span>Create a subdomain like <code>server.yourdomain.com</code>.</span>
+                </article>
+                <article>
+                  <strong>2</strong>
+                  <span>Add the CNAME above in your domain DNS.</span>
+                </article>
+                <article>
+                  <strong>3</strong>
+                  <span>Use that same subdomain when creating the container.</span>
+                </article>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Launch Status</h2>
+                  <p>Tagioo automatically creates Docker, Nginx, and SSL after DNS is ready.</p>
+                </div>
+                <span id="customerContainersBadge" class="badge">0 containers</span>
+              </div>
+              <div class="launch-steps">
+                <span>DNS</span>
+                <span>Docker</span>
+                <span>Nginx</span>
+                <span>SSL</span>
+                <span>Live</span>
+              </div>
+            </article>
           </section>
 
           <section class="panel">
             <div class="panel-header">
               <div>
-                <h2>DNS Setup</h2>
-                <p>Complete this in your domain provider before creating the container.</p>
+                <h2>Your Containers</h2>
+                <p>Each container is isolated and mapped to its own tracking subdomain.</p>
               </div>
-              <span class="badge">Required</span>
             </div>
-            <div class="dns-guide">
-              <article>
-                <strong>1</strong>
-                <span>Choose a tracking subdomain, usually <code>server.yourdomain.com</code>.</span>
-              </article>
-              <article>
-                <strong>2</strong>
-                <span>Add a DNS record for that subdomain and point it to <code id="customerDnsTarget">the SGTM server</code>.</span>
-              </article>
-              <article>
-                <strong>3</strong>
-                <span>Use the same subdomain in the Tracking subdomain field below. If DNS is not ready yet, the container will show <code>dns_pending</code>.</span>
-              </article>
+            <div id="customerContainersTable" class="customer-card-list">
+              <div class="empty-log">No containers yet.</div>
             </div>
           </section>
 

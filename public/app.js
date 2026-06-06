@@ -39,6 +39,13 @@ const els = {
   businessDuplicates: document.querySelector("#businessDuplicates"),
   businessDuplicateDetail: document.querySelector("#businessDuplicateDetail"),
   customerSetupBadge: document.querySelector("#customerSetupBadge"),
+  customerHeroTitle: document.querySelector("#customerHeroTitle"),
+  customerHeroDomain: document.querySelector("#customerHeroDomain"),
+  customerUsagePercent: document.querySelector("#customerUsagePercent"),
+  customerPlanName: document.querySelector("#customerPlanName"),
+  customerMonthEvents: document.querySelector("#customerMonthEvents"),
+  customerNextStepBadge: document.querySelector("#customerNextStepBadge"),
+  customerNextStepList: document.querySelector("#customerNextStepList"),
   customerSetupForm: document.querySelector("#customerSetupForm"),
   customerSetupFormMessage: document.querySelector("#customerSetupFormMessage"),
   customerSetupList: document.querySelector("#customerSetupList"),
@@ -130,8 +137,10 @@ const viewTitles = {
 
 let latestData = null;
 let currentSession = { role: "owner" };
-const ownerOnlyViews = new Set(["settings", "deployment", "provisioning", "admin"]);
+const ownerOnlyViews = new Set(["logs", "analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
 const customerOnlyViews = new Set(["customerContainers"]);
+const customerNavViews = new Set(["dashboard", "customerContainers", "billing"]);
+const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs"]);
 
 function text(value, fallback = "--") {
   return value === undefined || value === null || value === "" ? fallback : String(value);
@@ -190,9 +199,15 @@ function applySessionAccess(data) {
   document.querySelectorAll("[data-customer-only]").forEach((element) => {
     element.hidden = !customerMode;
   });
+  els.navItems.forEach((item) => {
+    const target = item.dataset.viewTarget;
+    item.hidden = customerMode ? !customerNavViews.has(target) : !ownerNavViews.has(target);
+  });
   if ((customerMode && ownerOnlyViews.has(window.location.hash.replace("#", ""))) ||
     (!customerMode && customerOnlyViews.has(window.location.hash.replace("#", "")))) {
     setView("dashboard");
+  } else {
+    setView(window.location.hash.replace("#", "") || "dashboard");
   }
 }
 
@@ -1156,18 +1171,52 @@ function renderBusinessSnapshot(data) {
 function renderCustomerSetup(data) {
   const requests = data.customerSetup?.requests || [];
   const latest = requests[0];
+  const usage = data.usage || {};
+  const dnsTarget = data.config?.provisionDnsTarget || data.config?.publicBaseUrl || window.location.host || "bd.tagioo.com";
+  const usagePercent = Math.min(100, Math.max(0, Number(usage.usagePercent || 0)));
+  const latestStatus = String(latest?.status || "").replaceAll("_", " ");
+
   els.customerSetupBadge.className = `badge ${latest ? "ok" : "warn"}`;
-  els.customerSetupBadge.textContent = latest ? `${requests.length} container${requests.length === 1 ? "" : "s"}` : "No container";
-  renderSummaryList(
-    els.customerSetupList,
-    requests.length
-      ? requests.slice(0, 3).map((request) => ({
-        label: request.containerName || request.websiteUrl,
-        value: `${request.websiteUrl} · ${request.trackingDomain} · ${String(request.status || "requested").replaceAll("_", " ")} · ${formatShortDate(request.createdAt)}`,
-        status: request.status === "complete" ? "healthy" : "warning"
-      }))
-      : [{ label: "No containers yet", value: "Create your first sGTM container to start onboarding", status: "warning" }]
-  );
+  els.customerSetupBadge.textContent = latest ? `${requests.length} container${requests.length === 1 ? "" : "s"}` : "No container yet";
+
+  if (els.customerHeroTitle) {
+    els.customerHeroTitle.textContent = latest
+      ? latest.containerName || latest.websiteUrl || "Your sGTM container"
+      : "Create your first sGTM container";
+  }
+  if (els.customerHeroDomain) {
+    els.customerHeroDomain.textContent = latest
+      ? `${latest.websiteUrl || "Website"} -> ${latest.trackingDomain || "tracking domain"} · ${latestStatus || "requested"}`
+      : `Point a tracking subdomain to ${dnsTarget}, paste your GTM server container config, and Tagioo will launch it automatically.`;
+  }
+  if (els.customerUsagePercent) els.customerUsagePercent.textContent = `${usagePercent}%`;
+  if (els.customerPlanName) els.customerPlanName.textContent = usage.plan || "Starter";
+  if (els.customerMonthEvents) {
+    els.customerMonthEvents.textContent = `${Number(usage.requestsMonth || 0).toLocaleString()} of ${Number(usage.requestLimit || 0).toLocaleString()} requests`;
+  }
+
+  if (els.customerSetupList) {
+    els.customerSetupList.innerHTML = requests.length
+      ? requests.slice(0, 3).map((request) => customerContainerCard(request, { compact: true })).join("")
+      : `<article class="customer-container-card empty-customer-card">
+          <div>
+            <strong>No containers yet</strong>
+            <p>Create your first hosted server-side GTM container.</p>
+          </div>
+          <button class="button button-primary" type="button" data-view-shortcut="customerContainers">Create</button>
+        </article>`;
+  }
+
+  if (els.customerNextStepBadge && els.customerNextStepList) {
+    const step = customerNextStep(latest, dnsTarget);
+    els.customerNextStepBadge.className = `badge ${step.status === "healthy" ? "ok" : "warn"}`;
+    els.customerNextStepBadge.textContent = step.badge;
+    renderSummaryList(els.customerNextStepList, [
+      { label: step.label, value: step.value, status: step.status },
+      { label: "Customer DNS value", value: dnsTarget, status: "healthy" },
+      { label: "Need help?", value: "Send the DNS value to your domain manager or developer.", status: "healthy" }
+    ]);
+  }
 }
 
 function renderCustomerContainers(data) {
@@ -1177,35 +1226,113 @@ function renderCustomerContainers(data) {
   els.customerContainersBadge.className = `badge ${requests.length ? "ok" : "warn"}`;
   els.customerContainersBadge.textContent = `${requests.length} container${requests.length === 1 ? "" : "s"}`;
   if (!requests.length) {
-    els.customerContainersTable.innerHTML = '<tr><td colspan="8">No containers yet. Use the create form below.</td></tr>';
+    els.customerContainersTable.innerHTML = `<article class="customer-container-card empty-customer-card">
+      <div>
+        <strong>No containers yet</strong>
+        <p>Create one below. If DNS is not ready, Tagioo will keep checking and show DNS pending.</p>
+      </div>
+    </article>`;
     return;
   }
 
-  els.customerContainersTable.innerHTML = requests.map((request) => {
-    const status = String(request.status || "requested");
-    const canDelete = !["deleted", "delete_requested"].includes(status);
-    return `
-      <tr>
-        <td>
-          <strong>${escapeHtml(request.containerName || request.tenantName || "sGTM Container")}</strong>
-          <span class="owner-subtext">${escapeHtml(request.notes || "Managed server-side tracking")}</span>
-        </td>
-        <td>${statusPill(request.containerType || "sGTM", "healthy")}</td>
-        <td>${escapeHtml(request.websiteUrl || "--")}</td>
-        <td>${escapeHtml(request.trackingDomain || "--")}</td>
-        <td>${statusPill(status.replaceAll("_", " "), status === "complete" ? "healthy" : "warning")}</td>
-        <td>${escapeHtml(request.serverLocation || "Bangladesh BDIX")}</td>
-        <td>${escapeHtml(formatShortDate(request.createdAt))}</td>
-        <td>
-          ${canDelete ? `<button class="button button-danger" type="button" data-container-delete="${escapeHtml(request.id)}">Delete</button>` : ""}
-        </td>
-      </tr>
-    `;
-  }).join("");
+  els.customerContainersTable.innerHTML = requests.map((request) => customerContainerCard(request)).join("");
 
   els.customerContainersTable.querySelectorAll("[data-container-delete]").forEach((button) => {
     button.addEventListener("click", () => deleteCustomerContainer(button.dataset.containerDelete));
   });
+}
+
+function customerStatusMeta(status) {
+  const normalized = String(status || "requested").toLowerCase();
+  if (["complete", "live", "http_live", "ssl_ready"].includes(normalized)) {
+    return { label: "Live", className: "healthy", badge: "Live" };
+  }
+  if (normalized.includes("dns")) return { label: "DNS pending", className: "warning", badge: "DNS" };
+  if (normalized.includes("failed") || normalized.includes("error")) return { label: "Needs attention", className: "error", badge: "Issue" };
+  if (normalized.includes("delete")) return { label: "Deleting", className: "warning", badge: "Deleting" };
+  if (normalized.includes("launch") || normalized.includes("nginx") || normalized.includes("docker") || normalized.includes("ssl")) {
+    return { label: "Launching", className: "warning", badge: "Launching" };
+  }
+  return { label: "Requested", className: "warning", badge: "Setup" };
+}
+
+function customerNextStep(request, dnsTarget) {
+  if (!request) {
+    return {
+      badge: "Create",
+      label: "Create a container",
+      value: "Add your website URL, tracking subdomain, and GTM server container config.",
+      status: "warning"
+    };
+  }
+  const meta = customerStatusMeta(request.status);
+  if (meta.className === "healthy") {
+    return {
+      badge: "Live",
+      label: "Container is live",
+      value: "Check Events and Billing to monitor usage.",
+      status: "healthy"
+    };
+  }
+  if (meta.label === "DNS pending") {
+    return {
+      badge: "DNS",
+      label: "Point DNS",
+      value: `Create CNAME ${request.trackingDomain || "server.yourdomain.com"} -> ${dnsTarget}.`,
+      status: "warning"
+    };
+  }
+  if (meta.className === "error") {
+    return {
+      badge: "Issue",
+      label: "Contact support",
+      value: "The automatic launch hit an infrastructure error. We need to review the container request.",
+      status: "warning"
+    };
+  }
+  return {
+    badge: "Launching",
+    label: "Wait for launch",
+    value: "Tagioo is creating Docker, Nginx, and SSL for your container.",
+    status: "warning"
+  };
+}
+
+function customerContainerCard(request, options = {}) {
+  const status = String(request.status || "requested");
+  const meta = customerStatusMeta(status);
+  const canDelete = !["deleted", "delete_requested"].includes(status);
+  const compact = Boolean(options.compact);
+  return `
+    <article class="customer-container-card ${compact ? "compact" : ""}">
+      <div class="customer-container-top">
+        <div>
+          <span class="state ${meta.className}">${escapeHtml(meta.label)}</span>
+          <h3>${escapeHtml(request.containerName || request.tenantName || "sGTM Container")}</h3>
+          <p>${escapeHtml(request.websiteUrl || "Website not set")}</p>
+        </div>
+        <span class="container-type-pill">${escapeHtml(request.containerType || "sGTM")}</span>
+      </div>
+      <div class="customer-container-meta">
+        <div>
+          <span>Tracking domain</span>
+          <strong>${escapeHtml(request.trackingDomain || "--")}</strong>
+        </div>
+        <div>
+          <span>Server</span>
+          <strong>${escapeHtml(request.serverLocation || "Bangladesh BDIX")}</strong>
+        </div>
+        <div>
+          <span>Created</span>
+          <strong>${escapeHtml(formatShortDate(request.createdAt) || "--")}</strong>
+        </div>
+      </div>
+      ${compact ? "" : `<div class="customer-container-actions">
+        <span>${escapeHtml(request.notes || "Managed server-side tracking")}</span>
+        ${canDelete ? `<button class="button button-danger" type="button" data-container-delete="${escapeHtml(request.id)}">Delete</button>` : ""}
+      </div>`}
+    </article>
+  `;
 }
 
 function renderBusinessGrid(el, items) {
@@ -1845,13 +1972,9 @@ function renderOwnerDashboard(data) {
     { label: "Customers", value: Number(metrics.totalCustomers || 0).toLocaleString(), detail: `${Number(metrics.activeCustomers || 0)} active · ${Number(metrics.trialCustomers || 0)} trial` },
     { label: "MRR", value: formatMoney(metrics.mrr || 0, currency), detail: `${Number(metrics.healthySubscriptions || 0)} paid or good subscriptions` },
     { label: "Containers", value: Number(metrics.totalCustomerContainers || 0).toLocaleString(), detail: `${Number(metrics.pendingCustomerContainers || 0)} waiting for provisioning` },
-    { label: "Workers", value: Number(metrics.activeWorkers || 0).toLocaleString(), detail: `${Number(metrics.workerCapacityPercent || 0)}% capacity used` },
     { label: "Launch failures", value: Number(metrics.failedLaunches || 0).toLocaleString(), detail: `${Number(metrics.dnsPendingContainers || 0)} DNS pending` },
     { label: "Requests month", value: Number(metrics.requestsMonth || 0).toLocaleString(), detail: `${Number(metrics.requestsToday || 0).toLocaleString()} requests today` },
-    { label: "Payment issues", value: Number(metrics.overdueCustomers || 0).toLocaleString(), detail: `${Number(metrics.cancelledCustomers || 0)} cancelled` },
-    { label: "Tracking issues", value: Number(metrics.noTrackingToday || 0).toLocaleString(), detail: "Active customers with zero requests" },
-    { label: "Purchase issues", value: Number(metrics.brokenPurchaseTracking || 0).toLocaleString(), detail: "Purchase tracking needs review" },
-    { label: "SSL attention", value: Number(metrics.sslAttention || 0).toLocaleString(), detail: "Certificates expiring within 14 days" }
+    { label: "Payment issues", value: Number(metrics.overdueCustomers || 0).toLocaleString(), detail: `${Number(metrics.cancelledCustomers || 0)} cancelled` }
   ]);
 
   els.ownerWatchBadge.className = `badge ${issueCount ? "warn" : "ok"}`;
@@ -2191,8 +2314,9 @@ els.navItems.forEach((item) => {
   item.addEventListener("click", () => setView(item.dataset.viewTarget));
 });
 
-document.querySelectorAll("[data-view-shortcut]").forEach((button) => {
-  button.addEventListener("click", () => setView(button.dataset.viewShortcut));
+document.addEventListener("click", (event) => {
+  const shortcut = event.target.closest("[data-view-shortcut]");
+  if (shortcut) setView(shortcut.dataset.viewShortcut);
 });
 
 document.querySelectorAll("[data-scroll-target]").forEach((button) => {
