@@ -31,6 +31,10 @@ body {
   background: var(--color-surface);
 }
 
+.signup-card {
+  width: min(560px, 100%);
+}
+
 .brand-mark {
   display: grid;
   width: 40px;
@@ -59,7 +63,8 @@ label {
   font-weight: 800;
 }
 
-input {
+input,
+select {
   min-height: 44px;
   border: var(--rule-thin) solid var(--color-line-strong);
   border-radius: var(--radius-md);
@@ -70,6 +75,7 @@ input {
 }
 
 input:focus-visible,
+select:focus-visible,
 button:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
@@ -92,4 +98,13 @@ button {
   border-radius: var(--radius-md);
   color: var(--color-danger);
   background: color-mix(in oklch, var(--color-danger), transparent 88%);
+}
+
+.login-links {
+  text-align: center;
+}
+
+.login-links a {
+  color: var(--color-accent);
+  font-weight: 900;
 }

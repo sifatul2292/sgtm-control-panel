@@ -150,6 +150,14 @@ function redirect(res, location) {
   res.end();
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function parseCookies(header = "") {
   return Object.fromEntries(
     header
@@ -351,6 +359,60 @@ function loginPage(error = "") {
           <input name="password" type="password" autocomplete="current-password" required />
         </label>
         <button type="submit">Sign in</button>
+        <p class="login-links">New customer? <a href="/signup">Create an account</a></p>
+      </form>
+    </main>
+  </body>
+</html>`;
+}
+
+function signupPage(error = "", values = {}) {
+  const selectedPlan = values.plan || "Starter";
+  const planOptions = ["Starter", "Growth", "Pro", "Agency"]
+    .map((plan) => `<option${selectedPlan === plan ? " selected" : ""}>${plan}</option>`)
+    .join("");
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create account - Tagioo</title>
+    <link rel="stylesheet" href="/tokens.css" />
+    <link rel="stylesheet" href="/login.css" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <form class="login-card signup-card" method="post" action="/signup">
+        <span class="brand-mark">T</span>
+        <h1>Create your Tagioo account</h1>
+        <p>Start with a customer dashboard. You can create your sGTM container after signup.</p>
+        ${error ? `<div class="login-error">${escapeHtml(error)}</div>` : ""}
+        <label>
+          Business name
+          <input name="tenantName" autocomplete="organization" value="${escapeHtml(values.tenantName)}" placeholder="Your store or company" required />
+        </label>
+        <label>
+          Email / username
+          <input name="username" autocomplete="username" value="${escapeHtml(values.username)}" placeholder="you@example.com" required />
+        </label>
+        <label>
+          Password
+          <input name="password" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" required />
+        </label>
+        <label>
+          Website
+          <input name="websiteUrl" autocomplete="url" value="${escapeHtml(values.websiteUrl)}" placeholder="https://example.com" required />
+        </label>
+        <label>
+          Tracking subdomain
+          <input name="trackingDomain" value="${escapeHtml(values.trackingDomain)}" placeholder="server.example.com" />
+        </label>
+        <label>
+          Plan
+          <select name="plan">${planOptions}</select>
+        </label>
+        <button type="submit">Create account</button>
+        <p class="login-links">Already have an account? <a href="/login">Sign in</a></p>
       </form>
     </main>
   </body>
@@ -1215,12 +1277,17 @@ function validateCustomerAccountInput(input) {
   const password = String(input.password || "");
   const plan = String(input.plan || input.planName || config.billingPlan || "Starter").trim();
   const domain = String(input.domain || "").trim().toLowerCase();
+  const websiteUrl = normalizeWebsiteUrl(input.websiteUrl || input.website_url || "");
+  const source = String(input.source || "customer_account").trim().toLowerCase();
+  const subscriptionStatus = String(input.subscriptionStatus || input.subscription_status || "active").trim().toLowerCase();
+  const paymentStatus = String(input.paymentStatus || input.payment_status || "paid").trim().toLowerCase();
   const errors = [];
 
   if (!tenantId) errors.push("Tenant ID is required.");
-  if (!/^[a-z0-9][a-z0-9._-]{2,63}$/i.test(username)) errors.push("Username must be at least 3 characters and use letters, numbers, dot, dash, or underscore.");
+  if (!/^[a-z0-9][a-z0-9._@-]{2,127}$/i.test(username)) errors.push("Username must be at least 3 characters and use letters, numbers, dot, dash, underscore, or @.");
   if (password.length < 8) errors.push("Password must be at least 8 characters.");
   if (domain && !validDomain(domain)) errors.push("Domain must be a valid hostname.");
+  if ((input.websiteUrl || input.website_url) && !websiteUrl) errors.push("Website must be a valid URL.");
 
   return {
     errors,
@@ -1231,12 +1298,17 @@ function validateCustomerAccountInput(input) {
       password,
       plan,
       domain,
+      websiteUrl,
+      source,
+      subscriptionStatus,
+      paymentStatus,
       status: String(input.status || "active").trim().toLowerCase()
     }
   };
 }
 
-async function addCustomerAccount(input) {
+async function addCustomerAccount(input, options = {}) {
+  const allowUpdate = options.allowUpdate !== false;
   const validated = validateCustomerAccountInput(input);
   if (validated.errors.length) return { ok: false, errors: validated.errors };
 
@@ -1253,6 +1325,7 @@ async function addCustomerAccount(input) {
 
   const now = new Date().toISOString();
   const accountIndex = data.customerAccounts.findIndex((account) => account.tenantId === validated.value.tenantId);
+  if (!allowUpdate && accountIndex !== -1) return { ok: false, errors: ["An account already exists for this customer."] };
   const account = {
     id: accountIndex === -1 ? `acct_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}` : data.customerAccounts[accountIndex].id,
     tenantId: validated.value.tenantId,
@@ -1272,14 +1345,15 @@ async function addCustomerAccount(input) {
     id: validated.value.tenantId,
     name: validated.value.tenantName,
     domain: validated.value.domain,
+    websiteUrl: validated.value.websiteUrl,
     plan: validated.value.plan,
-    subscriptionStatus: "active",
-    paymentStatus: "paid",
+    subscriptionStatus: validated.value.subscriptionStatus,
+    paymentStatus: validated.value.paymentStatus,
     requestLimit: config.monthlyRequestLimit,
     containerLimit: 1,
     monthlyAmount: monthlyAmountForPlan(validated.value.plan),
     status: "active",
-    source: "customer_account",
+    source: validated.value.source,
     updatedAt: now
   };
   if (tenantIndex === -1) data.tenants.push({ ...tenant, createdAt: now });
@@ -1287,6 +1361,58 @@ async function addCustomerAccount(input) {
 
   await writeDatabase(data);
   return { ok: true, account: publicCustomerAccount(account) };
+}
+
+function signupTenantBase(input) {
+  const tenantName = String(input.tenantName || "").trim();
+  const websiteHost = normalizeHost(input.websiteUrl || "");
+  const usernameBase = String(input.username || "").split("@")[0];
+  return sanitizeId(tenantName || websiteHost.split(".")[0] || usernameBase || "customer") || "customer";
+}
+
+function uniqueTenantId(base, data) {
+  const existing = new Set([
+    ...(data.tenants || []).map((tenant) => tenant.id),
+    ...(data.customerAccounts || []).map((account) => account.tenantId)
+  ].filter(Boolean));
+  if (!existing.has(base)) return base;
+  for (let index = 2; index < 1000; index += 1) {
+    const candidate = sanitizeId(`${base}-${index}`);
+    if (!existing.has(candidate)) return candidate;
+  }
+  return sanitizeId(`${base}-${Date.now().toString(36)}`);
+}
+
+async function addCustomerSignup(input) {
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+
+  const data = loaded.data;
+  data.customerAccounts ||= [];
+  data.tenants ||= [];
+  const username = String(input.username || "").trim().toLowerCase();
+  if (data.customerAccounts.some((account) => account.username === username)) {
+    return { ok: false, errors: ["An account already exists with this email or username."] };
+  }
+
+  const websiteUrl = normalizeWebsiteUrl(input.websiteUrl || "");
+  const trackingDomain = String(input.trackingDomain || input.tracking_domain || "").trim().toLowerCase();
+  const tenantId = uniqueTenantId(signupTenantBase(input), data);
+  const result = await addCustomerAccount({
+    tenantId,
+    tenantName: input.tenantName,
+    username,
+    password: input.password,
+    plan: input.plan || "Starter",
+    websiteUrl,
+    domain: trackingDomain || normalizeHost(websiteUrl),
+    source: "self_signup",
+    subscriptionStatus: "trial",
+    paymentStatus: "pending",
+    status: "active"
+  }, { allowUpdate: false });
+
+  return result;
 }
 
 async function markCustomerAccountLogin(id) {
@@ -3132,6 +3258,11 @@ function customerDashboardData(data, session) {
   const tenantOrders = filterOrdersForTenant(data.orders, tenant);
   const tenantUsage = {
     ...data.usage,
+    plan: tenant?.plan || data.usage.plan,
+    subscriptionStatus: tenant?.subscriptionStatus || data.usage.subscriptionStatus,
+    paymentStatus: tenant?.paymentStatus || data.usage.paymentStatus,
+    monthlyAmount: tenant?.monthlyAmount ?? data.usage.monthlyAmount,
+    containerLimit: tenant?.containerLimit || data.usage.containerLimit,
     requestsToday: tenantRequestSummary.count,
     requestsMonth: tenant?.requestsMonth || tenantRequestSummary.count,
     requestLimit: tenant?.requestLimit || data.usage.requestLimit,
@@ -3366,6 +3497,39 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === "/signup" && req.method === "GET") {
+      if (isAuthenticated(req)) {
+        redirect(res, "/");
+        return;
+      }
+      htmlResponse(res, 200, signupPage());
+      return;
+    }
+
+    if (pathname === "/signup" && req.method === "POST") {
+      const form = await readForm(req);
+      const values = Object.fromEntries(form.entries());
+      const result = await addCustomerSignup(values);
+      if (!result.ok) {
+        htmlResponse(res, 400, signupPage((result.errors || ["Signup failed."]).join(" "), values));
+        return;
+      }
+
+      const account = {
+        username: result.account.username,
+        role: "customer",
+        tenantId: result.account.tenantId,
+        accountId: result.account.id
+      };
+      res.writeHead(302, {
+        location: "/#customerContainers",
+        "set-cookie": `sgtm_session=${makeSessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`,
+        "cache-control": "no-store"
+      });
+      res.end();
+      return;
+    }
+
     if (pathname === "/login" && req.method === "POST") {
       const form = await readForm(req);
       const username = form.get("username") || "";
@@ -3407,7 +3571,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (pathname !== "/login" && pathname !== "/tokens.css" && pathname !== "/login.css" && !isAuthenticated(req)) {
+    if (pathname !== "/login" && pathname !== "/signup" && pathname !== "/tokens.css" && pathname !== "/login.css" && !isAuthenticated(req)) {
       if (pathname.startsWith("/api/")) {
         jsonResponse(res, 401, { error: "Authentication required." });
         return;
