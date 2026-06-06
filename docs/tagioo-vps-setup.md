@@ -5,7 +5,7 @@ This guide sets up a fresh VPS for:
 - Public site: `https://tagioo.com`
 - Dashboard login: `https://tagioo.com/login`
 - App hostname: `https://app.tagioo.com`
-- Customer CNAME target: `in.tagioo.com`
+- Customer CNAME target: `bd.tagioo.com`
 
 ## DNS
 
@@ -14,13 +14,13 @@ Create these records at your domain DNS provider:
 ```text
 A      tagioo.com       147.79.67.213
 A      app.tagioo.com   147.79.67.213
-A      in.tagioo.com    147.79.67.213
+A      bd.tagioo.com    147.79.67.213
 ```
 
 Customers will create:
 
 ```text
-CNAME  server.customer.com  in.tagioo.com
+CNAME  server.customer.com  bd.tagioo.com
 ```
 
 ## Install Server Packages
@@ -82,7 +82,7 @@ SERVICE_NAME=Tagioo
 PUBLIC_BASE_URL=https://tagioo.com
 CUSTOMER_SUPPORT_EMAIL=support@tagioo.com
 
-PROVISION_DNS_TARGET=in.tagioo.com
+PROVISION_DNS_TARGET=bd.tagioo.com
 PROVISION_OUTPUT_DIR=./data/provisioning
 
 AUTO_LAUNCH_ENABLED=true
@@ -96,7 +96,7 @@ NGINX_SITES_ENABLED_DIR=/etc/nginx/sites-enabled
 LOCAL_WORKER_ID=tagioo-bdix-1
 LOCAL_WORKER_NAME="Tagioo BDIX Worker 1"
 LOCAL_WORKER_REGION="Bangladesh BDIX"
-LOCAL_WORKER_PUBLIC_HOST=in.tagioo.com
+LOCAL_WORKER_PUBLIC_HOST=bd.tagioo.com
 LOCAL_WORKER_IP=147.79.67.213
 LOCAL_WORKER_MAX_CONTAINERS=200
 LOCAL_WORKER_CPU_CORES=1
@@ -109,7 +109,7 @@ DEFAULT_CONTAINER_CPU_LIMIT=0.50
 DATA_DIR=./data
 HISTORY_RETENTION_DAYS=90
 
-TRACKING_HOSTS=tagioo.com,app.tagioo.com,in.tagioo.com
+TRACKING_HOSTS=tagioo.com,app.tagioo.com,bd.tagioo.com
 SSL_DOMAIN=tagioo.com
 SSL_PORT=443
 ```
@@ -158,7 +158,7 @@ Paste:
 ```nginx
 server {
     listen 80;
-    server_name tagioo.com www.tagioo.com app.tagioo.com in.tagioo.com;
+    server_name tagioo.com www.tagioo.com app.tagioo.com bd.tagioo.com;
 
     location / {
         proxy_pass http://127.0.0.1:3100;
@@ -184,7 +184,7 @@ sudo systemctl reload nginx
 Issue SSL:
 
 ```bash
-sudo certbot --nginx -d tagioo.com -d www.tagioo.com -d app.tagioo.com -d in.tagioo.com
+sudo certbot --nginx -d tagioo.com -d www.tagioo.com -d app.tagioo.com -d bd.tagioo.com
 ```
 
 ## Deploy Updates
@@ -209,7 +209,7 @@ pm2 restart tagioo
 6. Customer DNS must point:
 
 ```text
-CNAME  server.customer-domain.com  in.tagioo.com
+CNAME  server.customer-domain.com  bd.tagioo.com
 ```
 
 If DNS is ready, Tagioo should move the container toward `http_live` or `live`.
