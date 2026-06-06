@@ -20,7 +20,7 @@
             <span class="nav-icon" aria-hidden="true">▦</span>
             <span>Dashboard</span>
           </button>
-          <button class="nav-item" type="button" data-view-target="logs" data-owner-only aria-label="Event Logs" title="Event Logs">
+          <button class="nav-item" type="button" data-view-target="logs" aria-label="Event Logs" title="Event Logs">
             <span class="nav-icon" aria-hidden="true">≡</span>
             <span>Event Logs</span>
           </button>
@@ -249,7 +249,7 @@
             <div id="alertList" class="summary-list"></div>
           </section>
 
-          <section class="split-grid">
+          <section class="split-grid" data-owner-only>
             <article class="panel">
               <div class="panel-header">
                 <div>
@@ -412,7 +412,7 @@
           </section>
 
           <section class="split-grid">
-            <article class="panel log-panel" data-log-panel="error">
+            <article class="panel log-panel" data-log-panel="error" data-owner-only>
             <div class="panel-header">
               <div>
                 <h2>Nginx Errors</h2>
@@ -423,7 +423,7 @@
             <div id="errorLog" class="log-output">Loading error log...</div>
             </article>
 
-            <article id="docker" class="panel log-panel" data-log-panel="docker">
+            <article id="docker" class="panel log-panel" data-log-panel="docker" data-owner-only>
             <div class="panel-header">
               <div>
                 <h2>Docker Logs</h2>

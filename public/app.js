@@ -138,9 +138,9 @@ const viewTitles = {
 
 let latestData = null;
 let currentSession = { role: "pending" };
-const ownerOnlyViews = new Set(["logs", "analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
+const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
 const customerOnlyViews = new Set(["customerContainers"]);
-const customerNavViews = new Set(["dashboard", "customerContainers", "billing"]);
+const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "billing"]);
 const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs"]);
 
 function text(value, fallback = "--") {

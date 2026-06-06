@@ -3309,11 +3309,48 @@ function publicCustomerConfig(data) {
   };
 }
 
-function customerDashboardData(data, session) {
+function provisioningRequestsForTenant(data, tenantId) {
+  const setupIds = new Set((data.customerSetup?.requests || [])
+    .filter((request) => request.tenantId === tenantId)
+    .map((request) => request.id));
+  return (data.provisioning?.requests || []).filter((request) =>
+    request.tenantId === tenantId || setupIds.has(request.sourceRequestId)
+  );
+}
+
+async function customerAccessLogForTenant(data, tenantId) {
+  const requests = provisioningRequestsForTenant(data, tenantId);
+  const paths = [...new Set(requests.map((request) => request.plan?.accessLog).filter(Boolean))];
+  if (!paths.length) {
+    return unavailable("No container access log is available yet.", "Create a live container first.");
+  }
+
+  const logs = await Promise.all(paths.map(async (pathname) => {
+    const log = await tailFile(pathname, config.logTailLines);
+    return { pathname, log };
+  }));
+  const readable = logs.filter((item) => item.log.available);
+  if (!readable.length) {
+    return unavailable(
+      "Container access log is not readable yet.",
+      logs.map((item) => `${item.pathname}: ${item.log.detail || item.log.message}`).join(" | ")
+    );
+  }
+
+  return {
+    available: true,
+    path: readable.map((item) => item.pathname).join(", "),
+    message: "Customer container access logs loaded.",
+    lines: readable.flatMap((item) => item.log.lines)
+  };
+}
+
+async function customerDashboardData(data, session) {
   const customerRows = data.owner?.customers || data.customers?.tenants || [];
   const tenant = customerRows.find((customer) => customer.id === session.tenantId) || customerRows[0] || null;
   const tenantRequestSummary = filterRequestSummaryForTenant(data.nginx.todayEvents, tenant);
   const tenantOrders = filterOrdersForTenant(data.orders, tenant);
+  const tenantAccessLog = await customerAccessLogForTenant(data, session.tenantId);
   const tenantUsage = {
     ...data.usage,
     plan: tenant?.plan || data.usage.plan,
@@ -3367,6 +3404,7 @@ function customerDashboardData(data, session) {
       ...data.nginx,
       requestCountToday: tenantRequestSummary,
       todayEvents: tenantRequestSummary,
+      accessLog: tenantAccessLog,
       errorLog: unavailable("Nginx error logs are owner-only.")
     },
     orders: tenantOrders,
@@ -3641,7 +3679,7 @@ const server = createServer(async (req, res) => {
     if (req.url?.startsWith("/api/dashboard")) {
       const session = getSession(req);
       const dashboardData = await getDashboardData();
-      jsonResponse(res, 200, session?.role === "customer" ? customerDashboardData(dashboardData, session) : { ...dashboardData, session });
+      jsonResponse(res, 200, session?.role === "customer" ? await customerDashboardData(dashboardData, session) : { ...dashboardData, session });
       return;
     }
 
