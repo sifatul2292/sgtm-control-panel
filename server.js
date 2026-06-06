@@ -1540,7 +1540,8 @@ function validateCustomerSetupInput(input, session) {
   const websiteUrl = normalizeWebsiteUrl(input.websiteUrl || input.website_url || input.siteUrl || input.site_url);
   const trackingDomain = String(input.trackingDomain || input.tracking_domain || input.serverDomain || input.server_domain || "").trim().toLowerCase();
   const platform = String(input.platform || "custom").trim().slice(0, 40);
-  const containerConfig = String(input.containerConfig || input.container_config || "").trim();
+  const normalizedContainerConfig = normalizeContainerConfig(input.containerConfig || input.container_config || "");
+  const containerConfig = normalizedContainerConfig.value;
   const serverLocation = String(input.serverLocation || input.server_location || "Bangladesh BDIX").trim().slice(0, 80);
   const notes = String(input.notes || "").trim().slice(0, 1000);
   const errors = [];
@@ -1550,6 +1551,9 @@ function validateCustomerSetupInput(input, session) {
   if (!websiteUrl) errors.push("Enter a valid website URL.");
   if (!validDomain(trackingDomain)) errors.push("Enter a valid tracking subdomain, such as server.example.com.");
   if (!containerConfig) errors.push("Container Config is required. Copy it from Google Tag Manager server container settings.");
+  if (containerConfig && !validContainerConfig(containerConfig, normalizedContainerConfig.decoded)) {
+    errors.push("Container Config is not valid. Copy the full value from Google Tag Manager > Admin > Container Settings > Manually provision tagging server.");
+  }
 
   return {
     errors,
@@ -2305,11 +2309,34 @@ function validDomain(value) {
   return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(String(value || ""));
 }
 
+function normalizeContainerConfig(value) {
+  const compact = String(value || "").replace(/\s+/g, "").trim();
+  if (!compact) return { value: "", decoded: "" };
+  const padding = "=".repeat((4 - (compact.length % 4)) % 4);
+  const padded = `${compact}${padding}`;
+  let decoded = "";
+  try {
+    decoded = Buffer.from(padded.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+  } catch {
+    decoded = "";
+  }
+  return { value: padded, decoded };
+}
+
+function validContainerConfig(value, decoded = "") {
+  return (
+    /^[A-Za-z0-9+/_-]+={0,2}$/.test(String(value || "")) &&
+    /(?:^|&)id=GTM-[A-Z0-9]+(?:&|$)/i.test(decoded) &&
+    /(?:^|&)auth=[^&]+/i.test(decoded)
+  );
+}
+
 function validateProvisioningRequest(input) {
   const errors = [];
   const domain = String(input.domain || "").trim().toLowerCase();
   const instanceName = sanitizeId(input.instanceName || domain.split(".")[0] || "sgtm");
-  const containerConfig = String(input.containerConfig || "").trim();
+  const normalizedContainerConfig = normalizeContainerConfig(input.containerConfig || "");
+  const containerConfig = normalizedContainerConfig.value;
   const previewUrl = String(input.previewUrl || "").trim();
   const ownerEmail = String(input.ownerEmail || "").trim();
   const planName = String(input.planName || config.billingPlan || "Starter").trim();
@@ -2324,6 +2351,9 @@ function validateProvisioningRequest(input) {
   if (!validDomain(domain)) errors.push("Enter a valid tracking subdomain.");
   if (!instanceName) errors.push("Enter an instance name.");
   if (!containerConfig) errors.push("Container config is required before launch.");
+  if (containerConfig && !validContainerConfig(containerConfig, normalizedContainerConfig.decoded)) {
+    errors.push("Container Config is not valid. Copy the full value from Google Tag Manager > Admin > Container Settings > Manually provision tagging server.");
+  }
   if (previewUrl && !/^https?:\/\//i.test(previewUrl)) errors.push("Preview URL must start with http:// or https://.");
   if (ownerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) errors.push("Owner email is not valid.");
   if (!Number.isFinite(requestLimit) || requestLimit <= 0) errors.push("Monthly request limit must be a positive number.");

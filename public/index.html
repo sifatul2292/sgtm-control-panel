@@ -582,7 +582,7 @@
               <label class="form-wide">
                 Container Config
                 <textarea name="containerConfig" placeholder="Paste the Container Config from Google Tag Manager > Admin > Container Settings > Manually provision tagging server" required></textarea>
-                <span class="field-help">Tagioo will use this to create the Docker container and connect Nginx/SSL automatically.</span>
+                <span class="field-help">Paste the full value exactly from GTM, including any ending = or == characters. Tagioo checks it before Docker starts.</span>
               </label>
               <button class="button button-primary" type="submit">Create Container</button>
               <p id="customerSetupFormMessage" class="form-message"></p>
@@ -776,6 +776,7 @@
                 <label class="form-wide">
                   Container config
                   <textarea name="containerConfig" placeholder="Paste the SGTM CONTAINER_CONFIG value" required></textarea>
+                  <span class="field-help">Copy the full value from GTM server container settings. Missing padding or a partial value will block launch.</span>
                 </label>
                 <label class="form-wide">
                   Notes
