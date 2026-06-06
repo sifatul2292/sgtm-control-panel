@@ -1267,9 +1267,12 @@ function customerStatusMeta(status) {
     return { label: "Live", className: "healthy", badge: "Live" };
   }
   if (normalized.includes("dns")) return { label: "DNS pending", className: "warning", badge: "DNS" };
+  if (normalized.includes("docker")) return { label: "Launch issue", className: "error", badge: "Docker" };
+  if (normalized.includes("nginx")) return { label: "Routing issue", className: "error", badge: "Nginx" };
+  if (normalized.includes("certbot") || normalized.includes("ssl")) return { label: "SSL issue", className: "error", badge: "SSL" };
   if (normalized.includes("failed") || normalized.includes("error")) return { label: "Needs attention", className: "error", badge: "Issue" };
   if (normalized.includes("delete")) return { label: "Deleting", className: "warning", badge: "Deleting" };
-  if (normalized.includes("launch") || normalized.includes("nginx") || normalized.includes("docker") || normalized.includes("ssl")) {
+  if (normalized.includes("launch")) {
     return { label: "Launching", className: "warning", badge: "Launching" };
   }
   return { label: "Requested", className: "warning", badge: "Setup" };
@@ -1302,6 +1305,14 @@ function customerNextStep(request, dnsTarget) {
     };
   }
   if (meta.className === "error") {
+    if (meta.badge === "Docker") {
+      return {
+        badge: "Issue",
+        label: "Tagioo launch check",
+        value: "The tracking domain is set, but the VPS could not start the Docker container. No customer action is needed right now.",
+        status: "warning"
+      };
+    }
     return {
       badge: "Issue",
       label: "Contact support",
