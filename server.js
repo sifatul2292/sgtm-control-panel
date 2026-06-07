@@ -333,6 +333,349 @@ function readJson(req) {
   });
 }
 
+function cleanTemplateValue(value, fallback = "YOUR_VALUE_HERE") {
+  const cleaned = String(value || "").trim();
+  return cleaned || fallback;
+}
+
+function selectedDestinations(input) {
+  const allowed = new Set(["ga4", "meta", "googleAds", "tiktok"]);
+  const destinations = Array.isArray(input.destinations) ? input.destinations : String(input.destinations || "").split(",");
+  const selected = destinations.map((item) => String(item).trim()).filter((item) => allowed.has(item));
+  return selected.length ? selected : ["ga4", "meta", "googleAds", "tiktok"];
+}
+
+function gtmTemplateParam(key, value) {
+  return { type: "TEMPLATE", key, value: String(value ?? "") };
+}
+
+function gtmBooleanParam(key, value) {
+  return { type: "BOOLEAN", key, value: value ? "true" : "false" };
+}
+
+function gtmListParam(key, rows) {
+  return {
+    type: "LIST",
+    key,
+    list: rows.map((row) => ({
+      type: "MAP",
+      map: Object.entries(row).map(([parameter, parameterValue]) => gtmTemplateParam(parameter, parameterValue))
+    }))
+  };
+}
+
+function gtmConstVariable(id, name, value, folderId = "1") {
+  return {
+    accountId: "0",
+    containerId: "0",
+    variableId: String(id),
+    name,
+    type: "c",
+    parameter: [gtmTemplateParam("value", value)],
+    fingerprint: String(Date.now()),
+    parentFolderId: folderId
+  };
+}
+
+function gtmDataLayerVariable(id, name, path, folderId = "2") {
+  return {
+    accountId: "0",
+    containerId: "0",
+    variableId: String(id),
+    name,
+    type: "v",
+    parameter: [
+      { type: "INTEGER", key: "dataLayerVersion", value: "2" },
+      gtmBooleanParam("setDefaultValue", false),
+      gtmTemplateParam("name", path)
+    ],
+    fingerprint: String(Date.now()),
+    parentFolderId: folderId
+  };
+}
+
+function gtmEventDataVariable(id, name, key, folderId = "2") {
+  return {
+    accountId: "0",
+    containerId: "0",
+    variableId: String(id),
+    name,
+    type: "ed",
+    parameter: [gtmTemplateParam("keyPath", key)],
+    fingerprint: String(Date.now()),
+    parentFolderId: folderId
+  };
+}
+
+function gtmTrigger(id, name, eventName, filterClient = "") {
+  const trigger = {
+    accountId: "0",
+    containerId: "0",
+    triggerId: String(id),
+    name,
+    type: "CUSTOM_EVENT",
+    customEventFilter: [
+      {
+        type: "EQUALS",
+        parameter: [gtmTemplateParam("arg0", "{{_event}}"), gtmTemplateParam("arg1", eventName)]
+      }
+    ],
+    fingerprint: String(Date.now())
+  };
+  if (filterClient) {
+    trigger.filter = [
+      {
+        type: "CONTAINS",
+        parameter: [gtmTemplateParam("arg0", "{{Client Name}}"), gtmTemplateParam("arg1", filterClient)]
+      }
+    ];
+  }
+  return trigger;
+}
+
+function gtmTag(id, name, type, parameters, triggerIds, folderId = "1") {
+  return {
+    accountId: "0",
+    containerId: "0",
+    tagId: String(id),
+    name,
+    type,
+    parameter: parameters,
+    fingerprint: String(Date.now()),
+    firingTriggerId: triggerIds.map(String),
+    parentFolderId: folderId,
+    tagFiringOption: "ONCE_PER_EVENT",
+    monitoringMetadata: { type: "MAP" },
+    consentSettings: { consentStatus: "NOT_SET" }
+  };
+}
+
+function gtmFolder(id, name) {
+  return {
+    accountId: "0",
+    containerId: "0",
+    folderId: String(id),
+    name,
+    fingerprint: String(Date.now())
+  };
+}
+
+function gtmExport(kind, name, payload, content) {
+  return {
+    exportFormatVersion: 2,
+    exportTime: new Date().toISOString(),
+    containerVersion: {
+      path: "accounts/0/containers/0/versions/0",
+      accountId: "0",
+      containerId: "0",
+      containerVersionId: "0",
+      container: {
+        path: "accounts/0/containers/0",
+        accountId: "0",
+        containerId: "0",
+        name,
+        publicId: kind === "server" ? "GTM-SERVER-TAGIOO" : "GTM-WEB-TAGIOO",
+        usageContext: [kind === "server" ? "SERVER" : "WEB"],
+        fingerprint: String(Date.now())
+      },
+      ...content,
+      fingerprint: String(Date.now()),
+      tagManagerUrl: "https://tagmanager.google.com/"
+    },
+    tagiooSetup: {
+      generatedBy: "Tagioo Setup Assistant",
+      businessType: payload.businessType,
+      platform: payload.platform,
+      destinations: payload.destinations,
+      trackingDomain: payload.trackingDomain,
+      note: "Import into Google Tag Manager, preview, then publish only after testing."
+    }
+  };
+}
+
+function buildWebGtmTemplate(input) {
+  const destinations = selectedDestinations(input);
+  const payload = {
+    businessType: cleanTemplateValue(input.businessType, "ecommerce"),
+    platform: cleanTemplateValue(input.platform, "custom"),
+    destinations,
+    trackingDomain: cleanTemplateValue(input.trackingDomain, "https://track.yourdomain.com"),
+    currency: cleanTemplateValue(input.currency, "BDT")
+  };
+  const folders = [gtmFolder(1, "Tagioo - Config"), gtmFolder(2, "Tagioo - Data Layer"), gtmFolder(3, "Tagioo - GA4"), gtmFolder(4, "Tagioo - Meta"), gtmFolder(5, "Tagioo - Google Ads"), gtmFolder(6, "Tagioo - TikTok")];
+  const variables = [
+    gtmConstVariable(1, "Tagioo - server_container_url", payload.trackingDomain, "1"),
+    gtmConstVariable(2, "Tagioo - ga4_measurement_id", cleanTemplateValue(input.ga4MeasurementId), "1"),
+    gtmConstVariable(3, "Tagioo - meta_pixel_id", cleanTemplateValue(input.metaPixelId), "1"),
+    gtmConstVariable(4, "Tagioo - google_ads_conversion_id", cleanTemplateValue(input.googleAdsConversionId), "1"),
+    gtmConstVariable(5, "Tagioo - tiktok_pixel_id", cleanTemplateValue(input.tiktokPixelId), "1"),
+    gtmConstVariable(6, "Tagioo - default_currency", payload.currency, "1"),
+    gtmDataLayerVariable(10, "dlv - ecommerce.value", "ecommerce.value"),
+    gtmDataLayerVariable(11, "dlv - ecommerce.currency", "ecommerce.currency"),
+    gtmDataLayerVariable(12, "dlv - ecommerce.transaction_id", "ecommerce.transaction_id"),
+    gtmDataLayerVariable(13, "dlv - ecommerce.items", "ecommerce.items"),
+    gtmDataLayerVariable(14, "dlv - user_data.email_address", "user_data.email_address"),
+    gtmDataLayerVariable(15, "dlv - user_data.phone_number", "user_data.phone_number")
+  ];
+  const triggers = [
+    { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - DOM Ready PageView", type: "DOM_READY", fingerprint: String(Date.now()) },
+    gtmTrigger(2, "Tagioo - view_item", "view_item"),
+    gtmTrigger(3, "Tagioo - add_to_cart", "add_to_cart"),
+    gtmTrigger(4, "Tagioo - begin_checkout", "begin_checkout"),
+    gtmTrigger(5, "Tagioo - purchase", "purchase")
+  ];
+  const tags = [];
+  if (destinations.includes("ga4")) {
+    tags.push(gtmTag(1, "Tagioo GA4 - Config", "googtag", [
+      gtmTemplateParam("tagId", "{{Tagioo - ga4_measurement_id}}"),
+      gtmListParam("configSettingsTable", [
+        { parameter: "server_container_url", parameterValue: "{{Tagioo - server_container_url}}" },
+        { parameter: "send_page_view", parameterValue: "false" }
+      ])
+    ], ["2147479573"], "3"));
+    const eventMap = [["page_view", "1"], ["view_item", "2"], ["add_to_cart", "3"], ["begin_checkout", "4"], ["purchase", "5"]];
+    for (const [eventName, triggerId] of eventMap) {
+      const eventSettingsRows = [
+        { parameter: "server_container_url", parameterValue: "{{Tagioo - server_container_url}}" }
+      ];
+      if (eventName === "purchase") {
+        eventSettingsRows.push(
+          { parameter: "currency", parameterValue: "{{dlv - ecommerce.currency}}" },
+          { parameter: "value", parameterValue: "{{dlv - ecommerce.value}}" },
+          { parameter: "transaction_id", parameterValue: "{{dlv - ecommerce.transaction_id}}" },
+          { parameter: "items", parameterValue: "{{dlv - ecommerce.items}}" }
+        );
+      }
+      tags.push(gtmTag(tags.length + 1, `Tagioo GA4 - ${eventName}`, "gaawe", [
+        gtmBooleanParam("sendEcommerceData", false),
+        gtmBooleanParam("enhancedUserId", false),
+        gtmTemplateParam("eventName", eventName),
+        gtmTemplateParam("measurementIdOverride", "{{Tagioo - ga4_measurement_id}}"),
+        gtmListParam("eventSettingsTable", eventSettingsRows)
+      ], [triggerId], "3"));
+    }
+  }
+  if (destinations.includes("meta")) {
+    tags.push(gtmTag(tags.length + 1, "Tagioo Meta - Pixel Base", "html", [
+      gtmTemplateParam("html", "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{Tagioo - meta_pixel_id}}');fbq('track','PageView');</script>")
+    ], ["2147479553"], "4"));
+  }
+  if (destinations.includes("tiktok")) {
+    tags.push(gtmTag(tags.length + 1, "Tagioo TikTok - Pixel Base", "html", [
+      gtmTemplateParam("html", "<script>!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=['page','track','identify','instances','debug','on','off','once','ready','alias','group','enableCookie','disableCookie'];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.load=function(e){var i='https://analytics.tiktok.com/i18n/pixel/events.js';ttq._i=ttq._i||{};ttq._i[e]=[];var n=d.createElement('script');n.type='text/javascript';n.async=!0;n.src=i;var a=d.getElementsByTagName('script')[0];a.parentNode.insertBefore(n,a)};ttq.load('{{Tagioo - tiktok_pixel_id}}');ttq.page();}(window,document,'ttq');</script>")
+    ], ["2147479553"], "6"));
+  }
+  return gtmExport("web", "Tagioo Web GTM Template", payload, {
+    tag: tags,
+    trigger: triggers,
+    variable: variables,
+    folder: folders,
+    builtInVariable: [{ accountId: "0", containerId: "0", type: "EVENT", name: "Event" }]
+  });
+}
+
+function buildServerGtmTemplate(input) {
+  const destinations = selectedDestinations(input);
+  const payload = {
+    businessType: cleanTemplateValue(input.businessType, "ecommerce"),
+    platform: cleanTemplateValue(input.platform, "custom"),
+    destinations,
+    trackingDomain: cleanTemplateValue(input.trackingDomain, "https://track.yourdomain.com")
+  };
+  const folders = [gtmFolder(1, "Tagioo - Config"), gtmFolder(2, "Tagioo - Event Data"), gtmFolder(3, "Tagioo - GA4"), gtmFolder(4, "Tagioo - Meta"), gtmFolder(5, "Tagioo - Google Ads"), gtmFolder(6, "Tagioo - TikTok")];
+  const variables = [
+    gtmConstVariable(1, "Tagioo - ga4_api_secret", cleanTemplateValue(input.ga4ApiSecret), "1"),
+    gtmConstVariable(2, "Tagioo - meta_pixel_id", cleanTemplateValue(input.metaPixelId), "1"),
+    gtmConstVariable(3, "Tagioo - meta_capi_token", cleanTemplateValue(input.metaAccessToken), "1"),
+    gtmConstVariable(4, "Tagioo - meta_test_event_code", cleanTemplateValue(input.metaTestEventCode, ""), "1"),
+    gtmConstVariable(5, "Tagioo - google_ads_conversion_id", cleanTemplateValue(input.googleAdsConversionId), "1"),
+    gtmConstVariable(6, "Tagioo - google_ads_purchase_label", cleanTemplateValue(input.googleAdsPurchaseLabel), "1"),
+    gtmConstVariable(7, "Tagioo - tiktok_pixel_id", cleanTemplateValue(input.tiktokPixelId), "1"),
+    gtmConstVariable(8, "Tagioo - tiktok_access_token", cleanTemplateValue(input.tiktokAccessToken), "1"),
+    gtmEventDataVariable(20, "ed - value", "value"),
+    gtmEventDataVariable(21, "ed - currency", "currency"),
+    gtmEventDataVariable(22, "ed - transaction_id", "transaction_id"),
+    gtmEventDataVariable(23, "ed - event_id", "event_id"),
+    gtmEventDataVariable(24, "ed - email_address", "user_data.email_address"),
+    gtmEventDataVariable(25, "ed - phone_number", "user_data.phone_number")
+  ];
+  const triggers = [
+    { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - GA4 Client", type: "ALWAYS", filter: [{ type: "CONTAINS", parameter: [gtmTemplateParam("arg0", "{{Client Name}}"), gtmTemplateParam("arg1", "GA4")] }], fingerprint: String(Date.now()) },
+    gtmTrigger(2, "Tagioo - GA4 purchase", "purchase", "GA4"),
+    gtmTrigger(3, "Tagioo - GA4 add_to_cart", "add_to_cart", "GA4"),
+    gtmTrigger(4, "Tagioo - GA4 begin_checkout", "begin_checkout", "GA4")
+  ];
+  const tags = [];
+  const clients = [];
+  if (destinations.includes("ga4")) {
+    clients.push({
+      accountId: "0",
+      containerId: "0",
+      clientId: "1",
+      name: "Tagioo - GA4 Client",
+      type: "gaaw_client",
+      parameter: [],
+      fingerprint: String(Date.now())
+    });
+    tags.push(gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", [
+      gtmBooleanParam("redactVisitorIp", false),
+      gtmTemplateParam("epToIncludeDropdown", "all"),
+      gtmTemplateParam("upToIncludeDropdown", "all")
+    ], ["1"], "3"));
+  }
+  if (destinations.includes("googleAds")) {
+    tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Conversion Linker", "sgtmadscl", [
+      gtmBooleanParam("enableLinkerParams", false),
+      gtmBooleanParam("enableCookieOverrides", false)
+    ], ["1"], "5"));
+    tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Purchase", "sgtmadsct", [
+      gtmTemplateParam("productReportingDataSource", "EVENT"),
+      gtmBooleanParam("enableConversionLinker", true),
+      gtmBooleanParam("enableProductReporting", true),
+      gtmTemplateParam("conversionId", "{{Tagioo - google_ads_conversion_id}}"),
+      gtmTemplateParam("conversionLabel", "{{Tagioo - google_ads_purchase_label}}"),
+      gtmBooleanParam("rdp", false)
+    ], ["2"], "5"));
+    tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Remarketing", "sgtmadsremarket", [
+      gtmBooleanParam("enableConversionLinker", true),
+      gtmBooleanParam("enableDynamicRemarketing", true),
+      gtmTemplateParam("remarketingEventDataSource", "EVENT_DATA"),
+      gtmTemplateParam("conversionId", "{{Tagioo - google_ads_conversion_id}}"),
+      gtmBooleanParam("rdp", false)
+    ], ["1"], "5"));
+  }
+  return gtmExport("server", "Tagioo Server GTM Template", payload, {
+    tag: tags,
+    trigger: triggers,
+    variable: variables,
+    folder: folders,
+    builtInVariable: [
+      { accountId: "0", containerId: "0", type: "EVENT_NAME", name: "Event Name" },
+      { accountId: "0", containerId: "0", type: "CLIENT_NAME", name: "Client Name" }
+    ],
+    client: clients
+  });
+}
+
+function buildSetupAssistantTemplates(input) {
+  const destinations = selectedDestinations(input);
+  const web = buildWebGtmTemplate({ ...input, destinations });
+  const server = buildServerGtmTemplate({ ...input, destinations });
+  const warnings = [];
+  if (destinations.includes("meta") || destinations.includes("tiktok")) {
+    warnings.push("Meta CAPI and TikTok server tags require approved GTM server community templates or future Tagioo native templates; this generator prepares IDs, tokens, web pixels, and server variables without copying Stape internals.");
+  }
+  return {
+    fileNames: {
+      web: "tagioo-web-template.json",
+      server: "tagioo-server-template.json"
+    },
+    web,
+    server,
+    warnings
+  };
+}
+
 function loginPage(error = "") {
   return `<!doctype html>
 <html lang="en">
@@ -3992,6 +4335,18 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await addCustomerSetupRequest(body, session);
       jsonResponse(res, result.ok ? 201 : 400, result.ok ? { request: result.request } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/setup-assistant/templates" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const body = await readJson(req);
+      const templates = buildSetupAssistantTemplates(body);
+      jsonResponse(res, 200, templates);
       return;
     }
 

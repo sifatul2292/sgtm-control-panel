@@ -571,6 +571,186 @@ h2 {
   align-items: center;
 }
 
+.assistant-head {
+  align-items: center;
+}
+
+.assistant-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: var(--space-md);
+}
+
+.assistant-steps {
+  align-self: start;
+  display: grid;
+  gap: var(--space-lg);
+  padding: var(--space-lg);
+}
+
+.assistant-step {
+  position: relative;
+  display: grid;
+  gap: var(--space-xs);
+  padding-left: 58px;
+  min-height: 48px;
+}
+
+.assistant-step::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 42px;
+  height: 42px;
+  border: var(--rule-thin) solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+
+.assistant-step::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  top: 48px;
+  bottom: calc(var(--space-lg) * -1);
+  width: var(--rule-thin);
+  background: var(--color-line-strong);
+}
+
+.assistant-step:last-of-type::after {
+  display: none;
+}
+
+.assistant-step.is-active::before,
+.assistant-step.is-complete::before {
+  border-color: var(--color-ok);
+  background: var(--color-ok);
+}
+
+.assistant-step.is-complete::before {
+  content: "✓";
+  display: grid;
+  place-items: center;
+  color: var(--color-surface);
+  font-weight: 900;
+}
+
+.assistant-step strong {
+  font-size: var(--text-lg);
+}
+
+.assistant-step span,
+.assistant-steps p {
+  color: var(--color-muted);
+}
+
+.assistant-panel {
+  overflow: hidden;
+}
+
+.assistant-step-panel {
+  display: none;
+}
+
+.assistant-step-panel.is-active {
+  display: grid;
+}
+
+.assistant-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  padding: var(--space-lg);
+}
+
+.assistant-form-grid label {
+  display: grid;
+  gap: var(--space-xs);
+  color: var(--color-muted);
+  font-weight: 850;
+}
+
+.assistant-destination-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  padding: var(--space-lg);
+}
+
+.assistant-destination-grid label {
+  min-height: 86px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.assistant-destination-grid input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--color-ok);
+}
+
+.assistant-download-card {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-md);
+  margin: var(--space-lg);
+  padding: var(--space-xl);
+  border: var(--rule-thin) solid color-mix(in oklch, var(--color-ok), transparent 45%);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--color-ok), var(--color-surface) 91%);
+  text-align: center;
+}
+
+.assistant-download-card > span {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-ok);
+  color: var(--color-surface);
+  font-size: var(--text-xl);
+  font-weight: 900;
+}
+
+.assistant-download-actions,
+.assistant-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.assistant-import-guide {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-md);
+  padding: 0 var(--space-lg) var(--space-lg);
+  text-align: center;
+}
+
+.assistant-import-guide ol {
+  max-width: 720px;
+  display: grid;
+  gap: var(--space-sm);
+  color: var(--color-muted);
+  text-align: left;
+}
+
+.assistant-actions {
+  justify-content: space-between;
+  padding: var(--space-lg);
+  border-top: var(--rule-thin) solid var(--color-line);
+}
+
 .powerups-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2457,6 +2637,9 @@ textarea::placeholder {
   .customer-home-grid,
   .customer-two-col,
   .container-detail-grid,
+  .assistant-layout,
+  .assistant-form-grid,
+  .assistant-destination-grid,
   .detail-setting-row,
   .dns-instruction-card,
   .quick-link-list,
@@ -2500,6 +2683,23 @@ textarea::placeholder {
 
   .powerup-card {
     grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .assistant-steps {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .assistant-step {
+    padding-left: 0;
+    padding-top: 50px;
+  }
+
+  .assistant-step::before {
+    left: 0;
+  }
+
+  .assistant-step::after {
+    display: none;
   }
 
   .powerup-card .button {
@@ -2561,6 +2761,10 @@ textarea::placeholder {
   }
 
   .launch-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-steps {
     grid-template-columns: 1fr;
   }
 

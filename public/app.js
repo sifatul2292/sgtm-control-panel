@@ -63,6 +63,13 @@ const els = {
   powerUpsFilters: document.querySelector("#powerUpsFilters"),
   powerUpsGrid: document.querySelector("#powerUpsGrid"),
   powerUpsMessage: document.querySelector("#powerUpsMessage"),
+  setupAssistantBadge: document.querySelector("#setupAssistantBadge"),
+  setupAssistantForm: document.querySelector("#setupAssistantForm"),
+  setupAssistantResult: document.querySelector("#setupAssistantResult"),
+  assistantBack: document.querySelector("#assistantBack"),
+  assistantNext: document.querySelector("#assistantNext"),
+  downloadWebTemplate: document.querySelector("#downloadWebTemplate"),
+  downloadServerTemplate: document.querySelector("#downloadServerTemplate"),
   reconciliationBadge: document.querySelector("#reconciliationBadge"),
   reconciliationGrid: document.querySelector("#reconciliationGrid"),
   logModeBadge: document.querySelector("#logModeBadge"),
@@ -141,6 +148,7 @@ const viewTitles = {
   analytics: ["Tracking / Analytics", "Analytics"],
   customerContainers: ["Containers / List", "Containers"],
   powerUps: ["Containers / Power-Ups", "Power-Ups"],
+  setupAssistant: ["Setup Assistant / GTM Templates", "Setup Assistant"],
   settings: ["Account & Others / Settings", "Settings"],
   deployment: ["Operations / Deployment", "Deployment Health"],
   provisioning: ["Operations / Provisioning", "Container Provisioning"],
@@ -152,10 +160,12 @@ const viewTitles = {
 
 let latestData = null;
 let selectedCustomerContainerId = "";
+let setupAssistantStep = 1;
+let generatedAssistantTemplates = null;
 let currentSession = { role: "pending" };
 const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
-const customerOnlyViews = new Set(["customerContainers", "powerUps"]);
-const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "billing"]);
+const customerOnlyViews = new Set(["customerContainers", "powerUps", "setupAssistant"]);
+const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "billing"]);
 const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs"]);
 
 const subscriptionPlans = [
@@ -1980,6 +1990,79 @@ function renderPowerUps(data) {
   });
 }
 
+function renderSetupAssistant(data) {
+  if (!els.setupAssistantForm) return;
+  const latest = (data.customerSetup?.requests || [])
+    .filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()))
+    .at(0);
+  const trackingDomainInput = els.setupAssistantForm.elements.trackingDomain;
+  if (trackingDomainInput && !trackingDomainInput.value && latest?.trackingDomain) {
+    trackingDomainInput.value = `https://${latest.trackingDomain}`;
+  }
+  updateSetupAssistantStep();
+}
+
+function updateSetupAssistantStep() {
+  document.querySelectorAll("[data-assistant-step-label]").forEach((item) => {
+    const step = Number(item.dataset.assistantStepLabel);
+    item.classList.toggle("is-active", step === setupAssistantStep);
+    item.classList.toggle("is-complete", step < setupAssistantStep);
+  });
+  document.querySelectorAll("[data-assistant-step]").forEach((panel) => {
+    panel.classList.toggle("is-active", Number(panel.dataset.assistantStep) === setupAssistantStep);
+  });
+  if (els.assistantBack) els.assistantBack.disabled = setupAssistantStep === 1;
+  if (els.assistantNext) els.assistantNext.textContent = setupAssistantStep === 4 ? "Generate templates" : "Next";
+  if (els.setupAssistantBadge) {
+    els.setupAssistantBadge.textContent = `Step ${setupAssistantStep} of 4`;
+  }
+}
+
+function setupAssistantPayload() {
+  const form = els.setupAssistantForm;
+  const payload = Object.fromEntries(new FormData(form).entries());
+  payload.destinations = [...form.querySelectorAll("input[name='destinations']:checked")].map((input) => input.value);
+  return payload;
+}
+
+async function generateSetupAssistantTemplates() {
+  if (!els.setupAssistantForm) return;
+  if (els.setupAssistantResult) els.setupAssistantResult.textContent = "Generating Tagioo GTM templates...";
+  try {
+    const response = await fetch("/api/customer/setup-assistant/templates", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(setupAssistantPayload())
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Template generation failed."]).join(" "));
+    generatedAssistantTemplates = result;
+    if (els.downloadWebTemplate) els.downloadWebTemplate.disabled = false;
+    if (els.downloadServerTemplate) els.downloadServerTemplate.disabled = false;
+    if (els.setupAssistantResult) {
+      const warnings = (result.warnings || []).join(" ");
+      els.setupAssistantResult.textContent = `Templates are ready. ${warnings}`;
+    }
+  } catch (error) {
+    if (els.setupAssistantResult) els.setupAssistantResult.textContent = error.message;
+  }
+}
+
+function downloadGeneratedTemplate(type) {
+  const template = generatedAssistantTemplates?.[type];
+  if (!template) return;
+  const filename = generatedAssistantTemplates.fileNames?.[type] || `tagioo-${type}.json`;
+  const blob = new Blob([JSON.stringify(template, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function customerStatusMeta(status) {
   const normalized = String(status || "requested").toLowerCase();
   if (["complete", "live", "http_live", "ssl_ready"].includes(normalized)) {
@@ -3189,6 +3272,7 @@ function renderAll(data) {
   renderAdmin(data);
   renderCustomerContainers(data);
   renderPowerUps(data);
+  renderSetupAssistant(data);
   renderIntegrations(data);
   renderBilling(data);
   renderDocs(data);
@@ -3232,6 +3316,20 @@ els.eventLimitFilter.addEventListener("change", () => latestData && renderLogs(l
 els.requestUrlFilter.addEventListener("input", () => latestData && renderLogs(latestData));
 els.purchaseSearch.addEventListener("input", () => latestData && renderPurchaseInspector(latestData));
 els.customerContainerSearch?.addEventListener("input", () => latestData && renderCustomerContainers(latestData));
+els.assistantBack?.addEventListener("click", () => {
+  setupAssistantStep = Math.max(1, setupAssistantStep - 1);
+  updateSetupAssistantStep();
+});
+els.assistantNext?.addEventListener("click", async () => {
+  if (setupAssistantStep < 4) {
+    setupAssistantStep += 1;
+    updateSetupAssistantStep();
+    return;
+  }
+  await generateSetupAssistantTemplates();
+});
+els.downloadWebTemplate?.addEventListener("click", () => downloadGeneratedTemplate("web"));
+els.downloadServerTemplate?.addEventListener("click", () => downloadGeneratedTemplate("server"));
 els.provisioningForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   els.provisioningFormMessage.textContent = "Submitting request...";

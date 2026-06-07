@@ -36,6 +36,10 @@
             <span class="nav-icon" aria-hidden="true">◆</span>
             <span>Power-Ups</span>
           </button>
+          <button class="nav-item" type="button" data-view-target="setupAssistant" data-customer-only hidden aria-label="Setup Assistant" title="Setup Assistant">
+            <span class="nav-icon" aria-hidden="true">⇣</span>
+            <span>Setup Assistant</span>
+          </button>
           <button class="nav-item" type="button" data-view-target="settings" data-owner-only aria-label="Settings" title="Settings">
             <span class="nav-icon" aria-hidden="true">⚙</span>
             <span>Settings</span>
@@ -740,6 +744,168 @@
             </div>
             <div id="powerUpsGrid" class="powerups-grid"></div>
             <p id="powerUpsMessage" class="form-message"></p>
+          </section>
+        </section>
+
+        <section id="setupAssistantView" class="view" data-view="setupAssistant" data-customer-only hidden>
+          <section class="customer-page-head assistant-head">
+            <div>
+              <p class="breadcrumb">Setup Assistant / GTM Templates</p>
+              <h2>Setup Assistant</h2>
+              <p>Create import-ready Web and Server GTM files for GA4, Meta CAPI, Google Ads, and TikTok.</p>
+            </div>
+            <span id="setupAssistantBadge" class="badge">Manual import</span>
+          </section>
+
+          <section class="assistant-layout">
+            <aside class="panel assistant-steps" aria-label="Setup steps">
+              <div class="assistant-step is-active" data-assistant-step-label="1">
+                <strong>Step 1</strong>
+                <span>Choose type</span>
+              </div>
+              <div class="assistant-step" data-assistant-step-label="2">
+                <strong>Step 2</strong>
+                <span>Select destinations</span>
+              </div>
+              <div class="assistant-step" data-assistant-step-label="3">
+                <strong>Step 3</strong>
+                <span>Add details</span>
+              </div>
+              <div class="assistant-step" data-assistant-step-label="4">
+                <strong>Step 4</strong>
+                <span>Download templates</span>
+              </div>
+              <p>Use this assistant after your Tagioo container is live. Import the generated files into your Web GTM and Server GTM containers.</p>
+            </aside>
+
+            <section class="panel assistant-panel">
+              <form id="setupAssistantForm" class="assistant-form">
+                <div class="assistant-step-panel is-active" data-assistant-step="1">
+                  <div class="panel-header">
+                    <div>
+                      <h2>Choose Type</h2>
+                      <p>Select the business type and store platform so the templates use the right ecommerce events.</p>
+                    </div>
+                  </div>
+                  <div class="assistant-form-grid">
+                    <label>
+                      Business type
+                      <select name="businessType">
+                        <option value="ecommerce">Ecommerce</option>
+                        <option value="lead">Lead generation</option>
+                        <option value="general">General analytics</option>
+                      </select>
+                    </label>
+                    <label>
+                      Platform
+                      <select name="platform">
+                        <option value="shopify">Shopify</option>
+                        <option value="woocommerce">WooCommerce</option>
+                        <option value="custom">Custom / Other</option>
+                        <option value="wix">Wix</option>
+                        <option value="bigcommerce">BigCommerce</option>
+                      </select>
+                    </label>
+                    <label>
+                      Default currency
+                      <input name="currency" value="BDT" placeholder="BDT" />
+                    </label>
+                    <label>
+                      Tracking domain
+                      <input name="trackingDomain" placeholder="https://track.example.com" />
+                    </label>
+                  </div>
+                </div>
+
+                <div class="assistant-step-panel" data-assistant-step="2">
+                  <div class="panel-header">
+                    <div>
+                      <h2>Select Destinations</h2>
+                      <p>Pick the marketing and analytics platforms you want the templates to prepare.</p>
+                    </div>
+                  </div>
+                  <div class="assistant-destination-grid">
+                    <label><input type="checkbox" name="destinations" value="ga4" checked /> <span>Google Analytics 4</span></label>
+                    <label><input type="checkbox" name="destinations" value="meta" checked /> <span>Meta CAPI</span></label>
+                    <label><input type="checkbox" name="destinations" value="googleAds" checked /> <span>Google Ads</span></label>
+                    <label><input type="checkbox" name="destinations" value="tiktok" checked /> <span>TikTok Events API</span></label>
+                  </div>
+                </div>
+
+                <div class="assistant-step-panel" data-assistant-step="3">
+                  <div class="panel-header">
+                    <div>
+                      <h2>Add Details</h2>
+                      <p>Leave fields blank if a destination is not ready. Tagioo will create placeholders you can fill inside GTM.</p>
+                    </div>
+                  </div>
+                  <div class="assistant-form-grid">
+                    <label>
+                      GA4 Measurement ID
+                      <input name="ga4MeasurementId" placeholder="G-XXXXXXXXXX" />
+                    </label>
+                    <label>
+                      GA4 API Secret
+                      <input name="ga4ApiSecret" placeholder="Optional for Measurement Protocol" />
+                    </label>
+                    <label>
+                      Meta Pixel ID
+                      <input name="metaPixelId" placeholder="1234567890" />
+                    </label>
+                    <label>
+                      Meta CAPI Access Token
+                      <input name="metaAccessToken" placeholder="EAAB..." />
+                    </label>
+                    <label>
+                      Meta Test Event Code
+                      <input name="metaTestEventCode" placeholder="TEST12345" />
+                    </label>
+                    <label>
+                      Google Ads Conversion ID
+                      <input name="googleAdsConversionId" placeholder="AW-123456789" />
+                    </label>
+                    <label>
+                      Google Ads Purchase Label
+                      <input name="googleAdsPurchaseLabel" placeholder="Purchase conversion label" />
+                    </label>
+                    <label>
+                      TikTok Pixel ID
+                      <input name="tiktokPixelId" placeholder="CXXXXXXXXXXXX" />
+                    </label>
+                    <label>
+                      TikTok Access Token
+                      <input name="tiktokAccessToken" placeholder="TikTok Events API token" />
+                    </label>
+                  </div>
+                </div>
+
+                <div class="assistant-step-panel" data-assistant-step="4">
+                  <div class="assistant-download-card">
+                    <span aria-hidden="true">⇣</span>
+                    <h2>Download Templates</h2>
+                    <p>Generate Tagioo Web and Server GTM import files from your settings.</p>
+                    <div class="assistant-download-actions">
+                      <button id="downloadWebTemplate" class="button" type="button" disabled>Download web.json</button>
+                      <button id="downloadServerTemplate" class="button" type="button" disabled>Download server.json</button>
+                    </div>
+                  </div>
+                  <div class="assistant-import-guide">
+                    <h3>How to import</h3>
+                    <ol>
+                      <li>Open Web GTM, go to Admin, then Import Container, and import <strong>web.json</strong>.</li>
+                      <li>Open Server GTM, go to Admin, then Import Container, and import <strong>server.json</strong>.</li>
+                      <li>Preview both containers, trigger PageView and Purchase, then check Tagioo Event Logs.</li>
+                    </ol>
+                    <p id="setupAssistantResult" class="form-message"></p>
+                  </div>
+                </div>
+
+                <div class="assistant-actions">
+                  <button id="assistantBack" class="button" type="button">Back</button>
+                  <button id="assistantNext" class="button button-primary" type="button">Next</button>
+                </div>
+              </form>
+            </section>
           </section>
         </section>
 
