@@ -73,7 +73,9 @@ const els = {
   eventStatusFilter: document.querySelector("#eventStatusFilter"),
   eventTypeFilter: document.querySelector("#eventTypeFilter"),
   clientFilter: document.querySelector("#clientFilter"),
+  eventLimitFilter: document.querySelector("#eventLimitFilter"),
   requestUrlFilter: document.querySelector("#requestUrlFilter"),
+  eventLogStats: document.querySelector("#eventLogStats"),
   purchaseSearch: document.querySelector("#purchaseSearch"),
   purchaseInspector: document.querySelector("#purchaseInspector"),
   purchaseInspectorBadge: document.querySelector("#purchaseInspectorBadge"),
@@ -740,6 +742,10 @@ function eventDetail(item) {
     item.method && item.path ? `${item.method} ${item.path}` : "",
     item.protocol || "",
     item.ip ? `Visitor IP: ${item.ip}` : "",
+    item.host ? `Host: ${item.host}` : "",
+    item.value ? `Value: ${formatMoney(item.value, item.currency)}` : "",
+    item.eventId ? `Event ID: ${item.eventId}` : "",
+    item.transactionId ? `Transaction ID: ${item.transactionId}` : "",
     item.bytes !== undefined && item.bytes !== null ? `${item.bytes} bytes` : "",
     item.referer ? `From: ${item.referer}` : "",
     item.agent || ""
@@ -770,6 +776,21 @@ function serverEventRows(data) {
   }));
 }
 
+function renderEventLogStats(allItems, visibleItems) {
+  if (!els.eventLogStats) return;
+  const total = allItems.length;
+  const visible = visibleItems.length;
+  const errors = visibleItems.filter((item) => Number(item.status) >= 400).length;
+  const purchases = visibleItems.filter((item) => item.eventName === "Purchase").length;
+  const clients = new Set(visibleItems.map((item) => item.client).filter(Boolean)).size;
+  renderBusinessGrid(els.eventLogStats, [
+    { label: "Filtered", value: visible.toLocaleString(), detail: `${total.toLocaleString()} latest loaded` },
+    { label: "Success", value: Math.max(0, visible - errors).toLocaleString(), detail: "2xx / 3xx requests" },
+    { label: "Errors", value: errors.toLocaleString(), detail: "4xx / 5xx requests" },
+    { label: "Purchases", value: purchases.toLocaleString(), detail: `${clients.toLocaleString()} client${clients === 1 ? "" : "s"}` }
+  ]);
+}
+
 function renderEventTable(data) {
   const summary = data.nginx?.todayEvents;
   const serverItems = serverEventRows(data);
@@ -778,13 +799,16 @@ function renderEventTable(data) {
   if (summary?.available && serverItems.length) {
     updateEventFilters(serverItems);
     const visibleItems = serverItems.filter(visibleEvent);
+    renderEventLogStats(serverItems, visibleItems);
     const errors = visibleItems.filter((item) => Number(item.status) >= 400).length;
-    els.eventLogSummary.textContent = `Showing ${visibleItems.length.toLocaleString()} of the latest ${serverItems.length.toLocaleString()} tracking events today (${errors.toLocaleString()} errors).`;
+    const limit = Number(els.eventLimitFilter?.value || 50);
+    els.eventLogSummary.textContent = `Showing ${Math.min(visibleItems.length, limit).toLocaleString()} of ${visibleItems.length.toLocaleString()} matching events from the latest ${serverItems.length.toLocaleString()} today (${errors.toLocaleString()} errors).`;
     renderEventRows(visibleItems, "No matching tracking events found for today's filters.");
     return;
   }
 
   if (!log?.available) {
+    renderEventLogStats([], []);
     els.eventLogSummary.textContent = log?.detail || log?.message || "Access log unavailable.";
     els.accessLog.innerHTML = `<tr><td colspan="6">${escapeHtml(`${log?.message || "Unavailable"} ${log?.detail || ""}`.trim())}</td></tr>`;
     return;
@@ -793,8 +817,10 @@ function renderEventTable(data) {
   const items = parseLogLines(log, "access").filter((item) => item.tracking);
   updateEventFilters(items);
   const visibleItems = items.filter(visibleEvent);
+  renderEventLogStats(items, visibleItems);
   const errors = visibleItems.filter((item) => Number(item.status) >= 400).length;
-  els.eventLogSummary.textContent = `Showing ${visibleItems.length.toLocaleString()} records (${errors.toLocaleString()} errors) from the recent access log sample.`;
+  const limit = Number(els.eventLimitFilter?.value || 50);
+  els.eventLogSummary.textContent = `Showing ${Math.min(visibleItems.length, limit).toLocaleString()} of ${visibleItems.length.toLocaleString()} matching records (${errors.toLocaleString()} errors) from the recent access log sample.`;
 
   renderEventRows(visibleItems, "No SGTM event collection requests found in the recent sample. The full-day summary may still have older events.");
 }
@@ -805,19 +831,36 @@ function renderEventRows(visibleItems, emptyMessage) {
     return;
   }
 
+  const limit = Number(els.eventLimitFilter?.value || 50);
+  const rows = visibleItems.slice(0, limit);
+  const fragment = document.createDocumentFragment();
+  rows.forEach((item, index) => {
+    const detailId = `event-detail-${index}`;
+    const eventRow = document.createElement("tr");
+    eventRow.className = "event-main-row";
+    eventRow.innerHTML = `
+      <td>${escapeHtml(item.displayDate)}</td>
+      <td><span class="status-code ${Number(item.status) >= 400 ? "bad" : "good"}">${escapeHtml(item.status)}</span></td>
+      <td><div class="event-type-cell"><strong>${escapeHtml(item.eventName || "Other")}</strong>${item.value ? `<small>${escapeHtml(formatMoney(item.value, item.currency))}</small>` : ""}</div></td>
+      <td>${escapeHtml(item.client || "Other")}</td>
+      <td><span class="request-url">${escapeHtml(item.requestUrl)}</span></td>
+      <td><button class="more-button" type="button" aria-expanded="false" aria-controls="${detailId}" aria-label="Toggle request details">Details</button></td>
+    `;
+    const detailRow = document.createElement("tr");
+    detailRow.id = detailId;
+    detailRow.className = "event-detail-row";
+    detailRow.hidden = true;
+    detailRow.innerHTML = `<td colspan="6"><div class="event-detail-box">${escapeHtml(item.detail || item.requestUrl || "No details available.")}</div></td>`;
+    eventRow.querySelector(".more-button").addEventListener("click", (event) => {
+      const expanded = event.currentTarget.getAttribute("aria-expanded") === "true";
+      event.currentTarget.setAttribute("aria-expanded", String(!expanded));
+      detailRow.hidden = expanded;
+    });
+    fragment.append(eventRow, detailRow);
+  });
+
   els.accessLog.replaceChildren(
-    ...visibleItems.map((item) => {
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>${escapeHtml(item.displayDate)}</td>
-        <td><span class="status-code ${Number(item.status) >= 400 ? "bad" : "good"}">${escapeHtml(item.status)}</span></td>
-        <td>${escapeHtml(item.eventName || "Other")}</td>
-        <td>${escapeHtml(item.client || "Other")}</td>
-        <td><span class="request-url">${escapeHtml(item.requestUrl)}</span></td>
-        <td><button class="more-button" type="button" title="${escapeHtml(item.detail)}" aria-label="Request details">→</button></td>
-      `;
-      return row;
-    })
+    fragment
   );
 }
 
@@ -2855,6 +2898,7 @@ els.refreshButton.addEventListener("click", loadDashboard);
 els.eventStatusFilter.addEventListener("change", () => latestData && renderLogs(latestData));
 els.eventTypeFilter.addEventListener("change", () => latestData && renderLogs(latestData));
 els.clientFilter.addEventListener("change", () => latestData && renderLogs(latestData));
+els.eventLimitFilter.addEventListener("change", () => latestData && renderLogs(latestData));
 els.requestUrlFilter.addEventListener("input", () => latestData && renderLogs(latestData));
 els.purchaseSearch.addEventListener("input", () => latestData && renderPurchaseInspector(latestData));
 els.provisioningForm.addEventListener("submit", async (event) => {

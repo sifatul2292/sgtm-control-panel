@@ -400,12 +400,23 @@
                   <option value="all">All clients</option>
                 </select>
               </label>
+              <label>
+                Show
+                <select id="eventLimitFilter">
+                  <option value="25">25 latest</option>
+                  <option value="50" selected>50 latest</option>
+                  <option value="100">100 latest</option>
+                  <option value="250">250 latest</option>
+                </select>
+              </label>
               <label class="filter-wide">
                 Request URL
                 <input id="requestUrlFilter" type="search" placeholder="Search URL" />
               </label>
             </div>
           </section>
+
+          <section id="eventLogStats" class="log-stats-grid" aria-label="Event log summary"></section>
 
           <section id="nginx" class="panel log-panel" data-log-panel="access">
             <div class="panel-header">
