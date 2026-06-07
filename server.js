@@ -461,6 +461,20 @@ function gtmFolder(id, name) {
 }
 
 function gtmExport(kind, name, payload, content) {
+  const tagiooSetup = {
+    generatedBy: "Tagioo Setup Assistant",
+    businessType: payload.businessType,
+    platform: payload.platform,
+    destinations: payload.destinations,
+    trackingDomain: payload.trackingDomain,
+    note: "Import into Google Tag Manager, preview, then publish only after testing."
+  };
+  if (payload.galleryTemplates) {
+    tagiooSetup.galleryTemplates = payload.galleryTemplates;
+  }
+  if (payload.fieldMappings) {
+    tagiooSetup.fieldMappings = payload.fieldMappings;
+  }
   return {
     exportFormatVersion: 2,
     exportTime: new Date().toISOString(),
@@ -482,15 +496,55 @@ function gtmExport(kind, name, payload, content) {
       fingerprint: String(Date.now()),
       tagManagerUrl: "https://tagmanager.google.com/"
     },
-    tagiooSetup: {
-      generatedBy: "Tagioo Setup Assistant",
-      businessType: payload.businessType,
-      platform: payload.platform,
-      destinations: payload.destinations,
-      trackingDomain: payload.trackingDomain,
-      note: "Import into Google Tag Manager, preview, then publish only after testing."
-    }
+    tagiooSetup
   };
+}
+
+function tagiooGalleryTemplateGuide(destinations) {
+  const guide = [];
+  if (destinations.includes("meta")) {
+    guide.push({
+      destination: "Meta CAPI",
+      container: "Server GTM",
+      gallerySearch: "Facebook Conversion API",
+      installBeforeImport: true,
+      manualTagName: "Tagioo Meta CAPI - All Events",
+      fieldMappings: [
+        { field: "Pixel ID", value: "{{Tagioo - meta_pixel_id}}" },
+        { field: "Access Token", value: "{{Tagioo - meta_capi_token}}" },
+        { field: "Test Event Code", value: "{{Tagioo - meta_test_event_code}}" },
+        { field: "Event Name", value: "{{Event Name}}" },
+        { field: "Event ID", value: "{{ed - event_id}}" },
+        { field: "Action Source", value: "website" },
+        { field: "Value", value: "{{ed - value}}" },
+        { field: "Currency", value: "{{ed - currency}}" },
+        { field: "Transaction ID", value: "{{ed - transaction_id}}" },
+        { field: "Email", value: "{{ed - email_address}}" },
+        { field: "Phone", value: "{{ed - phone_number}}" }
+      ]
+    });
+  }
+  if (destinations.includes("tiktok")) {
+    guide.push({
+      destination: "TikTok Events API",
+      container: "Server GTM",
+      gallerySearch: "TikTok Events API",
+      installBeforeImport: true,
+      manualTagName: "Tagioo TikTok Events API - All Events",
+      fieldMappings: [
+        { field: "Pixel ID", value: "{{Tagioo - tiktok_pixel_id}}" },
+        { field: "Access Token", value: "{{Tagioo - tiktok_access_token}}" },
+        { field: "Event Name", value: "{{Event Name}}" },
+        { field: "Event ID", value: "{{ed - event_id}}" },
+        { field: "Value", value: "{{ed - value}}" },
+        { field: "Currency", value: "{{ed - currency}}" },
+        { field: "Content / Items", value: "{{ed - items}}" },
+        { field: "Email", value: "{{ed - email_address}}" },
+        { field: "Phone", value: "{{ed - phone_number}}" }
+      ]
+    });
+  }
+  return guide;
 }
 
 function buildWebGtmTemplate(input) {
@@ -510,6 +564,7 @@ function buildWebGtmTemplate(input) {
     gtmConstVariable(4, "Tagioo - google_ads_conversion_id", cleanTemplateValue(input.googleAdsConversionId), "1"),
     gtmConstVariable(5, "Tagioo - tiktok_pixel_id", cleanTemplateValue(input.tiktokPixelId), "1"),
     gtmConstVariable(6, "Tagioo - default_currency", payload.currency, "1"),
+    gtmDataLayerVariable(9, "dlv - event_id", "event_id"),
     gtmDataLayerVariable(10, "dlv - ecommerce.value", "ecommerce.value"),
     gtmDataLayerVariable(11, "dlv - ecommerce.currency", "ecommerce.currency"),
     gtmDataLayerVariable(12, "dlv - ecommerce.transaction_id", "ecommerce.transaction_id"),
@@ -536,7 +591,8 @@ function buildWebGtmTemplate(input) {
     const eventMap = [["page_view", "1"], ["view_item", "2"], ["add_to_cart", "3"], ["begin_checkout", "4"], ["purchase", "5"]];
     for (const [eventName, triggerId] of eventMap) {
       const eventSettingsRows = [
-        { parameter: "server_container_url", parameterValue: "{{Tagioo - server_container_url}}" }
+        { parameter: "server_container_url", parameterValue: "{{Tagioo - server_container_url}}" },
+        { parameter: "event_id", parameterValue: "{{dlv - event_id}}" }
       ];
       if (eventName === "purchase") {
         eventSettingsRows.push(
@@ -580,7 +636,14 @@ function buildServerGtmTemplate(input) {
     businessType: cleanTemplateValue(input.businessType, "ecommerce"),
     platform: cleanTemplateValue(input.platform, "custom"),
     destinations,
-    trackingDomain: cleanTemplateValue(input.trackingDomain, "https://track.yourdomain.com")
+    trackingDomain: cleanTemplateValue(input.trackingDomain, "https://track.yourdomain.com"),
+    galleryTemplates: tagiooGalleryTemplateGuide(destinations),
+    fieldMappings: {
+      ga4: "Native server-side GA4 forwarding tag is included.",
+      googleAds: "Native Google Ads Conversion Linker, Purchase, and Remarketing tags are included.",
+      meta: destinations.includes("meta") ? "Install the Facebook Conversion API template from the Server GTM Community Template Gallery, then map the fields listed in tagiooSetup.galleryTemplates." : "Not selected.",
+      tiktok: destinations.includes("tiktok") ? "Install the TikTok Events API template from the Server GTM Community Template Gallery, then map the fields listed in tagiooSetup.galleryTemplates." : "Not selected."
+    }
   };
   const folders = [gtmFolder(1, "Tagioo - Config"), gtmFolder(2, "Tagioo - Event Data"), gtmFolder(3, "Tagioo - GA4"), gtmFolder(4, "Tagioo - Meta"), gtmFolder(5, "Tagioo - Google Ads"), gtmFolder(6, "Tagioo - TikTok")];
   const variables = [
@@ -597,7 +660,12 @@ function buildServerGtmTemplate(input) {
     gtmEventDataVariable(22, "ed - transaction_id", "transaction_id"),
     gtmEventDataVariable(23, "ed - event_id", "event_id"),
     gtmEventDataVariable(24, "ed - email_address", "user_data.email_address"),
-    gtmEventDataVariable(25, "ed - phone_number", "user_data.phone_number")
+    gtmEventDataVariable(25, "ed - phone_number", "user_data.phone_number"),
+    gtmEventDataVariable(26, "ed - items", "items"),
+    gtmEventDataVariable(27, "ed - client_id", "client_id"),
+    gtmEventDataVariable(28, "ed - page_location", "page_location"),
+    gtmEventDataVariable(29, "ed - user_agent", "user_agent"),
+    gtmEventDataVariable(30, "ed - ip_override", "ip_override")
   ];
   const triggers = [
     { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - GA4 Client", type: "ALWAYS", filter: [{ type: "CONTAINS", parameter: [gtmTemplateParam("arg0", "{{Client Name}}"), gtmTemplateParam("arg1", "GA4")] }], fingerprint: String(Date.now()) },
@@ -663,7 +731,7 @@ function buildSetupAssistantTemplates(input) {
   const server = buildServerGtmTemplate({ ...input, destinations });
   const warnings = [];
   if (destinations.includes("meta") || destinations.includes("tiktok")) {
-    warnings.push("Meta CAPI and TikTok server tags require approved GTM server community templates or future Tagioo native templates; this generator prepares IDs, tokens, web pixels, and server variables without copying Stape internals.");
+    warnings.push("Before importing server.json, add the selected Meta/TikTok templates from the Server GTM Community Template Gallery. The downloaded server.json includes Tagioo variables and field mappings for those templates.");
   }
   return {
     fileNames: {

@@ -893,9 +893,27 @@
                     <h3>How to import</h3>
                     <ol>
                       <li>Open Web GTM, go to Admin, then Import Container, and import <strong>web.json</strong>.</li>
-                      <li>Open Server GTM, go to Admin, then Import Container, and import <strong>server.json</strong>.</li>
+                      <li>Before importing <strong>server.json</strong>, open Server GTM, go to Templates, then Search Gallery.</li>
+                      <li>Add <strong>Facebook Conversion API</strong> if Meta is selected and <strong>TikTok Events API</strong> if TikTok is selected.</li>
+                      <li>Import <strong>server.json</strong>, then connect the Gallery template fields using the Tagioo mapping below.</li>
                       <li>Preview both containers, trigger PageView and Purchase, then check Tagioo Event Logs.</li>
                     </ol>
+                    <div class="assistant-template-prereqs">
+                      <div>
+                        <h4>Meta CAPI mapping</h4>
+                        <p>Template: Facebook Conversion API</p>
+                        <code>Pixel ID -> {{Tagioo - meta_pixel_id}}</code>
+                        <code>Access Token -> {{Tagioo - meta_capi_token}}</code>
+                        <code>Event ID -> {{ed - event_id}}</code>
+                      </div>
+                      <div>
+                        <h4>TikTok Events API mapping</h4>
+                        <p>Template: TikTok Events API</p>
+                        <code>Pixel ID -> {{Tagioo - tiktok_pixel_id}}</code>
+                        <code>Access Token -> {{Tagioo - tiktok_access_token}}</code>
+                        <code>Event ID -> {{ed - event_id}}</code>
+                      </div>
+                    </div>
                     <p id="setupAssistantResult" class="form-message"></p>
                   </div>
                 </div>
