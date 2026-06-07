@@ -592,18 +592,43 @@
         <section id="customerContainersView" class="view" data-view="customerContainers" data-customer-only hidden>
           <section class="customer-page-head">
             <div>
-              <p class="breadcrumb">Containers / Create</p>
-              <h2>Create Container</h2>
-              <p>Add your website, tracking subdomain, and GTM server container config. Tagioo launches the server automatically.</p>
+              <p class="breadcrumb">Containers / List</p>
+              <h2>Containers</h2>
+              <p>Manage your server-side GTM containers, tracking domains, logs, and setup details from one place.</p>
             </div>
-            <span class="badge">sGTM</span>
+            <button class="button button-primary" type="button" data-scroll-target="customerContainerCreate">New Container</button>
           </section>
+
+          <section class="panel container-list-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Your Containers</h2>
+                <p>Each container is isolated, mapped to a first-party tracking domain, and launched automatically.</p>
+              </div>
+              <span id="customerContainersBadge" class="badge">0 containers</span>
+            </div>
+            <div class="container-list-toolbar">
+              <label class="container-search">
+                <span>Search</span>
+                <input id="customerContainerSearch" placeholder="Search by name, website, or tracking domain" />
+              </label>
+              <div class="container-toolbar-hint">
+                <span>CNAME target</span>
+                <strong id="customerDnsTarget">bd.tagioo.com</strong>
+              </div>
+            </div>
+            <div id="customerContainersTable" class="customer-container-list">
+              <div class="empty-log">No containers yet.</div>
+            </div>
+          </section>
+
+          <section id="customerContainerDetail" class="container-detail-shell"></section>
 
           <section id="customerContainerCreate" class="panel create-container-panel">
             <div class="panel-header">
               <div>
-                <h2>Container Details</h2>
-                <p>Use a first-party tracking subdomain such as server.yourdomain.com.</p>
+                <h2>Create New Container</h2>
+                <p>Add your website, tracking subdomain, and GTM server container config. Tagioo launches Docker, Nginx, and SSL automatically.</p>
               </div>
               <span class="badge">Automatic launch</span>
             </div>
@@ -684,7 +709,7 @@
                   <h2>Launch Status</h2>
                   <p>Tagioo automatically creates Docker, Nginx, and SSL after DNS is ready.</p>
                 </div>
-                <span id="customerContainersBadge" class="badge">0 containers</span>
+                <span class="badge">Managed</span>
               </div>
               <div class="launch-steps">
                 <span>DNS</span>
@@ -696,17 +721,6 @@
             </article>
           </section>
 
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Your Containers</h2>
-                <p>Each container is isolated and mapped to its own tracking subdomain.</p>
-              </div>
-            </div>
-            <div id="customerContainersTable" class="customer-card-list">
-              <div class="empty-log">No containers yet.</div>
-            </div>
-          </section>
         </section>
 
         <section id="powerUpsView" class="view" data-view="powerUps" data-customer-only hidden>

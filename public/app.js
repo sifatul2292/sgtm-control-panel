@@ -56,6 +56,8 @@ const els = {
   customerSetupList: document.querySelector("#customerSetupList"),
   customerContainersBadge: document.querySelector("#customerContainersBadge"),
   customerContainersTable: document.querySelector("#customerContainersTable"),
+  customerContainerSearch: document.querySelector("#customerContainerSearch"),
+  customerContainerDetail: document.querySelector("#customerContainerDetail"),
   customerDnsTarget: document.querySelector("#customerDnsTarget"),
   powerUpsBadge: document.querySelector("#powerUpsBadge"),
   powerUpsFilters: document.querySelector("#powerUpsFilters"),
@@ -137,7 +139,7 @@ const viewTitles = {
   dashboard: ["Dashboard", "Server Overview"],
   logs: ["Containers / Event Logs", "Event Logs"],
   analytics: ["Tracking / Analytics", "Analytics"],
-  customerContainers: ["Containers / Create", "Create Container"],
+  customerContainers: ["Containers / List", "Containers"],
   powerUps: ["Containers / Power-Ups", "Power-Ups"],
   settings: ["Account & Others / Settings", "Settings"],
   deployment: ["Operations / Deployment", "Deployment Health"],
@@ -149,6 +151,7 @@ const viewTitles = {
 };
 
 let latestData = null;
+let selectedCustomerContainerId = "";
 let currentSession = { role: "pending" };
 const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
 const customerOnlyViews = new Set(["customerContainers", "powerUps"]);
@@ -346,6 +349,15 @@ function formatShortDate(value) {
     minute: "2-digit",
     second: "2-digit"
   }).format(date);
+}
+
+function hostLabel(value) {
+  if (!value) return "";
+  try {
+    return new URL(value).hostname || value;
+  } catch {
+    return String(value).replace(/^https?:\/\//i, "").split("/")[0];
+  }
 }
 
 function setView(name) {
@@ -1604,20 +1616,284 @@ function renderCustomerContainers(data) {
   els.customerContainersBadge.className = `badge ${requests.length ? "ok" : "warn"}`;
   els.customerContainersBadge.textContent = `${requests.length} container${requests.length === 1 ? "" : "s"}`;
   if (!requests.length) {
-    els.customerContainersTable.innerHTML = `<article class="customer-container-card empty-customer-card">
-      <div>
-        <strong>No containers yet</strong>
-        <p>Use the form above. If DNS is not ready, Tagioo will show DNS pending and keep the launch status simple.</p>
-      </div>
+    selectedCustomerContainerId = "";
+    els.customerContainersTable.innerHTML = `<article class="empty-container-list">
+      <strong>No containers yet</strong>
+      <p>Create your first container below. Tagioo will keep DNS, Docker, Nginx, and SSL status easy to follow.</p>
+      <button class="button button-primary" type="button" data-scroll-target="customerContainerCreate">Create Container</button>
     </article>`;
+    if (els.customerContainerDetail) {
+      els.customerContainerDetail.innerHTML = `<section class="panel container-empty-detail">
+        <h2>Create a container to see setup details</h2>
+        <p>After launch, this area will show the server container URL, first-party domain, DNS record, logs, and quick links.</p>
+      </section>`;
+    }
     return;
   }
 
-  els.customerContainersTable.innerHTML = requests.map((request) => customerContainerCard(request)).join("");
+  if (!requests.some((request) => request.id === selectedCustomerContainerId)) {
+    selectedCustomerContainerId = requests[0]?.id || "";
+  }
 
+  const searchTerm = String(els.customerContainerSearch?.value || "").trim().toLowerCase();
+  const filteredRequests = searchTerm
+    ? requests.filter((request) => [request.containerName, request.websiteUrl, request.trackingDomain, request.serverLocation, request.status]
+      .some((value) => String(value || "").toLowerCase().includes(searchTerm)))
+    : requests;
+
+  els.customerContainersTable.innerHTML = customerContainersList(filteredRequests, requests.length, data);
+  if (els.customerContainerDetail) {
+    const selected = requests.find((request) => request.id === selectedCustomerContainerId) || requests[0];
+    els.customerContainerDetail.innerHTML = customerContainerDetail(selected, data, dnsTarget);
+  }
+
+  els.customerContainersTable.querySelectorAll("[data-container-select]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedCustomerContainerId = button.dataset.containerSelect || selectedCustomerContainerId;
+      renderCustomerContainers(latestData || data);
+      document.querySelector("#customerContainerDetail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+  els.customerContainersTable.querySelectorAll("[data-container-logs]").forEach((button) => {
+    button.addEventListener("click", () => setView("logs"));
+  });
+  els.customerContainersTable.querySelectorAll("[data-container-powerups]").forEach((button) => {
+    button.addEventListener("click", () => setView("powerUps"));
+  });
   els.customerContainersTable.querySelectorAll("[data-container-delete]").forEach((button) => {
     button.addEventListener("click", () => deleteCustomerContainer(button.dataset.containerDelete));
   });
+  els.customerContainerDetail?.querySelectorAll("[data-container-delete]").forEach((button) => {
+    button.addEventListener("click", () => deleteCustomerContainer(button.dataset.containerDelete));
+  });
+}
+
+function customerContainersList(requests, totalCount, data) {
+  if (!requests.length) {
+    return `<article class="empty-container-list">
+      <strong>No matching containers</strong>
+      <p>Try searching by website, container name, tracking subdomain, or status.</p>
+    </article>`;
+  }
+  return `<div class="customer-container-table-wrap">
+    <table class="customer-container-list-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Domain</th>
+          <th>Status</th>
+          <th>Requests</th>
+          <th>Last Sync</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${requests.map((request) => customerContainerRow(request, data)).join("")}
+      </tbody>
+    </table>
+    <div class="container-list-footer">
+      <span>Showing ${requests.length.toLocaleString()} of ${totalCount.toLocaleString()} container${totalCount === 1 ? "" : "s"}</span>
+      <span>Per page 10</span>
+    </div>
+  </div>`;
+}
+
+function customerContainerRow(request, data) {
+  const meta = customerStatusMeta(request.status);
+  const isSelected = request.id === selectedCustomerContainerId;
+  const requestCount = customerContainerRequestCount(request, data);
+  const canDelete = !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase());
+  return `<tr class="${isSelected ? "is-selected" : ""}">
+    <td>
+      <button class="container-name-button" type="button" data-container-select="${escapeHtml(request.id)}">
+        <strong>${escapeHtml(containerDisplayName(request))}</strong>
+        <span>${escapeHtml(request.trackingDomain || "Tracking domain pending")}</span>
+      </button>
+    </td>
+    <td><span class="container-type-pill">${escapeHtml(request.containerType || "sGTM")}</span></td>
+    <td>${escapeHtml(request.websiteUrl || "--")}</td>
+    <td><span class="state ${meta.className}">${escapeHtml(meta.label)}</span></td>
+    <td>${Number(requestCount || 0).toLocaleString()}</td>
+    <td>${escapeHtml(formatShortDate(request.updatedAt || request.createdAt) || "--")}</td>
+    <td>
+      <div class="container-row-actions">
+        <button type="button" data-container-select="${escapeHtml(request.id)}">View</button>
+        <button type="button" data-container-logs="${escapeHtml(request.id)}">Logs</button>
+        <button type="button" data-container-powerups="${escapeHtml(request.id)}">Power-Ups</button>
+        ${canDelete ? `<button class="danger-link" type="button" data-container-delete="${escapeHtml(request.id)}">Delete</button>` : ""}
+      </div>
+    </td>
+  </tr>`;
+}
+
+function customerContainerDetail(request, data, dnsTarget) {
+  const meta = customerStatusMeta(request.status);
+  const usage = data.usage || {};
+  const planName = usage.plan || "Starter";
+  const requestLimit = Number(usage.requestLimit || 100000);
+  const monthRequests = Number(usage.requestsMonth || 0);
+  const requestCount = customerContainerRequestCount(request, data);
+  const usagePercent = requestLimit ? Math.min(100, Math.round((monthRequests / requestLimit) * 100)) : 0;
+  const limits = request.resourceLimits || {};
+  const serverUrl = request.trackingDomain ? `https://${request.trackingDomain}` : "Tracking domain pending";
+  const platformUrl = request.platformDomain || serverUrl;
+  const canDelete = !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase());
+  return `<section class="container-detail-view">
+    <article class="panel container-detail-hero">
+      <div>
+        <div class="detail-pill-row">
+          <span class="state ${meta.className}">${escapeHtml(meta.label)}</span>
+          <span class="container-type-pill">${escapeHtml(request.containerType || "sGTM")}</span>
+        </div>
+        <h2>${escapeHtml(containerDisplayName(request))}</h2>
+        <p>${escapeHtml(request.websiteUrl || "Website not set")}</p>
+        <div class="container-detail-progress">
+          <strong>${Number(monthRequests).toLocaleString()}</strong>
+          <span>of ${Number(requestLimit).toLocaleString()} requests sent this month</span>
+          <em>${usagePercent}% used</em>
+        </div>
+      </div>
+      <div class="container-plan-chip">
+        <strong>${escapeHtml(planName)}</strong>
+        <span>Current plan</span>
+        <small>${escapeHtml(subscriptionPlans.find((plan) => plan.name === planName)?.renewal || "Renews monthly")}</small>
+      </div>
+    </article>
+
+    <nav class="container-detail-tabs" aria-label="Container shortcuts">
+      <button class="is-active" type="button">Settings</button>
+      <button type="button" data-view-shortcut="powerUps">Power-Ups</button>
+      <button type="button" data-view-shortcut="logs">Logs</button>
+    </nav>
+
+    <div class="container-detail-grid">
+      <article class="panel container-detail-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Container Settings</h2>
+            <p>Core GTM configuration and isolated runtime identity.</p>
+          </div>
+          <span class="badge">Settings</span>
+        </div>
+        <div class="detail-setting-list">
+          ${detailSetting("Name", containerDisplayName(request))}
+          ${detailSetting("Type", request.containerType || "sGTM (Server-Side GTM)")}
+          ${detailSetting("Container Config", request.containerConfig ? "Configured" : "Missing")}
+          ${detailSetting("sGTM Container ID", request.sgtmContainerId || "GTM server ID unavailable")}
+          ${detailSetting("Preview Environment", request.previewEnvironment || "Production")}
+          ${detailSetting("Recent Requests", Number(requestCount || 0).toLocaleString())}
+          ${detailSetting("API Key", request.apiKey || "Auto-managed by Tagioo")}
+        </div>
+      </article>
+
+      <article class="panel container-detail-panel">
+        <div class="panel-header">
+          <div>
+            <h2>sGTM Cloud</h2>
+            <p>Use these URLs in Google Tag Manager and your first-party setup.</p>
+          </div>
+          <span class="badge ${meta.className === "healthy" ? "ok" : "warn"}">${escapeHtml(meta.badge)}</span>
+        </div>
+        <div class="cloud-url-list">
+          ${cloudUrlRow("Server Container URL", platformUrl, "Default Tagioo hosted endpoint for this container.")}
+          ${cloudUrlRow("First-Party Domain", serverUrl, "Use this as the Server Container URL in your GTM Web Container tags.")}
+          ${cloudUrlRow("Location", request.serverLocation || "Bangladesh BDIX", "Closest available worker region for your traffic.")}
+          ${cloudUrlRow("Resource Limit", limits.memoryMb ? `${limits.memoryMb} MB memory, ${limits.cpuLimit || "CPU default"}` : "Plan default", "Keeps each customer container isolated.")}
+        </div>
+      </article>
+
+      <article class="panel container-detail-panel domain-detail-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Domains</h2>
+            <p>Your tagging server URLs and the DNS record needed for first-party tracking.</p>
+          </div>
+          <span class="badge">1/1</span>
+        </div>
+        <div class="domain-live-card">
+          <strong>${escapeHtml(serverUrl)}</strong>
+          <span>Domain: ${escapeHtml(meta.className === "healthy" ? "Active" : "Waiting")} · SSL: ${escapeHtml(meta.className === "healthy" ? "Active" : "Provisioning")}</span>
+        </div>
+        <div class="dns-instruction-card">
+          <div>
+            <span>Type</span>
+            <strong>CNAME</strong>
+          </div>
+          <div>
+            <span>Host</span>
+            <strong>${escapeHtml(request.trackingDomain || "server.yourdomain.com")}</strong>
+          </div>
+          <div>
+            <span>Value</span>
+            <strong>${escapeHtml(dnsTarget)}</strong>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel container-detail-panel support-detail-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Tagioo Care</h2>
+            <p>Get help reviewing tags, DNS, purchase value, and event deduplication.</p>
+          </div>
+        </div>
+        <div class="care-panel-body">
+          <strong>Personal setup help</strong>
+          <p>We can audit your GTM web tags, server tags, and Meta event match quality before launch.</p>
+          <button class="button" type="button">Get a quote</button>
+        </div>
+      </article>
+
+      <article class="panel container-detail-panel quick-links-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Quick Links</h2>
+            <p>Jump to the pages most customers need after launch.</p>
+          </div>
+        </div>
+        <div class="quick-link-list">
+          <button type="button" data-view-shortcut="logs">View Logs</button>
+          <button type="button" data-view-shortcut="powerUps">Power-Ups</button>
+          <button type="button" data-view-shortcut="billing">My Subscription</button>
+          ${canDelete ? `<button class="danger-link" type="button" data-container-delete="${escapeHtml(request.id)}">Delete Container</button>` : ""}
+        </div>
+      </article>
+    </div>
+  </section>`;
+}
+
+function containerDisplayName(request) {
+  return request.containerName || request.tenantName || hostLabel(request.websiteUrl) || "sGTM Container";
+}
+
+function customerContainerRequestCount(request, data) {
+  const trackingDomain = String(request.trackingDomain || "").toLowerCase();
+  const rows = todayRows(data);
+  const matchingRows = trackingDomain
+    ? rows.filter((row) => `${row.host || ""} ${row.requestUrl || ""}`.toLowerCase().includes(trackingDomain))
+    : [];
+  if (matchingRows.length) return matchingRows.length;
+  const activeContainers = (data.customerSetup?.requests || [])
+    .filter((item) => !["deleted", "delete_requested"].includes(String(item.status || "").toLowerCase())).length;
+  return activeContainers <= 1 ? Number(data.usage?.requestsToday || data.nginx?.todayEvents?.count || 0) : 0;
+}
+
+function detailSetting(label, value) {
+  return `<div class="detail-setting-row">
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(value || "--")}</strong>
+  </div>`;
+}
+
+function cloudUrlRow(label, value, help) {
+  return `<div class="cloud-url-row">
+    <div>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value || "--")}</strong>
+      <small>${escapeHtml(help || "")}</small>
+    </div>
+  </div>`;
 }
 
 function powerUpAvailable(item, planName) {
@@ -2942,12 +3218,10 @@ els.navItems.forEach((item) => {
 document.addEventListener("click", (event) => {
   const shortcut = event.target.closest("[data-view-shortcut]");
   if (shortcut) setView(shortcut.dataset.viewShortcut);
-});
-
-document.querySelectorAll("[data-scroll-target]").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelector(`#${CSS.escape(button.dataset.scrollTarget)}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
+  const scrollTarget = event.target.closest("[data-scroll-target]");
+  if (scrollTarget) {
+    document.querySelector(`#${CSS.escape(scrollTarget.dataset.scrollTarget)}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 });
 
 els.refreshButton.addEventListener("click", loadDashboard);
@@ -2957,6 +3231,7 @@ els.clientFilter.addEventListener("change", () => latestData && renderLogs(lates
 els.eventLimitFilter.addEventListener("change", () => latestData && renderLogs(latestData));
 els.requestUrlFilter.addEventListener("input", () => latestData && renderLogs(latestData));
 els.purchaseSearch.addEventListener("input", () => latestData && renderPurchaseInspector(latestData));
+els.customerContainerSearch?.addEventListener("input", () => latestData && renderCustomerContainers(latestData));
 els.provisioningForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   els.provisioningFormMessage.textContent = "Submitting request...";
