@@ -2244,16 +2244,55 @@ function renderCustomerAccounts(data) {
   const accounts = data.customerAccounts?.accounts || [];
   els.customerAccountsBadge.className = `badge ${accounts.length ? "ok" : "warn"}`;
   els.customerAccountsBadge.textContent = `${accounts.length} login${accounts.length === 1 ? "" : "s"}`;
-  renderSummaryList(
-    els.customerAccountsList,
-    accounts.length
-      ? accounts.map((account) => ({
-        label: account.fullName || account.tenantName || account.tenantId,
-        value: `${account.email || account.username} · ${account.phone || "No phone"} · ${account.country || "No country"} · ${account.referral || "No source"} · ${account.status}${account.lastLoginAt ? ` · last login ${formatShortDate(account.lastLoginAt)}` : ""}`,
-        status: account.status === "active" ? "healthy" : "warning"
-      }))
-      : [{ label: "Customer logins", value: "Create the first customer login from the form", status: "warning" }]
-  );
+  if (!accounts.length) {
+    renderSummaryList(
+      els.customerAccountsList,
+      [{ label: "Customer logins", value: "Create the first customer login from the form", status: "warning" }]
+    );
+    return;
+  }
+
+  els.customerAccountsList.innerHTML = accounts.map((account) => `
+    <article class="summary-item account-row">
+      <div>
+        <strong>${escapeHtml(account.fullName || account.tenantName || account.tenantId)}</strong>
+        <span>${escapeHtml(account.email || account.username)} · ${escapeHtml(account.phone || "No phone")} · ${escapeHtml(account.country || "No country")}</span>
+        <small>${escapeHtml(account.referral || "No source")} · ${escapeHtml(account.status)}${account.lastLoginAt ? ` · last login ${escapeHtml(formatShortDate(account.lastLoginAt))}` : ""}</small>
+      </div>
+      <button class="button" type="button" data-reset-customer-password="${escapeHtml(account.id)}">Reset Password</button>
+    </article>
+  `).join("");
+
+  els.customerAccountsList.querySelectorAll("[data-reset-customer-password]").forEach((button) => {
+    button.addEventListener("click", () => resetCustomerPassword(button.dataset.resetCustomerPassword));
+  });
+}
+
+async function resetCustomerPassword(accountId) {
+  const password = window.prompt("Enter a new customer password. Minimum 8 characters.");
+  if (password === null) return;
+  if (password.length < 8) {
+    window.alert("Password must be at least 8 characters.");
+    return;
+  }
+
+  if (els.customerAccountFormMessage) els.customerAccountFormMessage.textContent = "Resetting customer password...";
+  try {
+    const response = await fetch(`/api/customer-accounts/${encodeURIComponent(accountId)}/password`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Password reset failed"]).join(" "));
+    if (els.customerAccountFormMessage) {
+      els.customerAccountFormMessage.textContent = `Password reset for ${result.account.username}.`;
+    }
+    await loadDashboard();
+    setView("admin");
+  } catch (error) {
+    if (els.customerAccountFormMessage) els.customerAccountFormMessage.textContent = error.message;
+  }
 }
 
 function renderWorkerNodes(data) {

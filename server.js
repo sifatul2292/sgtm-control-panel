@@ -1464,6 +1464,28 @@ async function addCustomerAccount(input, options = {}) {
   return { ok: true, account: publicCustomerAccount(account) };
 }
 
+async function resetCustomerAccountPassword(id, password) {
+  const accountId = String(id || "").trim();
+  const nextPassword = String(password || "");
+  if (!accountId) return { ok: false, status: 400, errors: ["Customer account is required."] };
+  if (nextPassword.length < 8) return { ok: false, status: 400, errors: ["Password must be at least 8 characters."] };
+
+  const loaded = await readDatabase();
+  if (!loaded.available) {
+    return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  }
+
+  const data = loaded.data;
+  data.customerAccounts ||= [];
+  const account = data.customerAccounts.find((item) => item.id === accountId || item.tenantId === accountId || item.username === accountId);
+  if (!account) return { ok: false, status: 404, errors: ["Customer login was not found."] };
+
+  account.passwordHash = hashPassword(nextPassword);
+  account.updatedAt = new Date().toISOString();
+  await writeDatabase(data);
+  return { ok: true, account: publicCustomerAccount(account) };
+}
+
 function signupTenantBase(input) {
   const fullName = String(input.fullName || input.tenantName || "").trim();
   const usernameBase = String(input.email || input.username || "").split("@")[0];
@@ -4000,6 +4022,18 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await addCustomerAccount(body);
       jsonResponse(res, result.ok ? 201 : 400, result.ok ? { account: result.account } : { errors: result.errors });
+      return;
+    }
+
+    const customerPasswordMatch = pathname.match(/^\/api\/customer-accounts\/([^/]+)\/password$/);
+    if (customerPasswordMatch && req.method === "PATCH") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await resetCustomerAccountPassword(decodeURIComponent(customerPasswordMatch[1]), body.password);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { account: result.account } : { errors: result.errors });
       return;
     }
 

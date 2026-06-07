@@ -753,6 +753,20 @@ h2 {
   color: var(--color-text);
 }
 
+.account-row {
+  align-items: flex-start;
+}
+
+.account-row div {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.account-row span,
+.account-row small {
+  color: var(--color-muted);
+}
+
 .dns-guide article {
   justify-content: flex-start;
 }
