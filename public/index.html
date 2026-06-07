@@ -32,6 +32,10 @@
             <span class="nav-icon" aria-hidden="true">▧</span>
             <span>Containers</span>
           </button>
+          <button class="nav-item" type="button" data-view-target="powerUps" data-customer-only hidden aria-label="Power-Ups" title="Power-Ups">
+            <span class="nav-icon" aria-hidden="true">◆</span>
+            <span>Power-Ups</span>
+          </button>
           <button class="nav-item" type="button" data-view-target="settings" data-owner-only aria-label="Settings" title="Settings">
             <span class="nav-icon" aria-hidden="true">⚙</span>
             <span>Settings</span>
@@ -691,6 +695,26 @@
             <div id="customerContainersTable" class="customer-card-list">
               <div class="empty-log">No containers yet.</div>
             </div>
+          </section>
+        </section>
+
+        <section id="powerUpsView" class="view" data-view="powerUps" data-customer-only hidden>
+          <section class="customer-page-head powerups-head">
+            <div>
+              <p class="breadcrumb">Containers / Power-Ups</p>
+              <h2>Power-Ups</h2>
+              <p>Optional enhancements for attribution, data quality, privacy, and server-side tracking control.</p>
+            </div>
+            <span id="powerUpsBadge" class="badge">0 enabled</span>
+          </section>
+
+          <section class="panel">
+            <div class="powerups-toolbar">
+              <p>Start with the recommended set. Upgrade-only cards are shown clearly so customers understand what each plan unlocks.</p>
+              <div id="powerUpsFilters" class="powerups-filters" aria-label="Power-Up categories"></div>
+            </div>
+            <div id="powerUpsGrid" class="powerups-grid"></div>
+            <p id="powerUpsMessage" class="form-message"></p>
           </section>
         </section>
 

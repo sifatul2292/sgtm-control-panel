@@ -56,6 +56,10 @@ const els = {
   customerContainersBadge: document.querySelector("#customerContainersBadge"),
   customerContainersTable: document.querySelector("#customerContainersTable"),
   customerDnsTarget: document.querySelector("#customerDnsTarget"),
+  powerUpsBadge: document.querySelector("#powerUpsBadge"),
+  powerUpsFilters: document.querySelector("#powerUpsFilters"),
+  powerUpsGrid: document.querySelector("#powerUpsGrid"),
+  powerUpsMessage: document.querySelector("#powerUpsMessage"),
   reconciliationBadge: document.querySelector("#reconciliationBadge"),
   reconciliationGrid: document.querySelector("#reconciliationGrid"),
   logModeBadge: document.querySelector("#logModeBadge"),
@@ -131,6 +135,7 @@ const viewTitles = {
   logs: ["Containers / Event Logs", "Event Logs"],
   analytics: ["Tracking / Analytics", "Analytics"],
   customerContainers: ["Containers / Create", "Create Container"],
+  powerUps: ["Containers / Power-Ups", "Power-Ups"],
   settings: ["Account & Others / Settings", "Settings"],
   deployment: ["Operations / Deployment", "Deployment Health"],
   provisioning: ["Operations / Provisioning", "Container Provisioning"],
@@ -143,8 +148,8 @@ const viewTitles = {
 let latestData = null;
 let currentSession = { role: "pending" };
 const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
-const customerOnlyViews = new Set(["customerContainers"]);
-const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "billing"]);
+const customerOnlyViews = new Set(["customerContainers", "powerUps"]);
+const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "billing"]);
 const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs"]);
 
 const subscriptionPlans = [
@@ -190,6 +195,122 @@ const subscriptionPlans = [
     features: ["Priority Migration", "Dedicated Support", "Multi-Domain Support", "Advanced Reports", "Traffic Filtering, IP, Country Block", "Bot Detection & Filtering", "Event Logs", "WordPress Plugin"]
   }
 ];
+
+const planRank = { Free: 0, Starter: 1, Growth: 2, Pro: 3, Enterprise: 4, Agency: 4 };
+
+const powerUps = [
+  {
+    id: "cookie-keeper",
+    name: "Cookie Keeper",
+    category: "Popular",
+    icon: "●",
+    minimumPlan: "Starter",
+    defaultState: "enabled",
+    description: "Extends cookie lifetime through your first-party tracking domain for cleaner attribution."
+  },
+  {
+    id: "custom-loader",
+    name: "Custom Loader",
+    category: "Web GTM load",
+    icon: "</>",
+    minimumPlan: "Pro",
+    defaultState: "configure",
+    recommended: true,
+    description: "Makes GTM and GA scripts more resilient to basic blockers by loading from your tracking subdomain."
+  },
+  {
+    id: "click-id-restorer",
+    name: "Click ID Restorer",
+    category: "Data enrich",
+    icon: "↗",
+    minimumPlan: "Pro",
+    defaultState: "configure",
+    description: "Preserves gclid, fbclid, ttclid, and other click IDs so ad platforms can match conversions better."
+  },
+  {
+    id: "bot-detection",
+    name: "Bot Detection",
+    category: "Utilities",
+    icon: "◇",
+    minimumPlan: "Starter",
+    defaultState: "enabled",
+    description: "Marks suspicious traffic and keeps noisy requests separate from clean tracking activity."
+  },
+  {
+    id: "geo-headers",
+    name: "GEO Headers",
+    category: "Data enrich",
+    icon: "◎",
+    minimumPlan: "Starter",
+    defaultState: "enabled",
+    description: "Adds country and region hints for debugging server-side tracking quality."
+  },
+  {
+    id: "user-agent-info",
+    name: "User Agent Info",
+    category: "Data enrich",
+    icon: "▥",
+    minimumPlan: "Starter",
+    defaultState: "enabled",
+    description: "Shows device, browser, and platform context in request diagnostics."
+  },
+  {
+    id: "multi-domains",
+    name: "Multi-Domains",
+    category: "Utilities",
+    icon: "⌘",
+    minimumPlan: "Pro",
+    defaultState: "upgrade",
+    description: "Use one container with multiple first-party tagging domains."
+  },
+  {
+    id: "block-ip",
+    name: "Block Request by IP",
+    category: "Utilities",
+    icon: "■",
+    minimumPlan: "Pro",
+    defaultState: "upgrade",
+    description: "Block known bad IPs before they reach your server-side GTM container."
+  },
+  {
+    id: "dedicated-ip",
+    name: "Dedicated IP",
+    category: "CDN",
+    icon: "⬢",
+    minimumPlan: "Enterprise",
+    defaultState: "upgrade",
+    description: "Reserve a static outbound IP for enterprise security and partner allowlists."
+  },
+  {
+    id: "bigquery-export",
+    name: "BigQuery Export",
+    category: "Data enrich",
+    icon: "▣",
+    minimumPlan: "Enterprise",
+    defaultState: "upgrade",
+    description: "Send selected server-side events into BigQuery for reporting and retention."
+  },
+  {
+    id: "file-proxy",
+    name: "File Proxy",
+    category: "CDN",
+    icon: "✦",
+    minimumPlan: "Enterprise",
+    defaultState: "coming",
+    description: "Proxy selected static files through the server-side tracking domain."
+  },
+  {
+    id: "tagioo-care",
+    name: "Tagioo Care",
+    category: "Popular",
+    icon: "☺",
+    minimumPlan: "Pro",
+    defaultState: "configure",
+    description: "Request guided setup, tracking review, and migration help from the Tagioo team."
+  }
+];
+
+let activePowerUpCategory = "All";
 
 function text(value, fallback = "--") {
   return value === undefined || value === null || value === "" ? fallback : String(value);
@@ -1431,6 +1552,90 @@ function renderCustomerContainers(data) {
   });
 }
 
+function powerUpAvailable(item, planName) {
+  return Number(planRank[planName] ?? 1) >= Number(planRank[item.minimumPlan] ?? 1);
+}
+
+function powerUpState(item, planName) {
+  if (item.defaultState === "coming") return "coming";
+  if (!powerUpAvailable(item, planName)) return "upgrade";
+  return item.defaultState === "configure" ? "configure" : "enabled";
+}
+
+function powerUpActionLabel(state) {
+  if (state === "enabled") return "Enabled";
+  if (state === "configure") return "Configure";
+  if (state === "upgrade") return "Upgrade to use";
+  return "Coming soon";
+}
+
+function renderPowerUps(data) {
+  if (!els.powerUpsGrid) return;
+  const planName = data.usage?.plan || "Starter";
+  const categories = ["All", ...new Set(powerUps.map((item) => item.category))];
+  const visiblePowerUps = activePowerUpCategory === "All"
+    ? powerUps
+    : powerUps.filter((item) => item.category === activePowerUpCategory);
+  const enabledCount = powerUps.filter((item) => powerUpState(item, planName) === "enabled").length;
+
+  if (els.powerUpsBadge) {
+    els.powerUpsBadge.className = "badge ok";
+    els.powerUpsBadge.textContent = `${enabledCount} enabled`;
+  }
+
+  if (els.powerUpsFilters) {
+    els.powerUpsFilters.innerHTML = categories.map((category) => {
+      const count = category === "All" ? powerUps.length : powerUps.filter((item) => item.category === category).length;
+      return `<button class="powerups-filter ${category === activePowerUpCategory ? "is-active" : ""}" type="button" data-powerup-category="${escapeHtml(category)}">
+        <span>${escapeHtml(category)}</span>
+        <strong>${count}</strong>
+      </button>`;
+    }).join("");
+    els.powerUpsFilters.querySelectorAll("[data-powerup-category]").forEach((button) => {
+      button.addEventListener("click", () => {
+        activePowerUpCategory = button.dataset.powerupCategory || "All";
+        renderPowerUps(latestData || data);
+      });
+    });
+  }
+
+  els.powerUpsGrid.innerHTML = visiblePowerUps.map((item) => {
+    const state = powerUpState(item, planName);
+    const recommended = item.recommended ? `<span class="powerup-recommended">Recommended</span>` : "";
+    return `<article class="powerup-card ${state}">
+      <div class="powerup-icon" aria-hidden="true">${escapeHtml(item.icon)}</div>
+      <div class="powerup-copy">
+        <div class="powerup-title-row">
+          <h3>${escapeHtml(item.name)}</h3>
+          ${recommended}
+        </div>
+        <p>${escapeHtml(item.description)}</p>
+        <span>${escapeHtml(item.category)} · ${escapeHtml(item.minimumPlan)}+</span>
+      </div>
+      <button class="button ${state === "upgrade" ? "button-primary" : ""}" type="button" data-powerup-action="${escapeHtml(item.id)}" data-powerup-state="${state}">
+        ${escapeHtml(powerUpActionLabel(state))}
+      </button>
+    </article>`;
+  }).join("");
+
+  els.powerUpsGrid.querySelectorAll("[data-powerup-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = powerUps.find((entry) => entry.id === button.dataset.powerupAction);
+      const state = button.dataset.powerupState;
+      if (!item) return;
+      if (state === "upgrade") {
+        setView("billing");
+        return;
+      }
+      if (els.powerUpsMessage) {
+        els.powerUpsMessage.textContent = state === "coming"
+          ? `${item.name} is coming soon.`
+          : `${item.name} settings will be configurable in the next version.`;
+      }
+    });
+  });
+}
+
 function customerStatusMeta(status) {
   const normalized = String(status || "requested").toLowerCase();
   if (["complete", "live", "http_live", "ssl_ready"].includes(normalized)) {
@@ -2609,6 +2814,7 @@ function renderAll(data) {
   renderProvisioning(data);
   renderAdmin(data);
   renderCustomerContainers(data);
+  renderPowerUps(data);
   renderIntegrations(data);
   renderBilling(data);
   renderDocs(data);
