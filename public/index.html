@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/tokens.css" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
+  <body class="app-loading">
     <div class="app-shell">
       <aside class="sidebar" aria-label="Primary">
         <a class="brand" href="#dashboard" aria-label="Tagioo Control Panel home">
@@ -114,7 +114,7 @@
                   <button class="button" type="button" data-view-shortcut="billing">View Plan</button>
                 </div>
               </div>
-              <div class="usage-ring" aria-label="Monthly usage">
+              <div id="customerUsageRing" class="usage-ring" aria-label="Monthly usage">
                 <strong id="customerUsagePercent">0%</strong>
                 <span>used</span>
               </div>

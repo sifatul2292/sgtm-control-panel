@@ -1625,6 +1625,9 @@ function normalizeWebsiteUrl(value) {
 }
 
 function publicSetupRequest(request) {
+  const normalizedConfig = normalizeContainerConfig(request.containerConfig || "");
+  const gtmMatch = normalizedConfig.decoded.match(/(?:^|&)id=(GTM-[A-Z0-9]+)(?:&|$)/i);
+  const previewMatch = normalizedConfig.decoded.match(/(?:^|&)preview=([^&]+)(?:&|$)/i);
   return {
     id: request.id,
     tenantId: request.tenantId,
@@ -1635,6 +1638,8 @@ function publicSetupRequest(request) {
     trackingDomain: request.trackingDomain,
     platform: request.platform,
     containerConfig: request.containerConfig ? "configured" : "",
+    sgtmContainerId: gtmMatch ? gtmMatch[1].toUpperCase() : "",
+    previewEnvironment: previewMatch ? decodeURIComponent(previewMatch[1]) : "",
     serverLocation: request.serverLocation || "Bangladesh BDIX",
     provisioningRequestId: request.provisioningRequestId || "",
     workerId: request.workerId || "",

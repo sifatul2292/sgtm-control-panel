@@ -41,6 +41,7 @@ const els = {
   customerSetupBadge: document.querySelector("#customerSetupBadge"),
   customerHeroTitle: document.querySelector("#customerHeroTitle"),
   customerHeroDomain: document.querySelector("#customerHeroDomain"),
+  customerUsageRing: document.querySelector("#customerUsageRing"),
   customerUsagePercent: document.querySelector("#customerUsagePercent"),
   customerPlanName: document.querySelector("#customerPlanName"),
   customerMonthEvents: document.querySelector("#customerMonthEvents"),
@@ -365,6 +366,7 @@ function setView(name) {
 function applySessionAccess(data) {
   currentSession = data.session || { role: "owner" };
   const customerMode = currentSession.role === "customer";
+  document.body.classList.remove("app-loading");
   document.body.classList.toggle("customer-session", customerMode);
   document.querySelectorAll("[data-owner-only]").forEach((element) => {
     element.hidden = customerMode;
@@ -1471,6 +1473,7 @@ function renderCustomerSetup(data) {
       : `Create a container, then point CNAME to ${dnsTarget}. Tagioo handles Docker, Nginx, SSL, and launch status automatically.`;
   }
   if (els.customerUsagePercent) els.customerUsagePercent.textContent = `${usagePercent}%`;
+  if (els.customerUsageRing) els.customerUsageRing.style.setProperty("--usage-percent", usagePercent);
   if (els.customerPlanName) els.customerPlanName.textContent = usage.plan || "Starter";
   if (els.customerMonthEvents) {
     els.customerMonthEvents.textContent = `${Number(usage.requestsMonth || 0).toLocaleString()} of ${Number(usage.requestLimit || 0).toLocaleString()} requests`;
@@ -1524,14 +1527,23 @@ function renderCustomerAnalytics(summary) {
     const points = hourly.length ? hourly.map((row) => Number(row.total || 0)) : Array.from({ length: 12 }, () => 0);
     const max = Math.max(1, ...points);
     const width = 640;
-    const height = 180;
-    const step = points.length > 1 ? width / (points.length - 1) : width;
+    const height = 220;
+    const pad = { left: 54, right: 18, top: 18, bottom: 42 };
+    const plotWidth = width - pad.left - pad.right;
+    const plotHeight = height - pad.top - pad.bottom;
+    const step = points.length > 1 ? plotWidth / (points.length - 1) : plotWidth;
     const coords = points.map((value, index) => {
-      const x = index * step;
-      const y = height - (value / max) * (height - 28) - 14;
+      const x = pad.left + index * step;
+      const y = pad.top + plotHeight - (value / max) * plotHeight;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     }).join(" ");
+    const areaPoints = `${pad.left},${pad.top + plotHeight} ${coords} ${pad.left + plotWidth},${pad.top + plotHeight}`;
+    const mid = Math.ceil(max / 2);
     els.customerEventChart.innerHTML = `
+      <div class="chart-explainer">
+        <strong>Server events per hour</strong>
+        <span>Y-axis is event count. X-axis runs from 24 hours ago to now.</span>
+      </div>
       <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Hourly event trend">
         <defs>
           <linearGradient id="customerChartFill" x1="0" x2="0" y1="0" y2="1">
@@ -1539,8 +1551,16 @@ function renderCustomerAnalytics(summary) {
             <stop offset="1" stop-color="currentColor" stop-opacity=".02" />
           </linearGradient>
         </defs>
-        <polyline class="chart-grid-line" points="0,${height - 16} ${width},${height - 16}" />
-        <polygon class="chart-area" points="0,${height - 16} ${coords} ${width},${height - 16}" />
+        <line class="chart-grid-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left + plotWidth}" y2="${pad.top}" />
+        <line class="chart-grid-line" x1="${pad.left}" y1="${pad.top + plotHeight / 2}" x2="${pad.left + plotWidth}" y2="${pad.top + plotHeight / 2}" />
+        <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top + plotHeight}" x2="${pad.left + plotWidth}" y2="${pad.top + plotHeight}" />
+        <text class="chart-axis-text" x="${pad.left - 10}" y="${pad.top + 4}" text-anchor="end">${max}</text>
+        <text class="chart-axis-text" x="${pad.left - 10}" y="${pad.top + plotHeight / 2 + 4}" text-anchor="end">${mid}</text>
+        <text class="chart-axis-text" x="${pad.left - 10}" y="${pad.top + plotHeight + 4}" text-anchor="end">0</text>
+        <text class="chart-axis-text" x="${pad.left}" y="${height - 12}" text-anchor="start">24h ago</text>
+        <text class="chart-axis-text" x="${pad.left + plotWidth}" y="${height - 12}" text-anchor="end">Now</text>
+        <text class="chart-axis-title" x="16" y="${pad.top + plotHeight / 2}" transform="rotate(-90 16 ${pad.top + plotHeight / 2})" text-anchor="middle">Events</text>
+        <polygon class="chart-area" points="${areaPoints}" />
         <polyline class="chart-line" points="${coords}" />
       </svg>
     `;
@@ -1548,8 +1568,13 @@ function renderCustomerAnalytics(summary) {
 
   const events = (summary.events || []).filter((row) => Number(row.count || 0) > 0);
   if (els.customerTopEvents) {
+    const purchaseEvent = events.find((event) => event.name === "Purchase");
+    const topEvents = events.slice(0, 5);
+    if (purchaseEvent && !topEvents.some((event) => event.name === "Purchase")) {
+      topEvents.push(purchaseEvent);
+    }
     els.customerTopEvents.innerHTML = events.length
-      ? events.slice(0, 5).map((event) => `
+      ? topEvents.map((event) => `
           <div class="top-event-row">
             <span>${escapeHtml(event.name || "Other")}</span>
             <strong>${Number(event.count || 0).toLocaleString()}</strong>
@@ -1751,6 +1776,10 @@ function customerContainerCard(request, options = {}) {
   const meta = customerStatusMeta(status);
   const canDelete = !["deleted", "delete_requested"].includes(status);
   const compact = Boolean(options.compact);
+  const limits = request.resourceLimits || {};
+  const configStatus = request.containerConfig ? "Configured" : "Missing";
+  const serverContainerId = request.sgtmContainerId || "GTM server ID unavailable";
+  const previewEnvironment = request.previewEnvironment || "Production";
   return `
     <article class="customer-container-card ${compact ? "compact" : ""}">
       <div class="customer-container-top">
@@ -1775,6 +1804,32 @@ function customerContainerCard(request, options = {}) {
           <strong>${escapeHtml(formatShortDate(request.createdAt) || "--")}</strong>
         </div>
       </div>
+      ${compact ? "" : `<div class="container-settings-grid">
+        <div>
+          <span>Container Config</span>
+          <strong>${escapeHtml(configStatus)}</strong>
+        </div>
+        <div>
+          <span>sGTM Container ID</span>
+          <strong>${escapeHtml(serverContainerId)}</strong>
+        </div>
+        <div>
+          <span>Preview Environment</span>
+          <strong>${escapeHtml(previewEnvironment)}</strong>
+        </div>
+        <div>
+          <span>Worker</span>
+          <strong>${escapeHtml(request.workerName || request.workerId || "Auto-assigned")}</strong>
+        </div>
+        <div>
+          <span>Request Limit</span>
+          <strong>${escapeHtml(limits.monthlyRequestLimit ? Number(limits.monthlyRequestLimit).toLocaleString() : "Plan default")}</strong>
+        </div>
+        <div>
+          <span>Resource Limit</span>
+          <strong>${escapeHtml(limits.memoryMb ? `${limits.memoryMb} MB · ${limits.cpuLimit || "CPU default"}` : "Plan default")}</strong>
+        </div>
+      </div>`}
       ${compact ? "" : `<div class="customer-container-actions">
         <span>${escapeHtml(request.notes || "Managed server-side tracking")}</span>
         ${canDelete ? `<button class="button button-danger" type="button" data-container-delete="${escapeHtml(request.id)}">Delete</button>` : ""}
@@ -2874,6 +2929,7 @@ async function loadDashboard() {
   } catch (error) {
     els.generatedAt.textContent = "Update failed";
     els.containerCards.innerHTML = `<div class="empty-log">${escapeHtml(error.message)}</div>`;
+    document.body.classList.remove("app-loading");
   } finally {
     els.refreshButton.disabled = false;
   }
