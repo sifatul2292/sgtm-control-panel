@@ -3493,6 +3493,22 @@ async function deleteCustomerContainer(id, session) {
 async function getProvisioningSummary() {
   const loaded = await readDatabase();
   const requests = loaded.data.provisioning?.requests || [];
+  // Skip live DNS lookups on the dashboard hot path. Each enrichProvisioningRequest
+  // ran a `getent ahosts` per record (800ms timeout each), which dominated reload time
+  // once many provisioning records existed. Static plan.checks still render; the live
+  // DNS status is available on demand via GET /api/provisioning/checks.
+  return {
+    available: loaded.available,
+    path: databasePath,
+    message: loaded.message || "",
+    detail: loaded.detail || "",
+    requests: requests.map((request) => ({ ...request, plan: request.plan || provisioningPlan(request) }))
+  };
+}
+
+async function getEnrichedProvisioningSummary() {
+  const loaded = await readDatabase();
+  const requests = loaded.data.provisioning?.requests || [];
   const enriched = await Promise.all(requests.map(enrichProvisioningRequest));
   return {
     available: loaded.available,
@@ -4140,12 +4156,16 @@ async function getDashboardData() {
       ? errorLog.message
       : "No recent Nginx errors matched the configured tracking host filter.";
   }
-  const history = await persistDailySummary(requestSummary);
-  const provisioning = await getProvisioningSummary();
-  const workers = await getWorkerSummary();
-  const orders = await getOrderSummary();
-  const customerAccounts = await getCustomerAccountsSummary();
-  const customerSetup = await getCustomerSetupSummary();
+  // Run independent DB-backed collectors in parallel. Only persistDailySummary writes
+  // (atomic temp+rename), the rest read, so concurrent access is safe.
+  const [history, provisioning, workers, orders, customerAccounts, customerSetup] = await Promise.all([
+    persistDailySummary(requestSummary),
+    getProvisioningSummary(),
+    getWorkerSummary(),
+    getOrderSummary(),
+    getCustomerAccountsSummary(),
+    getCustomerSetupSummary()
+  ]);
   const customers = await getCustomerCatalog({ docker, ssl, orders });
   const usage = getUsageSummary({ requestSummary, history });
   const tenantUsage = await tenantBillingUsageMap({ customerSetup, provisioning }, customers.tenants || []);
@@ -4859,6 +4879,16 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await addProvisioningRequest(body);
       jsonResponse(res, result.ok ? 201 : 400, result.ok ? { request: result.request } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/provisioning/checks" && req.method === "GET") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const enriched = await getEnrichedProvisioningSummary();
+      jsonResponse(res, 200, enriched);
       return;
     }
 
