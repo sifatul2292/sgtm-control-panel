@@ -20,6 +20,7 @@ const config = {
   usingDedicatedLogs: Boolean(process.env.SGTM_ACCESS_LOG || process.env.SGTM_ERROR_LOG),
   logTailLines: Number(process.env.LOG_TAIL_LINES || 80),
   summaryTailLines: Number(process.env.SUMMARY_TAIL_LINES || 50000),
+  customerSummaryTailLines: Number(process.env.CUSTOMER_SUMMARY_TAIL_LINES || Math.min(Number(process.env.SUMMARY_TAIL_LINES || 50000), 10000)),
   eventLogLimit: Number(process.env.EVENT_LOG_LIMIT || 500),
   dataDir: configuredDataDir,
   historyRetentionDays: Number(process.env.HISTORY_RETENTION_DAYS || 90),
@@ -83,7 +84,9 @@ const DASHBOARD_COMMAND_TIMEOUT_MS = 1000;
 const DOCKER_INSPECT_TIMEOUT_MS = 700;
 const DOCKER_LOG_TIMEOUT_MS = 600;
 const SSL_NETWORK_TIMEOUT_MS = 1000;
+const SUMMARY_CACHE_TTL_MS = Number(process.env.SUMMARY_CACHE_TTL_MS || 30000);
 const alertMemory = new Map();
+const summaryCache = new Map();
 const databasePath = join(config.dataDir, "history.json");
 
 function parseCsv(value) {
@@ -965,6 +968,44 @@ function unavailable(message, detail = "") {
   return { available: false, message, detail };
 }
 
+function cloneJson(value) {
+  return value === undefined ? value : JSON.parse(JSON.stringify(value));
+}
+
+async function cachedSummary(key, producer, { allowStale = true } = {}) {
+  const now = Date.now();
+  const cached = summaryCache.get(key);
+  if (cached?.value && now - cached.updatedAt < SUMMARY_CACHE_TTL_MS) {
+    return { ...cloneJson(cached.value), cached: true };
+  }
+  if (cached?.promise) return cached.promise;
+  if (allowStale && cached?.value) {
+    const refresh = producer()
+      .then((value) => {
+        summaryCache.set(key, { value, updatedAt: Date.now(), promise: null });
+        return value;
+      })
+      .catch((error) => {
+        summaryCache.set(key, { ...cached, promise: null });
+        return unavailable("Cached summary refresh failed.", error.message);
+      });
+    summaryCache.set(key, { ...cached, promise: refresh });
+    return { ...cloneJson(cached.value), cached: true, refreshing: true };
+  }
+
+  const promise = producer()
+    .then((value) => {
+      summaryCache.set(key, { value, updatedAt: Date.now(), promise: null });
+      return value;
+    })
+    .catch((error) => {
+      summaryCache.delete(key);
+      return unavailable("Summary could not be calculated.", error.message);
+    });
+  summaryCache.set(key, { value: cached?.value || null, updatedAt: cached?.updatedAt || 0, promise });
+  return promise;
+}
+
 function buildServerAlerts({ docker, requestCount, accessLog, errorLog, ssl }) {
   const alerts = [];
   if (!docker.available) {
@@ -1239,27 +1280,43 @@ function normalizeEventName(value) {
   return names[normalized] || "";
 }
 
-function queryEventName(pathname) {
+function searchParamsForPath(pathname) {
   try {
-    const parsed = new URL(pathname, "https://sgtm.local");
-    for (const key of ["event", "event_name", "en", "e", "action", "type", "name"]) {
-      const eventName = normalizeEventName(parsed.searchParams.get(key));
-      if (eventName) return eventName;
-    }
+    return new URL(pathname, "https://sgtm.local").searchParams;
   } catch {
-    return "";
+    return null;
+  }
+}
+
+function queryValueFromParams(params, keys) {
+  if (!params) return "";
+  for (const key of keys) {
+    const value = params.get(key);
+    if (value !== null && value !== "") return value;
   }
   return "";
 }
 
-function inferEventName(pathname, method, status) {
+function queryEventNameFromParams(params) {
+  for (const key of ["event", "event_name", "en", "e", "action", "type", "name"]) {
+    const eventName = normalizeEventName(params?.get(key));
+    if (eventName) return eventName;
+  }
+  return "";
+}
+
+function queryEventName(pathname) {
+  return queryEventNameFromParams(searchParamsForPath(pathname));
+}
+
+function inferEventName(pathname, method, status, params = null) {
   let raw = String(pathname || "").toLowerCase();
   try {
     raw = decodeURIComponent(raw);
   } catch {
     // Keep the raw URL when a bot or malformed client sends broken encoding.
   }
-  const queryEvent = queryEventName(pathname);
+  const queryEvent = queryEventNameFromParams(params || searchParamsForPath(pathname));
   const blocked = Number(status) >= 400;
 
   if (queryEvent) return queryEvent;
@@ -1292,16 +1349,7 @@ function inferClient(pathname, agent) {
 }
 
 function queryValue(pathname, keys) {
-  try {
-    const parsed = new URL(pathname, "https://sgtm.local");
-    for (const key of keys) {
-      const value = parsed.searchParams.get(key);
-      if (value !== null && value !== "") return value;
-    }
-  } catch {
-    return "";
-  }
-  return "";
+  return queryValueFromParams(searchParamsForPath(pathname), keys);
 }
 
 function firstNonEmpty(...values) {
@@ -1334,8 +1382,12 @@ function payloadValue(payload, keys) {
   return "";
 }
 
+function dataTagPayloadFromParams(params) {
+  return decodeBase64Json(queryValueFromParams(params, ["dtdc", "data", "payload"])) || {};
+}
+
 function dataTagPayload(pathname) {
-  return decodeBase64Json(queryValue(pathname, ["dtdc", "data", "payload"])) || {};
+  return dataTagPayloadFromParams(searchParamsForPath(pathname));
 }
 
 function inferHost(line, pathname) {
@@ -1383,11 +1435,12 @@ function parseTrackingAccessLine(line) {
   const [, ip, time, method, pathname, protocol, status, bytes, referer, agent] = match;
   if (!isTrackingLogLine(line)) return null;
 
+  const params = searchParamsForPath(pathname);
   const date = parseNginxLogDate(time);
-  const eventName = inferEventName(pathname, method, status);
+  const eventName = inferEventName(pathname, method, status, params);
   const client = inferClient(pathname, agent);
   const host = inferHost(line, pathname);
-  const payload = dataTagPayload(pathname);
+  const payload = dataTagPayloadFromParams(params);
   return {
     eventName,
     client,
@@ -1402,31 +1455,31 @@ function parseTrackingAccessLine(line) {
     agent: agent === "-" ? "" : agent,
     ip,
     value: firstNonEmpty(
-      queryValue(pathname, ["value", "ep.value", "epn.value", "epn.ecomm_totalvalue", "price", "revenue"]),
+      queryValueFromParams(params, ["value", "ep.value", "epn.value", "epn.ecomm_totalvalue", "price", "revenue"]),
       payloadValue(payload, ["value", "revenue", "total", "amount", "ecomm_totalvalue"])
     ),
     currency: firstNonEmpty(
-      queryValue(pathname, ["currency", "ep.currency", "cu"]),
+      queryValueFromParams(params, ["currency", "ep.currency", "cu"]),
       payloadValue(payload, ["currency", "currencyCode"])
     ),
     eventId: firstNonEmpty(
-      queryValue(pathname, ["event_id", "eventId", "eid", "x-fb-event-id"]),
+      queryValueFromParams(params, ["event_id", "eventId", "eid", "x-fb-event-id"]),
       payloadValue(payload, ["event_id", "eventId", "fb_event_id"])
     ),
     transactionId: firstNonEmpty(
-      queryValue(pathname, ["transaction_id", "transactionId", "ep.transaction_id", "ep.order_id", "tr", "order_id", "orderId"]),
+      queryValueFromParams(params, ["transaction_id", "transactionId", "ep.transaction_id", "ep.order_id", "tr", "order_id", "orderId"]),
       payloadValue(payload, ["transaction_id", "transactionId", "order_id", "orderId", "order_number"])
     ),
     pageLocation: firstNonEmpty(
-      queryValue(pathname, ["dl", "page_location", "ep.page_location", "url"]),
+      queryValueFromParams(params, ["dl", "page_location", "ep.page_location", "url"]),
       payloadValue(payload, ["page_location", "url", "source_url"])
     ),
     pagePath: firstNonEmpty(
-      queryValue(pathname, ["dp", "page_path", "ep.page_path"]),
+      queryValueFromParams(params, ["dp", "page_path", "ep.page_path"]),
       payloadValue(payload, ["page_path", "path"])
     ),
     eventKey: firstNonEmpty(
-      queryValue(pathname, ["_p", "cid", "client_id", "sid", "session_id"]),
+      queryValueFromParams(params, ["_p", "cid", "client_id", "sid", "session_id"]),
       payloadValue(payload, ["client_id", "session_id", "fbp", "fbc"])
     )
   };
@@ -3526,7 +3579,7 @@ async function persistDailySummary(summary) {
   }
 }
 
-async function summarizeRequestsToday(pathname) {
+async function summarizeRequestsTodayUncached(pathname, lineLimit = config.summaryTailLines) {
   const token = nginxDateToken();
   const emptyPurchases = {
     rawCount: 0,
@@ -3540,9 +3593,9 @@ async function summarizeRequestsToday(pathname) {
     averageOrderValue: 0,
     currency: ""
   };
-  const tail = await command("tail", ["-n", String(config.summaryTailLines), pathname], {
+  const tail = await command("tail", ["-n", String(lineLimit), pathname], {
     timeout: DASHBOARD_COMMAND_TIMEOUT_MS,
-    maxBuffer: Math.max(5 * 1024 * 1024, config.summaryTailLines * 1024)
+    maxBuffer: Math.max(5 * 1024 * 1024, lineLimit * 1024)
   });
   if (!tail.ok) {
     return {
@@ -3564,7 +3617,7 @@ async function summarizeRequestsToday(pathname) {
       recentEvents: [],
       purchases: emptyPurchases,
       eventLogLimit: config.eventLogLimit,
-      summaryTailLines: config.summaryTailLines
+      summaryTailLines: lineLimit
     };
   }
 
@@ -3722,7 +3775,7 @@ async function summarizeRequestsToday(pathname) {
     filter: "tracking-only",
     trackingPaths: config.trackingPaths,
     sampledLines: lines.length,
-    summaryTailLines: config.summaryTailLines,
+    summaryTailLines: lineLimit,
     events: serializeSummaryMap(events),
     clients: serializeSummaryMap(clients),
     hosts: serializeSummaryMap(hosts),
@@ -3734,10 +3787,15 @@ async function summarizeRequestsToday(pathname) {
   };
 }
 
-async function summarizeRequestsForPeriod(pathname, period) {
-  const tail = await command("tail", ["-n", String(config.summaryTailLines), pathname], {
+async function summarizeRequestsToday(pathname, { lineLimit = config.summaryTailLines } = {}) {
+  const key = `today:${pathname}:${lineLimit}:${config.eventLogLimit}:${nginxDateToken()}`;
+  return cachedSummary(key, () => summarizeRequestsTodayUncached(pathname, lineLimit));
+}
+
+async function summarizeRequestsForPeriodUncached(pathname, period, lineLimit = config.summaryTailLines) {
+  const tail = await command("tail", ["-n", String(lineLimit), pathname], {
     timeout: DASHBOARD_COMMAND_TIMEOUT_MS,
-    maxBuffer: Math.max(5 * 1024 * 1024, config.summaryTailLines * 1024)
+    maxBuffer: Math.max(5 * 1024 * 1024, lineLimit * 1024)
   });
   if (!tail.ok) {
     return {
@@ -3772,6 +3830,17 @@ async function summarizeRequestsForPeriod(pathname, period) {
     },
     sampledLines
   };
+}
+
+async function summarizeRequestsForPeriod(pathname, period, { lineLimit = config.summaryTailLines } = {}) {
+  const key = [
+    "period",
+    pathname,
+    lineLimit,
+    period.start.toISOString(),
+    period.end.toISOString()
+  ].join(":");
+  return cachedSummary(key, () => summarizeRequestsForPeriodUncached(pathname, period, lineLimit));
 }
 
 function mergeSummaryRows(summaries, key) {
@@ -3813,10 +3882,10 @@ function mergePurchaseSummaries(summaries) {
   };
 }
 
-async function summarizeRequestsTodayForPaths(paths) {
+async function summarizeRequestsTodayForPaths(paths, options = {}) {
   const uniquePaths = [...new Set((paths || []).filter(Boolean))];
   if (!uniquePaths.length) return unavailable("No container access log is available yet.", "Create a live container first.");
-  const summaries = await Promise.all(uniquePaths.map((pathname) => summarizeRequestsToday(pathname)));
+  const summaries = await Promise.all(uniquePaths.map((pathname) => summarizeRequestsToday(pathname, options)));
   const readable = summaries.filter((summary) => summary.available);
   if (!readable.length) {
     return {
@@ -3849,13 +3918,13 @@ async function summarizeRequestsTodayForPaths(paths) {
   };
 }
 
-async function summarizeRequestsForPeriodForPaths(paths, period) {
+async function summarizeRequestsForPeriodForPaths(paths, period, options = {}) {
   const uniquePaths = [...new Set((paths || []).filter(Boolean))];
   if (!uniquePaths.length) {
     return unavailable("No container access log is available yet.", "Create a live container first.");
   }
 
-  const summaries = await Promise.all(uniquePaths.map((pathname) => summarizeRequestsForPeriod(pathname, period)));
+  const summaries = await Promise.all(uniquePaths.map((pathname) => summarizeRequestsForPeriod(pathname, period, options)));
   const readable = summaries.filter((summary) => summary.available);
   if (!readable.length) {
     return {
@@ -4015,6 +4084,7 @@ function publicRuntimeConfig() {
     usingDedicatedLogs: config.usingDedicatedLogs,
     logTailLines: config.logTailLines,
     summaryTailLines: config.summaryTailLines,
+    customerSummaryTailLines: config.customerSummaryTailLines,
     eventLogLimit: config.eventLogLimit,
     dataDir: config.dataDir,
     historyRetentionDays: config.historyRetentionDays,
@@ -4336,11 +4406,12 @@ async function customerDashboardData(data, session) {
   const tenantLogPaths = customerAccessLogPaths(data, session.tenantId);
   const tenantSetupRequests = (data.customerSetup.requests || []).filter((request) => request.tenantId === session.tenantId && !isDeletedStatus(request.status));
   const billingPeriod = billingPeriodForTenant(tenant, tenantSetupRequests);
+  const customerSummaryOptions = { lineLimit: config.customerSummaryTailLines };
   const tenantRequestSummary = tenantLogPaths.length
-    ? await summarizeRequestsTodayForPaths(tenantLogPaths)
+    ? await summarizeRequestsTodayForPaths(tenantLogPaths, customerSummaryOptions)
     : filterRequestSummaryForTenant(data.nginx.todayEvents, tenant);
   const tenantPeriodSummary = tenantLogPaths.length
-    ? await summarizeRequestsForPeriodForPaths(tenantLogPaths, billingPeriod)
+    ? await summarizeRequestsForPeriodForPaths(tenantLogPaths, billingPeriod, customerSummaryOptions)
     : { available: false, count: tenant?.requestsMonth || tenantRequestSummary.count, period: billingPeriod };
   const requestLimit = tenant?.requestLimit || data.usage.requestLimit;
   const requestsMonth = Number(tenant?.requestsMonth ?? tenantPeriodSummary.count ?? tenantRequestSummary.count ?? 0);
@@ -4679,12 +4750,22 @@ const server = createServer(async (req, res) => {
 
     if (req.url?.startsWith("/api/dashboard")) {
       const session = getSession(req);
+      const startedAt = Date.now();
       if (session?.role === "customer") {
-        jsonResponse(res, 200, await getCustomerDashboardData(session));
+        const payload = await getCustomerDashboardData(session);
+        payload.timing = { dashboardMs: Date.now() - startedAt, role: "customer" };
+        if (payload.timing.dashboardMs > 2000) {
+          console.warn(`[dashboard] customer dashboard took ${payload.timing.dashboardMs}ms for tenant ${session.tenantId}`);
+        }
+        jsonResponse(res, 200, payload);
         return;
       }
       const dashboardData = await getDashboardData();
-      jsonResponse(res, 200, { ...dashboardData, session });
+      const payload = { ...dashboardData, session, timing: { dashboardMs: Date.now() - startedAt, role: session?.role || "unknown" } };
+      if (payload.timing.dashboardMs > 2000) {
+        console.warn(`[dashboard] owner dashboard took ${payload.timing.dashboardMs}ms`);
+      }
+      jsonResponse(res, 200, payload);
       return;
     }
 
