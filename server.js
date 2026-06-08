@@ -2500,6 +2500,47 @@ function isPastDate(value) {
   return Number.isFinite(date.getTime()) && date < new Date();
 }
 
+function validDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function addDays(date, days) {
+  return new Date(date.getTime() + days * 86400000);
+}
+
+function billingPeriodForTenant(tenant, setupRequests = []) {
+  const now = new Date();
+  const renewal = validDate(tenant?.renewalDate);
+  if (renewal) {
+    const start = addDays(renewal, -30);
+    return {
+      start,
+      end: renewal > now ? now : renewal,
+      renewal,
+      label: `${localDateKey(start)} to ${localDateKey(renewal)}`
+    };
+  }
+
+  const createdCandidates = [
+    tenant?.createdAt,
+    tenant?.signupAt,
+    ...(setupRequests || []).map((request) => request.createdAt)
+  ]
+    .map(validDate)
+    .filter(Boolean)
+    .sort((a, b) => a - b);
+  const start = createdCandidates[0] || addDays(now, -30);
+  const end = addDays(start, 30);
+  return {
+    start,
+    end: end > now ? now : end,
+    renewal: end,
+    label: `${localDateKey(start)} to ${localDateKey(end)}`
+  };
+}
+
 function hasNumericValue(value) {
   return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 }
@@ -2548,14 +2589,19 @@ function getTenantContainers(tenantId, tenant = null, setupRequests = [], provis
   );
 }
 
-function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers }) {
+function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers, tenantUsage = {} }) {
   const enrichedCustomers = (customers.tenants || []).map((customer) => {
     const customerContainers = getTenantContainers(customer.id, customer, customerSetup?.requests || [], provisioning?.requests || []);
     const plan = customer.plan || config.billingPlan;
     const requestLimit = Number(customer.requestLimit || config.monthlyRequestLimit || 0);
     const requestsToday = customerRequestCount(customer, requestSummary);
-    const requestsMonth = customer.source === "environment" ? Number(usage.requestsMonth || requestsToday) : requestsToday;
-    const usagePercent = requestLimit ? Math.round((requestsMonth / requestLimit) * 100) : 0;
+    const periodUsage = tenantUsage[customer.id] || null;
+    const requestsMonth = Number(
+      customer.requestsMonth ??
+      periodUsage?.requestsMonth ??
+      (customer.source === "environment" ? usage.requestsMonth : requestsToday)
+    );
+    const usagePercent = requestLimit ? Math.min(100, Math.round((requestsMonth / requestLimit) * 1000) / 10) : 0;
     const containers = customerContainerHealth(customer, docker);
     const subscriptionStatus = normalizeLifecycleStatus(customer.subscriptionStatus || customer.status || "active");
     const paymentStatus = normalizeLifecycleStatus(customer.paymentStatus || "paid");
@@ -2577,6 +2623,7 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
       requestedContainers: customerContainers.filter((container) => container.status === "requested").length,
       requestsToday,
       requestsMonth,
+      usagePeriod: periodUsage?.period || usage.period || "",
       requestLimit,
       usagePercent,
       usageStatus: requestLimit && usagePercent >= 100 ? "over_limit" : requestLimit && usagePercent >= 80 ? "warning" : "healthy",
@@ -3664,6 +3711,46 @@ async function summarizeRequestsToday(pathname) {
   };
 }
 
+async function summarizeRequestsForPeriod(pathname, period) {
+  const tail = await command("tail", ["-n", String(config.summaryTailLines), pathname], {
+    timeout: DASHBOARD_COMMAND_TIMEOUT_MS,
+    maxBuffer: Math.max(5 * 1024 * 1024, config.summaryTailLines * 1024)
+  });
+  if (!tail.ok) {
+    return {
+      available: false,
+      count: 0,
+      path: pathname,
+      message: "Billing-period request count could not be calculated.",
+      detail: tail.stderr || tail.error,
+      sampledLines: 0
+    };
+  }
+
+  let count = 0;
+  let sampledLines = 0;
+  for (const line of splitLines(tail.stdout)) {
+    sampledLines += 1;
+    const parsed = parseTrackingAccessLine(line);
+    if (!parsed || !parsed.date) continue;
+    if (parsed.date < period.start || parsed.date > period.end) continue;
+    if (classifyTrackingNoise(parsed)) continue;
+    count += 1;
+  }
+
+  return {
+    available: true,
+    count,
+    path: pathname,
+    period: {
+      start: period.start.toISOString(),
+      end: period.end.toISOString(),
+      label: period.label
+    },
+    sampledLines
+  };
+}
+
 function mergeSummaryRows(summaries, key) {
   const rows = new Map();
   for (const summary of summaries) {
@@ -3736,6 +3823,36 @@ async function summarizeRequestsTodayForPaths(paths) {
     purchases: mergePurchaseSummaries(readable),
     recentEvents,
     message: "Customer container request summary loaded."
+  };
+}
+
+async function summarizeRequestsForPeriodForPaths(paths, period) {
+  const uniquePaths = [...new Set((paths || []).filter(Boolean))];
+  if (!uniquePaths.length) {
+    return unavailable("No container access log is available yet.", "Create a live container first.");
+  }
+
+  const summaries = await Promise.all(uniquePaths.map((pathname) => summarizeRequestsForPeriod(pathname, period)));
+  const readable = summaries.filter((summary) => summary.available);
+  if (!readable.length) {
+    return {
+      ...summaries[0],
+      path: uniquePaths.join(", "),
+      message: "Billing-period request count could not be calculated.",
+      detail: summaries.map((summary) => `${summary.path}: ${summary.detail || summary.message}`).join(" | ")
+    };
+  }
+
+  return {
+    available: true,
+    count: readable.reduce((total, summary) => total + Number(summary.count || 0), 0),
+    path: uniquePaths.join(", "),
+    period: {
+      start: period.start.toISOString(),
+      end: period.end.toISOString(),
+      label: period.label
+    },
+    sampledLines: readable.reduce((total, summary) => total + Number(summary.sampledLines || 0), 0)
   };
 }
 
@@ -3884,10 +4001,11 @@ async function getDashboardData() {
   const customerSetup = await getCustomerSetupSummary();
   const customers = await getCustomerCatalog({ docker, ssl, orders });
   const usage = getUsageSummary({ requestSummary, history });
+  const tenantUsage = await tenantBillingUsageMap({ customerSetup, provisioning }, customers.tenants || []);
   const reconciliation = getReconciliationSummary({ requestSummary, orders });
   const integrations = getIntegrationSummary({ orders, requestSummary });
   const setupWizard = getSetupWizard({ customers, provisioning, integrations, ssl, requestSummary });
-  const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers });
+  const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers, tenantUsage });
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
   void sendAlertHooks(alerts);
@@ -4048,18 +4166,45 @@ async function customerAccessLogForTenant(data, tenantId) {
   };
 }
 
+async function tenantBillingUsageMap(data, tenants = []) {
+  const entries = await Promise.all((tenants || []).map(async (tenant) => {
+    const tenantSetupRequests = (data.customerSetup?.requests || []).filter((request) => request.tenantId === tenant.id && !isDeletedStatus(request.status));
+    const period = billingPeriodForTenant(tenant, tenantSetupRequests);
+    const paths = tenant.source === "environment" ? [config.accessLog].filter(Boolean) : customerAccessLogPaths(data, tenant.id);
+    if (!paths.length) {
+      return [tenant.id, {
+        requestsMonth: Number(tenant.requestsMonth || 0),
+        period: period.label,
+        available: false
+      }];
+    }
+    const summary = await summarizeRequestsForPeriodForPaths(paths, period);
+    return [tenant.id, {
+      requestsMonth: Number(tenant.requestsMonth ?? summary.count ?? 0),
+      period: period.label,
+      available: Boolean(summary.available)
+    }];
+  }));
+  return Object.fromEntries(entries);
+}
+
 async function customerDashboardData(data, session) {
   const customerRows = data.owner?.customers || data.customers?.tenants || [];
   const tenant = customerRows.find((customer) => customer.id === session.tenantId) || customerRows[0] || null;
   const tenantOrders = filterOrdersForTenant(data.orders, tenant);
   const tenantAccessLog = await customerAccessLogForTenant(data, session.tenantId);
   const tenantLogPaths = customerAccessLogPaths(data, session.tenantId);
+  const tenantSetupRequests = (data.customerSetup.requests || []).filter((request) => request.tenantId === session.tenantId && !isDeletedStatus(request.status));
+  const billingPeriod = billingPeriodForTenant(tenant, tenantSetupRequests);
   const tenantRequestSummary = tenantLogPaths.length
     ? await summarizeRequestsTodayForPaths(tenantLogPaths)
     : filterRequestSummaryForTenant(data.nginx.todayEvents, tenant);
+  const tenantPeriodSummary = tenantLogPaths.length
+    ? await summarizeRequestsForPeriodForPaths(tenantLogPaths, billingPeriod)
+    : { available: false, count: tenant?.requestsMonth || tenantRequestSummary.count, period: billingPeriod };
   const requestLimit = tenant?.requestLimit || data.usage.requestLimit;
-  const requestsMonth = tenant?.requestsMonth || tenantRequestSummary.count;
-  const usagePercent = requestLimit ? Math.round((requestsMonth / requestLimit) * 100) : 0;
+  const requestsMonth = Number(tenant?.requestsMonth ?? tenantPeriodSummary.count ?? tenantRequestSummary.count ?? 0);
+  const usagePercent = requestLimit ? Math.min(100, Math.round((requestsMonth / requestLimit) * 1000) / 10) : 0;
   const tenantUsage = {
     ...data.usage,
     plan: tenant?.plan || data.usage.plan,
@@ -4071,6 +4216,11 @@ async function customerDashboardData(data, session) {
     requestsToday: tenantRequestSummary.count,
     requestsMonth,
     requestLimit,
+    period: billingPeriod.label,
+    periodStart: billingPeriod.start.toISOString(),
+    periodEnd: billingPeriod.renewal.toISOString(),
+    renewalDate: tenant?.renewalDate || billingPeriod.renewal.toISOString(),
+    periodSummary: tenantPeriodSummary,
     usagePercent,
     status: !requestLimit ? "unmetered" : usagePercent >= 100 ? "over_limit" : usagePercent >= 80 ? "warning" : "healthy"
   };
@@ -4085,7 +4235,7 @@ async function customerDashboardData(data, session) {
     customerSetup: {
       available: data.customerSetup.available,
       path: "",
-      requests: (data.customerSetup.requests || []).filter((request) => request.tenantId === session.tenantId && !isDeletedStatus(request.status))
+      requests: tenantSetupRequests
     },
     customers: tenant
       ? {

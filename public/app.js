@@ -1531,10 +1531,11 @@ function renderCustomerPerformance(data) {
   const summary = data.nginx?.todayEvents || {};
   const purchases = purchaseSummary(data);
   const totalEvents = Number(summary.count || 0);
+  const periodEvents = Number(data.usage?.requestsMonth ?? totalEvents);
   const purchaseCount = Number(purchases.uniqueCount || 0);
   const conversion = totalEvents ? Math.round((purchaseCount / totalEvents) * 100) : 0;
   renderBusinessGrid(els.customerPerformanceGrid, [
-    { label: "Events", value: totalEvents.toLocaleString(), detail: `${Number(data.usage?.usagePercent || 0)}% used` },
+    { label: "Events", value: periodEvents.toLocaleString(), detail: `${Number(data.usage?.usagePercent || 0)}% used this billing period` },
     { label: "Today", value: Number(data.usage?.requestsToday || totalEvents || 0).toLocaleString(), detail: "Clean tracking requests" },
     { label: "Revenue", value: purchases.uniqueRevenue ? formatMoney(purchases.uniqueRevenue, purchases.currency) : "0", detail: "Tracked purchase value" },
     { label: "Conversion", value: `${conversion}%`, detail: `${purchaseCount.toLocaleString()} / ${totalEvents.toLocaleString()}` },
@@ -1744,7 +1745,7 @@ function customerContainerDetail(request, data, dnsTarget) {
   const requestLimit = Number(usage.requestLimit || 100000);
   const monthRequests = Number(usage.requestsMonth || 0);
   const requestCount = customerContainerRequestCount(request, data);
-  const usagePercent = requestLimit ? Math.min(100, Math.round((monthRequests / requestLimit) * 100)) : 0;
+  const usagePercent = requestLimit ? Math.min(100, Math.round((monthRequests / requestLimit) * 1000) / 10) : 0;
   const limits = request.resourceLimits || {};
   const serverUrl = request.trackingDomain ? `https://${request.trackingDomain}` : "Tracking domain pending";
   const platformUrl = request.platformDomain || serverUrl;
@@ -1760,7 +1761,7 @@ function customerContainerDetail(request, data, dnsTarget) {
         <p>${escapeHtml(request.websiteUrl || "Website not set")}</p>
         <div class="container-detail-progress">
           <strong>${Number(monthRequests).toLocaleString()}</strong>
-          <span>of ${Number(requestLimit).toLocaleString()} requests sent this month</span>
+          <span>of ${Number(requestLimit).toLocaleString()} requests in this billing period</span>
           <em>${usagePercent}% used</em>
         </div>
       </div>
@@ -3133,6 +3134,7 @@ function renderBilling(data) {
       <div><span>Domains</span><strong>${activePlan.domains} / ${activePlan.domains}</strong></div>
       <div><span>Receivers per Container</span><strong>${activePlan.receivers}</strong></div>
       <div><span>Requests today</span><strong>${Number(usage.requestsToday || 0).toLocaleString()}</strong></div>
+      <div><span>Billing period</span><strong>${escapeHtml(String(usage.period || "Current 30 days"))}</strong></div>
     </div>
   `;
 
