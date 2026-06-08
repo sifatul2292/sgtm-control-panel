@@ -2857,6 +2857,178 @@ textarea::placeholder {
   }
 }
 
+/* ============================================================
+   Modern visual + motion layer
+   Appended enhancement — depth, gradients, and micro-motion.
+   Markup unchanged. Honored by the reduced-motion guard below.
+   ============================================================ */
+
+@property --usage-percent {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@keyframes view-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ring-pop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* View switch — fade the container, stagger the cards inside */
+.view.is-active {
+  animation: view-enter var(--dur-med) var(--ease-out) both;
+}
+
+.customer-home > *,
+.metrics-grid > *,
+.customer-home-grid > *,
+.customer-two-col > *,
+.customer-analytics-grid > * {
+  animation: rise-in 460ms var(--ease-out) both;
+}
+
+.customer-home > *:nth-child(1),
+.metrics-grid > *:nth-child(1) { animation-delay: 30ms; }
+.customer-home > *:nth-child(2),
+.metrics-grid > *:nth-child(2) { animation-delay: 80ms; }
+.customer-home > *:nth-child(3),
+.metrics-grid > *:nth-child(3) { animation-delay: 130ms; }
+.customer-home > *:nth-child(4),
+.metrics-grid > *:nth-child(4) { animation-delay: 180ms; }
+.customer-home > *:nth-child(n + 5),
+.metrics-grid > *:nth-child(n + 5) { animation-delay: 230ms; }
+
+/* Card depth + hover lift (shared surfaces) */
+.panel,
+.metric-card,
+.customer-hero-card,
+.customer-plan-box {
+  transition:
+    transform var(--dur-med) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out),
+    border-color var(--dur-med) var(--ease-out);
+}
+
+.metric-card:hover,
+.panel:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 24px 60px color-mix(in oklch, var(--color-text), transparent 88%);
+  border-color: var(--color-line-strong);
+}
+
+/* Metric cards — faint accent wash + reveal edge */
+.metric-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(165deg, color-mix(in oklch, var(--color-accent), transparent 95%), transparent 58%),
+    var(--color-surface);
+}
+
+.metric-card::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-accent), color-mix(in oklch, var(--color-accent-2), transparent 25%));
+  opacity: 0;
+  transition: opacity var(--dur-med) var(--ease-out);
+}
+
+.metric-card:hover::after {
+  opacity: 1;
+}
+
+/* Customer hero — branded gradient + soft glow */
+.customer-hero-card {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in oklch, var(--color-accent), transparent 78%);
+  background:
+    radial-gradient(120% 150% at 100% 0%, color-mix(in oklch, var(--color-accent), transparent 85%), transparent 55%),
+    radial-gradient(120% 130% at 0% 100%, color-mix(in oklch, var(--color-accent-2), transparent 90%), transparent 52%),
+    var(--color-surface);
+}
+
+/* Usage ring — animated fill, brand gradient, count pops in */
+.usage-ring {
+  animation: ring-pop 520ms var(--ease-out) both;
+  transition: --usage-percent 1100ms var(--ease-out);
+  background: conic-gradient(
+    from -90deg,
+    var(--color-accent) calc(var(--usage-percent) * 1%),
+    color-mix(in oklch, var(--color-accent), transparent 84%) 0
+  );
+}
+
+.usage-ring strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sidebar nav — slide accent on hover */
+.nav-item,
+.side-link {
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.nav-item:hover {
+  transform: translateX(2px);
+}
+
+/* Primary button — gradient + lift */
+.button-primary {
+  background: linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent), var(--color-accent-2) 32%));
+  box-shadow: 0 8px 20px color-mix(in oklch, var(--color-accent), transparent 72%);
+}
+
+.button-primary:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent), var(--color-accent-2) 32%));
+  box-shadow: 0 12px 28px color-mix(in oklch, var(--color-accent), transparent 64%);
+}
+
+/* List rows — hover highlight */
+.top-event-row,
+.distribution-row {
+  border-radius: var(--radius-sm);
+  padding-inline: var(--space-sm);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.top-event-row:hover,
+.distribution-row:hover {
+  background: var(--color-surface-2);
+}
+
+/* Status dot — soft halo */
+.status-dot {
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--color-ok), transparent 88%);
+}
+
+/* Anchor buttons — kill default underline/blue link look */
+a.button {
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+a.button.button-primary {
+  color: var(--color-page);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
