@@ -1636,95 +1636,144 @@ function renderCustomerAnalytics(summary) {
     });
 
     const SERIES = [
-      { key: "total",         label: "Total Events",       color: "#2563eb", width: 2.5, fill: true },
-      { key: "pageView",      label: "PageView",           color: "#60a5fa", width: 1.5, fill: false },
-      { key: "viewItem",      label: "ViewContent",        color: "#a78bfa", width: 1.5, fill: false },
-      { key: "addToCart",     label: "AddToCart",          color: "#34d399", width: 1.5, fill: false },
-      { key: "beginCheckout", label: "InitiateCheckout",   color: "#818cf8", width: 1.5, fill: false },
-      { key: "purchases",     label: "Purchase",           color: "#f97316", width: 1.5, fill: false }
+      { key: "total",         label: "Total Events",     color: "#3b82f6", width: 2.5, fill: true  },
+      { key: "pageView",      label: "PageView",         color: "#0ea5e9", width: 1.5, fill: false },
+      { key: "viewItem",      label: "ViewContent",      color: "#8b5cf6", width: 1.5, fill: false },
+      { key: "addToCart",     label: "AddToCart",        color: "#10b981", width: 1.5, fill: false },
+      { key: "beginCheckout", label: "InitiateCheckout", color: "#6366f1", width: 1.5, fill: false },
+      { key: "purchases",     label: "Purchase",         color: "#f59e0b", width: 1.5, fill: false }
     ];
 
     const maxVal = Math.max(1, ...sorted.map((h) => h.total));
-    const width = 640; const height = 200;
-    const pad = { left: 44, right: 16, top: 14, bottom: 32 };
-    const plotW = width - pad.left - pad.right;
-    const plotH = height - pad.top - pad.bottom;
+    const W = 640; const H = 220;
+    const pad = { left: 46, right: 20, top: 20, bottom: 38 };
+    const plotW = W - pad.left - pad.right;
+    const plotH = H - pad.top - pad.bottom;
 
     const toX = (i) => pad.left + (i / 23) * plotW;
-    const toY = (v) => pad.top + plotH - (v / maxVal) * plotH;
+    const toY = (v) => Math.max(pad.top, pad.top + plotH - Math.min(Number(v) / maxVal, 1) * plotH);
 
-    const buildPath = (key) => sorted.map((h, i) => `${i === 0 ? "M" : "L"} ${toX(i).toFixed(1)},${toY(Number(h[key] || 0)).toFixed(1)}`).join(" ");
-    const buildArea = (key) => `M ${pad.left},${pad.top + plotH} ` + sorted.map((h, i) => `L ${toX(i).toFixed(1)},${toY(Number(h[key] || 0)).toFixed(1)}`).join(" ") + ` L ${pad.left + plotW},${pad.top + plotH} Z`;
+    function catmullRom(points) {
+      if (!points.length) return "";
+      let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[Math.max(0, i - 1)];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[Math.min(points.length - 1, i + 2)];
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = Math.max(pad.top, Math.min(pad.top + plotH, p1.y + (p2.y - p0.y) / 6));
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = Math.max(pad.top, Math.min(pad.top + plotH, p2.y - (p3.y - p1.y) / 6));
+        d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+      }
+      return d;
+    }
 
-    const yTicks = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
+    const getPts = (key) => sorted.map((h, i) => ({ x: toX(i), y: toY(h[key] || 0) }));
+    const baseY = (pad.top + plotH).toFixed(1);
+
+    const yTicks = [0, 0.5, 1].map((pct) => {
       const y = (pad.top + plotH * (1 - pct)).toFixed(1);
       const val = Math.round(maxVal * pct);
-      return `<line class="chart-grid-line" x1="${pad.left}" y1="${y}" x2="${pad.left + plotW}" y2="${y}" />
-              <text class="chart-axis-text" x="${pad.left - 5}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end">${val}</text>`;
+      const isBase = pct === 0;
+      return `<line class="${isBase ? "chart-axis-line" : "chart-grid-line-dashed"}" x1="${pad.left}" y1="${y}" x2="${pad.left + plotW}" y2="${y}" />
+              <text class="chart-axis-label" x="${pad.left - 8}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end">${val}</text>`;
     }).join("");
 
     const xLabels = [0, 4, 8, 12, 16, 20, 23].map((i) =>
-      `<text class="chart-axis-text" x="${toX(i).toFixed(1)}" y="${height - 6}" text-anchor="middle">${i}:00</text>`
+      `<text class="chart-axis-label" x="${toX(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${i}:00</text>`
     ).join("");
 
+    const visibleSeries = SERIES.filter((s) => s.key === "total" || sorted.some((h) => Number(h[s.key] || 0) > 0));
+
+    const seriesSVG = visibleSeries.map((s) => {
+      const line = catmullRom(getPts(s.key));
+      const areaEl = s.fill ? `<path d="${line} L ${toX(23).toFixed(1)},${baseY} L ${toX(0).toFixed(1)},${baseY} Z" fill="url(#chartTotalFill)" />` : "";
+      return `${areaEl}<path d="${line}" stroke="${s.color}" stroke-width="${s.width}" fill="none" stroke-linejoin="round" stroke-linecap="round" />`;
+    }).join("");
+
     const slotW = plotW / 23;
-    const hoverRects = sorted.map((h, i) =>
+    const hoverRects = sorted.map((_, i) =>
       `<rect class="chart-hover-rect" x="${(toX(i) - slotW / 2).toFixed(1)}" y="${pad.top}" width="${slotW.toFixed(1)}" height="${plotH}" data-hour="${i}" />`
     ).join("");
 
-    const seriesSVG = SERIES.map((s) => {
-      const hasData = sorted.some((h) => Number(h[s.key] || 0) > 0);
-      if (!hasData && s.key !== "total") return "";
-      const areaEl = s.fill ? `<path d="${buildArea(s.key)}" fill="${s.color}" fill-opacity="0.08" />` : "";
-      return `${areaEl}<path d="${buildPath(s.key)}" stroke="${s.color}" stroke-width="${s.width}" fill="none" stroke-linejoin="round" stroke-linecap="round" />`;
-    }).join("");
-
     els.customerEventChart.innerHTML = `
       <div class="chart-tooltip" id="customerChartTooltip" style="display:none;pointer-events:none"></div>
-      <svg class="customer-analytics-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Hourly event analytics" style="overflow:visible">
+      <svg class="customer-analytics-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly event analytics">
         <defs>
-          <clipPath id="chartClip"><rect x="${pad.left}" y="${pad.top}" width="${plotW}" height="${plotH}" /></clipPath>
+          <linearGradient id="chartTotalFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.10" />
+            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.01" />
+          </linearGradient>
+          <clipPath id="chartClip">
+            <rect x="${pad.left}" y="${pad.top - 4}" width="${plotW}" height="${plotH + 4}" />
+          </clipPath>
         </defs>
         <g>${yTicks}</g>
-        <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top + plotH}" x2="${pad.left + plotW}" y2="${pad.top + plotH}" />
         <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" />
         <g clip-path="url(#chartClip)">${seriesSVG}</g>
-        <g class="chart-hover-strips">${hoverRects}</g>
+        <line class="chart-crosshair-line" x1="0" y1="${pad.top}" x2="0" y2="${pad.top + plotH}" style="display:none" />
+        <g class="chart-dots"></g>
+        <g>${hoverRects}</g>
         ${xLabels}
       </svg>
     `;
 
     if (els.customerChartLegend) {
-      els.customerChartLegend.innerHTML = SERIES.filter((s) => s.key === "total" || sorted.some((h) => Number(h[s.key] || 0) > 0)).map((s) =>
-        `<span class="chart-legend-item"><span class="chart-legend-dot" style="background:${s.color}"></span>${escapeHtml(s.label)}</span>`
+      els.customerChartLegend.innerHTML = visibleSeries.map((s) =>
+        `<button class="chart-legend-item" type="button" data-series="${s.key}" style="--dot-color:${s.color}">
+          <span class="chart-legend-dot"></span>${escapeHtml(s.label)}
+        </button>`
       ).join("");
     }
 
     const tooltip = document.getElementById("customerChartTooltip");
+    const crosshairLine = els.customerEventChart.querySelector(".chart-crosshair-line");
+    const dotsGroup = els.customerEventChart.querySelector(".chart-dots");
+
     els.customerEventChart.querySelectorAll(".chart-hover-rect").forEach((rect) => {
       rect.addEventListener("mouseenter", () => {
-        const i = Number(rect.dataset.hour);
-        const h = sorted[i] || {};
-        const rows = SERIES.map((s) => {
+        const ix = Number(rect.dataset.hour);
+        const h = sorted[ix] || {};
+        const x = toX(ix).toFixed(1);
+
+        crosshairLine.setAttribute("x1", x);
+        crosshairLine.setAttribute("x2", x);
+        crosshairLine.style.display = "";
+
+        dotsGroup.innerHTML = visibleSeries.map((s) => {
+          const val = Number(h[s.key] || 0);
+          if (val === 0 && s.key !== "total") return "";
+          return `<circle cx="${x}" cy="${toY(val).toFixed(1)}" r="4" fill="${s.color}" stroke="white" stroke-width="2" />`;
+        }).filter(Boolean).join("");
+
+        const rows = visibleSeries.map((s) => {
           const val = Number(h[s.key] || 0);
           if (val === 0 && s.key !== "total") return "";
           return `<div class="tooltip-row"><span class="tooltip-dot" style="background:${s.color}"></span><span>${s.label}</span><strong>${val.toLocaleString()}</strong></div>`;
         }).filter(Boolean).join("");
-        tooltip.innerHTML = `<div class="tooltip-hour">${i}:00</div>${rows}`;
+        tooltip.innerHTML = `<div class="tooltip-hour">${ix}:00</div>${rows}`;
         tooltip.style.display = "block";
       });
+
       rect.addEventListener("mousemove", (e) => {
-        const chartRect = els.customerEventChart.getBoundingClientRect();
+        const cr = els.customerEventChart.getBoundingClientRect();
         const tw = tooltip.offsetWidth || 170;
         const th = tooltip.offsetHeight || 90;
-        let left = e.clientX - chartRect.left + 14;
-        let top = e.clientY - chartRect.top - th - 10;
-        if (left + tw > chartRect.width) left = e.clientX - chartRect.left - tw - 14;
-        if (top < 0) top = e.clientY - chartRect.top + 14;
+        let left = e.clientX - cr.left + 16;
+        let top = e.clientY - cr.top - th - 12;
+        if (left + tw > cr.width - 8) left = e.clientX - cr.left - tw - 16;
+        if (top < 0) top = e.clientY - cr.top + 12;
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${top}px`;
       });
-      rect.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+
+      rect.addEventListener("mouseleave", () => {
+        tooltip.style.display = "none";
+        crosshairLine.style.display = "none";
+        dotsGroup.innerHTML = "";
+      });
     });
   }
 
