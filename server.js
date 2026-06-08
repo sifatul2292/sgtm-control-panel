@@ -2455,21 +2455,21 @@ function orderBreakdown(orders, key) {
 
 const planMonthlyAmounts = {
   Free: 0,
-  Starter: 1200,
-  Growth: 3000,
-  Pro: 2900,
-  Enterprise: 5900,
-  Agency: 12000
+  Starter: 900,
+  Growth: 2500,
+  Pro: 2500,
+  Enterprise: 15000,
+  Agency: 7500
 };
 
 const planResourceProfiles = {
-  Free: { memoryMb: 512, cpuLimit: "0.50", monthlyRequestLimit: 15000, containerLimit: 2 },
-  Starter: { memoryMb: 512, cpuLimit: "0.50", monthlyRequestLimit: 100000, containerLimit: 1 },
-  Growth: { memoryMb: 768, cpuLimit: "0.75", monthlyRequestLimit: 500000, containerLimit: 2 },
-  Pro: { memoryMb: 1024, cpuLimit: "1.00", monthlyRequestLimit: 2000000, containerLimit: 15 },
-  Enterprise: { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 5000000, containerLimit: 100 },
-  Agency: { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 3000000, containerLimit: 10 },
-  Customer: { memoryMb: 512, cpuLimit: "0.50", monthlyRequestLimit: 100000, containerLimit: 1 }
+  Free:       { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 15000,    containerLimit: 1  },
+  Starter:    { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 300000,   containerLimit: 1  },
+  Growth:     { memoryMb: 768,  cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2  },
+  Pro:        { memoryMb: 768,  cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2  },
+  Agency:     { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 8000000,  containerLimit: 10 },
+  Enterprise: { memoryMb: 2048, cpuLimit: "2.00", monthlyRequestLimit: 20000000, containerLimit: 50 },
+  Customer:   { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 300000,   containerLimit: 1  }
 };
 
 function monthlyAmountForPlan(planName) {
@@ -4679,8 +4679,18 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (pathname === "/landing.css" || pathname.startsWith("/assets/")) {
+    if (pathname === "/landing.css" || pathname === "/terms.css" || pathname.startsWith("/assets/")) {
       await serveStatic(req, res);
+      return;
+    }
+
+    if (pathname === "/terms") {
+      await servePublicPage(res, "terms.html");
+      return;
+    }
+
+    if (pathname === "/privacy") {
+      await servePublicPage(res, "privacy.html");
       return;
     }
 

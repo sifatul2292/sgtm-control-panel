@@ -3,117 +3,506 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Tagioo is managed server-side tracking for ecommerce teams that need hosted sGTM containers, first-party domains, and event diagnostics." />
-    <title>Tagioo - Server-side tracking, made simple</title>
+    <meta name="description" content="Tagioo — Managed server-side GTM hosting for Bangladesh. Dedicated sGTM containers, first-party domains, real-time event analytics. Starting ৳900/month." />
+    <meta property="og:title" content="Tagioo — Server-side tracking, made simple" />
+    <meta property="og:description" content="Dedicated sGTM containers with first-party domains. Beat ad blockers, recover conversions, track accurately." />
+    <title>Tagioo — Server-side GTM hosting for Bangladesh</title>
     <link rel="stylesheet" href="/landing.css" />
   </head>
   <body>
-    <header class="site-header">
+
+    <!-- ── HEADER ─────────────────────────────────────────────── -->
+    <header class="site-header" id="siteHeader">
       <a class="brand" href="/" aria-label="Tagioo home">
         <span class="brand-mark">T</span>
         <span>Tagioo</span>
       </a>
       <nav aria-label="Primary navigation">
-        <a href="#how">How it works</a>
         <a href="#features">Features</a>
+        <a href="#how">How it works</a>
         <a href="#pricing">Pricing</a>
-        <a href="/signup">Create account</a>
-        <a class="nav-cta" href="/login">Sign in</a>
+        <a href="#faq">FAQ</a>
+        <a href="/login">Sign in</a>
+        <a class="nav-cta" href="/signup">Get started free</a>
       </nav>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
     </header>
 
+    <!-- ── MOBILE NAV ─────────────────────────────────────────── -->
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true">
+      <nav>
+        <a href="#features" onclick="closeMobileNav()">Features</a>
+        <a href="#how" onclick="closeMobileNav()">How it works</a>
+        <a href="#pricing" onclick="closeMobileNav()">Pricing</a>
+        <a href="#faq" onclick="closeMobileNav()">FAQ</a>
+        <a href="/login">Sign in</a>
+        <a class="mobile-cta" href="/signup">Get started free →</a>
+      </nav>
+    </div>
+
     <main>
+
+      <!-- ── HERO ───────────────────────────────────────────────── -->
       <section class="hero">
         <img class="hero-image" src="/assets/tagioo-hero.png" alt="" />
         <div class="hero-overlay"></div>
         <div class="hero-content">
-          <p class="eyebrow">Managed server-side tracking</p>
-          <h1>Server-side tracking, made simple.</h1>
-          <p class="hero-copy">Launch hosted sGTM containers, connect first-party tracking domains, and monitor ecommerce events without operating the infrastructure yourself.</p>
+          <div class="hero-badge">
+            <span class="badge-dot"></span>
+            BDIX-hosted &nbsp;·&nbsp; Dedicated containers &nbsp;·&nbsp; Bangladesh
+          </div>
+          <h1>Server-side tracking<br>that <span class="hero-accent">actually works.</span></h1>
+          <p class="hero-copy">Launch isolated sGTM containers with first-party domains. Beat ad blockers, recover lost conversions, and monitor every ecommerce event — without touching a server yourself.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="/signup">Create account</a>
-            <a class="button button-secondary" href="#how">See setup flow</a>
+            <a class="button button-primary" href="/signup">Start for free</a>
+            <a class="button button-outline" href="#pricing">See pricing</a>
+          </div>
+          <p class="hero-social-proof">
+            <span class="proof-avatars">
+              <span>A</span><span>B</span><span>C</span><span>D</span>
+            </span>
+            Trusted by growing Bangladesh stores &amp; agencies
+          </p>
+        </div>
+      </section>
+
+      <!-- ── TRUST BAR ──────────────────────────────────────────── -->
+      <div class="trust-bar">
+        <div class="trust-inner">
+          <span class="trust-label">Accepted payments</span>
+          <div class="trust-items">
+            <span class="trust-badge bkash">bKash</span>
+            <span class="trust-badge nagad">Nagad</span>
+            <span class="trust-badge">Visa / MC</span>
+            <span class="trust-badge">Bank Transfer</span>
+            <div class="trust-divider"></div>
+            <span class="trust-check">✓ SSL Secured</span>
+            <span class="trust-check">✓ BDIX Hosted</span>
+            <span class="trust-check">✓ 99.9% Uptime</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STATS ──────────────────────────────────────────────── -->
+      <section class="stats-strip">
+        <div class="stats-inner">
+          <div class="stat-item">
+            <strong>~15ms</strong>
+            <span>BDIX response time</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <strong>100%</strong>
+            <span>Dedicated containers</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <strong>Free</strong>
+            <span>15K events/month forever</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <strong>24/7</strong>
+            <span>WhatsApp support in Bengali</span>
           </div>
         </div>
       </section>
 
-      <section id="how" class="section">
-        <div class="section-heading">
+      <!-- ── PROBLEM ────────────────────────────────────────────── -->
+      <section class="section problem-section">
+        <div class="section-heading centered">
+          <p class="eyebrow">Why server-side?</p>
+          <h2>Your tracking is broken.<br>Here's why.</h2>
+          <p class="section-sub">Ad platforms report 40–60% fewer conversions than your actual sales. Client-side pixels are dying.</p>
+        </div>
+        <div class="problem-grid">
+          <article class="problem-card">
+            <div class="problem-icon">🚫</div>
+            <h3>Ad blockers</h3>
+            <p>30–40% of Bangladesh internet users run ad blockers. Every blocked request is a lost conversion signal for Meta and Google.</p>
+          </article>
+          <article class="problem-card">
+            <div class="problem-icon">🍪</div>
+            <h3>Cookie restrictions</h3>
+            <p>Safari ITP limits cookies to 1–7 days. iOS 17 strips tracking parameters. Client-side cookies are increasingly unreliable.</p>
+          </article>
+          <article class="problem-card">
+            <div class="problem-icon">📉</div>
+            <h3>Lost ad spend</h3>
+            <p>If Meta can't see your purchases, it can't optimize campaigns. You waste budget targeting the wrong audiences with bad signals.</p>
+          </article>
+        </div>
+        <div class="problem-solution">
+          <span class="solution-badge">The fix</span>
+          <p>Server-side GTM routes events directly from your server to ad platforms — bypassing every client-side restriction.</p>
+        </div>
+      </section>
+
+      <!-- ── HOW IT WORKS ───────────────────────────────────────── -->
+      <section id="how" class="section how-section">
+        <div class="section-heading centered">
           <p class="eyebrow">Simple launch flow</p>
-          <h2>From domain to live container in a few steps.</h2>
+          <h2>Live in under 30 minutes.</h2>
         </div>
         <div class="step-grid">
-          <article>
-            <span>01</span>
-            <h3>Create a container</h3>
-            <p>Customers paste their GTM server container config and website details into Tagioo.</p>
+          <article class="step-card">
+            <div class="step-number">01</div>
+            <h3>Create your container</h3>
+            <p>Sign up, enter your website domain and GTM server container config. Tagioo handles the rest.</p>
           </article>
-          <article>
-            <span>02</span>
-            <h3>Point DNS</h3>
-            <p>They add a CNAME such as <code>server.store.com</code> to <code>bd.tagioo.com</code>.</p>
+          <div class="step-connector">→</div>
+          <article class="step-card">
+            <div class="step-number">02</div>
+            <h3>Point your DNS</h3>
+            <p>Add one CNAME record: <code>server.yourstore.com → bd.tagioo.com</code>. Your domain, your data.</p>
           </article>
-          <article>
-            <span>03</span>
-            <h3>Tagioo launches</h3>
-            <p>The platform provisions Docker, Nginx, SSL, and health checks for the assigned worker.</p>
+          <div class="step-connector">→</div>
+          <article class="step-card">
+            <div class="step-number">03</div>
+            <h3>Start tracking</h3>
+            <p>Tagioo provisions Docker, Nginx, and SSL automatically. Events start flowing within minutes.</p>
           </article>
         </div>
       </section>
 
+      <!-- ── FEATURES ───────────────────────────────────────────── -->
       <section id="features" class="section feature-band">
-        <div class="section-heading">
-          <p class="eyebrow">Built for ecommerce data</p>
-          <h2>Cleaner tracking infrastructure with owner visibility.</h2>
+        <div class="section-heading centered">
+          <p class="eyebrow">Built for ecommerce</p>
+          <h2>Everything you need.<br>Nothing you don't.</h2>
         </div>
         <div class="feature-grid">
-          <article>
-            <h3>Hosted sGTM containers</h3>
-            <p>Isolated Docker-based server-side GTM containers with automatic launch and cleanup.</p>
+          <article class="feature-card">
+            <div class="feature-icon">📦</div>
+            <h3>Dedicated sGTM container</h3>
+            <p>Your own isolated Docker container — not a shared proxy. Full GTM server access, preview mode, and debug tools.</p>
           </article>
-          <article>
-            <h3>First-party domains</h3>
-            <p>Use customer-owned tracking subdomains with SSL and Nginx routing.</p>
+          <article class="feature-card">
+            <div class="feature-icon">🌐</div>
+            <h3>First-party domain</h3>
+            <p>Use your own subdomain (e.g. <code>server.mystore.com</code>) with automatic SSL via Let's Encrypt.</p>
           </article>
-          <article>
-            <h3>Event diagnostics</h3>
-            <p>Monitor PageView, AddToCart, Checkout, Purchase, dedupe, and metadata health.</p>
+          <article class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3>Real-time event analytics</h3>
+            <p>Monitor PageView, AddToCart, Checkout, and Purchase events with hourly trends and conversion metrics.</p>
           </article>
-          <article>
-            <h3>Worker pool ready</h3>
-            <p>Assign containers to shared worker VPS nodes as the customer base grows.</p>
+          <article class="feature-card">
+            <div class="feature-icon">🔁</div>
+            <h3>Purchase deduplication</h3>
+            <p>Automatically detects and removes duplicate purchase events so your revenue data stays accurate.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">🤖</div>
+            <h3>Bot filtering</h3>
+            <p>Filters crawlers, scrapers, and fake traffic before it reaches your ad platforms — cleaner data, better ROAS.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>GTM template generator</h3>
+            <p>Download pre-built Web GTM + Server GTM templates for GA4, Meta CAPI, Google Ads, and TikTok in one click.</p>
           </article>
         </div>
       </section>
 
-      <section id="pricing" class="section">
-        <div class="section-heading">
-          <p class="eyebrow">Starter packages</p>
-          <h2>Plans for stores, teams, and agencies.</h2>
+      <!-- ── COMPARISON ─────────────────────────────────────────── -->
+      <section class="section comparison-section">
+        <div class="section-heading centered">
+          <p class="eyebrow">Why Tagioo</p>
+          <h2>Not a shared proxy.<br>Your own container.</h2>
+          <p class="section-sub">Most platforms run everyone on the same server. Tagioo gives every customer an isolated container with dedicated resources.</p>
+        </div>
+        <div class="comparison-table-wrap">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th class="col-tagioo">Tagioo</th>
+                <th>PixelFly</th>
+                <th>BonicBD</th>
+                <th>DIY VPS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Dedicated container per client</td>
+                <td class="col-tagioo yes">✓</td>
+                <td class="no">✗ shared proxy</td>
+                <td class="yes">✓</td>
+                <td class="neutral">Manual</td>
+              </tr>
+              <tr>
+                <td>Full sGTM server control</td>
+                <td class="col-tagioo yes">✓</td>
+                <td class="no">✗</td>
+                <td class="yes">✓</td>
+                <td class="yes">✓</td>
+              </tr>
+              <tr>
+                <td>BDIX-hosted (Bangladesh fast)</td>
+                <td class="col-tagioo yes">✓</td>
+                <td class="yes">✓</td>
+                <td class="yes">✓</td>
+                <td class="neutral">Depends</td>
+              </tr>
+              <tr>
+                <td>Free tier available</td>
+                <td class="col-tagioo yes">✓ 15K/mo</td>
+                <td class="yes">✓ 15K/mo</td>
+                <td class="no">✗</td>
+                <td class="no">✗ server cost</td>
+              </tr>
+              <tr>
+                <td>bKash / Nagad payment</td>
+                <td class="col-tagioo yes">✓</td>
+                <td class="yes">✓</td>
+                <td class="yes">✓</td>
+                <td class="neutral">N/A</td>
+              </tr>
+              <tr>
+                <td>Zero server management</td>
+                <td class="col-tagioo yes">✓</td>
+                <td class="yes">✓</td>
+                <td class="yes">✓</td>
+                <td class="no">✗</td>
+              </tr>
+              <tr>
+                <td>Real-time event dashboard</td>
+                <td class="col-tagioo yes">✓</td>
+                <td class="yes">✓</td>
+                <td class="yes">✓</td>
+                <td class="no">✗</td>
+              </tr>
+              <tr>
+                <td>Starting price</td>
+                <td class="col-tagioo price">৳900/mo</td>
+                <td class="price">৳900/mo</td>
+                <td class="price">৳1,000/mo</td>
+                <td class="price">৳2,000+/mo</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── PRICING ────────────────────────────────────────────── -->
+      <section id="pricing" class="section pricing-section">
+        <div class="section-heading centered">
+          <p class="eyebrow">Simple pricing</p>
+          <h2>Plans for every store size.</h2>
+          <p class="section-sub">All plans include: dedicated sGTM container, first-party domain, SSL, real-time analytics, bot filtering, and GTM templates.</p>
         </div>
         <div class="pricing-grid">
-          <article>
-            <h3>Starter</h3>
-            <strong>1 container</strong>
-            <p>For small stores starting with first-party server-side tracking.</p>
+
+          <article class="pricing-card">
+            <div class="plan-header">
+              <h3>Free</h3>
+              <div class="plan-price"><strong>৳0</strong><span>/month</span></div>
+              <p>Test the platform with real events. No credit card required.</p>
+            </div>
+            <ul class="plan-features">
+              <li><span class="check">✓</span> 15,000 events/month</li>
+              <li><span class="check">✓</span> 1 sGTM container</li>
+              <li><span class="check">✓</span> First-party domain</li>
+              <li><span class="check">✓</span> Real-time dashboard</li>
+              <li><span class="check">✓</span> GTM templates</li>
+              <li><span class="muted-check">–</span> Priority support</li>
+            </ul>
+            <a class="button button-outline full-width" href="/signup">Get started free</a>
           </article>
-          <article class="featured">
-            <h3>Growth</h3>
-            <strong>2 containers</strong>
-            <p>For stores running serious ad campaigns and purchase diagnostics.</p>
+
+          <article class="pricing-card">
+            <div class="plan-header">
+              <h3>Starter</h3>
+              <div class="plan-price"><strong>৳900</strong><span>/month</span></div>
+              <p>For stores starting with server-side tracking.</p>
+            </div>
+            <ul class="plan-features">
+              <li><span class="check">✓</span> 300,000 events/month</li>
+              <li><span class="check">✓</span> 1 sGTM container</li>
+              <li><span class="check">✓</span> First-party domain + SSL</li>
+              <li><span class="check">✓</span> Real-time analytics</li>
+              <li><span class="check">✓</span> Purchase deduplication</li>
+              <li><span class="check">✓</span> Email support</li>
+            </ul>
+            <a class="button button-outline full-width" href="/signup">Start Starter</a>
           </article>
-          <article>
-            <h3>Agency</h3>
-            <strong>Multiple clients</strong>
-            <p>For teams managing tracking infrastructure across customer accounts.</p>
+
+          <article class="pricing-card featured">
+            <div class="plan-badge">Most popular</div>
+            <div class="plan-header">
+              <h3>Growth</h3>
+              <div class="plan-price"><strong>৳2,500</strong><span>/month</span></div>
+              <p>For stores running serious ad campaigns.</p>
+            </div>
+            <ul class="plan-features">
+              <li><span class="check">✓</span> 1,500,000 events/month</li>
+              <li><span class="check">✓</span> 2 sGTM containers</li>
+              <li><span class="check">✓</span> Everything in Starter</li>
+              <li><span class="check">✓</span> Bot filtering + diagnostics</li>
+              <li><span class="check">✓</span> Priority WhatsApp support</li>
+              <li><span class="check">✓</span> Dedicated resources</li>
+            </ul>
+            <a class="button button-primary full-width" href="/signup">Start Growth</a>
           </article>
+
+          <article class="pricing-card">
+            <div class="plan-header">
+              <h3>Agency</h3>
+              <div class="plan-price"><strong>৳7,500</strong><span>/month</span></div>
+              <p>For agencies managing multiple client accounts.</p>
+            </div>
+            <ul class="plan-features">
+              <li><span class="check">✓</span> 8,000,000 events/month</li>
+              <li><span class="check">✓</span> 10 sGTM containers</li>
+              <li><span class="check">✓</span> Everything in Growth</li>
+              <li><span class="check">✓</span> Multi-client dashboard</li>
+              <li><span class="check">✓</span> Dedicated support line</li>
+              <li><span class="check">✓</span> SLA guarantee</li>
+            </ul>
+            <a class="button button-outline full-width" href="/signup">Start Agency</a>
+          </article>
+
+        </div>
+        <div class="pricing-footer">
+          <p>All plans billed monthly. Cancel anytime. Pay via <strong>bKash</strong>, <strong>Nagad</strong>, bank transfer, or card.</p>
+          <p>Need a custom plan? <a href="https://wa.me/+8801XXXXXXXXX" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
         </div>
       </section>
+
+      <!-- ── FAQ ────────────────────────────────────────────────── -->
+      <section id="faq" class="section faq-section">
+        <div class="section-heading centered">
+          <p class="eyebrow">Questions</p>
+          <h2>Frequently asked.</h2>
+        </div>
+        <div class="faq-grid">
+          <details class="faq-item">
+            <summary>What is server-side GTM and why do I need it?</summary>
+            <p>Server-side Google Tag Manager runs on a server you control instead of in the visitor's browser. This means ad blockers can't intercept your tracking events, and your data reaches Meta, GA4, and Google Ads reliably. It's essential for any store spending serious money on ads.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How is Tagioo different from PixelFly or BonicBD?</summary>
+            <p>PixelFly uses a shared proxy architecture — your events share infrastructure with other customers. Tagioo gives every customer a fully isolated Docker container with dedicated CPU and memory, just like a private server. You get full GTM server preview mode and complete data isolation.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Do I need to manage any servers?</summary>
+            <p>No. Tagioo handles everything: Docker provisioning, Nginx configuration, SSL certificate (Let's Encrypt), health monitoring, and container restarts. You just point your DNS and install the web GTM container — we do the rest.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What happens after I sign up?</summary>
+            <p>You get a trial dashboard immediately. Add your website details and GTM server container ID, then point your subdomain DNS to our BDIX server. Container launches automatically once DNS resolves. Payment activates your full plan limit.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How do I pay?</summary>
+            <p>We accept bKash, Nagad, bank transfer (all Bangladeshi banks), and international cards (Visa/Mastercard). After signup, contact us on WhatsApp or email to complete payment and activate your plan.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Is my tracking data safe and private?</summary>
+            <p>Yes. Each customer has a completely isolated container — your events never touch another customer's infrastructure. All traffic uses TLS 1.3 encryption. We don't read, sell, or share your event data.</p>
+          </details>
+        </div>
+      </section>
+
+      <!-- ── FINAL CTA ───────────────────────────────────────────── -->
+      <section class="section cta-section">
+        <div class="cta-inner">
+          <p class="eyebrow">Start today</p>
+          <h2>Stop losing conversions.<br>Start tracking accurately.</h2>
+          <p class="cta-sub">Free plan available. No credit card required. Setup takes under 30 minutes.</p>
+          <div class="cta-actions">
+            <a class="button button-primary button-lg" href="/signup">Create free account →</a>
+            <a class="button button-ghost button-lg" href="https://wa.me/+8801XXXXXXXXX" target="_blank" rel="noopener">Chat on WhatsApp</a>
+          </div>
+        </div>
+      </section>
+
     </main>
 
+    <!-- ── FOOTER ─────────────────────────────────────────────── -->
     <footer class="site-footer">
-      <span>Tagioo</span>
-      <span>First-party tracking infrastructure for modern commerce.</span>
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a class="brand" href="/">
+            <span class="brand-mark">T</span>
+            <span>Tagioo</span>
+          </a>
+          <p>First-party server-side tracking infrastructure for Bangladesh ecommerce and agencies.</p>
+          <div class="footer-payments">
+            <span class="trust-badge bkash sm">bKash</span>
+            <span class="trust-badge nagad sm">Nagad</span>
+            <span class="trust-badge sm">Visa / MC</span>
+          </div>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <strong>Product</strong>
+            <a href="#features">Features</a>
+            <a href="#how">How it works</a>
+            <a href="#pricing">Pricing</a>
+            <a href="/signup">Sign up</a>
+          </div>
+          <div class="footer-col">
+            <strong>Support</strong>
+            <a href="https://wa.me/+8801XXXXXXXXX" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
+            <a href="#faq">FAQ</a>
+          </div>
+          <div class="footer-col">
+            <strong>Legal</strong>
+            <a href="/terms">Terms of Service</a>
+            <a href="/privacy">Privacy Policy</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2025 Tagioo. All rights reserved.</span>
+        <span>Made in Bangladesh 🇧🇩</span>
+      </div>
     </footer>
+
+    <!-- ── WHATSAPP FLOAT ──────────────────────────────────────── -->
+    <!-- Replace +8801XXXXXXXXX with your actual WhatsApp number -->
+    <a class="whatsapp-float" href="https://wa.me/+8801XXXXXXXXX" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+    </a>
+
+    <script>
+      const menuBtn = document.getElementById("menuBtn");
+      const mobileNav = document.getElementById("mobileNav");
+
+      menuBtn.addEventListener("click", () => {
+        const open = mobileNav.classList.toggle("open");
+        menuBtn.setAttribute("aria-expanded", String(open));
+        mobileNav.setAttribute("aria-hidden", String(!open));
+      });
+
+      function closeMobileNav() {
+        mobileNav.classList.remove("open");
+        menuBtn.setAttribute("aria-expanded", "false");
+        mobileNav.setAttribute("aria-hidden", "true");
+      }
+
+      // Scroll-based header shadow
+      const header = document.getElementById("siteHeader");
+      window.addEventListener("scroll", () => {
+        header.classList.toggle("scrolled", window.scrollY > 40);
+      }, { passive: true });
+
+      // FAQ accordion
+      document.querySelectorAll(".faq-item").forEach(item => {
+        item.addEventListener("toggle", () => {
+          if (item.open) {
+            document.querySelectorAll(".faq-item[open]").forEach(other => {
+              if (other !== item) other.removeAttribute("open");
+            });
+          }
+        });
+      });
+    </script>
   </body>
 </html>
