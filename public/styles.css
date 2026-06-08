@@ -2158,6 +2158,20 @@ textarea::placeholder {
   gap: var(--space-md);
 }
 
+.inspector-card-top > div {
+  display: grid;
+  gap: 2px;
+}
+
+.inspector-card-top strong {
+  font-size: var(--text-lg);
+}
+
+.inspector-card-top small {
+  color: var(--color-muted);
+  font-weight: 800;
+}
+
 .inspector-grid {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr);
@@ -2170,6 +2184,34 @@ textarea::placeholder {
 }
 
 .inspector-grid strong {
+  overflow-wrap: anywhere;
+}
+
+.inspector-details {
+  border-top: var(--rule-thin) solid var(--color-line);
+  padding-top: var(--space-sm);
+}
+
+.inspector-details summary {
+  width: max-content;
+  color: var(--color-accent);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.inspector-details code {
+  display: block;
+  max-height: 120px;
+  overflow: auto;
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 

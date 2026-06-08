@@ -888,15 +888,68 @@ function renderEventRows(visibleItems, emptyMessage) {
   );
 }
 
+function customerFallbackHost(data) {
+  const request = (data.customerSetup?.requests || []).find((item) => item.trackingDomain || item.websiteUrl);
+  const value = request?.trackingDomain || request?.websiteUrl || data.config?.tenantDomain || data.config?.sslDomain || "";
+  try {
+    return new URL(value.startsWith("http") ? value : `https://${value}`).hostname;
+  } catch {
+    return String(value || "").replace(/^https?:\/\//, "").split("/")[0];
+  }
+}
+
+function purchaseCompleteness(item) {
+  return [
+    item.value,
+    item.currency,
+    item.eventId,
+    item.transactionId
+  ].filter(Boolean).length;
+}
+
+function cleanPurchaseRows(data) {
+  const fallbackHost = customerFallbackHost(data);
+  const rows = purchaseRows(data)
+    .map((item) => ({
+      ...item,
+      displayHost: item.host && item.host !== "Unknown host" ? item.host : fallbackHost || "Tracking domain",
+      completeness: purchaseCompleteness(item)
+    }))
+    .sort((a, b) => {
+      const dateDiff = Number(b.date || 0) - Number(a.date || 0);
+      if (Math.abs(dateDiff) > 30000) return dateDiff;
+      return b.completeness - a.completeness;
+    });
+
+  const grouped = new Map();
+  for (const item of rows) {
+    const key = item.transactionId
+      ? `tx:${item.transactionId}`
+      : item.eventId
+        ? `event:${item.eventId}`
+        : item.value && item.currency && item.date
+          ? `value:${item.value}:${item.currency}:${Math.floor(item.date.getTime() / 60000)}`
+          : `raw:${item.path}:${item.date?.getTime() || ""}`;
+    const current = grouped.get(key);
+    if (!current || item.completeness > current.completeness) grouped.set(key, item);
+  }
+
+  const deduped = [...grouped.values()];
+  const hasUsefulPurchase = deduped.some((item) => item.value || item.eventId || item.transactionId);
+  return hasUsefulPurchase
+    ? deduped.filter((item) => item.value || item.eventId || item.transactionId)
+    : deduped;
+}
+
 function renderPurchaseInspector(data) {
   const query = els.purchaseSearch.value.trim().toLowerCase();
-  const rows = purchaseRows(data).filter((item) => {
+  const rows = cleanPurchaseRows(data).filter((item) => {
     const haystack = [
       item.eventId,
       item.transactionId,
       item.value,
       item.currency,
-      item.host,
+      item.displayHost,
       item.path,
       item.client
     ].filter(Boolean).join(" ").toLowerCase();
@@ -905,7 +958,7 @@ function renderPurchaseInspector(data) {
 
   els.purchaseInspectorBadge.className = "badge";
   els.purchaseInspectorBadge.classList.add(rows.length ? "ok" : "warn");
-  els.purchaseInspectorBadge.textContent = `${rows.length} match${rows.length === 1 ? "" : "es"}`;
+  els.purchaseInspectorBadge.textContent = `${rows.length} purchase${rows.length === 1 ? "" : "s"}`;
 
   if (!rows.length) {
     els.purchaseInspector.innerHTML = '<div class="empty-log">No purchase requests matched.</div>';
@@ -916,19 +969,25 @@ function renderPurchaseInspector(data) {
     ...rows.slice(0, 12).map((item) => {
       const card = document.createElement("article");
       card.className = "inspector-card";
+      const hasValue = item.value && item.currency;
       card.innerHTML = `
         <div class="inspector-card-top">
-          <strong>${escapeHtml(item.displayDate)}</strong>
+          <div>
+            <strong>${escapeHtml(hasValue ? formatMoney(item.value, item.currency) : "Purchase")}</strong>
+            <small>${escapeHtml(item.displayDate)}</small>
+          </div>
           <span class="status-code ${Number(item.status) >= 400 ? "bad" : "good"}">${escapeHtml(item.status)}</span>
         </div>
         <div class="inspector-grid">
           <span>Client</span><strong>${escapeHtml(item.client || "Other")}</strong>
-          <span>Host</span><strong>${escapeHtml(item.host || "Unknown host")}</strong>
-          <span>Value</span><strong>${escapeHtml(item.value && item.currency ? `${item.value} ${item.currency}` : "Missing")}</strong>
-          <span>Event ID</span><strong>${escapeHtml(item.eventId || "Missing")}</strong>
-          <span>Transaction ID</span><strong>${escapeHtml(item.transactionId || "Missing")}</strong>
-          <span>URL</span><strong>${escapeHtml(item.path || "")}</strong>
+          <span>Domain</span><strong>${escapeHtml(item.displayHost)}</strong>
+          <span>Transaction ID</span><strong>${escapeHtml(item.transactionId || "Not provided")}</strong>
+          <span>Event ID</span><strong>${escapeHtml(item.eventId || "Not provided")}</strong>
         </div>
+        <details class="inspector-details">
+          <summary>Request details</summary>
+          <code>${escapeHtml(item.path || "No request URL available.")}</code>
+        </details>
       `;
       return card;
     })
