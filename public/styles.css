@@ -3029,6 +3029,138 @@ a.button.button-primary {
   color: var(--color-page);
 }
 
+/* ─── Interactive chart ──────────────────────────────────── */
+
+.customer-event-chart {
+  position: relative;
+  padding-top: 0.25rem;
+}
+
+.customer-analytics-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-hover-rect {
+  fill: transparent;
+  cursor: crosshair;
+}
+
+.chart-hover-rect:hover {
+  fill: var(--color-accent);
+  fill-opacity: 0.06;
+}
+
+.chart-series-line {
+  transition: opacity 150ms ease;
+}
+
+/* Tooltip */
+.chart-tooltip {
+  position: absolute;
+  z-index: 20;
+  background: var(--color-page);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  box-shadow: 0 8px 24px -4px rgba(0,0,0,.18);
+  font-size: 0.75rem;
+  min-width: 150px;
+  white-space: nowrap;
+}
+
+.tooltip-hour {
+  font-weight: 700;
+  font-size: 0.7rem;
+  color: var(--color-text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+  color: var(--color-text);
+}
+
+.tooltip-row span:nth-child(2) {
+  flex: 1;
+  color: var(--color-text-2);
+}
+
+.tooltip-row strong {
+  font-weight: 600;
+  color: var(--color-text);
+  margin-left: auto;
+  padding-left: 0.75rem;
+}
+
+.tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Legend */
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem 0.25rem 0.25rem;
+  font-size: 0.72rem;
+  color: var(--color-text-2);
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.chart-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Top Events — PixelFly-style table */
+.top-event-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.85rem;
+  gap: 1rem;
+}
+
+.top-event-row:last-child {
+  border-bottom: none;
+}
+
+.top-event-row span {
+  color: var(--color-text-2);
+  font-size: 0.82rem;
+}
+
+.top-event-row strong {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+/* Chart panel full-width */
+.customer-chart-panel {
+  grid-column: 1 / -1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

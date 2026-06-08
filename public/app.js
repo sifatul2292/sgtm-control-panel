@@ -49,6 +49,7 @@ const els = {
   customerNextStepList: document.querySelector("#customerNextStepList"),
   customerPerformanceGrid: document.querySelector("#customerPerformanceGrid"),
   customerEventChart: document.querySelector("#customerEventChart"),
+  customerChartLegend: document.querySelector("#customerChartLegend"),
   customerTopEvents: document.querySelector("#customerTopEvents"),
   customerEventDistribution: document.querySelector("#customerEventDistribution"),
   customerSetupForm: document.querySelector("#customerSetupForm"),
@@ -1628,47 +1629,103 @@ function renderCustomerPerformance(data) {
 
 function renderCustomerAnalytics(summary) {
   if (els.customerEventChart) {
-    const hourly = Array.isArray(summary.hourly) ? summary.hourly : [];
-    const points = hourly.length ? hourly.map((row) => Number(row.total || 0)) : Array.from({ length: 12 }, () => 0);
-    const max = Math.max(1, ...points);
-    const width = 640;
-    const height = 220;
-    const pad = { left: 54, right: 18, top: 18, bottom: 42 };
-    const plotWidth = width - pad.left - pad.right;
-    const plotHeight = height - pad.top - pad.bottom;
-    const step = points.length > 1 ? plotWidth / (points.length - 1) : plotWidth;
-    const coords = points.map((value, index) => {
-      const x = pad.left + index * step;
-      const y = pad.top + plotHeight - (value / max) * plotHeight;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(" ");
-    const areaPoints = `${pad.left},${pad.top + plotHeight} ${coords} ${pad.left + plotWidth},${pad.top + plotHeight}`;
-    const mid = Math.ceil(max / 2);
+    const rawHourly = Array.isArray(summary.hourly) ? summary.hourly : [];
+    const sorted = Array.from({ length: 24 }, (_, i) => {
+      const found = rawHourly.find((h) => h.hour === i);
+      return found || { hour: i, total: 0, errors: 0, purchases: 0, pageView: 0, viewItem: 0, addToCart: 0, beginCheckout: 0 };
+    });
+
+    const SERIES = [
+      { key: "total",         label: "Total Events",       color: "#2563eb", width: 2.5, fill: true },
+      { key: "pageView",      label: "PageView",           color: "#60a5fa", width: 1.5, fill: false },
+      { key: "viewItem",      label: "ViewContent",        color: "#a78bfa", width: 1.5, fill: false },
+      { key: "addToCart",     label: "AddToCart",          color: "#34d399", width: 1.5, fill: false },
+      { key: "beginCheckout", label: "InitiateCheckout",   color: "#818cf8", width: 1.5, fill: false },
+      { key: "purchases",     label: "Purchase",           color: "#f97316", width: 1.5, fill: false }
+    ];
+
+    const maxVal = Math.max(1, ...sorted.map((h) => h.total));
+    const width = 640; const height = 200;
+    const pad = { left: 44, right: 16, top: 14, bottom: 32 };
+    const plotW = width - pad.left - pad.right;
+    const plotH = height - pad.top - pad.bottom;
+
+    const toX = (i) => pad.left + (i / 23) * plotW;
+    const toY = (v) => pad.top + plotH - (v / maxVal) * plotH;
+
+    const buildPath = (key) => sorted.map((h, i) => `${i === 0 ? "M" : "L"} ${toX(i).toFixed(1)},${toY(Number(h[key] || 0)).toFixed(1)}`).join(" ");
+    const buildArea = (key) => `M ${pad.left},${pad.top + plotH} ` + sorted.map((h, i) => `L ${toX(i).toFixed(1)},${toY(Number(h[key] || 0)).toFixed(1)}`).join(" ") + ` L ${pad.left + plotW},${pad.top + plotH} Z`;
+
+    const yTicks = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
+      const y = (pad.top + plotH * (1 - pct)).toFixed(1);
+      const val = Math.round(maxVal * pct);
+      return `<line class="chart-grid-line" x1="${pad.left}" y1="${y}" x2="${pad.left + plotW}" y2="${y}" />
+              <text class="chart-axis-text" x="${pad.left - 5}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end">${val}</text>`;
+    }).join("");
+
+    const xLabels = [0, 4, 8, 12, 16, 20, 23].map((i) =>
+      `<text class="chart-axis-text" x="${toX(i).toFixed(1)}" y="${height - 6}" text-anchor="middle">${i}:00</text>`
+    ).join("");
+
+    const slotW = plotW / 23;
+    const hoverRects = sorted.map((h, i) =>
+      `<rect class="chart-hover-rect" x="${(toX(i) - slotW / 2).toFixed(1)}" y="${pad.top}" width="${slotW.toFixed(1)}" height="${plotH}" data-hour="${i}" />`
+    ).join("");
+
+    const seriesSVG = SERIES.map((s) => {
+      const hasData = sorted.some((h) => Number(h[s.key] || 0) > 0);
+      if (!hasData && s.key !== "total") return "";
+      const areaEl = s.fill ? `<path d="${buildArea(s.key)}" fill="${s.color}" fill-opacity="0.08" />` : "";
+      return `${areaEl}<path d="${buildPath(s.key)}" stroke="${s.color}" stroke-width="${s.width}" fill="none" stroke-linejoin="round" stroke-linecap="round" />`;
+    }).join("");
+
     els.customerEventChart.innerHTML = `
-      <div class="chart-explainer">
-        <strong>Server events per hour</strong>
-        <span>Y-axis is event count. X-axis runs from 24 hours ago to now.</span>
-      </div>
-      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Hourly event trend">
+      <div class="chart-tooltip" id="customerChartTooltip" style="display:none;pointer-events:none"></div>
+      <svg class="customer-analytics-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Hourly event analytics" style="overflow:visible">
         <defs>
-          <linearGradient id="customerChartFill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stop-color="currentColor" stop-opacity=".22" />
-            <stop offset="1" stop-color="currentColor" stop-opacity=".02" />
-          </linearGradient>
+          <clipPath id="chartClip"><rect x="${pad.left}" y="${pad.top}" width="${plotW}" height="${plotH}" /></clipPath>
         </defs>
-        <line class="chart-grid-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left + plotWidth}" y2="${pad.top}" />
-        <line class="chart-grid-line" x1="${pad.left}" y1="${pad.top + plotHeight / 2}" x2="${pad.left + plotWidth}" y2="${pad.top + plotHeight / 2}" />
-        <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top + plotHeight}" x2="${pad.left + plotWidth}" y2="${pad.top + plotHeight}" />
-        <text class="chart-axis-text" x="${pad.left - 10}" y="${pad.top + 4}" text-anchor="end">${max}</text>
-        <text class="chart-axis-text" x="${pad.left - 10}" y="${pad.top + plotHeight / 2 + 4}" text-anchor="end">${mid}</text>
-        <text class="chart-axis-text" x="${pad.left - 10}" y="${pad.top + plotHeight + 4}" text-anchor="end">0</text>
-        <text class="chart-axis-text" x="${pad.left}" y="${height - 12}" text-anchor="start">24h ago</text>
-        <text class="chart-axis-text" x="${pad.left + plotWidth}" y="${height - 12}" text-anchor="end">Now</text>
-        <text class="chart-axis-title" x="16" y="${pad.top + plotHeight / 2}" transform="rotate(-90 16 ${pad.top + plotHeight / 2})" text-anchor="middle">Events</text>
-        <polygon class="chart-area" points="${areaPoints}" />
-        <polyline class="chart-line" points="${coords}" />
+        <g>${yTicks}</g>
+        <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top + plotH}" x2="${pad.left + plotW}" y2="${pad.top + plotH}" />
+        <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" />
+        <g clip-path="url(#chartClip)">${seriesSVG}</g>
+        <g class="chart-hover-strips">${hoverRects}</g>
+        ${xLabels}
       </svg>
     `;
+
+    if (els.customerChartLegend) {
+      els.customerChartLegend.innerHTML = SERIES.filter((s) => s.key === "total" || sorted.some((h) => Number(h[s.key] || 0) > 0)).map((s) =>
+        `<span class="chart-legend-item"><span class="chart-legend-dot" style="background:${s.color}"></span>${escapeHtml(s.label)}</span>`
+      ).join("");
+    }
+
+    const tooltip = document.getElementById("customerChartTooltip");
+    els.customerEventChart.querySelectorAll(".chart-hover-rect").forEach((rect) => {
+      rect.addEventListener("mouseenter", () => {
+        const i = Number(rect.dataset.hour);
+        const h = sorted[i] || {};
+        const rows = SERIES.map((s) => {
+          const val = Number(h[s.key] || 0);
+          if (val === 0 && s.key !== "total") return "";
+          return `<div class="tooltip-row"><span class="tooltip-dot" style="background:${s.color}"></span><span>${s.label}</span><strong>${val.toLocaleString()}</strong></div>`;
+        }).filter(Boolean).join("");
+        tooltip.innerHTML = `<div class="tooltip-hour">${i}:00</div>${rows}`;
+        tooltip.style.display = "block";
+      });
+      rect.addEventListener("mousemove", (e) => {
+        const chartRect = els.customerEventChart.getBoundingClientRect();
+        const tw = tooltip.offsetWidth || 170;
+        const th = tooltip.offsetHeight || 90;
+        let left = e.clientX - chartRect.left + 14;
+        let top = e.clientY - chartRect.top - th - 10;
+        if (left + tw > chartRect.width) left = e.clientX - chartRect.left - tw - 14;
+        if (top < 0) top = e.clientY - chartRect.top + 14;
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+      });
+      rect.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+    });
   }
 
   const events = (summary.events || []).filter((row) => Number(row.count || 0) > 0);

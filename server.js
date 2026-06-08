@@ -3652,7 +3652,7 @@ async function summarizeRequestsTodayUncached(pathname, lineLimit = config.summa
   const purchaseOrders = new Map();
   const estimatedPurchases = [];
   const eventDedupe = { exact: new Set(), estimated: new Map() };
-  const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
+  const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0, pageView: 0, viewItem: 0, addToCart: 0, beginCheckout: 0 }));
   const recentEvents = [];
   const lines = splitLines(tail.stdout);
 
@@ -3688,6 +3688,10 @@ async function summarizeRequestsTodayUncached(pathname, lineLimit = config.summa
       bucket.total += 1;
       if (Number(parsed.status) >= 400) bucket.errors += 1;
       if (parsed.eventName === "Purchase") bucket.purchases += 1;
+      else if (parsed.eventName === "PageView") bucket.pageView += 1;
+      else if (parsed.eventName === "ViewItem") bucket.viewItem += 1;
+      else if (parsed.eventName === "AddToCart") bucket.addToCart += 1;
+      else if (parsed.eventName === "BeginCheckout") bucket.beginCheckout += 1;
     }
 
     if (parsed.eventName === "Purchase") {
@@ -4522,7 +4526,7 @@ function filterRequestSummaryForTenant(summary, tenant) {
   const eventCounts = new Map();
   const clientCounts = new Map();
   const hostCounts = new Map();
-  const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 }));
+  const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0, pageView: 0, viewItem: 0, addToCart: 0, beginCheckout: 0 }));
   const purchases = {
     rawCount: 0,
     uniqueCount: 0,
@@ -4567,6 +4571,10 @@ function filterRequestSummaryForTenant(summary, tenant) {
       bucket.total += 1;
       if (Number(event.status) >= 400) bucket.errors += 1;
       if (event.eventName === "Purchase") bucket.purchases += 1;
+      else if (event.eventName === "PageView") bucket.pageView += 1;
+      else if (event.eventName === "ViewItem") bucket.viewItem += 1;
+      else if (event.eventName === "AddToCart") bucket.addToCart += 1;
+      else if (event.eventName === "BeginCheckout") bucket.beginCheckout += 1;
     }
 
     if (event.eventName === "Purchase") {
