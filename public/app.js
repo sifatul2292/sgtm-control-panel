@@ -142,6 +142,8 @@ const els = {
   docsList: document.querySelector("#docsList")
 };
 
+document.body.classList.remove("app-loading");
+
 const viewTitles = {
   dashboard: ["Dashboard", "Server Overview"],
   logs: ["Containers / Event Logs", "Event Logs"],
@@ -163,10 +165,24 @@ let selectedCustomerContainerId = "";
 let setupAssistantStep = 1;
 let generatedAssistantTemplates = null;
 let currentSession = { role: "pending" };
+let currentViewName = "dashboard";
 const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
 const customerOnlyViews = new Set(["customerContainers", "powerUps", "setupAssistant"]);
 const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "billing"]);
 const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs"]);
+try {
+  const cachedRole = window.localStorage.getItem("tagioo_session_role");
+  if (cachedRole === "customer" || cachedRole === "owner") {
+    currentSession = { role: cachedRole };
+    document.body.classList.toggle("customer-session", cachedRole === "customer");
+    els.navItems.forEach((item) => {
+      const target = item.dataset.viewTarget;
+      item.hidden = cachedRole === "customer" ? !customerNavViews.has(target) : !ownerNavViews.has(target);
+    });
+  }
+} catch {
+  // Local storage can be disabled in hardened browsers; the app still loads normally.
+}
 
 const subscriptionPlans = [
   {
@@ -370,7 +386,7 @@ function hostLabel(value) {
   }
 }
 
-function setView(name) {
+function setView(name, options = {}) {
   const requested = viewTitles[name] ? name : "dashboard";
   const roleKnown = currentSession.role === "customer" || currentSession.role === "owner";
   const next =
@@ -378,16 +394,23 @@ function setView(name) {
     (roleKnown && currentSession.role !== "customer" && customerOnlyViews.has(requested))
       ? "dashboard"
       : requested;
+  currentViewName = next;
   els.views.forEach((view) => view.classList.toggle("is-active", view.dataset.view === next));
   els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.viewTarget === next));
   els.breadcrumb.textContent = currentSession.role === "customer" && next === "dashboard" ? "Dashboard" : viewTitles[next][0];
   els.pageTitle.textContent = currentSession.role === "customer" && next === "dashboard" ? "Tracking Overview" : viewTitles[next][1];
   window.location.hash = next;
+  if (!options.skipRender && latestData) renderCurrentView(latestData);
 }
 
 function applySessionAccess(data) {
   currentSession = data.session || { role: "owner" };
   const customerMode = currentSession.role === "customer";
+  try {
+    window.localStorage.setItem("tagioo_session_role", customerMode ? "customer" : "owner");
+  } catch {
+    // Ignore local storage failures; this only improves the next page refresh.
+  }
   document.body.classList.remove("app-loading");
   document.body.classList.toggle("customer-session", customerMode);
   document.querySelectorAll("[data-owner-only]").forEach((element) => {
@@ -402,9 +425,9 @@ function applySessionAccess(data) {
   });
   if ((customerMode && ownerOnlyViews.has(window.location.hash.replace("#", ""))) ||
     (!customerMode && customerOnlyViews.has(window.location.hash.replace("#", "")))) {
-    setView("dashboard");
+    setView("dashboard", { skipRender: true });
   } else {
-    setView(window.location.hash.replace("#", "") || "dashboard");
+    setView(window.location.hash.replace("#", "") || "dashboard", { skipRender: true });
   }
 }
 
@@ -3320,23 +3343,56 @@ function renderLogs(data) {
     : "Preview from the first running container.";
 }
 
+function renderCurrentView(data) {
+  switch (currentViewName) {
+    case "logs":
+      renderLogs(data);
+      break;
+    case "analytics":
+      renderAnalytics(data);
+      break;
+    case "settings":
+      renderSettings(data);
+      break;
+    case "deployment":
+      renderDeployment(data);
+      break;
+    case "provisioning":
+      renderProvisioning(data);
+      break;
+    case "admin":
+      renderAdmin(data);
+      break;
+    case "customerContainers":
+      renderCustomerContainers(data);
+      break;
+    case "powerUps":
+      renderPowerUps(data);
+      break;
+    case "setupAssistant":
+      renderSetupAssistant(data);
+      break;
+    case "integrations":
+      renderIntegrations(data);
+      break;
+    case "billing":
+      renderBilling(data);
+      break;
+    case "docs":
+      renderDocs(data);
+      break;
+    case "dashboard":
+    default:
+      renderDashboard(data);
+      renderContainers(data.docker);
+      break;
+  }
+}
+
 function renderAll(data) {
   applySessionAccess(data);
   els.generatedAt.textContent = `Updated ${formatDate(data.generatedAt)}`;
-  renderDashboard(data);
-  renderContainers(data.docker);
-  renderLogs(data);
-  renderAnalytics(data);
-  renderSettings(data);
-  renderDeployment(data);
-  renderProvisioning(data);
-  renderAdmin(data);
-  renderCustomerContainers(data);
-  renderPowerUps(data);
-  renderSetupAssistant(data);
-  renderIntegrations(data);
-  renderBilling(data);
-  renderDocs(data);
+  renderCurrentView(data);
 }
 
 async function loadDashboard() {
