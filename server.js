@@ -2729,8 +2729,12 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
 
 async function getCustomerCatalog({ docker, ssl, orders }) {
   const loaded = await readDatabase();
-  const provisioned = loaded.data.provisioning?.requests || [];
-  const storedTenants = loaded.data.tenants || [];
+  return getCustomerCatalogFromData(loaded.data, { docker, ssl, orders, available: loaded.available });
+}
+
+function getCustomerCatalogFromData(data, { docker, ssl, orders, available = true }) {
+  const provisioned = data.provisioning?.requests || [];
+  const storedTenants = data.tenants || [];
   const defaultDomain = config.tenantDomain || config.trackingHosts[0] || config.sslDomain || inferHostFromCertPath(config.sslCertPath) || "";
   const defaultTenant = {
     id: config.tenantId,
@@ -2775,7 +2779,7 @@ async function getCustomerCatalog({ docker, ssl, orders }) {
   ].filter((tenant, index, all) => all.findIndex((item) => item.id === tenant.id) === index);
 
   return {
-    available: loaded.available,
+    available,
     tenants,
     active: tenants.filter((tenant) => tenant.status === "active").length,
     queued: tenants.filter((tenant) => String(tenant.status || "").includes("pending") || String(tenant.status || "").includes("prepared")).length
@@ -2802,6 +2806,25 @@ function getUsageSummary({ requestSummary, history }) {
     usagePercent: percent,
     status: !limit ? "unmetered" : percent >= 100 ? "over_limit" : percent >= 80 ? "warning" : "healthy",
     containerLimit: config.monthlyContainerLimit
+  };
+}
+
+function baseCustomerUsageSummary() {
+  const profile = resourceProfileForPlan(config.billingPlan);
+  const limit = Number(config.monthlyRequestLimit || profile.monthlyRequestLimit || 0);
+  return {
+    plan: config.billingPlan,
+    period: "Current billing period",
+    requestLimit: limit,
+    requestsToday: 0,
+    requestsMonth: 0,
+    usagePercent: 0,
+    status: limit ? "healthy" : "unmetered",
+    containerLimit: Number(config.monthlyContainerLimit || profile.containerLimit || 1),
+    subscriptionStatus: config.subscriptionStatus,
+    paymentStatus: config.paymentStatus,
+    renewalDate: config.renewalDate,
+    monthlyAmount: config.monthlyAmount || monthlyAmountForPlan(config.billingPlan)
   };
 }
 
@@ -3970,6 +3993,60 @@ function buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ss
   ];
 }
 
+function publicRuntimeConfig() {
+  return {
+    serviceName: config.serviceName,
+    publicBaseUrl: config.publicBaseUrl,
+    tenantId: config.tenantId,
+    tenantName: config.tenantName,
+    tenantDomain: config.tenantDomain,
+    billingPlan: config.billingPlan,
+    subscriptionStatus: config.subscriptionStatus,
+    paymentStatus: config.paymentStatus,
+    renewalDate: config.renewalDate,
+    monthlyAmount: config.monthlyAmount,
+    monthlyRequestLimit: config.monthlyRequestLimit,
+    monthlyContainerLimit: config.monthlyContainerLimit,
+    customerSupportEmail: config.customerSupportEmail,
+    host: config.host,
+    port: config.port,
+    accessLog: config.accessLog,
+    errorLog: config.errorLog,
+    usingDedicatedLogs: config.usingDedicatedLogs,
+    logTailLines: config.logTailLines,
+    summaryTailLines: config.summaryTailLines,
+    eventLogLimit: config.eventLogLimit,
+    dataDir: config.dataDir,
+    historyRetentionDays: config.historyRetentionDays,
+    provisionPortStart: config.provisionPortStart,
+    provisionPortEnd: config.provisionPortEnd,
+    provisionDnsTarget: config.provisionDnsTarget,
+    provisionOutputDir: config.provisionOutputDir,
+    maxProvisioningRecords: config.maxProvisioningRecords,
+    maxCustomerSetupRecords: config.maxCustomerSetupRecords,
+    localWorkerId: config.localWorkerId,
+    localWorkerName: config.localWorkerName,
+    localWorkerRegion: config.localWorkerRegion,
+    localWorkerMaxContainers: config.localWorkerMaxContainers,
+    defaultContainerMemoryMb: config.defaultContainerMemoryMb,
+    defaultContainerCpuLimit: config.defaultContainerCpuLimit,
+    autoLaunchEnabled: config.autoLaunchEnabled,
+    autoLaunchRequireDns: config.autoLaunchRequireDns,
+    autoLaunchCertbot: config.autoLaunchCertbot,
+    autoLaunchCertbotEmail: config.autoLaunchCertbotEmail,
+    autoLaunchUseSudo: config.autoLaunchUseSudo,
+    nginxSitesAvailableDir: config.nginxSitesAvailableDir,
+    nginxSitesEnabledDir: config.nginxSitesEnabledDir,
+    nginxLogFormat: config.nginxLogFormat,
+    trackingPaths: config.trackingPaths,
+    trackingHosts: config.trackingHosts,
+    orderWebhookEnabled: Boolean(config.orderWebhookSecret),
+    alertWebhookEnabled: Boolean(config.alertWebhookUrl),
+    sslDomain: config.sslDomain,
+    sslPort: config.sslPort
+  };
+}
+
 async function getDashboardData() {
   const [docker, requestSummary, accessLog, errorLog, ssl] = await Promise.all([
     getDockerSummary(),
@@ -4036,57 +4113,7 @@ async function getDashboardData() {
     provisioning,
     workers,
     ssl,
-    config: {
-      serviceName: config.serviceName,
-      publicBaseUrl: config.publicBaseUrl,
-      tenantId: config.tenantId,
-      tenantName: config.tenantName,
-      tenantDomain: config.tenantDomain,
-      billingPlan: config.billingPlan,
-      subscriptionStatus: config.subscriptionStatus,
-      paymentStatus: config.paymentStatus,
-      renewalDate: config.renewalDate,
-      monthlyAmount: config.monthlyAmount,
-      monthlyRequestLimit: config.monthlyRequestLimit,
-      monthlyContainerLimit: config.monthlyContainerLimit,
-      customerSupportEmail: config.customerSupportEmail,
-      host: config.host,
-      port: config.port,
-      accessLog: config.accessLog,
-      errorLog: config.errorLog,
-      usingDedicatedLogs: config.usingDedicatedLogs,
-      logTailLines: config.logTailLines,
-      summaryTailLines: config.summaryTailLines,
-      eventLogLimit: config.eventLogLimit,
-      dataDir: config.dataDir,
-      historyRetentionDays: config.historyRetentionDays,
-      provisionPortStart: config.provisionPortStart,
-      provisionPortEnd: config.provisionPortEnd,
-      provisionDnsTarget: config.provisionDnsTarget,
-      provisionOutputDir: config.provisionOutputDir,
-      maxProvisioningRecords: config.maxProvisioningRecords,
-      maxCustomerSetupRecords: config.maxCustomerSetupRecords,
-      localWorkerId: config.localWorkerId,
-      localWorkerName: config.localWorkerName,
-      localWorkerRegion: config.localWorkerRegion,
-      localWorkerMaxContainers: config.localWorkerMaxContainers,
-      defaultContainerMemoryMb: config.defaultContainerMemoryMb,
-      defaultContainerCpuLimit: config.defaultContainerCpuLimit,
-      autoLaunchEnabled: config.autoLaunchEnabled,
-      autoLaunchRequireDns: config.autoLaunchRequireDns,
-      autoLaunchCertbot: config.autoLaunchCertbot,
-      autoLaunchCertbotEmail: config.autoLaunchCertbotEmail,
-      autoLaunchUseSudo: config.autoLaunchUseSudo,
-      nginxSitesAvailableDir: config.nginxSitesAvailableDir,
-      nginxSitesEnabledDir: config.nginxSitesEnabledDir,
-      nginxLogFormat: config.nginxLogFormat,
-      trackingPaths: config.trackingPaths,
-      trackingHosts: config.trackingHosts,
-      orderWebhookEnabled: Boolean(config.orderWebhookSecret),
-      alertWebhookEnabled: Boolean(config.alertWebhookUrl),
-      sslDomain: config.sslDomain,
-      sslPort: config.sslPort
-    }
+    config: publicRuntimeConfig()
   };
 }
 
@@ -4112,6 +4139,119 @@ function publicCustomerConfig(data) {
     sslDomain: data.config.sslDomain,
     sslPort: data.config.sslPort
   };
+}
+
+function customerDockerPlaceholder() {
+  return {
+    available: true,
+    message: "Customer infrastructure status is loaded from your live containers.",
+    detail: "",
+    containers: [],
+    totals: {
+      running: 0,
+      stopped: 0,
+      unhealthy: 0,
+      total: 0
+    }
+  };
+}
+
+function emptyCustomerRequestSummary() {
+  return {
+    available: true,
+    count: 0,
+    errors: 0,
+    totalLines: 0,
+    noise: 0,
+    botNoise: 0,
+    path: "",
+    filter: "tracking-only",
+    trackingPaths: config.trackingPaths,
+    sampledLines: 0,
+    summaryTailLines: config.summaryTailLines,
+    events: [],
+    clients: [],
+    hosts: [],
+    purchases: {
+      rawCount: 0,
+      uniqueCount: 0,
+      duplicateCount: 0,
+      keyedCount: 0,
+      estimatedKeyCount: 0,
+      missingKeyCount: 0,
+      uniqueRevenue: 0,
+      rawRevenue: 0,
+      averageOrderValue: 0,
+      currency: ""
+    },
+    hourly: Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0 })),
+    noiseReasons: [],
+    recentEvents: [],
+    eventLogLimit: config.eventLogLimit
+  };
+}
+
+async function getCustomerDashboardData(session) {
+  const loaded = await readDatabase();
+  const raw = loaded.data;
+  const docker = customerDockerPlaceholder();
+  const orders = await getOrderSummary();
+  const customerSetup = {
+    available: loaded.available,
+    path: databasePath,
+    message: loaded.message || "",
+    detail: loaded.detail || "",
+    requests: (raw.customerSetupRequests || []).map(publicSetupRequest)
+  };
+  const provisioning = {
+    available: loaded.available,
+    path: databasePath,
+    message: loaded.message || "",
+    detail: loaded.detail || "",
+    requests: raw.provisioning?.requests || []
+  };
+  const customers = getCustomerCatalogFromData(raw, {
+    docker,
+    ssl: unavailable("SSL is checked by the owner dashboard."),
+    orders,
+    available: loaded.available
+  });
+  const requestSummary = emptyCustomerRequestSummary();
+  const data = {
+    generatedAt: new Date().toISOString(),
+    readOnly: true,
+    docker,
+    nginx: {
+      requestCountToday: requestSummary,
+      todayEvents: requestSummary,
+      accessLog: unavailable("Container access log is loaded after a live container is found."),
+      errorLog: unavailable("Nginx error logs are owner-only.")
+    },
+    dockerLogs: unavailable("Docker logs are owner-only."),
+    alerts: loaded.available ? [] : [{
+      key: "database-unavailable",
+      severity: "error",
+      title: "Customer data unavailable",
+      message: loaded.detail || loaded.message || "Could not read customer records."
+    }],
+    deploymentChecks: [],
+    history: { available: loaded.available, daily: [] },
+    orders,
+    customers,
+    customerAccounts: { available: true, path: "", accounts: [] },
+    customerSetup,
+    owner: null,
+    usage: baseCustomerUsageSummary(),
+    reconciliation: getReconciliationSummary({ requestSummary, orders }),
+    integrations: getIntegrationSummary({ orders, requestSummary }),
+    setupWizard: {},
+    provisioning,
+    workers: { available: true, nodes: [], metrics: {} },
+    ssl: unavailable("SSL is checked by the owner dashboard."),
+    config: publicRuntimeConfig()
+  };
+
+  return customerDashboardData(data, session);
 }
 
 function provisioningRequestsForTenant(data, tenantId) {
@@ -4539,8 +4679,12 @@ const server = createServer(async (req, res) => {
 
     if (req.url?.startsWith("/api/dashboard")) {
       const session = getSession(req);
+      if (session?.role === "customer") {
+        jsonResponse(res, 200, await getCustomerDashboardData(session));
+        return;
+      }
       const dashboardData = await getDashboardData();
-      jsonResponse(res, 200, session?.role === "customer" ? await customerDashboardData(dashboardData, session) : { ...dashboardData, session });
+      jsonResponse(res, 200, { ...dashboardData, session });
       return;
     }
 
