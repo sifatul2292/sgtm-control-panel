@@ -5077,11 +5077,13 @@ const server = createServer(async (req, res) => {
     // ── Power-Ups ───────────────────────────────────────────────────────────
 
     if (pathname === "/api/powerups/status" && req.method === "GET") {
-      if (!isOwner(req)) {
-        jsonResponse(res, 403, { error: "Owner access required." });
+      if (!getSession(req)) {
+        jsonResponse(res, 401, { error: "Authentication required." });
         return;
       }
-      jsonResponse(res, 200, { powerUpsEnabled: powerUpsActive, mapsPath: powerUpMapsPath });
+      // Customers get status (read-only). Owners also get mapsPath.
+      const extra = isOwner(req) ? { mapsPath: powerUpMapsPath } : {};
+      jsonResponse(res, 200, { powerUpsEnabled: powerUpsActive, ...extra });
       return;
     }
 

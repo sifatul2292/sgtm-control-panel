@@ -168,9 +168,9 @@ let generatedAssistantTemplates = null;
 let currentSession = { role: "pending" };
 let currentViewName = "dashboard";
 const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
-const customerOnlyViews = new Set(["customerContainers", "powerUps", "setupAssistant"]);
+const customerOnlyViews = new Set(["customerContainers", "setupAssistant"]);
 const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "billing"]);
-const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs"]);
+const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs", "powerUps"]);
 try {
   const cachedRole = window.localStorage.getItem("tagioo_session_role");
   if (cachedRole === "customer" || cachedRole === "owner") {
@@ -2113,17 +2113,17 @@ function powerUpState(item, planName) {
   return item.defaultState === "configure" ? "configure" : "enabled";
 }
 
-function powerUpActionLabel(state) {
+function powerUpActionLabel(state, isOwner) {
   if (state === "active") return "✓ Active";
   if (state === "enabled") return "Enabled";
   if (state === "configure") return "Configure";
-  if (state === "needs-init") return "Setup Required";
+  if (state === "needs-init") return isOwner ? "Setup Required" : "Pending";
   if (state === "upgrade") return "Upgrade to use";
   return "Coming soon";
 }
 
 async function fetchPowerUpsStatus() {
-  if (powerUpsStatusFetched || currentSession.role !== "owner") return;
+  if (powerUpsStatusFetched) return;
   try {
     const res = await fetch("/api/powerups/status");
     if (res.ok) {
@@ -2282,8 +2282,8 @@ function showCookieKeeperInfoModal() {
 async function renderPowerUps(data) {
   if (!els.powerUpsGrid) return;
 
-  // Fetch server power-up status once per session (owner only)
-  if (!powerUpsStatusFetched && currentSession.role === "owner") {
+  // Fetch server power-up status once per session (all roles)
+  if (!powerUpsStatusFetched) {
     await fetchPowerUpsStatus();
   }
 
@@ -2355,7 +2355,7 @@ async function renderPowerUps(data) {
         <span>${escapeHtml(item.category)} · ${escapeHtml(item.minimumPlan)}+</span>
       </div>
       <button class="button ${btnClass}" type="button" data-powerup-action="${escapeHtml(item.id)}" data-powerup-state="${state}">
-        ${powerUpActionLabel(state)}
+        ${powerUpActionLabel(state, isOwner)}
       </button>
     </article>`;
   }).join("");
