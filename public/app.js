@@ -239,7 +239,7 @@ const powerUps = [
     icon: "●",
     minimumPlan: "Starter",
     defaultState: "enabled",
-    description: "Extends cookie lifetime through your first-party tracking domain for cleaner attribution."
+    description: "Safari and iOS cut analytics cookies to 7 days. Cookie Keeper renews them to 400 days via first-party HTTP headers — so ad platforms see your full conversion window and bid accurately."
   },
   {
     id: "custom-loader",
@@ -249,16 +249,16 @@ const powerUps = [
     minimumPlan: "Pro",
     defaultState: "configure",
     recommended: true,
-    description: "Makes GTM and GA scripts more resilient to basic blockers by loading from your tracking subdomain."
+    description: "Loads GTM and GA scripts from your own tracking subdomain. Bypasses ad blockers and Safari restrictions that kill 15–25% of tracking — recovering lost conversion signals for Google and Meta."
   },
   {
     id: "click-id-restorer",
     name: "Click ID Restorer",
     category: "Data enrich",
     icon: "↗",
-    minimumPlan: "Pro",
+    minimumPlan: "Starter",
     defaultState: "configure",
-    description: "Preserves gclid, fbclid, ttclid, and other click IDs so ad platforms can match conversions better."
+    description: "Captures gclid, fbclid, ttclid, and msclkid into 90-day first-party cookies at nginx level. Ad platforms get their click IDs back on every conversion — fixing attribution gaps from page reloads and SPA navigation."
   },
   {
     id: "bot-detection",
@@ -267,7 +267,7 @@ const powerUps = [
     icon: "◇",
     minimumPlan: "Starter",
     defaultState: "enabled",
-    description: "Marks suspicious traffic and keeps noisy requests separate from clean tracking activity."
+    description: "Flags crawlers and bots at nginx level via X-Tagioo-Bot header. Use it in sGTM to block ad conversion tags for non-human traffic — keeping your ROAS data clean and your ad budgets optimized."
   },
   {
     id: "geo-headers",
@@ -276,7 +276,7 @@ const powerUps = [
     icon: "◎",
     minimumPlan: "Starter",
     defaultState: "enabled",
-    description: "Adds country and region hints for debugging server-side tracking quality."
+    description: "Injects visitor country (X-Tagioo-Country) and real IP (X-Tagioo-Client-IP) into every sGTM request. Use for geo-targeted GA4 dimensions, country-specific conversion events, and regional ad attribution."
   },
   {
     id: "user-agent-info",
@@ -285,7 +285,7 @@ const powerUps = [
     icon: "▥",
     minimumPlan: "Starter",
     defaultState: "enabled",
-    description: "Shows device, browser, and platform context in request diagnostics."
+    description: "Sends device type (mobile/tablet/desktop) and raw UA string to sGTM via X-Tagioo-Device and X-Tagioo-UA headers. Build device segments in GA4 and optimize ad bidding by device performance."
   },
   {
     id: "multi-domains",
@@ -2105,7 +2105,7 @@ function powerUpState(item, planName) {
   if (item.defaultState === "coming") return "coming";
   if (!powerUpAvailable(item, planName)) return "upgrade";
   // For infrastructure-level power-ups, reflect server init state
-  const infraIds = new Set(["cookie-keeper", "click-id-restorer", "custom-loader"]);
+  const infraIds = new Set(["cookie-keeper", "click-id-restorer", "custom-loader", "bot-detection", "user-agent-info"]);
   if (infraIds.has(item.id)) {
     if (!powerUpsServerEnabled) return "needs-init";
     return item.id === "custom-loader" ? "configure" : "active";
@@ -2279,6 +2279,70 @@ function showCookieKeeperInfoModal() {
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
 }
 
+function showBotDetectionInfoModal() {
+  const modal = document.createElement("div");
+  modal.className = "powerup-modal-overlay";
+  modal.innerHTML = `
+    <div class="powerup-modal">
+      <div class="powerup-modal-header">
+        <h3>Bot Detection — How It Works</h3>
+        <button class="powerup-modal-close" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="powerup-modal-desc">nginx matches every request's User-Agent against known bot and crawler patterns, then forwards <code>X-Tagioo-Bot: 1</code> to your sGTM container for non-human traffic.</p>
+      <ul class="powerup-modal-list">
+        <li>✓ Detects crawlers: Googlebot, bingbot, AhrefsBot, SemrushBot, and more</li>
+        <li>✓ Detects automation: curl, wget, Python requests, headless browsers</li>
+        <li>✓ Human traffic gets <code>X-Tagioo-Bot: 0</code> — safe to use as a condition</li>
+      </ul>
+      <p class="powerup-modal-desc"><strong>How to use in sGTM:</strong> Create a "Request Header" variable for <code>X-Tagioo-Bot</code>. Add a trigger exception to your Google Ads and Meta conversion tags that fires only when this variable equals <code>0</code>. Bot clicks will stop inflating your conversion counts — your ROAS improves because ad platforms bid on real buyers.</p>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector(".powerup-modal-close").addEventListener("click", () => modal.remove());
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+}
+
+function showGeoHeadersInfoModal() {
+  const modal = document.createElement("div");
+  modal.className = "powerup-modal-overlay";
+  modal.innerHTML = `
+    <div class="powerup-modal">
+      <div class="powerup-modal-header">
+        <h3>GEO Headers — How It Works</h3>
+        <button class="powerup-modal-close" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="powerup-modal-desc">On every tracking request, nginx injects the visitor's country and IP into request headers forwarded to your sGTM container — no extra API calls needed.</p>
+      <ul class="powerup-modal-list">
+        <li>✓ <code>X-Tagioo-Country</code> → ISO country code (e.g. <code>BD</code>, <code>US</code>, <code>GB</code>) via Cloudflare</li>
+        <li>✓ <code>X-Tagioo-Client-IP</code> → real visitor IP for geo lookup in sGTM when no CDN</li>
+      </ul>
+      <p class="powerup-modal-desc"><strong>How to use in sGTM:</strong> Create "Request Header" variables for <code>X-Tagioo-Country</code> and <code>X-Tagioo-Client-IP</code>. Use the country as a custom GA4 dimension, a trigger condition for country-specific conversion events, or to send region data to Meta CAPI for better audience matching and geo-targeted ROAS reporting.</p>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector(".powerup-modal-close").addEventListener("click", () => modal.remove());
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+}
+
+function showUserAgentInfoModal() {
+  const modal = document.createElement("div");
+  modal.className = "powerup-modal-overlay";
+  modal.innerHTML = `
+    <div class="powerup-modal">
+      <div class="powerup-modal-header">
+        <h3>User Agent Info — How It Works</h3>
+        <button class="powerup-modal-close" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="powerup-modal-desc">nginx classifies every visitor's device and forwards both the device type and raw User-Agent string to sGTM as request headers — available instantly without client-side JavaScript.</p>
+      <ul class="powerup-modal-list">
+        <li>✓ <code>X-Tagioo-Device</code> → <code>mobile</code>, <code>tablet</code>, or <code>desktop</code></li>
+        <li>✓ <code>X-Tagioo-UA</code> → full User-Agent string for browser/OS parsing in sGTM</li>
+      </ul>
+      <p class="powerup-modal-desc"><strong>How to use in sGTM:</strong> Create "Request Header" variables for <code>X-Tagioo-Device</code> and <code>X-Tagioo-UA</code>. Send device type as a GA4 custom dimension to segment conversion reports by device. Use it as a trigger condition to fire mobile-specific tags, or pass it to Meta CAPI as device context to improve audience targeting and lower CPA on mobile campaigns.</p>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector(".powerup-modal-close").addEventListener("click", () => modal.remove());
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+}
+
 async function renderPowerUps(data) {
   if (!els.powerUpsGrid) return;
 
@@ -2393,6 +2457,9 @@ async function renderPowerUps(data) {
       if (item.id === "custom-loader") { showCustomLoaderModal(trackingDomain); return; }
       if (item.id === "click-id-restorer") { showClickIdInfoModal(); return; }
       if (item.id === "cookie-keeper") { showCookieKeeperInfoModal(); return; }
+      if (item.id === "bot-detection") { showBotDetectionInfoModal(); return; }
+      if (item.id === "geo-headers") { showGeoHeadersInfoModal(); return; }
+      if (item.id === "user-agent-info") { showUserAgentInfoModal(); return; }
       if (els.powerUpsMessage) {
         els.powerUpsMessage.textContent = `${item.name} is ${state === "active" || state === "enabled" ? "active on your container" : "configurable in settings"}.`;
         els.powerUpsMessage.className = "powerups-message info";
