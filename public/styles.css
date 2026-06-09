@@ -3217,3 +3217,129 @@ a.button.button-primary {
     animation-duration: 1ms !important;
   }
 }
+
+/* ── Power-Ups: Init Banner ─────────────────────────────────────────────── */
+.powerups-init-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 12%, var(--color-card));
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 40%, transparent);
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1rem;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+}
+.powerups-init-banner.ok {
+  background: color-mix(in srgb, var(--color-ok, #10b981) 10%, var(--color-card));
+  border-color: color-mix(in srgb, var(--color-ok, #10b981) 35%, transparent);
+}
+.powerups-init-banner strong { font-weight: 600; display: block; margin-bottom: 0.2rem; }
+.powerups-init-banner span { font-size: 0.82rem; color: var(--color-text-2); }
+.powerups-init-banner code { font-size: 0.78rem; }
+.powerups-init-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+
+/* ── Power-Ups: Message strip ────────────────────────────────────────────── */
+.powerups-message {
+  font-size: 0.84rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 7px;
+  margin-bottom: 0.8rem;
+  border: 1px solid transparent;
+}
+.powerups-message.ok { background: color-mix(in srgb,#10b981 12%,var(--color-card)); border-color: color-mix(in srgb,#10b981 35%,transparent); }
+.powerups-message.warn { background: color-mix(in srgb,#f59e0b 12%,var(--color-card)); border-color: color-mix(in srgb,#f59e0b 35%,transparent); }
+.powerups-message.error { background: color-mix(in srgb,#ef4444 12%,var(--color-card)); border-color: color-mix(in srgb,#ef4444 35%,transparent); }
+.powerups-message.info { background: color-mix(in srgb,#3b82f6 10%,var(--color-card)); border-color: color-mix(in srgb,#3b82f6 30%,transparent); }
+
+/* ── Power-Ups: Card states ──────────────────────────────────────────────── */
+.powerup-card.active .button-active,
+.button-active {
+  background: color-mix(in srgb,#10b981 18%,transparent);
+  color: #10b981;
+  border: 1px solid color-mix(in srgb,#10b981 40%,transparent);
+  cursor: default;
+}
+.button-warn {
+  background: color-mix(in srgb,#f59e0b 15%,transparent);
+  color: #f59e0b;
+  border: 1px solid color-mix(in srgb,#f59e0b 40%,transparent);
+}
+.powerup-card.active { border-color: color-mix(in srgb,#10b981 35%,transparent); }
+.powerup-card.needs-init { opacity: 0.75; }
+
+/* ── Power-Ups: Modal overlay ────────────────────────────────────────────── */
+.powerup-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.powerup-modal {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: slideUp 0.18s ease;
+}
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.powerup-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.powerup-modal-header h3 { font-size: 1.05rem; font-weight: 600; margin: 0; }
+.powerup-modal-close {
+  background: none;
+  border: none;
+  color: var(--color-text-2);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  line-height: 1;
+}
+.powerup-modal-close:hover { background: var(--color-surface-2, rgba(255,255,255,0.06)); }
+.powerup-modal-desc { font-size: 0.87rem; color: var(--color-text-2); line-height: 1.55; margin-bottom: 0.9rem; }
+.powerup-modal-code {
+  background: var(--color-surface, rgba(0,0,0,0.25));
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  font-size: 0.76rem;
+  overflow-x: auto;
+  white-space: pre;
+  margin-bottom: 0.8rem;
+  line-height: 1.5;
+}
+.powerup-modal-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-2);
+  margin-bottom: 1rem;
+}
+.powerup-modal-hint code { font-size: 0.76rem; }
+.powerup-modal-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+.powerup-modal-list li { padding: 0.15rem 0; }
+.powerup-modal-copy { width: 100%; justify-content: center; }

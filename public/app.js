@@ -344,6 +344,8 @@ const powerUps = [
 ];
 
 let activePowerUpCategory = "All";
+let powerUpsServerEnabled = false;
+let powerUpsStatusFetched = false;
 
 function text(value, fallback = "--") {
   return value === undefined || value === null || value === "" ? fallback : String(value);
@@ -2102,29 +2104,222 @@ function powerUpAvailable(item, planName) {
 function powerUpState(item, planName) {
   if (item.defaultState === "coming") return "coming";
   if (!powerUpAvailable(item, planName)) return "upgrade";
+  // For infrastructure-level power-ups, reflect server init state
+  const infraIds = new Set(["cookie-keeper", "click-id-restorer", "custom-loader"]);
+  if (infraIds.has(item.id)) {
+    if (!powerUpsServerEnabled) return "needs-init";
+    return item.id === "custom-loader" ? "configure" : "active";
+  }
   return item.defaultState === "configure" ? "configure" : "enabled";
 }
 
 function powerUpActionLabel(state) {
+  if (state === "active") return "✓ Active";
   if (state === "enabled") return "Enabled";
   if (state === "configure") return "Configure";
+  if (state === "needs-init") return "Setup Required";
   if (state === "upgrade") return "Upgrade to use";
   return "Coming soon";
 }
 
-function renderPowerUps(data) {
+async function fetchPowerUpsStatus() {
+  if (powerUpsStatusFetched || currentSession.role !== "owner") return;
+  try {
+    const res = await fetch("/api/powerups/status");
+    if (res.ok) {
+      const json = await res.json();
+      powerUpsServerEnabled = Boolean(json.powerUpsEnabled);
+      powerUpsStatusFetched = true;
+    }
+  } catch (_) { /* non-fatal */ }
+}
+
+async function triggerPowerUpsInit(data) {
+  if (els.powerUpsMessage) {
+    els.powerUpsMessage.textContent = "Initializing Power-Ups… this may take a few seconds.";
+    els.powerUpsMessage.className = "powerups-message info";
+  }
+  try {
+    const res = await fetch("/api/powerups/init", { method: "POST" });
+    const json = await res.json();
+    if (json.ok) {
+      powerUpsServerEnabled = true;
+      powerUpsStatusFetched = true;
+      if (els.powerUpsMessage) {
+        els.powerUpsMessage.textContent = "✓ Power-Ups initialized! Cookie Keeper, Click ID Restorer, and Custom Loader are now active for all new containers. Click “Regen nginx” to update existing containers.";
+        els.powerUpsMessage.className = "powerups-message ok";
+      }
+      renderPowerUps(data);
+    } else {
+      const failedStep = json.steps?.find((s) => !s.ok);
+      if (els.powerUpsMessage) {
+        els.powerUpsMessage.textContent = `Init failed: ${failedStep?.error || failedStep?.label || "Unknown error"}`;
+        els.powerUpsMessage.className = "powerups-message error";
+      }
+    }
+  } catch (err) {
+    if (els.powerUpsMessage) {
+      els.powerUpsMessage.textContent = `Init error: ${err.message}`;
+      els.powerUpsMessage.className = "powerups-message error";
+    }
+  }
+}
+
+async function triggerRegenNginx(data) {
+  if (els.powerUpsMessage) {
+    els.powerUpsMessage.textContent = "Regenerating nginx configs for all active containers…";
+    els.powerUpsMessage.className = "powerups-message info";
+  }
+  try {
+    const res = await fetch("/api/powerups/regen-nginx", { method: "POST" });
+    const json = await res.json();
+    const count = json.containers?.length || 0;
+    const failCount = json.containers?.filter((c) => !c.ok).length || 0;
+    if (els.powerUpsMessage) {
+      if (json.ok || failCount === 0) {
+        els.powerUpsMessage.textContent = `✓ Regenerated nginx for ${count} container(s). All Power-Ups now active.`;
+        els.powerUpsMessage.className = "powerups-message ok";
+      } else {
+        const errors = json.containers?.filter((c) => !c.ok).map((c) => `${c.domain}: ${c.error}`).join("; ");
+        els.powerUpsMessage.textContent = `Partial regen: ${count - failCount}/${count} succeeded. ${errors}`;
+        els.powerUpsMessage.className = "powerups-message error";
+      }
+    }
+  } catch (err) {
+    if (els.powerUpsMessage) {
+      els.powerUpsMessage.textContent = `Regen error: ${err.message}`;
+      els.powerUpsMessage.className = "powerups-message error";
+    }
+  }
+}
+
+function showCustomLoaderModal(domain) {
+  const snippet = domain
+    ? `<!-- Custom Loader: load GTM through your first-party domain -->
+<!-- Replace the standard GTM snippet's script URL with this path -->
+<script>
+(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;
+j.src='https://${escapeHtml(domain)}/tagioo-loader/gtm.js?id='+i+dl;
+f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-XXXXXXX');
+</script>
+<!-- Also update gtag.js references to: https://${escapeHtml(domain)}/tagioo-loader/gtag/js -->`
+    : "Deploy a container first to get your Custom Loader snippet.";
+
+  const modal = document.createElement("div");
+  modal.className = "powerup-modal-overlay";
+  modal.innerHTML = `
+    <div class="powerup-modal">
+      <div class="powerup-modal-header">
+        <h3>Custom Loader — GTM Snippet</h3>
+        <button class="powerup-modal-close" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="powerup-modal-desc">Replace your standard Web GTM script URL with your first-party tracking domain path. Ad blockers targeting <code>googletagmanager.com</code> will no longer block your tag.</p>
+      <pre class="powerup-modal-code"><code>${escapeHtml(snippet)}</code></pre>
+      <div class="powerup-modal-hint">Replace <code>GTM-XXXXXXX</code> with your actual Web GTM container ID.</div>
+      <button class="button button-primary powerup-modal-copy" type="button">Copy Snippet</button>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector(".powerup-modal-close").addEventListener("click", () => modal.remove());
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+  modal.querySelector(".powerup-modal-copy").addEventListener("click", () => {
+    navigator.clipboard?.writeText(snippet).then(() => {
+      modal.querySelector(".powerup-modal-copy").textContent = "Copied!";
+      setTimeout(() => { if (modal.isConnected) modal.querySelector(".powerup-modal-copy").textContent = "Copy Snippet"; }, 2000);
+    });
+  });
+}
+
+function showClickIdInfoModal() {
+  const modal = document.createElement("div");
+  modal.className = "powerup-modal-overlay";
+  modal.innerHTML = `
+    <div class="powerup-modal">
+      <div class="powerup-modal-header">
+        <h3>Click ID Restorer — How It Works</h3>
+        <button class="powerup-modal-close" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="powerup-modal-desc">When a visitor lands on your site with a click ID in the URL (e.g. <code>?fbclid=...</code>), your nginx container automatically captures and stores it in a <strong>90-day first-party cookie</strong>.</p>
+      <ul class="powerup-modal-list">
+        <li>✓ <code>fbclid</code> → stored as <code>tagioo_fbclid</code> cookie</li>
+        <li>✓ <code>gclid</code> → stored as <code>tagioo_gclid</code> cookie</li>
+        <li>✓ <code>ttclid</code> → stored as <code>tagioo_ttclid</code> cookie</li>
+        <li>✓ <code>msclkid</code> → stored as <code>tagioo_msclkid</code> cookie</li>
+      </ul>
+      <p class="powerup-modal-desc">On every subsequent tracking request, nginx passes these stored IDs to your sGTM container as <code>X-FB-Click-ID</code>, <code>X-GCL-Click-ID</code>, and <code>X-TT-Click-ID</code> request headers. Your GTM server variable can read them for conversion attribution.</p>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector(".powerup-modal-close").addEventListener("click", () => modal.remove());
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+}
+
+function showCookieKeeperInfoModal() {
+  const modal = document.createElement("div");
+  modal.className = "powerup-modal-overlay";
+  modal.innerHTML = `
+    <div class="powerup-modal">
+      <div class="powerup-modal-header">
+        <h3>Cookie Keeper — How It Works</h3>
+        <button class="powerup-modal-close" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="powerup-modal-desc">Safari and iOS browsers limit JavaScript-set cookies to <strong>7 days</strong>. Cookie Keeper renews analytics cookies via <strong>HTTP Set-Cookie headers</strong> on every tracking response — extending them to <strong>400 days</strong>.</p>
+      <ul class="powerup-modal-list">
+        <li>✓ <code>_ga</code> → renewed (400 days, SameSite=Lax)</li>
+        <li>✓ <code>_fbp</code> → renewed (400 days, SameSite=None)</li>
+        <li>✓ <code>_gcl_aw</code> → renewed (400 days)</li>
+        <li>✓ <code>_ttp</code> → renewed (400 days)</li>
+        <li>✓ <code>_gcl_gb</code> → renewed (400 days)</li>
+      </ul>
+      <p class="powerup-modal-desc">Cookies are only renewed if they already exist — no new cookies are created. Renewal happens at nginx level before the response reaches the browser.</p>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.querySelector(".powerup-modal-close").addEventListener("click", () => modal.remove());
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.remove(); });
+}
+
+async function renderPowerUps(data) {
   if (!els.powerUpsGrid) return;
+
+  // Fetch server power-up status once per session (owner only)
+  if (!powerUpsStatusFetched && currentSession.role === "owner") {
+    await fetchPowerUpsStatus();
+  }
+
   const planName = data.usage?.plan || "Starter";
   const categories = ["All", ...new Set(powerUps.map((item) => item.category))];
   const visiblePowerUps = activePowerUpCategory === "All"
     ? powerUps
     : powerUps.filter((item) => item.category === activePowerUpCategory);
-  const enabledCount = powerUps.filter((item) => powerUpState(item, planName) === "enabled").length;
+  const activeCount = powerUps.filter((item) => {
+    const s = powerUpState(item, planName);
+    return s === "enabled" || s === "active";
+  }).length;
 
   if (els.powerUpsBadge) {
-    els.powerUpsBadge.className = "badge ok";
-    els.powerUpsBadge.textContent = `${enabledCount} enabled`;
+    els.powerUpsBadge.className = `badge ${powerUpsServerEnabled ? "ok" : "warn"}`;
+    els.powerUpsBadge.textContent = powerUpsServerEnabled ? `${activeCount} active` : "Init required";
   }
+
+  // Owner init banner
+  const isOwner = currentSession.role === "owner";
+  const initBanner = isOwner && !powerUpsServerEnabled
+    ? `<div class="powerups-init-banner">
+        <div>
+          <strong>Power-Ups need one-time setup.</strong>
+          <span>Writes a shared nginx maps file (<code>/etc/nginx/conf.d/tagioo-powerups-maps.conf</code>) then reloads nginx. Run once, affects all containers.</span>
+        </div>
+        <div class="powerups-init-actions">
+          <button class="button button-primary" type="button" id="powerUpsInitBtn">Initialize Power-Ups</button>
+        </div>
+      </div>`
+    : isOwner && powerUpsServerEnabled
+      ? `<div class="powerups-init-banner ok">
+          <span>✓ Power-Ups active. New containers get all features automatically.</span>
+          <button class="button" type="button" id="powerUpsRegenBtn">Regen nginx for existing containers</button>
+        </div>`
+      : "";
 
   if (els.powerUpsFilters) {
     els.powerUpsFilters.innerHTML = categories.map((category) => {
@@ -2142,9 +2337,13 @@ function renderPowerUps(data) {
     });
   }
 
-  els.powerUpsGrid.innerHTML = visiblePowerUps.map((item) => {
+  els.powerUpsGrid.innerHTML = initBanner + visiblePowerUps.map((item) => {
     const state = powerUpState(item, planName);
     const recommended = item.recommended ? `<span class="powerup-recommended">Recommended</span>` : "";
+    const btnClass = state === "upgrade" ? "button-primary"
+      : state === "needs-init" ? "button-warn"
+      : state === "active" ? "button-active"
+      : "";
     return `<article class="powerup-card ${state}">
       <div class="powerup-icon" aria-hidden="true">${escapeHtml(item.icon)}</div>
       <div class="powerup-copy">
@@ -2155,25 +2354,48 @@ function renderPowerUps(data) {
         <p>${escapeHtml(item.description)}</p>
         <span>${escapeHtml(item.category)} · ${escapeHtml(item.minimumPlan)}+</span>
       </div>
-      <button class="button ${state === "upgrade" ? "button-primary" : ""}" type="button" data-powerup-action="${escapeHtml(item.id)}" data-powerup-state="${state}">
-        ${escapeHtml(powerUpActionLabel(state))}
+      <button class="button ${btnClass}" type="button" data-powerup-action="${escapeHtml(item.id)}" data-powerup-state="${state}">
+        ${powerUpActionLabel(state)}
       </button>
     </article>`;
   }).join("");
 
+  // Init / Regen banner buttons
+  const initBtn = document.getElementById("powerUpsInitBtn");
+  if (initBtn) initBtn.addEventListener("click", () => triggerPowerUpsInit(data));
+  const regenBtn = document.getElementById("powerUpsRegenBtn");
+  if (regenBtn) regenBtn.addEventListener("click", () => triggerRegenNginx(data));
+
+  // Power-up card action buttons
+  const trackingDomain = (data.containerSetup?.trackingDomain || data.customerSetup?.requests?.[0]?.trackingDomain || "");
   els.powerUpsGrid.querySelectorAll("[data-powerup-action]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = powerUps.find((entry) => entry.id === button.dataset.powerupAction);
       const state = button.dataset.powerupState;
       if (!item) return;
-      if (state === "upgrade") {
-        setView("billing");
+      if (state === "upgrade") { setView("billing"); return; }
+      if (state === "needs-init") {
+        if (els.powerUpsMessage) {
+          els.powerUpsMessage.textContent = isOwner
+            ? "Click “Initialize Power-Ups” above to activate this feature."
+            : "Contact your Tagioo admin to enable Power-Ups.";
+          els.powerUpsMessage.className = "powerups-message warn";
+        }
         return;
       }
+      if (state === "coming") {
+        if (els.powerUpsMessage) {
+          els.powerUpsMessage.textContent = `${item.name} is coming soon.`;
+          els.powerUpsMessage.className = "powerups-message info";
+        }
+        return;
+      }
+      if (item.id === "custom-loader") { showCustomLoaderModal(trackingDomain); return; }
+      if (item.id === "click-id-restorer") { showClickIdInfoModal(); return; }
+      if (item.id === "cookie-keeper") { showCookieKeeperInfoModal(); return; }
       if (els.powerUpsMessage) {
-        els.powerUpsMessage.textContent = state === "coming"
-          ? `${item.name} is coming soon.`
-          : `${item.name} settings will be configurable in the next version.`;
+        els.powerUpsMessage.textContent = `${item.name} is ${state === "active" || state === "enabled" ? "active on your container" : "configurable in settings"}.`;
+        els.powerUpsMessage.className = "powerups-message info";
       }
     });
   });
