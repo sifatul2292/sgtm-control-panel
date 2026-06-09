@@ -1,9 +1,13 @@
 import { createServer } from "node:http";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { gzip } from "node:zlib";
+import { promisify } from "node:util";
+
+const gzipAsync = promisify(gzip);
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(rootDir, "public");
@@ -140,6 +144,29 @@ function jsonResponse(res, status, body) {
     "cache-control": "no-store"
   });
   res.end(JSON.stringify(body));
+}
+
+async function jsonResponseGzip(req, res, status, body) {
+  const json = Buffer.from(JSON.stringify(body), "utf8");
+  const acceptsGzip = /gzip/.test(req.headers["accept-encoding"] || "");
+  const headers = {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+  };
+  if (acceptsGzip && json.length > 2048) {
+    try {
+      const compressed = await gzipAsync(json);
+      headers["content-encoding"] = "gzip";
+      headers["vary"] = "Accept-Encoding";
+      res.writeHead(status, headers);
+      res.end(compressed);
+      return;
+    } catch {
+      // Fall through to uncompressed
+    }
+  }
+  res.writeHead(status, headers);
+  res.end(json);
 }
 
 function htmlResponse(res, status, body, headers = {}) {
@@ -4821,12 +4848,38 @@ async function serveStatic(req, res) {
   }
 
   try {
-    const content = await readFile(absolutePath);
-    res.writeHead(200, {
-      "content-type": mimeTypes[extname(absolutePath)] || "application/octet-stream",
-      "cache-control": "no-store"
-    });
-    res.end(content);
+    const [content, fileStat] = await Promise.all([readFile(absolutePath), stat(absolutePath)]);
+    const etag = `"${fileStat.mtime.getTime().toString(16)}-${fileStat.size.toString(16)}"`;
+
+    // Ctrl+R sends If-None-Match; 304 means browser uses cached copy → zero download
+    if (req.headers["if-none-match"] === etag) {
+      res.writeHead(304);
+      res.end();
+      return;
+    }
+
+    const mime = mimeTypes[extname(absolutePath)] || "application/octet-stream";
+    const acceptsGzip = /gzip/.test(req.headers["accept-encoding"] || "");
+    const compressible = /javascript|css|html|json|text\//.test(mime);
+
+    const headers = {
+      "content-type": mime,
+      // max-age=0 + must-revalidate: browser always validates via ETag (Ctrl+R gets 304, not full download)
+      "cache-control": "public, max-age=0, must-revalidate",
+      "etag": etag,
+      "last-modified": fileStat.mtime.toUTCString()
+    };
+
+    if (acceptsGzip && compressible && content.length > 1024) {
+      const compressed = await gzipAsync(content);
+      headers["content-encoding"] = "gzip";
+      headers["vary"] = "Accept-Encoding";
+      res.writeHead(200, headers);
+      res.end(compressed);
+    } else {
+      res.writeHead(200, headers);
+      res.end(content);
+    }
   } catch {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
     res.end("Not found");
@@ -4977,7 +5030,7 @@ const server = createServer(async (req, res) => {
         if (payload.timing.dashboardMs > 2000) {
           console.warn(`[dashboard] customer dashboard took ${payload.timing.dashboardMs}ms for tenant ${session.tenantId}`);
         }
-        jsonResponse(res, 200, payload);
+        await jsonResponseGzip(req, res, 200, payload);
         return;
       }
       const dashboardData = await getDashboardData();
@@ -4985,7 +5038,7 @@ const server = createServer(async (req, res) => {
       if (payload.timing.dashboardMs > 2000) {
         console.warn(`[dashboard] owner dashboard took ${payload.timing.dashboardMs}ms`);
       }
-      jsonResponse(res, 200, payload);
+      await jsonResponseGzip(req, res, 200, payload);
       return;
     }
 
