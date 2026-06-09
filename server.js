@@ -1812,6 +1812,7 @@ async function readDatabase() {
     version: 3,
     settings: {},
     daily: {},
+    tenantDailyRequests: {},
     provisioning: { requests: [] },
     workerNodes: [],
     orders: [],
@@ -1832,6 +1833,7 @@ async function readDatabase() {
         ...parsed,
         settings: parsed.settings || {},
         daily: parsed.daily || {},
+        tenantDailyRequests: parsed.tenantDailyRequests || {},
         provisioning: parsed.provisioning || { requests: [] },
         workerNodes: parsed.workerNodes || [],
         orders: parsed.orders || [],
@@ -3778,12 +3780,37 @@ async function persistDailySummary(summary) {
   };
   pruneDailyHistory(data.daily);
 
+  // Persist per-tenant daily request counts so billing-period totals survive log rotation.
+  // After nightly logrotate the per-container access log starts fresh; without this,
+  // tail-based period summaries reset to 0. We store each tenant's count for today
+  // (derived from summary.hosts) so customerDashboardData can accumulate past days.
+  const allTenants = [...(data.owner?.customers || []), ...(data.customers?.tenants || [])];
+  if (allTenants.length && Array.isArray(summary.hosts) && summary.hosts.length) {
+    if (!data.tenantDailyRequests) data.tenantDailyRequests = {};
+    for (const tenant of allTenants) {
+      if (!tenant?.id) continue;
+      const tenantHostCount = summary.hosts
+        .filter((h) => hostMatchesTenant(h.key, tenant))
+        .reduce((s, h) => s + Number(h.count || 0), 0);
+      if (!data.tenantDailyRequests[tenant.id]) data.tenantDailyRequests[tenant.id] = {};
+      data.tenantDailyRequests[tenant.id][today] = tenantHostCount;
+    }
+    // Prune entries older than 35 days (billing period is 30 days + 5-day buffer)
+    const cutoffDate = localDateKey(addDays(new Date(), -35));
+    for (const tenantId of Object.keys(data.tenantDailyRequests)) {
+      for (const dateKey of Object.keys(data.tenantDailyRequests[tenantId])) {
+        if (dateKey < cutoffDate) delete data.tenantDailyRequests[tenantId][dateKey];
+      }
+    }
+  }
+
   try {
     await writeDatabase(data);
     return {
       available: true,
       path: databasePath,
       retentionDays: config.historyRetentionDays,
+      tenantDailyRequests: data.tenantDailyRequests || {},
       daily: Object.values(data.daily).sort((a, b) => b.date.localeCompare(a.date))
     };
   } catch (error) {
@@ -3792,6 +3819,7 @@ async function persistDailySummary(summary) {
       path: databasePath,
       message: "Summary database could not be written.",
       detail: error.message,
+      tenantDailyRequests: data.tenantDailyRequests || {},
       daily: Object.values(data.daily).sort((a, b) => b.date.localeCompare(a.date))
     };
   }
@@ -4374,7 +4402,7 @@ async function getDashboardData() {
   ]);
   const customers = await getCustomerCatalog({ docker, ssl, orders });
   const usage = getUsageSummary({ requestSummary, history });
-  const tenantUsage = await tenantBillingUsageMap({ customerSetup, provisioning }, customers.tenants || []);
+  const tenantUsage = await tenantBillingUsageMap({ customerSetup, provisioning, tenantDailyRequests: history.tenantDailyRequests || {} }, customers.tenants || []);
   const reconciliation = getReconciliationSummary({ requestSummary, orders });
   const integrations = getIntegrationSummary({ orders, requestSummary });
   const setupWizard = getSetupWizard({ customers, provisioning, integrations, ssl, requestSummary });
@@ -4608,16 +4636,28 @@ async function tenantBillingUsageMap(data, tenants = []) {
     const tenantSetupRequests = (data.customerSetup?.requests || []).filter((request) => request.tenantId === tenant.id && !isDeletedStatus(request.status));
     const period = billingPeriodForTenant(tenant, tenantSetupRequests);
     const paths = tenant.source === "environment" ? [config.accessLog].filter(Boolean) : customerAccessLogPaths(data, tenant.id);
+
+    // Compute accumulated billing-period count from stored daily data (rotation-safe)
+    const tenantDailyReqs = (data.tenantDailyRequests || {})[tenant.id] || {};
+    const startKey = localDateKey(period.start);
+    const todayKey = localDateKey();
+    const historicCount = Object.entries(tenantDailyReqs)
+      .filter(([d]) => d >= startKey && d < todayKey)
+      .reduce((sum, [, c]) => sum + Number(c), 0);
+    const todayStored = Number(tenantDailyReqs[todayKey] || 0);
+    const accumulatedCount = historicCount + todayStored;
+
     if (!paths.length) {
       return [tenant.id, {
-        requestsMonth: Number(tenant.requestsMonth || 0),
+        requestsMonth: Math.max(accumulatedCount, Number(tenant.requestsMonth || 0)),
         period: period.label,
-        available: false
+        available: Boolean(accumulatedCount > 0)
       }];
     }
     const summary = await summarizeRequestsForPeriodForPaths(paths, period);
+    const livePeriodCount = summary.available ? Number(summary.count || 0) : 0;
     return [tenant.id, {
-      requestsMonth: Number(tenant.requestsMonth ?? summary.count ?? 0),
+      requestsMonth: Math.max(accumulatedCount, livePeriodCount),
       period: period.label,
       available: Boolean(summary.available)
     }];
@@ -4647,7 +4687,23 @@ async function customerDashboardData(data, session) {
       : Promise.resolve({ available: false, count: tenant?.requestsMonth || 0, period: billingPeriod })
   ]);
   const requestLimit = tenant?.requestLimit || data.usage.requestLimit;
-  const requestsMonth = Number(tenant?.requestsMonth ?? tenantPeriodSummary.count ?? tenantRequestSummary.count ?? 0);
+
+  // Compute billing-period event count that survives nightly log rotation.
+  // Strategy: sum stored per-tenant daily counts for past days (from persistDailySummary)
+  // plus today's live count from the current nginx log. If the live period summary
+  // (tail-based) returns a higher value—meaning the log hasn't rotated yet and covers
+  // the full billing period—we use that instead so we never under-report.
+  const tenantDailyReqs = data.tenantDailyRequests?.[session.tenantId] || {};
+  const billingStartKey = localDateKey(billingPeriod.start);
+  const todayKey = localDateKey();
+  const historicCount = Object.entries(tenantDailyReqs)
+    .filter(([d]) => d >= billingStartKey && d < todayKey)
+    .reduce((sum, [, c]) => sum + Number(c), 0);
+  const todayLiveCount = Number(tenantRequestSummary.count || 0);
+  const accumulatedCount = historicCount + todayLiveCount;
+  // Keep whichever is higher: accumulated (rotation-safe) vs live log period scan
+  const livePeriodCount = tenantPeriodSummary.available ? Number(tenantPeriodSummary.count || 0) : 0;
+  const requestsMonth = Math.max(accumulatedCount, livePeriodCount);
   const usagePercent = requestLimit ? Math.min(100, Math.round((requestsMonth / requestLimit) * 1000) / 10) : 0;
   const tenantUsage = {
     ...data.usage,
