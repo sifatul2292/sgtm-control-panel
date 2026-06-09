@@ -86,6 +86,9 @@ const DOCKER_INSPECT_TIMEOUT_MS = 700;
 const DOCKER_LOG_TIMEOUT_MS = 600;
 const SSL_NETWORK_TIMEOUT_MS = 1000;
 const SUMMARY_CACHE_TTL_MS = Number(process.env.SUMMARY_CACHE_TTL_MS || 30000);
+// Customer summaries are less time-sensitive than owner real-time view.
+// Longer TTL means fewer cold-cache misses on customer dashboard reloads.
+const CUSTOMER_SUMMARY_CACHE_TTL_MS = Number(process.env.CUSTOMER_SUMMARY_CACHE_TTL_MS || 120000);
 const alertMemory = new Map();
 const summaryCache = new Map();
 const databasePath = join(config.dataDir, "history.json");
@@ -1112,10 +1115,10 @@ function cloneJson(value) {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
 }
 
-async function cachedSummary(key, producer, { allowStale = true } = {}) {
+async function cachedSummary(key, producer, { allowStale = true, ttl = SUMMARY_CACHE_TTL_MS } = {}) {
   const now = Date.now();
   const cached = summaryCache.get(key);
-  if (cached?.value && now - cached.updatedAt < SUMMARY_CACHE_TTL_MS) {
+  if (cached?.value && now - cached.updatedAt < ttl) {
     return { ...cloneJson(cached.value), cached: true };
   }
   if (cached?.promise) return cached.promise;
@@ -1900,6 +1903,36 @@ async function addOrderWebhook(body) {
 
   await writeDatabase(data);
   return { ok: true, order, created: index === -1 };
+}
+
+function getOrderSummaryFromData(loadedDb) {
+  const today = localDateKey();
+  const orders = ((loadedDb.data || loadedDb).orders || []).filter((order) => localDateKey(orderDate(order.createdAt)) === today);
+  const currencies = new Set(orders.map((order) => order.currency).filter(Boolean));
+  const currency = currencies.size === 1 ? [...currencies][0] : "";
+  const revenue = orders.reduce((total, order) => (
+    order.amount === null || order.amount === undefined ? total : total + Number(order.amount || 0)
+  ), 0);
+  const latest = orders
+    .slice()
+    .sort((a, b) => orderDate(b.createdAt) - orderDate(a.createdAt))[0] || null;
+  const available = loadedDb.available ?? true;
+  return {
+    available,
+    configured: Boolean(config.orderWebhookSecret),
+    path: databasePath,
+    message: loadedDb.message || "",
+    detail: loadedDb.detail || "",
+    rawToday: orders,
+    today: {
+      date: today,
+      count: orders.length,
+      revenue,
+      currency,
+      averageOrderValue: orders.length ? revenue / orders.length : 0,
+      latest
+    }
+  };
 }
 
 async function getOrderSummary() {
@@ -3949,9 +3982,9 @@ async function summarizeRequestsTodayUncached(pathname, lineLimit = config.summa
   };
 }
 
-async function summarizeRequestsToday(pathname, { lineLimit = config.summaryTailLines } = {}) {
+async function summarizeRequestsToday(pathname, { lineLimit = config.summaryTailLines, ttl = SUMMARY_CACHE_TTL_MS } = {}) {
   const key = `today:${pathname}:${lineLimit}:${config.eventLogLimit}:${nginxDateToken()}`;
-  return cachedSummary(key, () => summarizeRequestsTodayUncached(pathname, lineLimit));
+  return cachedSummary(key, () => summarizeRequestsTodayUncached(pathname, lineLimit), { ttl });
 }
 
 async function summarizeRequestsForPeriodUncached(pathname, period, lineLimit = config.summaryTailLines) {
@@ -3994,7 +4027,7 @@ async function summarizeRequestsForPeriodUncached(pathname, period, lineLimit = 
   };
 }
 
-async function summarizeRequestsForPeriod(pathname, period, { lineLimit = config.summaryTailLines } = {}) {
+async function summarizeRequestsForPeriod(pathname, period, { lineLimit = config.summaryTailLines, ttl = SUMMARY_CACHE_TTL_MS } = {}) {
   const key = [
     "period",
     pathname,
@@ -4002,7 +4035,7 @@ async function summarizeRequestsForPeriod(pathname, period, { lineLimit = config
     period.start.toISOString(),
     period.end.toISOString()
   ].join(":");
-  return cachedSummary(key, () => summarizeRequestsForPeriodUncached(pathname, period, lineLimit));
+  return cachedSummary(key, () => summarizeRequestsForPeriodUncached(pathname, period, lineLimit), { ttl });
 }
 
 function mergeSummaryRows(summaries, key) {
@@ -4431,7 +4464,8 @@ async function getCustomerDashboardData(session) {
   const loaded = await readDatabase();
   const raw = loaded.data;
   const docker = customerDockerPlaceholder();
-  const orders = await getOrderSummary();
+  // Reuse already-loaded DB data instead of calling readDatabase() again inside getOrderSummary
+  const orders = getOrderSummaryFromData(loaded);
   const customerSetup = {
     available: loaded.available,
     path: databasePath,
@@ -4568,17 +4602,23 @@ async function customerDashboardData(data, session) {
   const customerRows = data.owner?.customers || data.customers?.tenants || [];
   const tenant = customerRows.find((customer) => customer.id === session.tenantId) || customerRows[0] || null;
   const tenantOrders = filterOrdersForTenant(data.orders, tenant);
-  const tenantAccessLog = await customerAccessLogForTenant(data, session.tenantId);
   const tenantLogPaths = customerAccessLogPaths(data, session.tenantId);
   const tenantSetupRequests = (data.customerSetup.requests || []).filter((request) => request.tenantId === session.tenantId && !isDeletedStatus(request.status));
   const billingPeriod = billingPeriodForTenant(tenant, tenantSetupRequests);
-  const customerSummaryOptions = { lineLimit: config.customerSummaryTailLines };
-  const tenantRequestSummary = tenantLogPaths.length
-    ? await summarizeRequestsTodayForPaths(tenantLogPaths, customerSummaryOptions)
-    : filterRequestSummaryForTenant(data.nginx.todayEvents, tenant);
-  const tenantPeriodSummary = tenantLogPaths.length
-    ? await summarizeRequestsForPeriodForPaths(tenantLogPaths, billingPeriod, customerSummaryOptions)
-    : { available: false, count: tenant?.requestsMonth || tenantRequestSummary.count, period: billingPeriod };
+  const customerSummaryOptions = { lineLimit: config.customerSummaryTailLines, ttl: CUSTOMER_SUMMARY_CACHE_TTL_MS };
+
+  // Run all three I/O operations in parallel instead of sequentially.
+  // On cold cache (first load or after TTL) each can block up to DASHBOARD_COMMAND_TIMEOUT_MS.
+  // Serial: 3× timeout = 3–9s. Parallel: max(all three) = ~1s worst case.
+  const [tenantAccessLog, tenantRequestSummary, tenantPeriodSummary] = await Promise.all([
+    customerAccessLogForTenant(data, session.tenantId),
+    tenantLogPaths.length
+      ? summarizeRequestsTodayForPaths(tenantLogPaths, customerSummaryOptions)
+      : Promise.resolve(filterRequestSummaryForTenant(data.nginx.todayEvents, tenant)),
+    tenantLogPaths.length
+      ? summarizeRequestsForPeriodForPaths(tenantLogPaths, billingPeriod, customerSummaryOptions)
+      : Promise.resolve({ available: false, count: tenant?.requestsMonth || 0, period: billingPeriod })
+  ]);
   const requestLimit = tenant?.requestLimit || data.usage.requestLimit;
   const requestsMonth = Number(tenant?.requestsMonth ?? tenantPeriodSummary.count ?? tenantRequestSummary.count ?? 0);
   const usagePercent = requestLimit ? Math.min(100, Math.round((requestsMonth / requestLimit) * 1000) / 10) : 0;
