@@ -2742,10 +2742,17 @@ function normalizeHost(value) {
     .replace(/:\d+$/, "");
 }
 
-function customerRequestCount(customer, requestSummary) {
+function customerRequestCount(customer, requestSummary, { soleCustomer = false } = {}) {
   const hostRows = requestSummary?.hosts || [];
   const domain = normalizeHost(customer.domain);
-  if (!domain) return customer.source === "environment" ? Number(requestSummary?.count || 0) : 0;
+  // No host data in log (default combined format) → cannot separate tenants. Treat the
+  // environment tenant, or the only customer on a single-VPS setup, as owner of all requests.
+  const hasHostInfo = hostRows.some((host) => {
+    const name = normalizeHost(host.name);
+    return name && name !== "unknown host";
+  });
+  const sharedFallback = (customer.source === "environment" || soleCustomer) ? Number(requestSummary?.count || 0) : 0;
+  if (!domain || !hasHostInfo) return sharedFallback;
 
   const count = hostRows
     .filter((host) => {
@@ -2754,7 +2761,7 @@ function customerRequestCount(customer, requestSummary) {
     })
     .reduce((total, host) => total + Number(host.count || 0), 0);
 
-  return count || (customer.source === "environment" ? Number(requestSummary?.count || 0) : 0);
+  return count || sharedFallback;
 }
 
 function customerContainerHealth(customer, docker) {
@@ -2876,11 +2883,12 @@ function getTenantContainers(tenantId, tenant = null, setupRequests = [], provis
 }
 
 function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers, tenantUsage = {} }) {
+  const soleCustomer = (customers.tenants || []).length === 1;
   const enrichedCustomers = (customers.tenants || []).map((customer) => {
     const customerContainers = getTenantContainers(customer.id, customer, customerSetup?.requests || [], provisioning?.requests || []);
     const plan = customer.plan || config.billingPlan;
     const requestLimit = Number(customer.requestLimit || config.monthlyRequestLimit || 0);
-    const requestsToday = customerRequestCount(customer, requestSummary);
+    const requestsToday = customerRequestCount(customer, requestSummary, { soleCustomer });
     const periodUsage = tenantUsage[customer.id] || null;
     const requestsMonth = Number(
       customer.requestsMonth ??
@@ -4755,15 +4763,24 @@ async function customerDashboardData(data, session) {
   // Run all three I/O operations in parallel instead of sequentially.
   // On cold cache (first load or after TTL) each can block up to DASHBOARD_COMMAND_TIMEOUT_MS.
   // Serial: 3× timeout = 3–9s. Parallel: max(all three) = ~1s worst case.
-  const [tenantAccessLog, tenantRequestSummary, tenantPeriodSummary] = await Promise.all([
-    customerAccessLogForTenant(data, session.tenantId),
-    tenantLogPaths.length
-      ? summarizeRequestsTodayForPaths(tenantLogPaths, customerSummaryOptions)
-      : Promise.resolve(filterRequestSummaryForTenant(data.nginx.todayEvents, tenant)),
-    tenantLogPaths.length
-      ? summarizeRequestsForPeriodForPaths(tenantLogPaths, billingPeriod, customerSummaryOptions)
+  // When the tenant has its own per-container access log, use it (multi-tenant prod).
+  // Otherwise fall back to the shared nginx access log so single-VPS / pre-provisioning
+  // setups still show real tracking events instead of zeros.
+  const useDedicatedLogs = tenantLogPaths.length > 0;
+  const fallbackPaths = useDedicatedLogs ? tenantLogPaths : [config.accessLog].filter(Boolean);
+  const [tenantAccessLog, rawTodaySummary, rawPeriodSummary] = await Promise.all([
+    useDedicatedLogs
+      ? customerAccessLogForTenant(data, session.tenantId)
+      : tailFile(config.accessLog, config.logTailLines),
+    fallbackPaths.length
+      ? summarizeRequestsTodayForPaths(fallbackPaths, customerSummaryOptions)
+      : Promise.resolve(data.nginx.todayEvents),
+    fallbackPaths.length
+      ? summarizeRequestsForPeriodForPaths(fallbackPaths, billingPeriod, customerSummaryOptions)
       : Promise.resolve({ available: false, count: tenant?.requestsMonth || 0, period: billingPeriod })
   ]);
+  const tenantRequestSummary = filterRequestSummaryForTenant(rawTodaySummary, tenant);
+  const tenantPeriodSummary = rawPeriodSummary;
   const requestLimit = tenant?.requestLimit || data.usage.requestLimit;
 
   // Compute billing-period event count that survives nightly log rotation.
@@ -4864,6 +4881,16 @@ function hostMatchesTenant(host, tenant) {
 
 function filterRequestSummaryForTenant(summary, tenant) {
   if (!summary?.available || !tenant || (!tenant.domain && tenant.source === "environment")) return summary;
+
+  // If the nginx log format does not expose the request host (default `combined`
+  // format does not), every event reads as "Unknown host" and domain matching would
+  // filter everything to zero. On a single-VPS setup all requests belong to the only
+  // customer, so return the full summary instead of zeroing it out.
+  const hasHostInfo = (summary.recentEvents || []).some((event) => {
+    const host = normalizeHost(event.host);
+    return host && host !== "unknown host";
+  });
+  if (!hasHostInfo) return summary;
 
   const recentEvents = (summary.recentEvents || []).filter((event) => hostMatchesTenant(event.host, tenant));
   const eventCounts = new Map();
