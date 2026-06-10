@@ -443,6 +443,19 @@ function gtmEventDataVariable(id, name, key, folderId = "2") {
   };
 }
 
+function gtmRequestHeaderVariable(id, name, headerName, folderId = "2") {
+  return {
+    accountId: "0",
+    containerId: "0",
+    variableId: String(id),
+    name,
+    type: "smhttp_request_header",
+    parameter: [gtmTemplateParam("headerName", headerName)],
+    fingerprint: String(Date.now()),
+    parentFolderId: folderId
+  };
+}
+
 function gtmTrigger(id, name, eventName, filterClient = "") {
   const trigger = {
     accountId: "0",
@@ -556,7 +569,9 @@ function tagiooGalleryTemplateGuide(destinations) {
         { field: "Currency", value: "{{ed - currency}}" },
         { field: "Transaction ID", value: "{{ed - transaction_id}}" },
         { field: "Email", value: "{{ed - email_address}}" },
-        { field: "Phone", value: "{{ed - phone_number}}" }
+        { field: "Phone", value: "{{ed - phone_number}}" },
+        { field: "fbp (Browser ID)", value: "{{rh - fb_browser_id}}" },
+        { field: "fbc (Click ID)", value: "{{rh - fb_click_id}}" }
       ]
     });
   }
@@ -701,7 +716,9 @@ function buildServerGtmTemplate(input) {
     gtmEventDataVariable(27, "ed - client_id", "client_id"),
     gtmEventDataVariable(28, "ed - page_location", "page_location"),
     gtmEventDataVariable(29, "ed - user_agent", "user_agent"),
-    gtmEventDataVariable(30, "ed - ip_override", "ip_override")
+    gtmEventDataVariable(30, "ed - ip_override", "ip_override"),
+    gtmRequestHeaderVariable(31, "rh - fb_browser_id", "X-FB-Browser-ID", "4"),
+    gtmRequestHeaderVariable(32, "rh - fb_click_id", "X-FB-Click-ID", "4")
   ];
   const triggers = [
     { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - GA4 Client", type: "ALWAYS", filter: [{ type: "CONTAINS", parameter: [gtmTemplateParam("arg0", "{{Client Name}}"), gtmTemplateParam("arg1", "GA4")] }], fingerprint: String(Date.now()) },
@@ -1144,7 +1161,12 @@ ${accessLogLine}
         # X-Tagioo-Country: ISO country code from Cloudflare (CF-IPCountry header).
         # X-Tagioo-Client-IP: real visitor IP for geo lookup in sGTM if no CDN.
         proxy_set_header X-Tagioo-Country $http_cf_ipcountry;
-        proxy_set_header X-Tagioo-Client-IP $remote_addr;${powerUpSetCookies}
+        proxy_set_header X-Tagioo-Client-IP $remote_addr;
+        # ── Meta Signal Quality ─────────────────────────────────────────────
+        # Forwards _fbp and _fbc cookies as explicit headers so sGTM CAPI
+        # template can read them via Request Header variables (higher EMQ).
+        proxy_set_header X-FB-Browser-ID $cookie__fbp;
+        proxy_set_header X-FB-Click-Cookie $cookie__fbc;${powerUpSetCookies}
     }${customLoaderLocation}
 }
 `;
