@@ -1058,7 +1058,22 @@ async function regenNginxForContainer(request) {
   if (!testResult.ok) return { ok: false, error: `nginx -t failed: ${testResult.stderr || testResult.stdout}` };
 
   const reloadResult = await command("sudo", ["systemctl", "reload", "nginx"], { timeout: 10000 });
-  return { ok: reloadResult.ok, error: reloadResult.ok ? null : reloadResult.stderr };
+  if (!reloadResult.ok) return { ok: false, error: reloadResult.stderr };
+
+  // Re-run certbot to restore SSL after rebuilding the nginx config from template.
+  // buildNginxConfig generates HTTP-only (port 80); certbot --nginx re-adds the SSL block
+  // without re-issuing the certificate (idempotent when cert is still valid).
+  const certbotResult = await command(
+    "sudo",
+    ["certbot", "--nginx", "-d", request.domain, "--non-interactive", "--agree-tos", "--redirect"],
+    { timeout: 60000, maxBuffer: 1024 * 1024 }
+  ).catch((err) => ({ ok: false, stdout: "", stderr: err.message }));
+
+  return {
+    ok: true,
+    certbot: certbotResult.ok ? "ssl-restored" : "ssl-skipped",
+    certbotError: certbotResult.ok ? null : (certbotResult.stderr || certbotResult.stdout || null)
+  };
 }
 
 function buildNginxConfig({ domain, port, accessLogLine, errorLog }) {
