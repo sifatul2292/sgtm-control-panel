@@ -62,7 +62,7 @@ button {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -71,8 +71,8 @@ button {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
-  padding: var(--space-lg) var(--space-md);
+  gap: var(--space-md);
+  padding: 22px 16px;
   border-right: var(--rule-thin) solid var(--color-line);
   background: var(--color-sidebar);
 }
@@ -80,12 +80,15 @@ button {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 11px;
   color: var(--color-text);
   text-decoration: none;
   font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 800;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  padding: 4px 8px 0;
+  margin-bottom: 10px;
 }
 
 .brand-mark {
@@ -109,13 +112,22 @@ button {
   gap: var(--space-xs);
 }
 
+.nav-section-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+  padding: 0 10px;
+  margin: 0 0 4px;
+}
+
 .sidebar-group {
   margin-top: var(--space-md);
 }
 
 .sidebar-group p,
 .breadcrumb,
-.metric-label,
 .timestamp,
 .badge,
 .status-pill {
@@ -125,6 +137,14 @@ button {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.metric-label {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
 }
 
 .nav-item,
@@ -174,9 +194,15 @@ select:focus-visible {
 }
 
 .nav-icon {
-  width: 22px;
-  color: var(--color-accent);
+  width: 17px;
+  flex: none;
+  color: var(--color-dim);
   text-align: center;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.nav-item:hover .nav-icon {
+  color: var(--color-muted);
 }
 
 .side-link {
@@ -209,7 +235,7 @@ select:focus-visible {
 
 .main-shell {
   min-width: 0;
-  padding: var(--space-xl);
+  padding: 30px 40px 64px;
   background: var(--color-page);
 }
 
@@ -322,8 +348,7 @@ h2 {
 }
 
 .notice,
-.panel,
-.metric-card {
+.panel {
   border: var(--rule-thin) solid var(--color-line);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
@@ -349,10 +374,16 @@ h2 {
   line-height: 1.45;
 }
 
+/* KPI strip — single unified card with hairline column dividers */
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-sm);
+  gap: 0;
+  background: var(--color-surface);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
 }
 
 .owner-metrics {
@@ -360,11 +391,25 @@ h2 {
 }
 
 .metric-card {
-  min-height: 124px;
   display: grid;
   align-content: space-between;
   gap: var(--space-sm);
-  padding: var(--space-md);
+  padding: 19px 24px;
+  border-left: var(--rule-thin) solid var(--color-line);
+  border-radius: 0;
+  background: var(--color-surface);
+  box-shadow: none;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.metric-card:first-child {
+  border-left: none;
+}
+
+.metric-card:hover {
+  background: var(--color-surface-2);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .customer-session #dashboardView > section:not(.customer-home) {
@@ -1433,8 +1478,17 @@ h2 {
 }
 
 .metric-card strong {
-  font-size: clamp(var(--text-xl), 4vw, var(--text-3xl));
+  font-family: var(--font-mono);
+  font-size: clamp(1.5rem, 3vw, 1.75rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
   line-height: 1;
+  color: var(--color-text);
+}
+
+.metric-card small {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
 }
 
 .panel {
@@ -1443,8 +1497,8 @@ h2 {
 }
 
 .panel-header {
-  min-height: 68px;
-  padding: var(--space-md);
+  min-height: 0;
+  padding: 20px 24px 16px;
   border-bottom: var(--rule-thin) solid var(--color-line);
 }
 
@@ -1730,30 +1784,67 @@ h2 {
 
 .business-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  background: var(--color-surface);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  padding: 0;
+}
+
+.business-grid > .business-item {
+  border-left: var(--rule-thin) solid var(--color-line);
+  border-radius: 0;
+  background: var(--color-surface);
+}
+
+.business-grid > .business-item:first-child {
+  border-left: none;
 }
 
 .customer-performance-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   padding: 0;
+  gap: 0;
+  background: var(--color-surface);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
 }
 
 .business-item {
   display: grid;
   gap: var(--space-xs);
-  min-height: 116px;
-  padding: var(--space-md);
-  border: var(--rule-thin) solid var(--color-line);
-  border-radius: var(--radius-md);
+  padding: 19px 24px;
+  border-left: var(--rule-thin) solid var(--color-line);
+  border-radius: 0;
+  background: var(--color-surface);
+  min-height: 0;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.business-item:first-child {
+  border-left: none;
+}
+
+.business-item:hover {
   background: var(--color-surface-2);
 }
 
 .business-item span,
 .business-item small {
   color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .business-item strong {
-  font-size: var(--text-xl);
+  font-family: var(--font-mono);
+  font-size: clamp(1.3rem, 2.5vw, 1.6rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
   color: var(--color-text);
   overflow-wrap: anywhere;
 }
@@ -2251,9 +2342,22 @@ textarea::placeholder {
 .log-stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-sm);
+  gap: 0;
   margin-bottom: var(--space-lg);
   padding: 0;
+  background: var(--color-surface);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.log-stats-grid .metric-card {
+  border-left: var(--rule-thin) solid var(--color-line);
+}
+
+.log-stats-grid .metric-card:first-child {
+  border-left: none;
 }
 
 .event-table-wrap {
@@ -2943,7 +3047,6 @@ textarea::placeholder {
 
 /* Card hover — subtle border lift only */
 .panel,
-.metric-card,
 .customer-hero-card,
 .customer-plan-box {
   transition:
@@ -2951,18 +3054,12 @@ textarea::placeholder {
     box-shadow var(--dur-med) var(--ease-out);
 }
 
-.metric-card:hover,
 .panel:hover {
   border-color: var(--color-line-strong);
   box-shadow: 0 2px 8px oklch(0.4 0.02 60 / 0.08);
 }
 
-/* Metric cards — clean surface */
-.metric-card {
-  position: relative;
-  overflow: hidden;
-  background: var(--color-surface);
-}
+/* Metric cards inside strip — no extra overrides needed */
 
 /* Customer hero — clean surface with accent border hint */
 .customer-hero-card {
