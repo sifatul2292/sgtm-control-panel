@@ -215,164 +215,137 @@
             </article>
           </section>
 
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Actual Store Orders</h2>
-                <p>Real ecommerce orders from the store webhook, separated from tracking event hits.</p>
+          <!-- Owner: SaaS business overview -->
+          <section class="owner-home-section" data-owner-only>
+            <section class="metrics-grid owner-metrics" id="ownerHomeMetrics" aria-label="Business overview"></section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Customers</h2>
+                  <p>Plan, containers, and request usage for each customer this billing period.</p>
+                </div>
+                <span id="ownerHomeBadge" class="badge">Loading</span>
               </div>
-              <span id="businessBadge" class="badge">Checking</span>
-            </div>
-            <div class="business-grid">
-              <article class="business-item">
-                <span>Unique purchases</span>
-                <strong id="businessPurchases">--</strong>
-                <small id="businessPurchaseDetail">Waiting for purchases</small>
+              <div class="event-table-wrap">
+                <table class="event-table owner-table">
+                  <thead>
+                    <tr>
+                      <th>Customer</th>
+                      <th>Plan</th>
+                      <th>Containers</th>
+                      <th>Requests (month)</th>
+                      <th>Requests (today)</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ownerHomeCustomerTable">
+                    <tr><td colspan="6">Loading customers...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="split-grid">
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>VPS Health</h2>
+                    <p>Live server resource usage and Docker container status.</p>
+                  </div>
+                  <span id="vpsHealthBadge" class="badge">Checking</span>
+                </div>
+                <div id="vpsHealthGrid" class="summary-list"></div>
               </article>
-              <article class="business-item">
-                <span>Revenue</span>
-                <strong id="businessRevenue">--</strong>
-                <small id="businessRevenueDetail">Deduped order value</small>
+
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Infrastructure</h2>
+                    <p>Docker containers, SSL status, and service availability.</p>
+                  </div>
+                  <span id="infraStatusBadge" class="badge">Checking</span>
+                </div>
+                <div id="infraStatusList" class="summary-list"></div>
               </article>
-              <article class="business-item">
-                <span>Average order value</span>
-                <strong id="businessAov">--</strong>
-                <small id="businessAovDetail">Based on unique purchases</small>
+            </section>
+
+            <section id="alertPanel" class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Alerts</h2>
+                  <p>Issues that need attention.</p>
+                </div>
+                <span id="alertBadge" class="badge">Checking</span>
+              </div>
+              <div id="alertList" class="summary-list"></div>
+            </section>
+
+            <section id="containers" class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Docker Containers</h2>
+                  <p>Live container inventory on this server.</p>
+                </div>
+                <span id="dockerBadge" class="badge">Read only</span>
+              </div>
+              <div class="container-list" id="containerCards">Loading containers...</div>
+            </section>
+          </section>
+
+          <!-- Customer: tracking + event health panels (owner sees these via Event Logs / Analytics) -->
+          <section class="customer-tracking-section" data-customer-only hidden>
+            <section class="split-grid">
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Event Health</h2>
+                    <p>Tracked event hits seen in SGTM logs.</p>
+                  </div>
+                  <span id="logModeBadge" class="badge">Log mode</span>
+                </div>
+                <div id="eventHealthGrid" class="health-grid"></div>
               </article>
-              <article class="business-item">
-                <span>Duplicate purchase hits</span>
-                <strong id="businessDuplicates">--</strong>
-                <small id="businessDuplicateDetail">Raw request protection</small>
+
+              <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Funnel</h2>
+                    <p>Deduped SGTM event progression from page view to tracked purchase.</p>
+                  </div>
+                  <span class="badge">Recent sample</span>
+                </div>
+                <div id="funnelList" class="funnel-list"></div>
               </article>
-            </div>
-          </section>
+            </section>
 
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Purchase Reconciliation</h2>
-                <p>Compares actual store orders with deduped SGTM purchase tracking.</p>
-              </div>
-              <span id="reconciliationBadge" class="badge">Checking</span>
-            </div>
-            <div id="reconciliationGrid" class="business-grid"></div>
-          </section>
-
-          <section class="split-grid">
-            <article class="panel">
+            <section id="alertPanelCustomer" class="panel">
               <div class="panel-header">
                 <div>
-                  <h2>Event Health</h2>
-                  <p>Tracked event hits seen in SGTM logs. Purchase hits can include Meta, GA4, and Data Client copies.</p>
+                  <h2>Alerts</h2>
+                  <p>Issues that need attention before trusting the tracking data.</p>
                 </div>
-                <span id="logModeBadge" class="badge">Log mode</span>
+                <span id="alertBadgeCustomer" class="badge">Checking</span>
               </div>
-              <div id="eventHealthGrid" class="health-grid"></div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Funnel</h2>
-                  <p>Deduped SGTM event progression from page view to tracked purchase.</p>
-                </div>
-                <span class="badge">Recent sample</span>
-              </div>
-              <div id="funnelList" class="funnel-list"></div>
-            </article>
+              <div id="alertListCustomer" class="summary-list"></div>
+            </section>
           </section>
 
-          <section id="alertPanel" class="panel">
-            <div class="panel-header">
-              <div>
-                <h2>Alerts</h2>
-                <p>Issues that need attention before trusting the tracking data.</p>
-              </div>
-              <span id="alertBadge" class="badge">Checking</span>
-            </div>
-            <div id="alertList" class="summary-list"></div>
-          </section>
-
-          <section class="split-grid" data-owner-only>
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Domain Breakdown</h2>
-                  <p>Hosts detected in today's SGTM tracking requests.</p>
-                </div>
-                <span id="hostBadge" class="badge">Checking</span>
-              </div>
-              <div id="hostBreakdown" class="summary-list"></div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Tracking Quality</h2>
-                  <p>Checks for ecommerce event flow and purchase metadata.</p>
-                </div>
-                <span id="qualityBadge" class="badge">Checking</span>
-              </div>
-              <div id="qualityChecks" class="summary-list"></div>
-            </article>
-          </section>
-
-          <section id="containers" class="panel" data-owner-only>
-            <div class="panel-header">
-              <div>
-                <h2>Containers</h2>
-                <p>Live Docker inventory from this server.</p>
-              </div>
-              <span id="dockerBadge" class="badge">Read only</span>
-            </div>
-            <div class="container-list" id="containerCards">Loading containers...</div>
-          </section>
-
-          <section class="split-grid" data-owner-only>
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Traffic Snapshot</h2>
-                  <p>Recent SGTM endpoint mix from Nginx access logs.</p>
-                </div>
-              </div>
-              <div id="trafficSummary" class="summary-list"></div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Runtime Checks</h2>
-                  <p>Service availability for the dashboard collectors.</p>
-                </div>
-              </div>
-              <div id="runtimeChecks" class="summary-list"></div>
-            </article>
-          </section>
-
-          <section class="split-grid" data-owner-only>
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Noise Filter</h2>
-                  <p>Non-tracking log traffic separated from clean SGTM events.</p>
-                </div>
-                <span id="noiseBadge" class="badge">Checking</span>
-              </div>
-              <div id="noiseSummary" class="summary-list"></div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Latest Purchase</h2>
-                  <p>Most recent purchase request and its key metadata.</p>
-                </div>
-                <span id="purchaseBadge" class="badge">Checking</span>
-              </div>
-              <div id="latestPurchase" class="summary-list"></div>
-            </article>
-          </section>
+          <!-- Hidden elements kept for JS compatibility -->
+          <div hidden>
+            <span id="businessBadge"></span>
+            <strong id="businessPurchases"></strong><small id="businessPurchaseDetail"></small>
+            <strong id="businessRevenue"></strong><small id="businessRevenueDetail"></small>
+            <strong id="businessAov"></strong><small id="businessAovDetail"></small>
+            <strong id="businessDuplicates"></strong><small id="businessDuplicateDetail"></small>
+            <span id="reconciliationBadge"></span><div id="reconciliationGrid"></div>
+            <span id="hostBadge"></span><div id="hostBreakdown"></div>
+            <span id="qualityBadge"></span><div id="qualityChecks"></div>
+            <span id="noiseBadge"></span><div id="noiseSummary"></div>
+            <span id="purchaseBadge"></span><div id="latestPurchase"></div>
+            <div id="trafficSummary"></div>
+            <div id="runtimeChecks"></div>
+          </div>
         </section>
 
         <section id="logsView" class="view" data-view="logs">
@@ -492,12 +465,33 @@
         </section>
 
         <section id="analyticsView" class="view" data-view="analytics">
-          <section class="notice notice-soft" aria-label="Tracking quality">
-            <div>
-              <strong>Tracking analytics</strong>
-              <p>Summaries focus on SGTM event collection endpoints, not loader or service-worker requests.</p>
+          <!-- Owner: all-customers request summary -->
+          <section class="panel analytics-panel" data-owner-only>
+            <div class="panel-header">
+              <div>
+                <h2>All Customers — Request Overview</h2>
+                <p>Total tracking requests across every customer this billing period.</p>
+              </div>
+              <span id="allCustomersBadge" class="badge">Loading</span>
             </div>
-            <span class="status-dot">Read only</span>
+            <section class="metrics-grid owner-metrics" id="allCustomersMetrics" aria-label="All customers metrics"></section>
+            <div class="event-table-wrap" style="margin-top:1rem">
+              <table class="event-table owner-table">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Plan</th>
+                    <th>Requests (month)</th>
+                    <th>Requests (today)</th>
+                    <th>Usage %</th>
+                    <th>Containers</th>
+                  </tr>
+                </thead>
+                <tbody id="allCustomersTable">
+                  <tr><td colspan="6">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section class="panel analytics-panel">
@@ -995,35 +989,33 @@
         </section>
 
         <section id="provisioningView" class="view" data-view="provisioning">
-          <section class="notice notice-soft" aria-label="Provisioning safety">
+          <section class="customer-page-head">
             <div>
-              <strong>Provisioning pipeline</strong>
-              <p>Customers provide domain and container details. The system assigns infrastructure values and queues the launch plan.</p>
+              <p class="breadcrumb">Operations / Provisioning</p>
+              <h2>Add New Customer</h2>
+              <p>Fill in the customer's details to create their sGTM container. Ports and infrastructure are assigned automatically.</p>
             </div>
             <span id="provisioningBadge" class="status-dot">Launch queue</span>
           </section>
 
-          <section class="split-grid">
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>New SGTM Instance</h2>
-                  <p>Collect the customer-facing details. Local ports are assigned automatically.</p>
-                </div>
-                <span class="badge">Request</span>
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Customer Details</h2>
+                <p>Basic info — who is this container for?</p>
               </div>
-              <form id="provisioningForm" class="provisioning-form">
+              <span class="badge">Step 1</span>
+            </div>
+            <form id="provisioningForm" class="provisioning-form provisioning-form-clean">
+              <div class="prov-section">
                 <label>
-                  Instance name
-                  <input name="instanceName" placeholder="client-name" required />
+                  Customer name
+                  <input name="instanceName" placeholder="e.g. Acme Shop" required />
+                  <span class="field-help">Used as the container name. Can be anything you want to recognize the customer by.</span>
                 </label>
                 <label>
-                  Tracking domain
-                  <input name="domain" placeholder="server.example.com" required />
-                </label>
-                <label>
-                  Owner email
-                  <input name="ownerEmail" type="email" placeholder="client@example.com" />
+                  Customer email
+                  <input name="ownerEmail" type="email" placeholder="customer@example.com" />
                 </label>
                 <label>
                   Plan
@@ -1036,127 +1028,88 @@
                 </label>
                 <label>
                   Monthly request limit
-                  <input name="requestLimit" type="number" min="1" value="100000" />
+                  <input name="requestLimit" type="number" min="1" value="500000" />
+                  <span class="field-help">How many tracking requests per month this customer is allowed. Starter = 500,000.</span>
+                </label>
+              </div>
+
+              <div class="panel-header prov-divider">
+                <div>
+                  <h2>Container Setup</h2>
+                  <p>Where should we point the tracking server?</p>
+                </div>
+                <span class="badge">Step 2</span>
+              </div>
+              <div class="prov-section">
+                <label>
+                  Tracking domain
+                  <input name="domain" placeholder="server.example.com" required />
+                  <span class="field-help">The CNAME subdomain the customer will use. They must point it at your server before launch.</span>
                 </label>
                 <label>
-                  Preview URL
+                  Preview URL (optional)
                   <input name="previewUrl" placeholder="https://preview.example.com" />
+                  <span class="field-help">Only needed if the customer wants GTM preview mode to work. Usually leave blank.</span>
+                </label>
+              </div>
+
+              <div class="panel-header prov-divider">
+                <div>
+                  <h2>GTM Container Config</h2>
+                  <p>Paste the value from Google Tag Manager.</p>
+                </div>
+                <span class="badge">Step 3</span>
+              </div>
+              <div class="prov-section">
+                <label class="form-wide">
+                  Container Config
+                  <textarea name="containerConfig" placeholder="Paste the full CONTAINER_CONFIG value from GTM > Admin > Container Settings > Manually provision tagging server" required></textarea>
+                  <span class="field-help">Copy the full value from GTM. It starts with a long base64 string. Include any trailing = or == characters.</span>
                 </label>
                 <label class="form-wide">
-                  Container config
-                  <textarea name="containerConfig" placeholder="Paste the SGTM CONTAINER_CONFIG value" required></textarea>
-                  <span class="field-help">Copy the full value from GTM server container settings. Missing padding or a partial value will block launch.</span>
+                  Notes (optional)
+                  <textarea name="notes" placeholder="Any notes about this customer, their DNS status, or launch timing..."></textarea>
                 </label>
-                <label class="form-wide">
-                  Notes
-                  <textarea name="notes" placeholder="Plan, client, DNS, or launch notes"></textarea>
-                </label>
-                <button class="button button-primary" type="submit">Create Instance Request</button>
+                <div class="button-row">
+                  <button class="button button-primary" type="submit">Create Container Request</button>
+                </div>
                 <p id="provisioningFormMessage" class="form-message"></p>
-              </form>
-            </article>
-
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Provisioning Queue</h2>
-                  <p>Queued requests with auto-assigned ports and generated implementation plans.</p>
-                </div>
-                <span id="provisioningQueueBadge" class="badge">0 requests</span>
               </div>
-              <div id="provisioningRequests" class="provisioning-list"></div>
-            </article>
-          </section>
-        </section>
-
-        <section id="adminView" class="view" data-view="admin">
-          <section class="notice notice-soft" aria-label="Admin overview">
-            <div>
-              <strong>Service Admin</strong>
-              <p>Customer, container, and operational overview for running this as a managed SGTM service.</p>
-            </div>
-            <span id="adminBadge" class="status-dot">Checking</span>
-          </section>
-
-          <section class="metrics-grid owner-metrics" id="ownerMetricGrid" aria-label="Owner metrics"></section>
-
-          <section class="split-grid">
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Owner Watchlist</h2>
-                  <p>Subscriptions, tracking gaps, SSL, and infrastructure issues that need attention.</p>
-                </div>
-                <span id="ownerWatchBadge" class="badge">Checking</span>
-              </div>
-              <div id="ownerIssueList" class="summary-list"></div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Infrastructure</h2>
-                  <p>Fleet-level Docker and SSL status across managed customer instances.</p>
-                </div>
-                <span id="ownerInfraBadge" class="badge">Checking</span>
-              </div>
-              <div id="ownerInfraList" class="summary-list"></div>
-            </article>
+            </form>
           </section>
 
           <section class="panel">
             <div class="panel-header">
               <div>
-                <h2>Customers & Containers</h2>
-                <p>Customer plan, payment, created containers, request usage, and tracking status in one place.</p>
+                <h2>Pending Launch Queue</h2>
+                <p>Containers waiting for DNS verification and launch. Each gets auto-assigned ports and generated config files.</p>
               </div>
-              <span id="ownerCustomerBadge" class="badge">0 customers</span>
+              <span id="provisioningQueueBadge" class="badge">0 requests</span>
             </div>
-            <div class="event-table-wrap">
-              <table class="event-table owner-table">
-                <thead>
-                  <tr>
-                    <th>Customer</th>
-                    <th>Plan</th>
-                    <th>Containers</th>
-                    <th>Usage</th>
-                    <th>Payment</th>
-                    <th>MRR</th>
-                    <th>Tracking</th>
-                  </tr>
-                </thead>
-                <tbody id="ownerCustomerTable">
-                  <tr>
-                    <td colspan="7">Waiting for customers...</td>
-                  </tr>
-                </tbody>
-              </table>
+            <div id="provisioningRequests" class="provisioning-list"></div>
+          </section>
+        </section>
+
+        <section id="adminView" class="view" data-view="admin">
+          <section class="customer-page-head">
+            <div>
+              <p class="breadcrumb">Service / Admin</p>
+              <h2>Admin</h2>
+              <p>Manage customer logins, server workers, and monitor active subscriptions.</p>
             </div>
+            <span id="adminBadge" class="status-dot">Checking</span>
           </section>
 
-          <section class="split-grid">
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Customers</h2>
-                  <p>Current tenant records and queued customer instances.</p>
-                </div>
-                <span id="customersBadge" class="badge">0 customers</span>
-              </div>
-              <div id="customersList" class="summary-list"></div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Admin Actions</h2>
-                  <p>Dangerous infrastructure actions remain gated behind generated plans and manual approval.</p>
-                </div>
-                <span class="badge">Guarded</span>
-              </div>
-              <div id="adminActions" class="summary-list"></div>
-            </article>
-          </section>
+          <!-- Hidden refs kept for renderAdmin() JS compatibility -->
+          <div hidden>
+            <section id="ownerMetricGrid"></section>
+            <span id="ownerWatchBadge"></span><div id="ownerIssueList"></div>
+            <span id="ownerInfraBadge"></span><div id="ownerInfraList"></div>
+            <span id="ownerCustomerBadge"></span>
+            <tbody id="ownerCustomerTable"></tbody>
+            <span id="customersBadge"></span><div id="customersList"></div>
+            <div id="adminActions"></div>
+          </div>
 
           <section class="split-grid">
             <article class="panel">

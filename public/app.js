@@ -108,6 +108,15 @@ const els = {
   provisioningFormMessage: document.querySelector("#provisioningFormMessage"),
   provisioningQueueBadge: document.querySelector("#provisioningQueueBadge"),
   provisioningRequests: document.querySelector("#provisioningRequests"),
+  ownerHomeMetrics: document.querySelector("#ownerHomeMetrics"),
+  ownerHomeBadge: document.querySelector("#ownerHomeBadge"),
+  ownerHomeCustomerTable: document.querySelector("#ownerHomeCustomerTable"),
+  vpsHealthBadge: document.querySelector("#vpsHealthBadge"),
+  vpsHealthGrid: document.querySelector("#vpsHealthGrid"),
+  infraStatusBadge: document.querySelector("#infraStatusBadge"),
+  infraStatusList: document.querySelector("#infraStatusList"),
+  alertBadgeCustomer: document.querySelector("#alertBadgeCustomer"),
+  alertListCustomer: document.querySelector("#alertListCustomer"),
   adminBadge: document.querySelector("#adminBadge"),
   ownerMetricGrid: document.querySelector("#ownerMetricGrid"),
   ownerWatchBadge: document.querySelector("#ownerWatchBadge"),
@@ -140,7 +149,10 @@ const els = {
   billingGrid: document.querySelector("#billingGrid"),
   packageGrid: document.querySelector("#packageGrid"),
   subscriptionPlans: document.querySelector("#subscriptionPlans"),
-  docsList: document.querySelector("#docsList")
+  docsList: document.querySelector("#docsList"),
+  allCustomersBadge: document.querySelector("#allCustomersBadge"),
+  allCustomersMetrics: document.querySelector("#allCustomersMetrics"),
+  allCustomersTable: document.querySelector("#allCustomersTable")
 };
 
 document.body.classList.remove("app-loading");
@@ -2773,7 +2785,14 @@ function renderDashboard(data) {
     { label: "Nginx error log", value: data.nginx.errorLog.available ? "Readable" : "Blocked", status: data.nginx.errorLog.available ? "healthy" : "error" },
     { label: "SSL check", value: data.ssl.available ? "Configured" : "Missing", status: data.ssl.available ? "healthy" : "warning" }
   ]);
-  renderEventHealth(data);
+  const isOwner = currentSession.role === "owner" || currentSession.role !== "customer";
+  if (isOwner) {
+    renderOwnerHome(data);
+  } else {
+    renderEventHealth(data);
+    renderCustomerAlerts(data);
+  }
+  // Always render these for JS refs (elements may be hidden)
   renderAlerts(data);
   renderHostBreakdown(data);
   renderQualityChecks(data);
@@ -2781,6 +2800,143 @@ function renderDashboard(data) {
   renderLatestPurchase(data);
   renderBusinessSnapshot(data);
   renderReconciliation(data);
+}
+
+function renderCustomerAlerts(data) {
+  if (!els.alertBadgeCustomer || !els.alertListCustomer) return;
+  const alerts = collectAlerts(data);
+  const hasError = alerts.some((a) => a.status === "error");
+  els.alertBadgeCustomer.className = "badge";
+  els.alertBadgeCustomer.classList.add(hasError ? "danger" : alerts.length ? "warn" : "ok");
+  els.alertBadgeCustomer.textContent = alerts.length ? `${alerts.length} issue${alerts.length === 1 ? "" : "s"}` : "Clear";
+  renderSummaryList(
+    els.alertListCustomer,
+    alerts.length ? alerts : [{ label: "Tracking health", value: "No immediate issues", status: "healthy" }]
+  );
+}
+
+function renderVpsHealth(data) {
+  const sys = data.system || {};
+  const docker = data.docker || {};
+  const ssl = data.ssl || {};
+  const totals = docker.totals || {};
+
+  if (els.vpsHealthGrid) {
+    const memLabel = sys.memTotalMb
+      ? `${sys.memUsedMb || 0} / ${sys.memTotalMb} MB (${sys.memPercent || 0}%)`
+      : "Unavailable";
+    const diskLabel = sys.diskTotalMb
+      ? `${sys.diskUsedMb || 0} / ${sys.diskTotalMb} MB (${sys.diskPercent || 0}%)`
+      : "Unavailable";
+    const loadLabel = sys.load1 !== null && sys.load1 !== undefined
+      ? `${sys.load1} (1m) / ${sys.load5} (5m)`
+      : "Unavailable";
+    const memStatus = sys.memPercent > 90 ? "error" : sys.memPercent > 75 ? "warning" : "healthy";
+    const diskStatus = sys.diskPercent > 90 ? "error" : sys.diskPercent > 80 ? "warning" : "healthy";
+    const loadStatus = sys.load1 > 4 ? "warning" : "healthy";
+    renderSummaryList(els.vpsHealthGrid, [
+      { label: "Memory", value: memLabel, status: sys.available ? memStatus : "warning" },
+      { label: "Disk", value: diskLabel, status: sys.available ? diskStatus : "warning" },
+      { label: "CPU load", value: loadLabel, status: sys.available ? loadStatus : "warning" },
+      { label: "Uptime", value: sys.uptimeLabel || "Unavailable", status: "healthy" }
+    ]);
+    if (els.vpsHealthBadge) {
+      const bad = (sys.memPercent > 90) || (sys.diskPercent > 90);
+      els.vpsHealthBadge.className = `badge ${!sys.available ? "warn" : bad ? "danger" : "ok"}`;
+      els.vpsHealthBadge.textContent = !sys.available ? "No data" : bad ? "Attention" : "Healthy";
+    }
+  }
+
+  if (els.infraStatusList) {
+    const unhealthy = Number(totals.unhealthy || 0);
+    const sslDays = Number(ssl.daysRemaining || 0);
+    renderSummaryList(els.infraStatusList, [
+      { label: "Docker", value: docker.available ? "Connected" : "Unavailable", status: docker.available ? "healthy" : "error" },
+      { label: "Containers running", value: `${Number(totals.running || 0)} / ${Number(totals.total || 0)} total`, status: unhealthy ? "warning" : "healthy" },
+      { label: "Unhealthy containers", value: unhealthy.toLocaleString(), status: unhealthy ? "error" : "healthy" },
+      { label: "SSL", value: ssl.available ? `${sslDays} days remaining` : "Not configured", status: ssl.available && sslDays > 14 ? "healthy" : "warning" },
+      { label: "Nginx access log", value: data.nginx?.accessLog?.available ? "Readable" : "Unavailable", status: data.nginx?.accessLog?.available ? "healthy" : "warning" }
+    ]);
+    if (els.infraStatusBadge) {
+      els.infraStatusBadge.className = `badge ${unhealthy ? "danger" : "ok"}`;
+      els.infraStatusBadge.textContent = unhealthy ? `${unhealthy} unhealthy` : "All healthy";
+    }
+  }
+}
+
+function renderOwnerHome(data) {
+  const owner = data.owner || {};
+  const metrics = owner.metrics || {};
+  const customers = owner.customers || [];
+  const currency = owner.currency || "BDT";
+
+  if (els.ownerHomeMetrics) {
+    renderMetricCards(els.ownerHomeMetrics, [
+      { label: "Total customers", value: Number(metrics.totalCustomers || 0).toLocaleString(), detail: `${Number(metrics.activeCustomers || 0)} active · ${Number(metrics.trialCustomers || 0)} trial` },
+      { label: "Total containers", value: Number(metrics.totalCustomerContainers || 0).toLocaleString(), detail: `${Number(metrics.pendingCustomerContainers || 0)} pending launch` },
+      { label: "Requests this month", value: Number(metrics.requestsMonth || 0).toLocaleString(), detail: `${Number(metrics.requestsToday || 0).toLocaleString()} today across all customers` },
+      { label: "MRR", value: formatMoney(metrics.mrr || 0, currency), detail: `${Number(metrics.healthySubscriptions || 0)} paid subscriptions` },
+      { label: "Payment issues", value: Number(metrics.overdueCustomers || 0).toLocaleString(), detail: `${Number(metrics.cancelledCustomers || 0)} cancelled` },
+      { label: "Launch failures", value: Number(metrics.failedLaunches || 0).toLocaleString(), detail: `${Number(metrics.dnsPendingContainers || 0)} DNS pending` }
+    ]);
+  }
+
+  if (els.ownerHomeBadge) {
+    els.ownerHomeBadge.className = `badge ${customers.length ? "ok" : "warn"}`;
+    els.ownerHomeBadge.textContent = `${customers.length} customer${customers.length === 1 ? "" : "s"}`;
+  }
+
+  if (els.ownerHomeCustomerTable) {
+    if (!customers.length) {
+      els.ownerHomeCustomerTable.innerHTML = '<tr><td colspan="6">No customers yet. Use Provisioning to add one.</td></tr>';
+    } else {
+      els.ownerHomeCustomerTable.innerHTML = customers.map((customer) => {
+        const containers = customer.customerContainers || [];
+        const usagePercent = Number(customer.usagePercent || 0);
+        const subStatus = String(customer.subscriptionStatus || "unknown");
+        const subClass = lifecycleStatusClass(subStatus);
+        const containerNames = containers.length
+          ? containers.map((c) => escapeHtml(c.name || c.domain || "container")).join(", ")
+          : "None";
+        return `<tr>
+          <td>
+            <strong>${escapeHtml(customer.name || customer.id)}</strong>
+            <span class="owner-subtext">${escapeHtml(customer.id || "")}</span>
+          </td>
+          <td>
+            <strong>${escapeHtml(customer.plan || "No plan")}</strong>
+            <span class="owner-subtext">${statusPill(subStatus.replaceAll("_", " "), subClass)}</span>
+          </td>
+          <td>
+            <strong>${containers.length}</strong>
+            <span class="owner-subtext">${containerNames}</span>
+          </td>
+          <td>
+            <strong>${Number(customer.requestsMonth || 0).toLocaleString()}</strong>
+            <span class="owner-subtext">${usagePercent}% of ${Number(customer.requestLimit || 0).toLocaleString()}</span>
+          </td>
+          <td><strong>${Number(customer.requestsToday || 0).toLocaleString()}</strong></td>
+          <td>${statusPill(subStatus.replaceAll("_", " "), subClass)}</td>
+        </tr>`;
+      }).join("");
+    }
+  }
+
+  renderVpsHealth(data);
+
+  const alerts = collectAlerts(data);
+  const hasError = alerts.some((a) => a.status === "error");
+  if (els.alertBadge) {
+    els.alertBadge.className = "badge";
+    els.alertBadge.classList.add(hasError ? "danger" : alerts.length ? "warn" : "ok");
+    els.alertBadge.textContent = alerts.length ? `${alerts.length} issue${alerts.length === 1 ? "" : "s"}` : "Clear";
+  }
+  if (els.alertList) {
+    renderSummaryList(
+      els.alertList,
+      alerts.length ? alerts : [{ label: "System health", value: "No immediate issues", status: "healthy" }]
+    );
+  }
 }
 
 function eventCounts(items) {
@@ -3034,7 +3190,60 @@ function renderDailyHistory(data) {
   );
 }
 
+function renderAllCustomersAnalytics(data) {
+  const owner = data.owner || {};
+  const metrics = owner.metrics || {};
+  const customers = owner.customers || [];
+  const currency = owner.currency || "BDT";
+  const totalToday = Number(metrics.requestsToday || 0);
+  const totalMonth = Number(metrics.requestsMonth || 0);
+
+  if (els.allCustomersBadge) {
+    els.allCustomersBadge.className = `badge ${customers.length ? "ok" : "warn"}`;
+    els.allCustomersBadge.textContent = `${customers.length} customer${customers.length === 1 ? "" : "s"}`;
+  }
+  if (els.allCustomersMetrics) {
+    renderMetricCards(els.allCustomersMetrics, [
+      { label: "Total requests today", value: totalToday.toLocaleString(), detail: "Across all customer containers" },
+      { label: "Total requests this month", value: totalMonth.toLocaleString(), detail: "All customers combined" },
+      { label: "Total customers", value: Number(metrics.totalCustomers || 0).toLocaleString(), detail: `${Number(metrics.activeCustomers || 0)} active` },
+      { label: "MRR", value: formatMoney(metrics.mrr || 0, currency), detail: `${Number(metrics.healthySubscriptions || 0)} paying` }
+    ]);
+  }
+  if (els.allCustomersTable) {
+    if (!customers.length) {
+      els.allCustomersTable.innerHTML = '<tr><td colspan="6">No customers yet.</td></tr>';
+    } else {
+      els.allCustomersTable.innerHTML = customers.map((customer) => {
+        const containers = customer.customerContainers || [];
+        const usagePercent = Number(customer.usagePercent || 0);
+        const barWidth = Math.min(100, usagePercent);
+        const barColor = usagePercent > 90 ? "#ef4444" : usagePercent > 70 ? "#f59e0b" : "#10b981";
+        return `<tr>
+          <td>
+            <strong>${escapeHtml(customer.name || customer.id)}</strong>
+            <span class="owner-subtext">${escapeHtml(customer.id || "")}</span>
+          </td>
+          <td>${escapeHtml(customer.plan || "No plan")}</td>
+          <td><strong>${Number(customer.requestsMonth || 0).toLocaleString()}</strong></td>
+          <td><strong>${Number(customer.requestsToday || 0).toLocaleString()}</strong></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:0.5rem">
+              <div style="flex:1;height:6px;background:var(--color-border);border-radius:3px;overflow:hidden">
+                <div style="width:${barWidth}%;height:100%;background:${barColor};border-radius:3px"></div>
+              </div>
+              <span style="font-size:0.8rem;white-space:nowrap">${usagePercent}%</span>
+            </div>
+          </td>
+          <td>${containers.length}</td>
+        </tr>`;
+      }).join("");
+    }
+  }
+}
+
 function renderAnalytics(data) {
+  renderAllCustomersAnalytics(data);
   const summary = data.nginx?.todayEvents;
   if (summary?.available) {
     const eventRows = (summary.events || [])

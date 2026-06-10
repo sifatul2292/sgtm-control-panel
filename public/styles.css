@@ -3343,3 +3343,27 @@ a.button.button-primary {
 }
 .powerup-modal-list li { padding: 0.15rem 0; }
 .powerup-modal-copy { width: 100%; justify-content: center; }
+
+/* ── Owner Home & VPS ───────────────────────────────────────── */
+.owner-home-section { display: contents; }
+.customer-tracking-section { display: contents; }
+
+/* ── Provisioning form redesign ─────────────────────────────── */
+.provisioning-form-clean { display: flex; flex-direction: column; gap: 0; }
+.prov-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem 1.5rem;
+  padding: 1.25rem 0 1.5rem;
+}
+.prov-section label.form-wide,
+.prov-section .button-row { grid-column: 1 / -1; }
+.prov-section .button-row { display: flex; gap: 0.75rem; align-items: center; margin-top: 0.5rem; }
+.prov-divider {
+  margin-top: 0.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+@media (max-width: 600px) {
+  .prov-section { grid-template-columns: 1fr; }
+}

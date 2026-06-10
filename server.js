@@ -4396,13 +4396,61 @@ function publicRuntimeConfig() {
   };
 }
 
+async function getSystemMetrics() {
+  try {
+    const [loadavgRaw, meminfoRaw, uptimeRaw, dfResult] = await Promise.all([
+      readFile("/proc/loadavg", "utf8").catch(() => null),
+      readFile("/proc/meminfo", "utf8").catch(() => null),
+      readFile("/proc/uptime", "utf8").catch(() => null),
+      command("df", ["-BM", "/"], { timeout: 2000, maxBuffer: 16384 }).catch(() => null)
+    ]);
+
+    const load1 = loadavgRaw ? parseFloat(loadavgRaw.split(" ")[0]) : null;
+    const load5 = loadavgRaw ? parseFloat(loadavgRaw.split(" ")[1]) : null;
+
+    let memTotalMb = null, memAvailableMb = null;
+    if (meminfoRaw) {
+      const totalMatch = meminfoRaw.match(/MemTotal:\s+(\d+)/);
+      const availableMatch = meminfoRaw.match(/MemAvailable:\s+(\d+)/);
+      if (totalMatch) memTotalMb = Math.round(Number(totalMatch[1]) / 1024);
+      if (availableMatch) memAvailableMb = Math.round(Number(availableMatch[1]) / 1024);
+    }
+    const memUsedMb = memTotalMb && memAvailableMb !== null ? memTotalMb - memAvailableMb : null;
+    const memPercent = memTotalMb && memUsedMb !== null ? Math.round((memUsedMb / memTotalMb) * 100) : null;
+
+    const uptimeSeconds = uptimeRaw ? parseFloat(uptimeRaw.split(" ")[0]) : null;
+    let uptimeLabel = null;
+    if (uptimeSeconds !== null) {
+      const days = Math.floor(uptimeSeconds / 86400);
+      const hours = Math.floor((uptimeSeconds % 86400) / 3600);
+      uptimeLabel = days ? `${days}d ${hours}h` : `${hours}h`;
+    }
+
+    let diskTotalMb = null, diskUsedMb = null, diskPercent = null;
+    if (dfResult?.ok) {
+      const lines = dfResult.stdout.trim().split("\n");
+      if (lines[1]) {
+        const parts = lines[1].trim().split(/\s+/);
+        diskTotalMb = parts[1] ? parseInt(parts[1], 10) : null;
+        diskUsedMb = parts[2] ? parseInt(parts[2], 10) : null;
+        diskPercent = parts[4] ? parseInt(parts[4], 10) : null;
+      }
+    }
+
+    return { available: true, load1, load5, memTotalMb, memUsedMb, memAvailableMb, memPercent, diskTotalMb, diskUsedMb, diskPercent, uptimeLabel };
+  } catch {
+    return { available: false };
+  }
+}
+
 async function getDashboardData() {
-  const [docker, requestSummary, accessLog, errorLog, ssl] = await Promise.all([
+  const [docker, requestSummary, accessLog, errorLog, ssl, system] = await Promise.all([
     getDockerSummary(),
     summarizeRequestsToday(config.accessLog),
     tailFile(config.accessLog, config.logTailLines),
     tailFile(config.errorLog, config.logTailLines),
-    getSslSummary()
+    getSslSummary(),
+    getSystemMetrics()
   ]);
 
   const dockerLogs = docker.available
@@ -4466,6 +4514,7 @@ async function getDashboardData() {
     provisioning,
     workers,
     ssl,
+    system,
     config: publicRuntimeConfig()
   };
 }
