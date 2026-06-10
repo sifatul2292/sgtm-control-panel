@@ -11,6 +11,20 @@ body {
   display: none !important;
 }
 
+::selection {
+  background: var(--color-accent-wash);
+  color: var(--color-accent-ink);
+}
+
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--color-dim); }
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -76,13 +90,16 @@ button {
 
 .brand-mark {
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   place-items: center;
-  border-radius: var(--radius-md);
+  border-radius: 9px;
   background: var(--color-accent);
-  color: var(--color-page);
-  font-weight: 900;
+  color: #fff;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  box-shadow: 0 1px 2px oklch(0.5 0.15 33 / 0.35);
 }
 
 .nav-stack,
@@ -105,37 +122,48 @@ button {
   margin: 0;
   color: var(--color-muted);
   font-size: var(--text-xs);
-  font-weight: 800;
-  letter-spacing: 0;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .nav-item,
 .side-link {
-  min-height: 42px;
+  min-height: 38px;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   border-radius: var(--radius-md);
   color: var(--color-muted);
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 500;
+  font-size: var(--text-sm);
 }
 
 .nav-item {
   width: 100%;
-  border: 0;
+  border: 1px solid transparent;
   padding: 0 var(--space-sm);
   background: transparent;
   cursor: pointer;
 }
 
 .nav-item:hover,
-.side-link:hover,
+.side-link:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
 .nav-item.is-active {
   background: var(--color-surface);
   color: var(--color-text);
-  box-shadow: inset 3px 0 0 var(--color-accent);
+  border-color: var(--color-line);
+  box-shadow: var(--shadow-card);
+  font-weight: 600;
+}
+
+.nav-item.is-active .nav-icon {
+  color: var(--color-accent);
 }
 
 .nav-item:focus-visible,
@@ -182,9 +210,7 @@ select:focus-visible {
 .main-shell {
   min-width: 0;
   padding: var(--space-xl);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--color-accent), transparent 94%), transparent 320px),
-    var(--color-page);
+  background: var(--color-page);
 }
 
 .topbar,
@@ -211,12 +237,16 @@ h1 {
   margin-top: var(--space-xs);
   font-family: var(--font-display);
   font-size: clamp(var(--text-2xl), 4vw, var(--text-3xl));
+  font-weight: 700;
+  letter-spacing: -0.025em;
   line-height: 1;
   overflow-wrap: anywhere;
 }
 
 h2 {
   font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 .topbar-actions,
@@ -228,7 +258,7 @@ h2 {
 }
 
 .button {
-  min-height: 40px;
+  min-height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -237,13 +267,15 @@ h2 {
   border-radius: var(--radius-md);
   padding: 0 var(--space-md);
   background: var(--color-surface);
-  font-weight: 800;
+  font-weight: 600;
+  font-size: var(--text-sm);
   cursor: pointer;
-  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
 
 .button:hover {
   background: var(--color-surface-2);
+  border-color: var(--color-dim);
 }
 
 .button:active {
@@ -295,7 +327,7 @@ h2 {
   border: var(--rule-thin) solid var(--color-line);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
-  box-shadow: 0 14px 42px color-mix(in oklch, var(--color-text), transparent 94%);
+  box-shadow: var(--shadow-card);
 }
 
 .notice {
@@ -354,7 +386,7 @@ h2 {
   border: var(--rule-thin) solid var(--color-line);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
-  box-shadow: 0 18px 52px color-mix(in oklch, var(--color-text), transparent 93%);
+  box-shadow: var(--shadow-card);
 }
 
 .customer-hero-main {
@@ -555,6 +587,7 @@ h2 {
   border: var(--rule-thin) solid var(--color-line);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
 .customer-page-head h2 {
@@ -1642,9 +1675,8 @@ h2 {
   padding: var(--space-xl);
   border: var(--rule-thin) solid var(--color-line);
   border-radius: var(--radius-lg);
-  background:
-    linear-gradient(180deg, color-mix(in oklch, var(--color-accent), transparent 82%), transparent),
-    var(--color-surface);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
 .hero-panel div {
@@ -1927,7 +1959,8 @@ h2 {
   border: var(--rule-thin) solid var(--color-line);
   border-radius: var(--radius-lg);
   padding: var(--space-lg);
-  background: linear-gradient(135deg, var(--color-surface), var(--color-surface-2));
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
 .logs-hero h2 {
@@ -2468,7 +2501,7 @@ textarea::placeholder {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--color-accent), var(--color-ok));
+  background: var(--color-accent);
 }
 
 .small-chart {
@@ -2908,66 +2941,45 @@ textarea::placeholder {
 .customer-home > *:nth-child(n + 5),
 .metrics-grid > *:nth-child(n + 5) { animation-delay: 230ms; }
 
-/* Card depth + hover lift (shared surfaces) */
+/* Card hover — subtle border lift only */
 .panel,
 .metric-card,
 .customer-hero-card,
 .customer-plan-box {
   transition:
-    transform var(--dur-med) var(--ease-out),
-    box-shadow var(--dur-med) var(--ease-out),
-    border-color var(--dur-med) var(--ease-out);
+    border-color var(--dur-med) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out);
 }
 
 .metric-card:hover,
 .panel:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 24px 60px color-mix(in oklch, var(--color-text), transparent 88%);
   border-color: var(--color-line-strong);
+  box-shadow: 0 2px 8px oklch(0.4 0.02 60 / 0.08);
 }
 
-/* Metric cards — faint accent wash + reveal edge */
+/* Metric cards — clean surface */
 .metric-card {
   position: relative;
   overflow: hidden;
-  background:
-    linear-gradient(165deg, color-mix(in oklch, var(--color-accent), transparent 95%), transparent 58%),
-    var(--color-surface);
+  background: var(--color-surface);
 }
 
-.metric-card::after {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--color-accent), color-mix(in oklch, var(--color-accent-2), transparent 25%));
-  opacity: 0;
-  transition: opacity var(--dur-med) var(--ease-out);
-}
-
-.metric-card:hover::after {
-  opacity: 1;
-}
-
-/* Customer hero — branded gradient + soft glow */
+/* Customer hero — clean surface with accent border hint */
 .customer-hero-card {
   position: relative;
   overflow: hidden;
-  border-color: color-mix(in oklch, var(--color-accent), transparent 78%);
-  background:
-    radial-gradient(120% 150% at 100% 0%, color-mix(in oklch, var(--color-accent), transparent 85%), transparent 55%),
-    radial-gradient(120% 130% at 0% 100%, color-mix(in oklch, var(--color-accent-2), transparent 90%), transparent 52%),
-    var(--color-surface);
+  border-color: var(--color-accent-line);
+  background: var(--color-surface);
 }
 
-/* Usage ring — animated fill, brand gradient, count pops in */
+/* Usage ring — animated fill */
 .usage-ring {
   animation: ring-pop 520ms var(--ease-out) both;
   transition: --usage-percent 1100ms var(--ease-out);
   background: conic-gradient(
     from -90deg,
-    var(--color-accent) calc(var(--usage-percent) * 1%),
-    color-mix(in oklch, var(--color-accent), transparent 84%) 0
+    var(--color-ok) calc(var(--usage-percent) * 1%),
+    color-mix(in oklch, var(--color-ok), transparent 84%) 0
   );
 }
 
@@ -2975,30 +2987,25 @@ textarea::placeholder {
   font-variant-numeric: tabular-nums;
 }
 
-/* Sidebar nav — slide accent on hover */
+/* Sidebar nav */
 .nav-item,
 .side-link {
   transition:
     background var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out),
-    transform var(--dur-fast) var(--ease-out);
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 
-.nav-item:hover {
-  transform: translateX(2px);
-}
-
-/* Primary button — gradient + lift */
+/* Primary button — flat coral, no gradient */
 .button-primary {
-  background: linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent), var(--color-accent-2) 32%));
-  box-shadow: 0 8px 20px color-mix(in oklch, var(--color-accent), transparent 72%);
+  background: var(--color-accent);
+  box-shadow: 0 1px 2px oklch(0.5 0.15 33 / 0.3);
 }
 
 .button-primary:hover {
-  transform: translateY(-1px);
-  background: linear-gradient(135deg, var(--color-accent), color-mix(in oklch, var(--color-accent), var(--color-accent-2) 32%));
-  box-shadow: 0 12px 28px color-mix(in oklch, var(--color-accent), transparent 64%);
+  background: var(--color-accent-deep);
+  box-shadow: 0 1px 3px oklch(0.5 0.15 33 / 0.25);
 }
 
 /* List rows — hover highlight */
@@ -3014,9 +3021,9 @@ textarea::placeholder {
   background: var(--color-surface-2);
 }
 
-/* Status dot — soft halo */
+/* Status dot */
 .status-dot {
-  box-shadow: 0 0 0 4px color-mix(in oklch, var(--color-ok), transparent 88%);
+  box-shadow: var(--shadow-card);
 }
 
 /* Anchor buttons — kill default underline/blue link look */
