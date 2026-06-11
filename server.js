@@ -3912,20 +3912,55 @@ async function persistDailySummary(summary) {
 
   // Persist per-tenant daily request counts so billing-period totals survive log rotation.
   // After nightly logrotate the per-container access log starts fresh; without this,
-  // tail-based period summaries reset to 0. We store each tenant's count for today
-  // (derived from summary.hosts) so customerDashboardData can accumulate past days.
+  // tail-based period summaries reset to 0. We store each tenant's count for today.
+  //
+  // TWO sources:
+  //  1. Shared log (summary.hosts) — covers tenants whose traffic appears in the global log.
+  //  2. Dedicated per-container logs — covers tenants with their own sgtm-access.log.
+  //     These tenants never appear in summary.hosts so source-1 always stored 0 for them,
+  //     causing requestsMonth to reset to today-only after every nightly log rotation.
   const allTenants = [...(data.owner?.customers || []), ...(data.customers?.tenants || [])];
+  if (!data.tenantDailyRequests) data.tenantDailyRequests = {};
+
+  // Source 1: shared log host counts (multi-tenant setups where one log covers all)
   if (allTenants.length && Array.isArray(summary.hosts) && summary.hosts.length) {
-    if (!data.tenantDailyRequests) data.tenantDailyRequests = {};
     for (const tenant of allTenants) {
       if (!tenant?.id) continue;
       const tenantHostCount = summary.hosts
         .filter((h) => hostMatchesTenant(h.key, tenant))
         .reduce((s, h) => s + Number(h.count || 0), 0);
       if (!data.tenantDailyRequests[tenant.id]) data.tenantDailyRequests[tenant.id] = {};
-      data.tenantDailyRequests[tenant.id][today] = tenantHostCount;
+      if (tenantHostCount > 0) {
+        // Only overwrite if the shared log actually has data for this tenant
+        data.tenantDailyRequests[tenant.id][today] = tenantHostCount;
+      }
     }
-    // Prune entries older than 35 days (billing period is 30 days + 5-day buffer)
+  }
+
+  // Source 2: dedicated per-container access logs.
+  // Build a lightweight data shape that customerAccessLogPaths can use from the DB content.
+  if (allTenants.length) {
+    const dbShape = {
+      customerSetup: { requests: (data.customerSetupRequests || []) },
+      provisioning: data.provisioning || { requests: [] }
+    };
+    await Promise.all(allTenants.map(async (tenant) => {
+      if (!tenant?.id) return;
+      const paths = customerAccessLogPaths(dbShape, tenant.id);
+      if (!paths.length) return;
+      const todaySummary = await summarizeRequestsTodayForPaths(paths).catch(() => null);
+      const liveCount = todaySummary?.available ? Number(todaySummary.count || 0) : 0;
+      if (liveCount > 0) {
+        if (!data.tenantDailyRequests[tenant.id]) data.tenantDailyRequests[tenant.id] = {};
+        // Take the max: dedicated log count wins over the shared-log count (which would be 0)
+        const existing = Number(data.tenantDailyRequests[tenant.id][today] || 0);
+        data.tenantDailyRequests[tenant.id][today] = Math.max(existing, liveCount);
+      }
+    }));
+  }
+
+  // Prune entries older than 35 days (billing period is 30 days + 5-day buffer)
+  if (Object.keys(data.tenantDailyRequests).length) {
     const cutoffDate = localDateKey(addDays(new Date(), -35));
     for (const tenantId of Object.keys(data.tenantDailyRequests)) {
       for (const dateKey of Object.keys(data.tenantDailyRequests[tenantId])) {
