@@ -626,7 +626,10 @@ function buildWebGtmTemplate(input) {
     gtmDataLayerVariable(12, "dlv - ecommerce.transaction_id", "ecommerce.transaction_id"),
     gtmDataLayerVariable(13, "dlv - ecommerce.items", "ecommerce.items"),
     gtmDataLayerVariable(14, "dlv - user_data.email_address", "user_data.email_address"),
-    gtmDataLayerVariable(15, "dlv - user_data.phone_number", "user_data.phone_number")
+    gtmDataLayerVariable(15, "dlv - user_data.phone_number", "user_data.phone_number"),
+    gtmDataLayerVariable(16, "dlv - user_data.first_name", "user_data.first_name"),
+    gtmDataLayerVariable(17, "dlv - user_data.last_name", "user_data.last_name"),
+    gtmDataLayerVariable(18, "dlv - user_data.external_id", "user_data.external_id")
   ];
   const triggers = [
     { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - DOM Ready PageView", type: "DOM_READY", fingerprint: String(Date.now()) },
@@ -648,7 +651,12 @@ function buildWebGtmTemplate(input) {
     for (const [eventName, triggerId] of eventMap) {
       const eventSettingsRows = [
         { parameter: "server_container_url", parameterValue: "{{Tagioo - server_container_url}}" },
-        { parameter: "event_id", parameterValue: "{{dlv - event_id}}" }
+        { parameter: "event_id", parameterValue: "{{dlv - event_id}}" },
+        { parameter: "user_data.email_address", parameterValue: "{{dlv - user_data.email_address}}" },
+        { parameter: "user_data.phone_number", parameterValue: "{{dlv - user_data.phone_number}}" },
+        { parameter: "user_data.first_name", parameterValue: "{{dlv - user_data.first_name}}" },
+        { parameter: "user_data.last_name", parameterValue: "{{dlv - user_data.last_name}}" },
+        { parameter: "user_data.external_id", parameterValue: "{{dlv - user_data.external_id}}" }
       ];
       if (eventName === "purchase") {
         eventSettingsRows.push(

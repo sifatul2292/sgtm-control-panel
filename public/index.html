@@ -880,40 +880,66 @@
 
                 <div class="assistant-step-panel" data-assistant-step="4">
                   <div class="assistant-download-card">
-                    <span aria-hidden="true">⇣</span>
+                    <span class="assistant-download-icon" aria-hidden="true">⇣</span>
                     <h2>Download Templates</h2>
                     <p>Generate Tagioo Web and Server GTM import files from your settings.</p>
                     <div class="assistant-download-actions">
-                      <button id="downloadWebTemplate" class="button" type="button" disabled>Download web.json</button>
-                      <button id="downloadServerTemplate" class="button" type="button" disabled>Download server.json</button>
+                      <button id="downloadWebTemplate" class="button" type="button" disabled>⇣ web.json</button>
+                      <button id="downloadServerTemplate" class="button" type="button" disabled>⇣ server.json</button>
                     </div>
+                    <p id="setupAssistantResult" class="form-message"></p>
                   </div>
                   <div class="assistant-import-guide">
                     <h3>How to import</h3>
                     <ol>
-                      <li>Open Web GTM, go to Admin, then Import Container, and import <strong>web.json</strong>.</li>
-                      <li>Before importing <strong>server.json</strong>, open Server GTM, go to Templates, then Search Gallery.</li>
-                      <li>Add <strong>Facebook Conversion API</strong> if Meta is selected and <strong>TikTok Events API</strong> if TikTok is selected.</li>
-                      <li>Import <strong>server.json</strong>, then connect the Gallery template fields using the Tagioo mapping below.</li>
-                      <li>Preview both containers, trigger PageView and Purchase, then check Tagioo Event Logs.</li>
+                      <li>Open Web GTM → Admin → Import Container → upload <strong>web.json</strong>. Choose <em>Merge</em>.</li>
+                      <li>Open Server GTM → Templates → Search Gallery → add <strong>Facebook Conversion API</strong> (and TikTok if selected).</li>
+                      <li>Import <strong>server.json</strong> into Server GTM → Merge.</li>
+                      <li>In Server GTM create one tag per platform using the gallery template + mappings below.</li>
+                      <li>Preview both containers, fire a Purchase event, verify in Tagioo Event Logs and Meta Test Events.</li>
                     </ol>
-                    <div class="assistant-template-prereqs">
+
+                    <div class="assistant-template-prereqs assistant-template-prereqs--wide">
                       <div>
-                        <h4>Meta CAPI mapping</h4>
-                        <p>Template: Facebook Conversion API</p>
-                        <code>Pixel ID -> {{Tagioo - meta_pixel_id}}</code>
-                        <code>Access Token -> {{Tagioo - meta_capi_token}}</code>
-                        <code>Event ID -> {{ed - event_id}}</code>
+                        <h4>Meta CAPI — full field mapping</h4>
+                        <p>Template: <strong>Facebook Conversion API</strong> (Community Gallery)</p>
+                        <div class="mapping-grid">
+                          <span class="mapping-label">Pixel ID</span><code>{{Tagioo - meta_pixel_id}}</code>
+                          <span class="mapping-label">Access Token</span><code>{{Tagioo - meta_capi_token}}</code>
+                          <span class="mapping-label">Test Event Code</span><code>{{Tagioo - meta_test_event_code}}</code>
+                          <span class="mapping-label">Event Name</span><code>{{Event Name}}</code>
+                          <span class="mapping-label">Event ID</span><code>{{ed - event_id}}</code>
+                          <span class="mapping-label">Action Source</span><code>website</code>
+                          <span class="mapping-label">Value</span><code>{{ed - value}}</code>
+                          <span class="mapping-label">Currency</span><code>{{ed - currency}}</code>
+                          <span class="mapping-label">Transaction ID</span><code>{{ed - transaction_id}}</code>
+                          <span class="mapping-label">Email</span><code>{{ed - email_address}}</code>
+                          <span class="mapping-label">Phone</span><code>{{ed - phone_number}}</code>
+                          <span class="mapping-label">First Name</span><code>{{ed - first_name}}</code>
+                          <span class="mapping-label">Last Name</span><code>{{ed - last_name}}</code>
+                          <span class="mapping-label">External ID</span><code>{{ed - external_id}}</code>
+                          <span class="mapping-label">Country</span><code>{{rh - country}}</code>
+                          <span class="mapping-label">fbp (Browser ID)</span><code>{{rh - fb_browser_id}}</code>
+                          <span class="mapping-label">fbc (Click ID)</span><code>{{rh - fb_click_cookie}}</code>
+                          <span class="mapping-label">Client IP Address</span><code>{{rh - fb_client_ipv6}}</code>
+                        </div>
                       </div>
                       <div>
-                        <h4>TikTok Events API mapping</h4>
-                        <p>Template: TikTok Events API</p>
-                        <code>Pixel ID -> {{Tagioo - tiktok_pixel_id}}</code>
-                        <code>Access Token -> {{Tagioo - tiktok_access_token}}</code>
-                        <code>Event ID -> {{ed - event_id}}</code>
+                        <h4>TikTok Events API — field mapping</h4>
+                        <p>Template: <strong>TikTok Events API</strong> (Community Gallery)</p>
+                        <div class="mapping-grid">
+                          <span class="mapping-label">Pixel ID</span><code>{{Tagioo - tiktok_pixel_id}}</code>
+                          <span class="mapping-label">Access Token</span><code>{{Tagioo - tiktok_access_token}}</code>
+                          <span class="mapping-label">Event Name</span><code>{{Event Name}}</code>
+                          <span class="mapping-label">Event ID</span><code>{{ed - event_id}}</code>
+                          <span class="mapping-label">Value</span><code>{{ed - value}}</code>
+                          <span class="mapping-label">Currency</span><code>{{ed - currency}}</code>
+                          <span class="mapping-label">Content / Items</span><code>{{ed - items}}</code>
+                          <span class="mapping-label">Email</span><code>{{ed - email_address}}</code>
+                          <span class="mapping-label">Phone</span><code>{{ed - phone_number}}</code>
+                        </div>
                       </div>
                     </div>
-                    <p id="setupAssistantResult" class="form-message"></p>
                   </div>
                 </div>
 
@@ -923,6 +949,180 @@
                 </div>
               </form>
             </section>
+          </section>
+
+          <!-- ── Website DataLayer Instructions ─────────────────────────── -->
+          <section class="assistant-instructions panel">
+            <div class="panel-header">
+              <div>
+                <h2>Website DataLayer Setup</h2>
+                <p>Push these events and <code>user_data</code> fields from your website to achieve maximum event match quality. All fields are hashed server-side — send them plain.</p>
+              </div>
+              <span class="badge badge--tip">Required on your site</span>
+            </div>
+
+            <div class="instructions-emq-table">
+              <div class="emq-row emq-row--header">
+                <span>user_data field</span>
+                <span>Format</span>
+                <span>Impact on EMQ</span>
+                <span>When to push</span>
+              </div>
+              <div class="emq-row emq-row--required">
+                <strong>email_address</strong>
+                <span>lowercase, e.g. <code>user@example.com</code></span>
+                <span class="emq-badge emq-badge--high">+14–15%</span>
+                <span>All events when user is known</span>
+              </div>
+              <div class="emq-row emq-row--required">
+                <strong>phone_number</strong>
+                <span>E.164 format: <code>+8801700000000</code></span>
+                <span class="emq-badge emq-badge--high">+5–8%</span>
+                <span>All events when user is known</span>
+              </div>
+              <div class="emq-row emq-row--required">
+                <strong>first_name</strong>
+                <span>lowercase, e.g. <code>john</code></span>
+                <span class="emq-badge emq-badge--med">+3–5%</span>
+                <span>All events when user is known</span>
+              </div>
+              <div class="emq-row emq-row--required">
+                <strong>last_name</strong>
+                <span>lowercase, e.g. <code>doe</code></span>
+                <span class="emq-badge emq-badge--med">+3–5%</span>
+                <span>All events when user is known</span>
+              </div>
+              <div class="emq-row">
+                <strong>external_id</strong>
+                <span>Your CRM / DB user ID, e.g. <code>user_12345</code></span>
+                <span class="emq-badge emq-badge--med">+15%</span>
+                <span>All events when user is logged in</span>
+              </div>
+            </div>
+
+            <div class="instructions-code-section">
+              <h3>Required dataLayer push structure</h3>
+              <p>Use this pattern on every page event. Push <code>user_data</code> whenever the user's session contains it — even on PageView.</p>
+
+              <div class="instructions-tabs" role="tablist">
+                <button class="instructions-tab is-active" data-tab="custom" role="tab">Custom / JS</button>
+                <button class="instructions-tab" data-tab="shopify" role="tab">Shopify</button>
+                <button class="instructions-tab" data-tab="woo" role="tab">WooCommerce</button>
+              </div>
+
+              <div class="instructions-tab-panel is-active" data-tab-panel="custom">
+<pre class="instructions-code"><code>// Push on PageView (and every subsequent event) when user is known
+window.dataLayer = window.dataLayer || [];
+window.dataLayer.push({
+  event: 'page_view',          // or view_item / add_to_cart / begin_checkout / purchase
+  event_id: crypto.randomUUID(), // unique per event for deduplication
+  user_data: {
+    email_address: 'user@example.com',   // lowercase
+    phone_number:  '+8801700000000',     // E.164
+    first_name:    'john',               // lowercase
+    last_name:     'doe',                // lowercase
+    external_id:   'user_12345'          // your DB user ID
+  },
+  ecommerce: {                 // include for ecommerce events
+    currency: 'BDT',
+    value: 1200,
+    transaction_id: 'ORDER-001',         // purchase only
+    items: [{
+      item_id:   'SKU-123',
+      item_name: 'Product Name',
+      price:     1200,
+      quantity:  1
+    }]
+  }
+});</code></pre>
+              </div>
+
+              <div class="instructions-tab-panel" data-tab-panel="shopify">
+<pre class="instructions-code"><code>// In Shopify theme (theme.liquid or customer-specific sections)
+// Use Liquid to inject user data for logged-in customers
+{% if customer %}
+window.dataLayer = window.dataLayer || [];
+window.dataLayer.push({
+  event: 'page_view',
+  event_id: '{{ 'now' | date: '%s' }}-{{ customer.id }}',
+  user_data: {
+    email_address: '{{ customer.email | downcase }}',
+    phone_number:  '{{ customer.phone }}',
+    first_name:    '{{ customer.first_name | downcase }}',
+    last_name:     '{{ customer.last_name | downcase }}',
+    external_id:   '{{ customer.id }}'
+  }
+});
+{% endif %}
+
+// On purchase (Shopify checkout thank_you / order_status page)
+window.dataLayer.push({
+  event: 'purchase',
+  event_id: '{{ order.id }}-purchase',
+  user_data: {
+    email_address: '{{ customer.email | downcase }}',
+    phone_number:  '{{ customer.phone }}',
+    first_name:    '{{ customer.first_name | downcase }}',
+    last_name:     '{{ customer.last_name | downcase }}',
+    external_id:   '{{ customer.id }}'
+  },
+  ecommerce: {
+    currency: '{{ order.currency }}',
+    value: {{ order.total_price | money_without_currency | remove: ',' }},
+    transaction_id: '{{ order.order_number }}',
+    items: [{% for item in order.line_items %}{
+      item_id: '{{ item.sku }}',
+      item_name: '{{ item.title | escape }}',
+      price: {{ item.price | money_without_currency }},
+      quantity: {{ item.quantity }}
+    }{% unless forloop.last %},{% endunless %}{% endfor %}]
+  }
+});</code></pre>
+              </div>
+
+              <div class="instructions-tab-panel" data-tab-panel="woo">
+<pre class="instructions-code"><code>// In WooCommerce (functions.php or a custom plugin)
+// Hook into wp_footer to inject user_data for logged-in users
+add_action('wp_footer', function() {
+  if (!is_user_logged_in()) return;
+  $user = wp_get_current_user();
+  $phone = get_user_meta($user->ID, 'billing_phone', true);
+  echo "&lt;script&gt;
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: 'page_view',
+    event_id: '" . wp_generate_uuid4() . "',
+    user_data: {
+      email_address: '" . strtolower(esc_js($user->user_email)) . "',
+      phone_number:  '" . esc_js($phone) . "',
+      first_name:    '" . strtolower(esc_js($user->first_name)) . "',
+      last_name:     '" . strtolower(esc_js($user->last_name)) . "',
+      external_id:   '" . esc_js($user->ID) . "'
+    }
+  });
+  &lt;/script&gt;";
+});
+
+// For purchase event use WooCommerce hook: woocommerce_thankyou
+add_action('woocommerce_thankyou', function($order_id) {
+  $order = wc_get_order($order_id);
+  // push purchase event with same user_data structure + ecommerce object
+});</code></pre>
+              </div>
+            </div>
+
+            <div class="instructions-checklist">
+              <h3>Pre-launch checklist</h3>
+              <ul>
+                <li><span class="check-icon">□</span> <strong>user_data pushed on every event</strong> — not just purchase. PageView, ViewContent, AddToCart, InitiateCheckout all need it for session-level match.</li>
+                <li><span class="check-icon">□</span> <strong>event_id is unique per event</strong> — use <code>crypto.randomUUID()</code> or <code>Date.now() + Math.random()</code>. Prevents deduplication errors between Pixel and CAPI.</li>
+                <li><span class="check-icon">□</span> <strong>Phone in E.164 format</strong> — must start with <code>+</code> and country code. <code>+8801700000000</code> not <code>01700000000</code>.</li>
+                <li><span class="check-icon">□</span> <strong>Names lowercase</strong> — send <code>john</code> not <code>John</code>. Meta normalises before hashing; mismatches reduce match rate.</li>
+                <li><span class="check-icon">□</span> <strong>external_id consistent</strong> — use the same user ID you use in your CRM. Must be identical across browser and server events.</li>
+                <li><span class="check-icon">□</span> <strong>AddToCart must include user_data</strong> — commonly missed. Push it even for guest users if phone/email was collected at any point in the session.</li>
+                <li><span class="check-icon">□</span> <strong>Test in Meta Events Manager</strong> — use Test Event Code to verify all parameters arrive hashed and the score reaches 8+.</li>
+              </ul>
+            </div>
           </section>
         </section>
 

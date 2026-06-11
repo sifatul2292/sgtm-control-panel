@@ -4051,6 +4051,16 @@ els.assistantNext?.addEventListener("click", async () => {
 });
 els.downloadWebTemplate?.addEventListener("click", () => downloadGeneratedTemplate("web"));
 els.downloadServerTemplate?.addEventListener("click", () => downloadGeneratedTemplate("server"));
+
+document.addEventListener("click", (e) => {
+  const tab = e.target.closest(".instructions-tab");
+  if (!tab) return;
+  const key = tab.dataset.tab;
+  const section = tab.closest(".instructions-code-section");
+  if (!section) return;
+  section.querySelectorAll(".instructions-tab").forEach((t) => t.classList.toggle("is-active", t.dataset.tab === key));
+  section.querySelectorAll(".instructions-tab-panel").forEach((p) => p.classList.toggle("is-active", p.dataset.tabPanel === key));
+});
 els.provisioningForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   els.provisioningFormMessage.textContent = "Submitting request...";
