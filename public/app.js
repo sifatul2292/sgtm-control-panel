@@ -50,6 +50,7 @@ const els = {
   customerPerformanceGrid: document.querySelector("#customerPerformanceGrid"),
   customerEventChart: document.querySelector("#customerEventChart"),
   customerChartLegend: document.querySelector("#customerChartLegend"),
+  customerEventLogChart: document.querySelector("#customerEventLogChart"),
   customerTopEvents: document.querySelector("#customerTopEvents"),
   customerEventDistribution: document.querySelector("#customerEventDistribution"),
   customerSetupForm: document.querySelector("#customerSetupForm"),
@@ -174,6 +175,7 @@ const viewTitles = {
 };
 
 let latestData = null;
+let customerChartRange = "24h";
 let selectedCustomerContainerId = "";
 let setupAssistantStep = 1;
 let generatedAssistantTemplates = null;
@@ -258,7 +260,7 @@ const powerUps = [
     name: "Custom Loader",
     category: "Web GTM load",
     icon: "</>",
-    minimumPlan: "Pro",
+    minimumPlan: "Starter",
     defaultState: "configure",
     recommended: true,
     description: "Loads GTM and GA scripts from your own tracking subdomain. Bypasses ad blockers and Safari restrictions that kill 15–25% of tracking — recovering lost conversion signals for Google and Meta."
@@ -1638,25 +1640,144 @@ function renderCustomerPerformance(data) {
     { label: "Conversion", value: `${conversion}%`, detail: `${purchaseCount.toLocaleString()} / ${totalEvents.toLocaleString()}` },
     { label: "Purchases", value: purchaseCount.toLocaleString(), detail: "This month" }
   ]);
-  renderCustomerAnalytics(summary);
+  renderCustomerAnalytics(summary, data.history?.daily || [], customerChartRange);
 }
 
-function renderCustomerAnalytics(summary) {
+function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h") {
   if (els.customerEventChart) {
+    const SERIES = [
+      { key: "total",         label: "Total Events",     color: "#e55a3a", width: 2.5, fill: true  },
+      { key: "pageView",      label: "PageView",         color: "#6366f1", width: 1.5, fill: false },
+      { key: "viewItem",      label: "ViewContent",      color: "#8b5cf6", width: 1.5, fill: false },
+      { key: "addToCart",     label: "AddToCart",        color: "#10b981", width: 1.5, fill: false },
+      { key: "beginCheckout", label: "InitiateCheckout", color: "#d97706", width: 1.5, fill: false },
+      { key: "purchases",     label: "Purchase",         color: "#22c55e", width: 1.5, fill: false }
+    ];
+
+    if (range !== "24h") {
+      // 7d / 30d daily chart
+      const days = range === "7d" ? 7 : 30;
+      const rows = Array.isArray(dailyHistory) ? dailyHistory.slice(0, days).reverse() : [];
+      const W = 640; const H = 220;
+      const pad = { left: 46, right: 20, top: 20, bottom: 38 };
+      const plotW = W - pad.left - pad.right;
+      const plotH = H - pad.top - pad.bottom;
+      const maxVal = Math.max(1, ...rows.map((r) => Number(r.total || 0)));
+      const toX = (i) => rows.length < 2 ? pad.left + plotW / 2 : pad.left + (i / (rows.length - 1)) * plotW;
+      const toY = (v) => Math.max(pad.top, pad.top + plotH - Math.min(Number(v) / maxVal, 1) * plotH);
+      const baseY = (pad.top + plotH).toFixed(1);
+
+      function catmullRomDaily(points) {
+        if (!points.length) return "";
+        let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+        for (let i = 0; i < points.length - 1; i++) {
+          const p0 = points[Math.max(0, i - 1)];
+          const p1 = points[i];
+          const p2 = points[i + 1];
+          const p3 = points[Math.min(points.length - 1, i + 2)];
+          const cp1x = p1.x + (p2.x - p0.x) / 6;
+          const cp1y = Math.max(pad.top, Math.min(pad.top + plotH, p1.y + (p2.y - p0.y) / 6));
+          const cp2x = p2.x - (p3.x - p1.x) / 6;
+          const cp2y = Math.max(pad.top, Math.min(pad.top + plotH, p2.y - (p3.y - p1.y) / 6));
+          d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+        }
+        return d;
+      }
+
+      const yTicks = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
+        const y = (pad.top + plotH * (1 - pct)).toFixed(1);
+        const val = Math.round(maxVal * pct);
+        return `<line class="${pct === 0 ? "chart-axis-line" : "chart-grid-line-dashed"}" x1="${pad.left}" y1="${y}" x2="${pad.left + plotW}" y2="${y}" />
+                <text class="chart-axis-label" x="${pad.left - 8}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end">${val}</text>`;
+      }).join("");
+
+      const labelStep = rows.length <= 7 ? 1 : rows.length <= 14 ? 2 : 5;
+      const xLabels = rows.map((r, i) => {
+        if (i % labelStep !== 0 && i !== rows.length - 1) return "";
+        const label = r.date ? r.date.slice(5) : "";
+        return `<text class="chart-axis-label" x="${toX(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${escapeHtml(label)}</text>`;
+      }).join("");
+
+      if (!rows.length) {
+        els.customerEventChart.innerHTML = '<div class="empty-log" style="padding:2rem 1rem;text-align:center;color:var(--color-muted);font-size:.85rem">No history data yet for this period.</div>';
+        if (els.customerChartLegend) els.customerChartLegend.innerHTML = "";
+        return;
+      }
+
+      const pts = rows.map((r, i) => ({ x: toX(i), y: toY(Number(r.total || 0)) }));
+      const linePath = catmullRomDaily(pts);
+      const areaPath = `${linePath} L ${toX(rows.length - 1).toFixed(1)},${baseY} L ${toX(0).toFixed(1)},${baseY} Z`;
+
+      const slotW = rows.length > 1 ? plotW / (rows.length - 1) : plotW;
+      const hoverRects = rows.map((r, i) =>
+        `<rect class="chart-hover-rect" x="${(toX(i) - slotW / 2).toFixed(1)}" y="${pad.top}" width="${slotW.toFixed(1)}" height="${plotH}" data-idx="${i}" data-date="${escapeHtml(r.date || "")}" data-total="${Number(r.total || 0)}" />`
+      ).join("");
+
+      els.customerEventChart.innerHTML = `
+        <div class="chart-tooltip" id="customerChartTooltip" style="display:none;pointer-events:none"></div>
+        <svg class="customer-analytics-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily event analytics">
+          <defs>
+            <linearGradient id="chartTotalFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#e55a3a" stop-opacity="0.18" />
+              <stop offset="100%" stop-color="#e55a3a" stop-opacity="0.01" />
+            </linearGradient>
+            <clipPath id="chartClip">
+              <rect x="${pad.left}" y="${pad.top - 4}" width="${plotW}" height="${plotH + 4}" />
+            </clipPath>
+          </defs>
+          <g>${yTicks}</g>
+          <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" />
+          <g clip-path="url(#chartClip)">
+            <path d="${areaPath}" fill="url(#chartTotalFill)" />
+            <path d="${linePath}" stroke="#e55a3a" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+          </g>
+          <line class="chart-crosshair-line" x1="0" y1="${pad.top}" x2="0" y2="${pad.top + plotH}" style="display:none" />
+          <g class="chart-dots"></g>
+          <g>${hoverRects}</g>
+          ${xLabels}
+        </svg>
+      `;
+
+      if (els.customerChartLegend) {
+        els.customerChartLegend.innerHTML = `<span class="chart-legend-item" style="--dot-color:#e55a3a"><span class="chart-legend-dot"></span>Total Events</span>`;
+      }
+
+      const tooltip = document.getElementById("customerChartTooltip");
+      const crosshairLine = els.customerEventChart.querySelector(".chart-crosshair-line");
+      const dotsGroup = els.customerEventChart.querySelector(".chart-dots");
+
+      els.customerEventChart.querySelectorAll(".chart-hover-rect").forEach((rect) => {
+        rect.addEventListener("mouseenter", () => {
+          const ix = Number(rect.dataset.idx);
+          const x = toX(ix).toFixed(1);
+          const total = Number(rect.dataset.total);
+          crosshairLine.setAttribute("x1", x); crosshairLine.setAttribute("x2", x);
+          crosshairLine.style.display = "";
+          dotsGroup.innerHTML = `<circle cx="${x}" cy="${toY(total).toFixed(1)}" r="4" fill="#e55a3a" stroke="white" stroke-width="2" />`;
+          tooltip.innerHTML = `<div class="tooltip-hour">${escapeHtml(rect.dataset.date || "")}</div><div class="tooltip-row"><span class="tooltip-dot" style="background:#e55a3a"></span><span>Total Events</span><strong>${total.toLocaleString()}</strong></div>`;
+          tooltip.style.display = "block";
+        });
+        rect.addEventListener("mousemove", (e) => {
+          const cr = els.customerEventChart.getBoundingClientRect();
+          const tw = tooltip.offsetWidth || 170; const th = tooltip.offsetHeight || 60;
+          let left = e.clientX - cr.left + 16; let top = e.clientY - cr.top - th - 12;
+          if (left + tw > cr.width - 8) left = e.clientX - cr.left - tw - 16;
+          if (top < 0) top = e.clientY - cr.top + 12;
+          tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
+        });
+        rect.addEventListener("mouseleave", () => {
+          tooltip.style.display = "none"; crosshairLine.style.display = "none"; dotsGroup.innerHTML = "";
+        });
+      });
+      return;
+    }
+
+    // 24h hourly chart
     const rawHourly = Array.isArray(summary.hourly) ? summary.hourly : [];
     const sorted = Array.from({ length: 24 }, (_, i) => {
       const found = rawHourly.find((h) => h.hour === i);
       return found || { hour: i, total: 0, errors: 0, purchases: 0, pageView: 0, viewItem: 0, addToCart: 0, beginCheckout: 0 };
     });
-
-    const SERIES = [
-      { key: "total",         label: "Total Events",     color: "#3b82f6", width: 2.5, fill: true  },
-      { key: "pageView",      label: "PageView",         color: "#0ea5e9", width: 1.5, fill: false },
-      { key: "viewItem",      label: "ViewContent",      color: "#8b5cf6", width: 1.5, fill: false },
-      { key: "addToCart",     label: "AddToCart",        color: "#10b981", width: 1.5, fill: false },
-      { key: "beginCheckout", label: "InitiateCheckout", color: "#6366f1", width: 1.5, fill: false },
-      { key: "purchases",     label: "Purchase",         color: "#f59e0b", width: 1.5, fill: false }
-    ];
 
     const maxVal = Math.max(1, ...sorted.map((h) => h.total));
     const W = 640; const H = 220;
@@ -1687,7 +1808,7 @@ function renderCustomerAnalytics(summary) {
     const getPts = (key) => sorted.map((h, i) => ({ x: toX(i), y: toY(h[key] || 0) }));
     const baseY = (pad.top + plotH).toFixed(1);
 
-    const yTicks = [0, 0.5, 1].map((pct) => {
+    const yTicks = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
       const y = (pad.top + plotH * (1 - pct)).toFixed(1);
       const val = Math.round(maxVal * pct);
       const isBase = pct === 0;
@@ -1717,8 +1838,8 @@ function renderCustomerAnalytics(summary) {
       <svg class="customer-analytics-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly event analytics">
         <defs>
           <linearGradient id="chartTotalFill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.10" />
-            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.01" />
+            <stop offset="0%" stop-color="#e55a3a" stop-opacity="0.18" />
+            <stop offset="100%" stop-color="#e55a3a" stop-opacity="0.01" />
           </linearGradient>
           <clipPath id="chartClip">
             <rect x="${pad.left}" y="${pad.top - 4}" width="${plotW}" height="${plotH + 4}" />
@@ -3936,9 +4057,109 @@ async function deleteCustomerContainer(id) {
   }
 }
 
+function renderEventLogDailyChart(dailyHistory) {
+  if (!els.customerEventLogChart) return;
+  const rows = (Array.isArray(dailyHistory) ? dailyHistory : []).slice(0, 30).reverse();
+  if (!rows.length) {
+    els.customerEventLogChart.innerHTML = '<div class="empty-log" style="padding:2rem 1rem;text-align:center;color:var(--color-muted);font-size:.85rem">No daily history yet.</div>';
+    return;
+  }
+  const W = 640; const H = 180;
+  const pad = { left: 46, right: 20, top: 16, bottom: 34 };
+  const plotW = W - pad.left - pad.right;
+  const plotH = H - pad.top - pad.bottom;
+  const maxVal = Math.max(1, ...rows.map((r) => Number(r.total || 0)));
+  const toX = (i) => rows.length < 2 ? pad.left + plotW / 2 : pad.left + (i / (rows.length - 1)) * plotW;
+  const toY = (v) => Math.max(pad.top, pad.top + plotH - Math.min(Number(v) / maxVal, 1) * plotH);
+  const baseY = (pad.top + plotH).toFixed(1);
+
+  function smoothPath(pts) {
+    if (!pts.length) return "";
+    let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+      const cp1x = p1.x + (p2.x - p0.x) / 6, cp1y = Math.max(pad.top, Math.min(pad.top + plotH, p1.y + (p2.y - p0.y) / 6));
+      const cp2x = p2.x - (p3.x - p1.x) / 6, cp2y = Math.max(pad.top, Math.min(pad.top + plotH, p2.y - (p3.y - p1.y) / 6));
+      d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+    return d;
+  }
+
+  const pts = rows.map((r, i) => ({ x: toX(i), y: toY(Number(r.total || 0)) }));
+  const line = smoothPath(pts);
+  const area = `${line} L ${toX(rows.length - 1).toFixed(1)},${baseY} L ${toX(0).toFixed(1)},${baseY} Z`;
+
+  const yTicks = [0, 0.5, 1].map((pct) => {
+    const y = (pad.top + plotH * (1 - pct)).toFixed(1);
+    return `<line class="${pct === 0 ? "chart-axis-line" : "chart-grid-line-dashed"}" x1="${pad.left}" y1="${y}" x2="${pad.left + plotW}" y2="${y}" />
+            <text class="chart-axis-label" x="${pad.left - 8}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end">${Math.round(maxVal * pct)}</text>`;
+  }).join("");
+
+  const labelStep = rows.length <= 10 ? 1 : rows.length <= 20 ? 2 : 5;
+  const xLabels = rows.map((r, i) => {
+    if (i % labelStep !== 0 && i !== rows.length - 1) return "";
+    return `<text class="chart-axis-label" x="${toX(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${escapeHtml((r.date || "").slice(5))}</text>`;
+  }).join("");
+
+  const slotW = rows.length > 1 ? plotW / (rows.length - 1) : plotW;
+  const hoverRects = rows.map((r, i) =>
+    `<rect class="chart-hover-rect" x="${(toX(i) - slotW / 2).toFixed(1)}" y="${pad.top}" width="${slotW.toFixed(1)}" height="${plotH}" data-idx="${i}" data-date="${escapeHtml(r.date || "")}" data-total="${Number(r.total || 0)}" />`
+  ).join("");
+
+  els.customerEventLogChart.innerHTML = `
+    <div class="chart-tooltip" id="logChartTooltip" style="display:none;pointer-events:none"></div>
+    <svg class="customer-analytics-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily event trend">
+      <defs>
+        <linearGradient id="logChartFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#6366f1" stop-opacity="0.15" />
+          <stop offset="100%" stop-color="#6366f1" stop-opacity="0.01" />
+        </linearGradient>
+        <clipPath id="logChartClip">
+          <rect x="${pad.left}" y="${pad.top - 4}" width="${plotW}" height="${plotH + 4}" />
+        </clipPath>
+      </defs>
+      <g>${yTicks}</g>
+      <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" />
+      <g clip-path="url(#logChartClip)">
+        <path d="${area}" fill="url(#logChartFill)" />
+        <path d="${line}" stroke="#6366f1" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+      </g>
+      <line class="chart-crosshair-line" x1="0" y1="${pad.top}" x2="0" y2="${pad.top + plotH}" style="display:none" />
+      <g class="chart-dots"></g>
+      <g>${hoverRects}</g>
+      ${xLabels}
+    </svg>
+  `;
+
+  const tooltip = document.getElementById("logChartTooltip");
+  const crosshairLine = els.customerEventLogChart.querySelector(".chart-crosshair-line");
+  const dotsGroup = els.customerEventLogChart.querySelector(".chart-dots");
+  els.customerEventLogChart.querySelectorAll(".chart-hover-rect").forEach((rect) => {
+    rect.addEventListener("mouseenter", () => {
+      const i = Number(rect.dataset.idx); const x = toX(i).toFixed(1); const total = Number(rect.dataset.total);
+      crosshairLine.setAttribute("x1", x); crosshairLine.setAttribute("x2", x); crosshairLine.style.display = "";
+      dotsGroup.innerHTML = `<circle cx="${x}" cy="${toY(total).toFixed(1)}" r="4" fill="#6366f1" stroke="white" stroke-width="2" />`;
+      tooltip.innerHTML = `<div class="tooltip-hour">${escapeHtml(rect.dataset.date || "")}</div><div class="tooltip-row"><span class="tooltip-dot" style="background:#6366f1"></span><span>Events</span><strong>${total.toLocaleString()}</strong></div>`;
+      tooltip.style.display = "block";
+    });
+    rect.addEventListener("mousemove", (e) => {
+      const cr = els.customerEventLogChart.getBoundingClientRect();
+      const tw = tooltip.offsetWidth || 150; const th = tooltip.offsetHeight || 60;
+      let left = e.clientX - cr.left + 16; let top = e.clientY - cr.top - th - 12;
+      if (left + tw > cr.width - 8) left = e.clientX - cr.left - tw - 16;
+      if (top < 0) top = e.clientY - cr.top + 12;
+      tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
+    });
+    rect.addEventListener("mouseleave", () => {
+      tooltip.style.display = "none"; crosshairLine.style.display = "none"; dotsGroup.innerHTML = "";
+    });
+  });
+}
+
 function renderLogs(data) {
   renderEventTable(data);
   renderPurchaseInspector(data);
+  renderEventLogDailyChart(data.history?.daily || []);
   setLog(els.errorLog, data.nginx.errorLog, "error");
   setLog(els.dockerLog, data.dockerLogs, "docker");
   els.dockerLogSource.textContent = data.dockerLogs.container || "tail";
@@ -4026,6 +4247,17 @@ document.addEventListener("click", (event) => {
   const scrollTarget = event.target.closest("[data-scroll-target]");
   if (scrollTarget) {
     document.querySelector(`#${CSS.escape(scrollTarget.dataset.scrollTarget)}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+});
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-chart-range]");
+  if (!btn) return;
+  customerChartRange = btn.dataset.chartRange;
+  document.querySelectorAll("[data-chart-range]").forEach((b) => b.classList.toggle("is-active", b === btn));
+  if (latestData) {
+    const summary = latestData.nginx?.todayEvents || {};
+    renderCustomerAnalytics(summary, latestData.history?.daily || [], customerChartRange);
   }
 });
 

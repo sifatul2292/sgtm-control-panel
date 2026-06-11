@@ -4774,7 +4774,7 @@ async function getCustomerDashboardData(session) {
       message: loaded.detail || loaded.message || "Could not read customer records."
     }],
     deploymentChecks: [],
-    history: { available: loaded.available, daily: [] },
+    history: { available: loaded.available, daily: [], tenantDailyRequests: raw.tenantDailyRequests || {} },
     orders,
     customers,
     customerAccounts: { available: true, path: "", accounts: [] },
@@ -4916,7 +4916,11 @@ async function customerDashboardData(data, session) {
   // plus today's live count from the current nginx log. If the live period summary
   // (tail-based) returns a higher value—meaning the log hasn't rotated yet and covers
   // the full billing period—we use that instead so we never under-report.
-  const tenantDailyReqs = data.tenantDailyRequests?.[session.tenantId] || {};
+  const tenantDailyReqs = (data.history?.tenantDailyRequests || data.tenantDailyRequests || {})[session.tenantId] || {};
+  const tenantDailyHistory = Object.entries(tenantDailyReqs)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 30)
+    .map(([date, count]) => ({ date, total: Number(count) }));
   const billingStartKey = localDateKey(billingPeriod.start);
   const todayKey = localDateKey();
   const historicCount = Object.entries(tenantDailyReqs)
@@ -4991,6 +4995,7 @@ async function customerDashboardData(data, session) {
       accessLog: tenantAccessLog,
       errorLog: unavailable("Nginx error logs are owner-only.")
     },
+    history: { available: data.history.available, daily: tenantDailyHistory },
     orders: tenantOrders,
     usage: tenantUsage,
     reconciliation: tenantReconciliation,

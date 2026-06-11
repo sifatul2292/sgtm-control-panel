@@ -3368,6 +3368,40 @@ a.button.button-primary {
   color: var(--color-page);
 }
 
+/* ─── Chart range toggle ─────────────────────────────────── */
+
+.chart-range-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  padding: 3px;
+}
+
+.chart-range-btn {
+  padding: 0.2rem 0.65rem;
+  border-radius: 99px;
+  border: none;
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+  line-height: 1.4;
+}
+
+.chart-range-btn:hover {
+  color: var(--color-text);
+}
+
+.chart-range-btn.is-active {
+  background: var(--color-page);
+  color: var(--color-text);
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
 /* ─── Interactive chart ──────────────────────────────────── */
 
 .customer-event-chart {

@@ -140,9 +140,13 @@
                 <div class="panel-header">
                   <div>
                     <h2>Event Analytics</h2>
-                    <p>Recent server-side request trend from your tracking container.</p>
+                    <p>Server-side request trend from your tracking container.</p>
                   </div>
-                  <span class="badge">Last 24 hours</span>
+                  <div class="chart-range-toggle" role="group" aria-label="Chart time range">
+                    <button class="chart-range-btn is-active" type="button" data-chart-range="24h">24h</button>
+                    <button class="chart-range-btn" type="button" data-chart-range="7d">7d</button>
+                    <button class="chart-range-btn" type="button" data-chart-range="30d">30d</button>
+                  </div>
                 </div>
                 <div id="customerEventChart" class="customer-event-chart"></div>
                 <div id="customerChartLegend" class="chart-legend"></div>
@@ -171,29 +175,16 @@
               </article>
             </section>
 
-            <section class="customer-home-grid">
-              <article class="panel">
-                <div class="panel-header">
-                  <div>
-                    <h2>Your Containers</h2>
-                    <p>Live status and setup progress for your tracking domains.</p>
-                  </div>
-                  <button class="button button-primary" type="button" data-view-shortcut="customerContainers">New</button>
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Your Containers</h2>
+                  <p>Live status and setup progress for your tracking domains.</p>
                 </div>
-                <div id="customerSetupList" class="customer-card-list"></div>
-              </article>
-
-              <article class="panel">
-                <div class="panel-header">
-                  <div>
-                    <h2>Next Step</h2>
-                    <p>The one thing to do before tracking can be trusted.</p>
-                  </div>
-                  <span id="customerNextStepBadge" class="badge">Setup</span>
-                </div>
-                <div id="customerNextStepList" class="summary-list"></div>
-              </article>
-            </section>
+                <button class="button button-primary" type="button" data-view-shortcut="customerContainers">New</button>
+              </div>
+              <div id="customerSetupList" class="customer-card-list"></div>
+            </article>
           </section>
 
           <section class="metrics-grid" aria-label="Server summary">
@@ -399,6 +390,17 @@
           </section>
 
           <section id="eventLogStats" class="log-stats-grid" aria-label="Event log summary"></section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Events per Day</h2>
+                <p>Daily tracking request volume over the past 30 days.</p>
+              </div>
+              <span class="badge">30 days</span>
+            </div>
+            <div id="customerEventLogChart" class="customer-event-chart"></div>
+          </section>
 
           <section id="nginx" class="panel log-panel" data-log-panel="access">
             <div class="panel-header">
@@ -667,62 +669,43 @@
             </form>
           </section>
 
-          <section class="customer-two-col">
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>DNS Setup</h2>
-                  <p>Point your tracking subdomain to Tagioo before launch.</p>
-                </div>
-                <span class="badge">Required</span>
+          <article class="panel dns-setup-panel">
+            <div class="panel-header">
+              <div>
+                <h2>DNS Setup</h2>
+                <p>Point your tracking subdomain to Tagioo before launch.</p>
               </div>
-              <div class="dns-record-card">
-                <div>
-                  <span>Type</span>
-                  <strong>CNAME</strong>
-                </div>
-                <div>
-                  <span>Host</span>
-                  <strong>server.yourdomain.com</strong>
-                </div>
-                <div>
-                  <span>Value</span>
-                  <strong id="customerDnsTarget">bd.tagioo.com</strong>
-                </div>
+              <span class="badge">Required</span>
+            </div>
+            <div class="dns-record-card">
+              <div>
+                <span>Type</span>
+                <strong>CNAME</strong>
               </div>
-              <div class="dns-guide compact-dns-guide">
-                <article>
-                  <strong>1</strong>
-                  <span>Create a subdomain like <code>server.yourdomain.com</code>.</span>
-                </article>
-                <article>
-                  <strong>2</strong>
-                  <span>Add the CNAME above in your domain DNS.</span>
-                </article>
-                <article>
-                  <strong>3</strong>
-                  <span>Use that same subdomain when creating the container.</span>
-                </article>
+              <div>
+                <span>Host</span>
+                <strong>server.yourdomain.com</strong>
               </div>
-            </article>
-
-            <article class="panel">
-              <div class="panel-header">
-                <div>
-                  <h2>Launch Status</h2>
-                  <p>Tagioo automatically creates Docker, Nginx, and SSL after DNS is ready.</p>
-                </div>
-                <span class="badge">Managed</span>
+              <div>
+                <span>Value</span>
+                <strong id="customerDnsTarget">bd.tagioo.com</strong>
               </div>
-              <div class="launch-steps">
-                <span>DNS</span>
-                <span>Docker</span>
-                <span>Nginx</span>
-                <span>SSL</span>
-                <span>Live</span>
-              </div>
-            </article>
-          </section>
+            </div>
+            <div class="dns-guide compact-dns-guide">
+              <article>
+                <strong>1</strong>
+                <span>Create a subdomain like <code>server.yourdomain.com</code>.</span>
+              </article>
+              <article>
+                <strong>2</strong>
+                <span>Add the CNAME above in your domain DNS.</span>
+              </article>
+              <article>
+                <strong>3</strong>
+                <span>Use that same subdomain when creating the container.</span>
+              </article>
+            </div>
+          </article>
 
         </section>
 
