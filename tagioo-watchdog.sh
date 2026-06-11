@@ -65,7 +65,7 @@ except: print('error')
 
   if [[ "$PANEL_STATUS" == "stopped" || "$PANEL_STATUS" == "errored" || "$PANEL_STATUS" == "missing" ]]; then
     log "ALERT: pm2 control panel is $PANEL_STATUS — restarting"
-    cd /root/sgtm-contro-panel && pm2 restart ecosystem.config.cjs >> "$LOG" 2>&1
+    cd /var/www/tagioo && pm2 restart ecosystem.config.cjs >> "$LOG" 2>&1
   fi
 fi
 
