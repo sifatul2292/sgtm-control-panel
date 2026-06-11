@@ -64,6 +64,10 @@
             <span class="nav-icon" aria-hidden="true">↔</span>
             <span>Integrations</span>
           </button>
+          <button class="nav-item" type="button" data-view-target="customerAccountSettings" data-customer-only hidden aria-label="Account Settings" title="Account Settings">
+            <span class="nav-icon" aria-hidden="true">⚙</span>
+            <span>Account</span>
+          </button>
           <button class="nav-item" type="button" data-view-target="billing" aria-label="My Subscription" title="My Subscription">
             <span class="nav-icon" aria-hidden="true">৳</span>
             <span>My Subscription</span>
@@ -1896,6 +1900,75 @@ window.dataLayer.push({
             </div>
             <div id="integrationExamples" class="docs-grid"></div>
           </section>
+        </section>
+
+        <section id="customerAccountSettingsView" class="view" data-view="customerAccountSettings" data-customer-only hidden>
+          <section class="customer-page-head">
+            <div>
+              <p class="breadcrumb">Account / Settings</p>
+              <h2>Account Settings</h2>
+              <p>Update your profile information and password.</p>
+            </div>
+          </section>
+
+          <div class="account-settings-layout">
+            <nav class="account-settings-tabs" id="accountSettingsTabs">
+              <button class="account-settings-tab is-active" type="button" data-tab="profile">Profile</button>
+              <button class="account-settings-tab" type="button" data-tab="password">Password</button>
+            </nav>
+
+            <div class="account-settings-panels">
+              <section class="panel account-settings-panel is-active" id="accountProfilePanel">
+                <div class="panel-header">
+                  <div>
+                    <h2>Profile Information</h2>
+                    <p>Update your name, email, and phone number.</p>
+                  </div>
+                </div>
+                <form id="customerProfileForm" class="provisioning-form customer-create-form">
+                  <label>
+                    Full name
+                    <input id="customerProfileName" name="fullName" placeholder="Your name" required />
+                  </label>
+                  <label>
+                    Email address
+                    <input id="customerProfileEmail" name="email" type="email" placeholder="you@example.com" required />
+                  </label>
+                  <label>
+                    Phone number
+                    <input id="customerProfilePhone" name="phone" placeholder="+880 1700 000000" />
+                  </label>
+                  <button class="button button-primary" type="submit">Save Changes</button>
+                  <p id="customerProfileFormMessage" class="form-message"></p>
+                </form>
+              </section>
+
+              <section class="panel account-settings-panel" id="accountPasswordPanel" hidden>
+                <div class="panel-header">
+                  <div>
+                    <h2>Change Password</h2>
+                    <p>Choose a strong password. Minimum 8 characters.</p>
+                  </div>
+                </div>
+                <form id="customerPasswordForm" class="provisioning-form customer-create-form">
+                  <label>
+                    Current password
+                    <input name="currentPassword" type="password" autocomplete="current-password" placeholder="Your current password" required />
+                  </label>
+                  <label>
+                    New password
+                    <input id="customerPasswordNew" name="newPassword" type="password" autocomplete="new-password" placeholder="Minimum 8 characters" required />
+                  </label>
+                  <label>
+                    Confirm new password
+                    <input name="confirmPassword" type="password" autocomplete="new-password" placeholder="Repeat new password" required />
+                  </label>
+                  <button class="button button-primary" type="submit">Change Password</button>
+                  <p id="customerPasswordFormMessage" class="form-message"></p>
+                </form>
+              </section>
+            </div>
+          </div>
         </section>
 
         <section id="billingView" class="view" data-view="billing">

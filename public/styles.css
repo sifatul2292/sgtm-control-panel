@@ -3740,3 +3740,39 @@ a.button.button-primary {
 @media (max-width: 600px) {
   .prov-section { grid-template-columns: 1fr; }
 }
+
+/* ── Customer Account Settings ─────────────────────────────── */
+.account-settings-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: var(--space-lg);
+  align-items: start;
+}
+.account-settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--color-surface-2);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+.account-settings-tab {
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--color-muted);
+  text-align: left;
+  transition: color 0.15s, background 0.15s;
+}
+.account-settings-tab:hover { color: var(--color-text); background: var(--color-surface); }
+.account-settings-tab.is-active { color: var(--color-ok); background: color-mix(in oklch, var(--color-ok), var(--color-surface) 88%); }
+.account-settings-panels { min-width: 0; }
+.account-settings-panel { display: block; }
+@media (max-width: 700px) {
+  .account-settings-layout { grid-template-columns: 1fr; }
+  .account-settings-tabs { flex-direction: row; flex-wrap: wrap; }
+}

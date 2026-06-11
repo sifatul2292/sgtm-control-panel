@@ -153,7 +153,17 @@ const els = {
   docsList: document.querySelector("#docsList"),
   allCustomersBadge: document.querySelector("#allCustomersBadge"),
   allCustomersMetrics: document.querySelector("#allCustomersMetrics"),
-  allCustomersTable: document.querySelector("#allCustomersTable")
+  allCustomersTable: document.querySelector("#allCustomersTable"),
+  accountSettingsTabs: document.querySelector("#accountSettingsTabs"),
+  customerProfileForm: document.querySelector("#customerProfileForm"),
+  customerProfileName: document.querySelector("#customerProfileName"),
+  customerProfileEmail: document.querySelector("#customerProfileEmail"),
+  customerProfilePhone: document.querySelector("#customerProfilePhone"),
+  customerProfileFormMessage: document.querySelector("#customerProfileFormMessage"),
+  customerPasswordForm: document.querySelector("#customerPasswordForm"),
+  customerPasswordFormMessage: document.querySelector("#customerPasswordFormMessage"),
+  accountProfilePanel: document.querySelector("#accountProfilePanel"),
+  accountPasswordPanel: document.querySelector("#accountPasswordPanel")
 };
 
 document.body.classList.remove("app-loading");
@@ -165,6 +175,7 @@ const viewTitles = {
   customerContainers: ["Containers / List", "Containers"],
   powerUps: ["Containers / Power-Ups", "Power-Ups"],
   setupAssistant: ["Setup Assistant / GTM Templates", "Setup Assistant"],
+  customerAccountSettings: ["Account / Settings", "Account Settings"],
   settings: ["Account & Others / Settings", "Settings"],
   deployment: ["Operations / Deployment", "Deployment Health"],
   provisioning: ["Operations / Provisioning", "Container Provisioning"],
@@ -182,8 +193,8 @@ let generatedAssistantTemplates = null;
 let currentSession = { role: "pending" };
 let currentViewName = "dashboard";
 const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
-const customerOnlyViews = new Set(["customerContainers", "setupAssistant"]);
-const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "billing"]);
+const customerOnlyViews = new Set(["customerContainers", "setupAssistant", "customerAccountSettings"]);
+const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "customerAccountSettings", "billing"]);
 const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs", "powerUps"]);
 try {
   const cachedRole = window.localStorage.getItem("tagioo_session_role");
@@ -4188,6 +4199,9 @@ function renderCurrentView(data) {
     case "admin":
       renderAdmin(data);
       break;
+    case "customerAccountSettings":
+      renderCustomerAccountSettings();
+      break;
     case "customerContainers":
       renderCustomerContainers(data);
       break;
@@ -4353,6 +4367,70 @@ els.workerNodeForm.addEventListener("submit", async (event) => {
     els.workerNodeFormMessage.textContent = error.message;
   }
 });
+function renderCustomerAccountSettings() {
+  fetch("/api/customer/me")
+    .then((r) => r.json())
+    .then((result) => {
+      if (!result.account) return;
+      const { fullName, email, phone } = result.account;
+      if (els.customerProfileName) els.customerProfileName.value = fullName || "";
+      if (els.customerProfileEmail) els.customerProfileEmail.value = email || "";
+      if (els.customerProfilePhone) els.customerProfilePhone.value = phone || "";
+    })
+    .catch(() => {});
+}
+
+els.accountSettingsTabs.addEventListener("click", (event) => {
+  const tab = event.target.closest("[data-tab]");
+  if (!tab) return;
+  const target = tab.dataset.tab;
+  els.accountSettingsTabs.querySelectorAll("[data-tab]").forEach((btn) => btn.classList.toggle("is-active", btn.dataset.tab === target));
+  const profileActive = target === "profile";
+  els.accountProfilePanel.hidden = !profileActive;
+  els.accountPasswordPanel.hidden = profileActive;
+});
+
+els.customerProfileForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  els.customerProfileFormMessage.textContent = "Saving...";
+  const payload = Object.fromEntries(new FormData(els.customerProfileForm).entries());
+  try {
+    const response = await fetch("/api/customer/me", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Save failed"]).join(" "));
+    els.customerProfileFormMessage.textContent = "Profile updated.";
+  } catch (error) {
+    els.customerProfileFormMessage.textContent = error.message;
+  }
+});
+
+els.customerPasswordForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(els.customerPasswordForm).entries());
+  if (data.newPassword !== data.confirmPassword) {
+    els.customerPasswordFormMessage.textContent = "New passwords do not match.";
+    return;
+  }
+  els.customerPasswordFormMessage.textContent = "Changing password...";
+  try {
+    const response = await fetch("/api/customer/me/password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ currentPassword: data.currentPassword, newPassword: data.newPassword })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Password change failed"]).join(" "));
+    els.customerPasswordForm.reset();
+    els.customerPasswordFormMessage.textContent = "Password changed successfully.";
+  } catch (error) {
+    els.customerPasswordFormMessage.textContent = error.message;
+  }
+});
+
 els.customerSetupForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   els.customerSetupFormMessage.textContent = "Submitting setup request...";

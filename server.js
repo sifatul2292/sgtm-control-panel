@@ -2276,6 +2276,59 @@ async function resetCustomerAccountPassword(id, password) {
   return { ok: true, account: publicCustomerAccount(account) };
 }
 
+async function updateCustomerProfile(session, input) {
+  const fullName = String(input.fullName || "").trim().slice(0, 120);
+  const email = String(input.email || "").trim().slice(0, 254);
+  const phone = String(input.phone || "").trim().slice(0, 40);
+  const errors = [];
+  if (!fullName) errors.push("Name is required.");
+  if (!email) errors.push("Email is required.");
+  if (errors.length) return { ok: false, status: 400, errors };
+
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || "Database unavailable."] };
+  const data = loaded.data;
+  data.customerAccounts ||= [];
+  const account = data.customerAccounts.find((a) => a.id === session.accountId || a.tenantId === session.tenantId);
+  if (!account) return { ok: false, status: 404, errors: ["Account not found."] };
+
+  account.fullName = fullName;
+  account.email = email;
+  account.phone = phone;
+  account.updatedAt = new Date().toISOString();
+
+  const tenant = (data.tenants || []).find((t) => t.id === account.tenantId);
+  if (tenant) {
+    tenant.fullName = fullName;
+    tenant.email = email;
+    tenant.phone = phone;
+    tenant.updatedAt = account.updatedAt;
+  }
+
+  await writeDatabase(data);
+  return { ok: true, account: publicCustomerAccount(account) };
+}
+
+async function changeCustomerPassword(session, input) {
+  const currentPassword = String(input.currentPassword || "");
+  const newPassword = String(input.newPassword || "");
+  if (!currentPassword) return { ok: false, status: 400, errors: ["Current password is required."] };
+  if (newPassword.length < 8) return { ok: false, status: 400, errors: ["New password must be at least 8 characters."] };
+
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || "Database unavailable."] };
+  const data = loaded.data;
+  data.customerAccounts ||= [];
+  const account = data.customerAccounts.find((a) => a.id === session.accountId || a.tenantId === session.tenantId);
+  if (!account) return { ok: false, status: 404, errors: ["Account not found."] };
+  if (!verifyPassword(currentPassword, account.passwordHash)) return { ok: false, status: 400, errors: ["Current password is incorrect."] };
+
+  account.passwordHash = hashPassword(newPassword);
+  account.updatedAt = new Date().toISOString();
+  await writeDatabase(data);
+  return { ok: true };
+}
+
 function signupTenantBase(input) {
   const fullName = String(input.fullName || input.tenantName || "").trim();
   const usernameBase = String(input.email || input.username || "").split("@")[0];
@@ -5381,6 +5434,50 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await selectCustomerPlan(body, session);
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { tenant: result.tenant } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/me" && req.method === "GET") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const loaded = await readDatabase();
+      if (!loaded.available) {
+        jsonResponse(res, 500, { error: loaded.detail || "Database unavailable." });
+        return;
+      }
+      const account = (loaded.data.customerAccounts || []).find((a) => a.id === session.accountId || a.tenantId === session.tenantId);
+      if (!account) {
+        jsonResponse(res, 404, { error: "Account not found." });
+        return;
+      }
+      jsonResponse(res, 200, { account: publicCustomerAccount(account) });
+      return;
+    }
+
+    if (pathname === "/api/customer/me" && req.method === "PATCH") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await updateCustomerProfile(session, body);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { account: result.account } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/me/password" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await changeCustomerPassword(session, body);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { ok: true } : { errors: result.errors });
       return;
     }
 
