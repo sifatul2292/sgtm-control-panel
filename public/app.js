@@ -851,12 +851,20 @@ function serverEventRows(data) {
   }));
 }
 
-function renderEventLogStats(allItems, visibleItems) {
+function renderEventLogStats(allItems, visibleItems, summary) {
   if (!els.eventLogStats) return;
   const total = allItems.length;
   const visible = visibleItems.length;
   const errors = visibleItems.filter((item) => Number(item.status) >= 400).length;
-  const purchases = visibleItems.filter((item) => item.eventName === "Purchase").length;
+  const serverUniquePurchases = Number(summary?.purchases?.uniqueCount);
+  const purchases = Number.isFinite(serverUniquePurchases)
+    ? serverUniquePurchases
+    : new Set(
+        visibleItems
+          .filter((item) => item.eventName === "Purchase")
+          .map((item) => item.transactionId || item.eventId)
+          .filter(Boolean)
+      ).size;
   const clients = new Set(visibleItems.map((item) => item.client).filter(Boolean)).size;
   renderBusinessGrid(els.eventLogStats, [
     { label: "Filtered", value: visible.toLocaleString(), detail: `${total.toLocaleString()} latest loaded` },
@@ -874,7 +882,7 @@ function renderEventTable(data) {
   if (summary?.available && serverItems.length) {
     updateEventFilters(serverItems);
     const visibleItems = serverItems.filter(visibleEvent);
-    renderEventLogStats(serverItems, visibleItems);
+    renderEventLogStats(serverItems, visibleItems, summary);
     const errors = visibleItems.filter((item) => Number(item.status) >= 400).length;
     const limit = Number(els.eventLimitFilter?.value || 50);
     els.eventLogSummary.textContent = `Showing ${Math.min(visibleItems.length, limit).toLocaleString()} of ${visibleItems.length.toLocaleString()} matching events from the latest ${serverItems.length.toLocaleString()} today (${errors.toLocaleString()} errors).`;
