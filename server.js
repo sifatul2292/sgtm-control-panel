@@ -76,6 +76,8 @@ const config = {
   monthlyRequestLimit: Number(process.env.MONTHLY_REQUEST_LIMIT || 100000),
   monthlyContainerLimit: Number(process.env.MONTHLY_CONTAINER_LIMIT || 1),
   customerSupportEmail: process.env.CUSTOMER_SUPPORT_EMAIL || "",
+  resendApiKey: process.env.RESEND_API_KEY || "",
+  appUrl: process.env.APP_URL || `http://localhost:${process.env.PORT || 3100}`,
   sslCertPath: process.env.SSL_CERT_PATH || "",
   sslDomain: process.env.SSL_DOMAIN || "",
   sslPort: Number(process.env.SSL_PORT || 443),
@@ -95,6 +97,7 @@ const SUMMARY_CACHE_TTL_MS = Number(process.env.SUMMARY_CACHE_TTL_MS || 30000);
 const CUSTOMER_SUMMARY_CACHE_TTL_MS = Number(process.env.CUSTOMER_SUMMARY_CACHE_TTL_MS || 120000);
 const alertMemory = new Map();
 const summaryCache = new Map();
+const resetTokens = new Map();
 const databasePath = join(config.dataDir, "history.json");
 const powerUpMapsPath = join(config.nginxConfdDir, "tagioo-powerups-maps.conf");
 let powerUpsActive = false;
@@ -266,6 +269,48 @@ function verifyPassword(password, storedHash) {
   const actual = scryptSync(String(password), salt, 64);
   const expectedBuffer = Buffer.from(expected, "hex");
   return actual.length === expectedBuffer.length && timingSafeEqual(actual, expectedBuffer);
+}
+
+async function findCustomerAccountByEmail(email) {
+  const loaded = await readDatabase();
+  const normalized = String(email || "").trim().toLowerCase();
+  return (loaded.data.customerAccounts || []).find(
+    (a) => String(a.email || a.username || "").toLowerCase() === normalized
+  ) || null;
+}
+
+async function sendPasswordResetEmail(toEmail, resetUrl) {
+  if (!config.resendApiKey) {
+    console.error("[reset] RESEND_API_KEY not set — cannot send reset email");
+    return { ok: false };
+  }
+  try {
+    const fromAddr = config.customerSupportEmail || "noreply@tagioo.com";
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.resendApiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: `Tagioo <${fromAddr}>`,
+        to: [toEmail],
+        subject: "Reset your Tagioo password",
+        html: [
+          `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px">`,
+          `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Reset your password</p>`,
+          `<p style="color:#5B6B8A;margin:0 0 28px;line-height:1.6">Click the button below to set a new password for your Tagioo account. This link expires in <strong>1 hour</strong>.</p>`,
+          `<a href="${resetUrl}" style="display:inline-block;background:#5B21B6;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Reset password →</a>`,
+          `<p style="color:#9BA8C0;font-size:13px;margin:32px 0 0">If you didn't request a password reset, you can safely ignore this email — your password won't change.</p>`,
+          `<hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0">`,
+          `<p style="color:#C4CCDB;font-size:12px;margin:0">Tagioo · Server-side tracking for Bangladesh ecommerce</p>`,
+          `</div>`
+        ].join("")
+      })
+    });
+    if (!r.ok) console.error("[reset] Resend API error:", r.status);
+    return { ok: r.ok };
+  } catch (e) {
+    console.error("[reset] email send error:", e.message);
+    return { ok: false };
+  }
 }
 
 function getSession(req) {
@@ -816,7 +861,8 @@ function buildSetupAssistantTemplates(input) {
   };
 }
 
-function loginPage(error = "") {
+function loginPage(error = "", opts = {}) {
+  const { resetSent = false, resetDone = false } = opts;
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -887,6 +933,7 @@ function loginPage(error = "") {
               <h1>Welcome back</h1>
               <p class="lf-subtitle">Sign in to view your tracking dashboard.</p>
             </div>
+            ${resetDone ? `<div class="lf-success">Password updated. Sign in with your new password.</div>` : ""}
             ${error ? `<div class="lf-error">${error}</div>` : ""}
             <form method="post" action="/login" class="lf-form">
               <div class="lf-field">
@@ -912,20 +959,32 @@ function loginPage(error = "") {
           </div>
 
           <!-- Forgot password view -->
-          <div id="forgotView" class="lf-forgot-panel" hidden>
+          <div id="forgotView" class="lf-forgot-panel" ${resetSent ? "" : "hidden"}>
             <button type="button" id="backBtn" class="lf-back-btn">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Back to sign in
             </button>
+            ${resetSent ? `
+            <div class="lf-header" style="margin-top:8px">
+              <h1>Check your inbox</h1>
+              <p class="lf-subtitle">If that email is registered, you'll receive a reset link shortly. Check your spam folder too.</p>
+            </div>
+            <div class="lf-reset-sent-icon">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="23" stroke="#5B21B6" stroke-width="2" stroke-opacity="0.15"/><path d="M8 18L24 28L40 18" stroke="#5B21B6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.4"/><rect x="8" y="14" width="32" height="22" rx="4" stroke="#5B21B6" stroke-width="2"/><path d="M17 32L21 28M31 32L27 28" stroke="#5B21B6" stroke-width="1.5" stroke-linecap="round" stroke-opacity="0.35"/></svg>
+            </div>
+            ` : `
             <div class="lf-header" style="margin-top:8px">
               <h1>Forgot password?</h1>
-              <p class="lf-subtitle">No worries. Chat with our team on WhatsApp and we'll reset your password within minutes.</p>
+              <p class="lf-subtitle">Enter your account email and we'll send you a reset link.</p>
             </div>
-            <a href="https://wa.me/+8801XXXXXXXXX?text=Hi%2C%20I%20need%20help%20resetting%20my%20Tagioo%20password." class="lf-btn-whatsapp" target="_blank" rel="noopener">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-              Chat on WhatsApp
-            </a>
-            <p class="lf-forgot-alt">Or email us at <a href="mailto:hello@tagioo.com">hello@tagioo.com</a></p>
+            <form method="post" action="/forgot-password" class="lf-form">
+              <div class="lf-field">
+                <label for="resetEmail">Email address</label>
+                <input id="resetEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+              </div>
+              <button type="submit" class="lf-btn-primary">Send reset link →</button>
+            </form>
+            `}
           </div>
 
         </div>
@@ -948,6 +1007,7 @@ function loginPage(error = "") {
       // Forgot password toggle
       const loginView = document.getElementById("loginView");
       const forgotView = document.getElementById("forgotView");
+      ${resetSent ? "loginView.hidden = true;" : ""}
       document.getElementById("forgotBtn").addEventListener("click", () => {
         loginView.hidden = true;
         forgotView.hidden = false;
@@ -957,6 +1017,89 @@ function loginPage(error = "") {
         loginView.hidden = false;
       });
     </script>
+  </body>
+</html>`;
+}
+
+function resetPasswordPage(token = "", error = "") {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reset password — Tagioo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/login.css" />
+  </head>
+  <body class="login-body">
+    <div class="login-layout">
+      <aside class="login-brand">
+        <a class="lb-logo" href="/">
+          <span class="lb-mark">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
+              <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
+            </svg>
+          </span>
+          <span>Tagioo</span>
+        </a>
+        <div class="lb-hero">
+          <h2>Track every purchase.<br>Boost every campaign.</h2>
+          <p>Server-side GTM built for Bangladesh ecommerce. Recover lost conversions and feed Meta &amp; Google clean data.</p>
+        </div>
+        <div class="lb-stats">
+          <div class="lb-stat"><span class="lb-stat-num">+31%</span><small>avg ROAS lift</small></div>
+          <div class="lb-stat"><span class="lb-stat-num">+58%</span><small>more purchases seen</small></div>
+          <div class="lb-stat"><span class="lb-stat-num">15ms</span><small>BDIX response</small></div>
+        </div>
+        <p class="lb-footer">© 2025 Tagioo · Made in Bangladesh 🇧🇩</p>
+      </aside>
+      <main class="login-form-panel">
+        <div class="login-form-wrap">
+          <div class="lf-header">
+            <h1>${token ? "Set new password" : "Link expired"}</h1>
+            <p class="lf-subtitle">${token ? "Choose a strong password for your Tagioo account." : "This reset link has expired or already been used."}</p>
+          </div>
+          ${error ? `<div class="lf-error">${error}</div>` : ""}
+          ${token ? `
+          <form method="post" action="/reset-password" class="lf-form">
+            <input type="hidden" name="token" value="${token}" />
+            <div class="lf-field">
+              <label for="password">New password</label>
+              <div class="lf-pw-wrap">
+                <input id="password" name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" required minlength="8" />
+                <button type="button" class="lf-pw-toggle" id="pwToggle" aria-label="Show password">
+                  <svg id="eyeShow" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1 9C1 9 4 3 9 3C14 3 17 9 17 9C17 9 14 15 9 15C4 15 1 9 1 9Z" stroke="currentColor" stroke-width="1.4"/><circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.4"/></svg>
+                  <svg id="eyeHide" width="18" height="18" viewBox="0 0 18 18" fill="none" style="display:none"><path d="M1 1L17 17M7.5 4.2C8 4.07 8.5 4 9 4C14 4 17 9 17 9C16.4 10.1 15.5 11.3 14.4 12.3M10.6 13.8C10.1 13.93 9.6 14 9 14C4 14 1 9 1 9C1.6 7.9 2.5 6.7 3.6 5.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="lf-field">
+              <label for="confirm">Confirm new password</label>
+              <input id="confirm" name="confirm" type="password" autocomplete="new-password" placeholder="Repeat password" required minlength="8" />
+            </div>
+            <button type="submit" class="lf-btn-primary">Update password →</button>
+          </form>
+          <script>
+            const pwInput = document.getElementById("password");
+            const pwToggle = document.getElementById("pwToggle");
+            const eyeShow = document.getElementById("eyeShow");
+            const eyeHide = document.getElementById("eyeHide");
+            pwToggle.addEventListener("click", () => {
+              const isText = pwInput.type === "text";
+              pwInput.type = isText ? "password" : "text";
+              eyeShow.style.display = isText ? "" : "none";
+              eyeHide.style.display = isText ? "none" : "";
+            });
+          </script>
+          ` : `
+          <a href="/login" class="lf-btn-primary" style="display:flex;align-items:center;justify-content:center;text-decoration:none">Request a new link →</a>
+          `}
+        </div>
+      </main>
+    </div>
   </body>
 </html>`;
 }
@@ -5361,7 +5504,8 @@ async function servePublicPage(res, filename) {
 
 const server = createServer(async (req, res) => {
   try {
-    const pathname = new URL(req.url || "/", `http://${req.headers.host}`).pathname;
+    const reqUrl = new URL(req.url || "/", `http://${req.headers.host}`);
+    const pathname = reqUrl.pathname;
     const hostname = String(req.headers.host || "").split(":")[0].toLowerCase();
 
     if (pathname === "/" && !isAuthenticated(req)) {
@@ -5393,7 +5537,70 @@ const server = createServer(async (req, res) => {
         redirect(res, "/");
         return;
       }
-      htmlResponse(res, 200, loginPage(config.authPassword ? "" : "Set AUTH_PASSWORD in .env before using the panel."));
+      const resetParam = reqUrl.searchParams.get("reset");
+      const opts = { resetSent: resetParam === "sent", resetDone: resetParam === "done" };
+      htmlResponse(res, 200, loginPage(config.authPassword ? "" : "Set AUTH_PASSWORD in .env before using the panel.", opts));
+      return;
+    }
+
+    if (pathname === "/forgot-password" && req.method === "POST") {
+      const form = await readForm(req);
+      const email = String(form.get("email") || "").trim().toLowerCase();
+      if (email) {
+        const account = await findCustomerAccountByEmail(email);
+        if (account) {
+          for (const [k, v] of resetTokens) if (v.expires < Date.now()) resetTokens.delete(k);
+          const token = randomBytes(32).toString("hex");
+          resetTokens.set(token, { email, username: account.username, expires: Date.now() + 3_600_000 });
+          const resetUrl = `${config.appUrl}/reset-password?token=${encodeURIComponent(token)}`;
+          await sendPasswordResetEmail(email, resetUrl);
+        }
+      }
+      res.writeHead(302, { location: "/login?reset=sent", "cache-control": "no-store" });
+      res.end();
+      return;
+    }
+
+    if (pathname === "/reset-password" && req.method === "GET") {
+      const token = reqUrl.searchParams.get("token") || "";
+      const entry = resetTokens.get(token);
+      if (!token || !entry || entry.expires < Date.now()) {
+        htmlResponse(res, 400, resetPasswordPage("", ""));
+        return;
+      }
+      htmlResponse(res, 200, resetPasswordPage(token, ""));
+      return;
+    }
+
+    if (pathname === "/reset-password" && req.method === "POST") {
+      const form = await readForm(req);
+      const token = String(form.get("token") || "");
+      const password = String(form.get("password") || "");
+      const confirm = String(form.get("confirm") || "");
+      const entry = resetTokens.get(token);
+      if (!entry || entry.expires < Date.now()) {
+        htmlResponse(res, 400, resetPasswordPage("", "This reset link has expired. Please request a new one."));
+        return;
+      }
+      if (password.length < 8) {
+        htmlResponse(res, 400, resetPasswordPage(token, "Password must be at least 8 characters."));
+        return;
+      }
+      if (password !== confirm) {
+        htmlResponse(res, 400, resetPasswordPage(token, "Passwords do not match."));
+        return;
+      }
+      const db = await readDatabase();
+      const account = (db.data.customerAccounts || []).find((a) => a.username === entry.username);
+      if (!account) {
+        htmlResponse(res, 400, resetPasswordPage("", "Account not found. Please contact support."));
+        return;
+      }
+      account.passwordHash = hashPassword(password);
+      await writeDatabase(db.data);
+      resetTokens.delete(token);
+      res.writeHead(302, { location: "/login?reset=done", "cache-control": "no-store" });
+      res.end();
       return;
     }
 

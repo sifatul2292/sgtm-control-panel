@@ -193,6 +193,18 @@
   margin: 0;
 }
 
+/* Success */
+.lf-success {
+  padding: 12px 14px;
+  border: 1px solid rgba(5,150,105,0.25);
+  border-radius: 10px;
+  background: rgba(5,150,105,0.07);
+  color: #065F46;
+  font-size: 0.875rem;
+  margin-bottom: 20px;
+  line-height: 1.45;
+}
+
 /* Error */
 .lf-error {
   padding: 12px 14px;
@@ -383,14 +395,11 @@
   transform: translateY(-1px);
 }
 
-.lf-forgot-alt {
-  text-align: center;
-  font-size: 0.82rem;
-  color: #9BA8C0;
-  margin: 0;
+.lf-reset-sent-icon {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
 }
-.lf-forgot-alt a { color: #5B21B6; font-weight: 600; }
-.lf-forgot-alt a:hover { text-decoration: underline; }
 
 /* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 820px) {
