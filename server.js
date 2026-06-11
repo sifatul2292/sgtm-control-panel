@@ -1119,59 +1119,158 @@ function signupPage(error = "", values = {}) {
   const referralOptions = ["", "Google Search", "Facebook", "YouTube", "Friend or colleague", "Agency", "Other"]
     .map((item) => `<option value="${escapeHtml(item)}"${values.referral === item ? " selected" : ""}>${item || "Select an option (optional)"}</option>`)
     .join("");
+  const eyeSvg = (id) => `
+    <svg id="${id}Show" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1 9C1 9 4 3 9 3C14 3 17 9 17 9C17 9 14 15 9 15C4 15 1 9 1 9Z" stroke="currentColor" stroke-width="1.4"/><circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.4"/></svg>
+    <svg id="${id}Hide" width="18" height="18" viewBox="0 0 18 18" fill="none" style="display:none"><path d="M1 1L17 17M7.5 4.2C8 4.07 8.5 4 9 4C14 4 17 9 17 9C16.4 10.1 15.5 11.3 14.4 12.3M10.6 13.8C10.1 13.93 9.6 14 9 14C4 14 1 9 1 9C1.6 7.9 2.5 6.7 3.6 5.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Create account - Tagioo</title>
-    <link rel="stylesheet" href="/tokens.css" />
+    <title>Create account — Tagioo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
   </head>
-  <body>
-    <main class="login-shell">
-      <form class="login-card signup-card" method="post" action="/signup">
-        <div class="login-brand-row">
-          <span class="brand-mark">T</span>
-          <strong>Tagioo</strong>
+  <body class="login-body">
+    <div class="login-layout">
+
+      <!-- ── Brand panel ── -->
+      <aside class="login-brand">
+        <a class="lb-logo" href="/">
+          <span class="lb-mark">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
+              <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
+            </svg>
+          </span>
+          <span>Tagioo</span>
+        </a>
+        <div class="lb-hero">
+          <h2>Start tracking smarter.<br>Launch in minutes.</h2>
+          <p>Server-side GTM built for Bangladesh ecommerce. Recover lost conversions and feed Meta &amp; Google clean, accurate data.</p>
         </div>
-        <h1>Sign up</h1>
-        <p>or <a href="/login">sign in to your account</a></p>
-        ${error ? `<div class="login-error">${escapeHtml(error)}</div>` : ""}
-        <label>
-          Full Name
-          <input name="fullName" autocomplete="name" value="${escapeHtml(values.fullName)}" required />
-        </label>
-        <label>
-          Email Address
-          <input name="email" type="email" autocomplete="email" value="${escapeHtml(values.email || values.username)}" required />
-        </label>
-        <div class="signup-row">
-          <label>
-            Country
-            <select name="country">${countryOptions}</select>
-          </label>
-          <label>
-            Phone Number
-            <input name="phone" autocomplete="tel" value="${escapeHtml(values.phone)}" placeholder="1712345678" required />
-          </label>
+        <div class="su-steps">
+          <div class="su-step su-step--active">
+            <span class="su-step-num">1</span>
+            Create your account
+          </div>
+          <div class="su-step">
+            <span class="su-step-num">2</span>
+            Connect your domain
+          </div>
+          <div class="su-step">
+            <span class="su-step-num">3</span>
+            Go live &amp; track
+          </div>
         </div>
-        <label>
-          Password
-          <input name="password" type="password" autocomplete="new-password" required />
-        </label>
-        <label>
-          Confirm Password
-          <input name="confirmPassword" type="password" autocomplete="new-password" required />
-        </label>
-        <label>
-          Where did you hear about us?
-          <select name="referral">${referralOptions}</select>
-        </label>
-        <button type="submit">Create account</button>
-        <p class="login-links"><a href="/">Back to homepage</a></p>
-      </form>
-    </main>
+        <div class="lb-trust" style="margin-top:28px">
+          <span class="lb-trust-item">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 7L5 10L11 3" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            No credit card required
+          </span>
+          <span class="lb-trust-item">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 7L5 10L11 3" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Setup in under 10 minutes
+          </span>
+          <span class="lb-trust-item">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 7L5 10L11 3" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            BDIX Hosted · 99.9% Uptime
+          </span>
+        </div>
+        <p class="lb-footer">© 2025 Tagioo · Made in Bangladesh 🇧🇩</p>
+      </aside>
+
+      <!-- ── Form panel ── -->
+      <main class="login-form-panel su-form-panel">
+        <div class="login-form-wrap su-form-wrap">
+
+          <div class="lf-header su-anim" style="--d:0ms">
+            <h1>Create your account</h1>
+            <p class="lf-subtitle">Already have one? <a href="/login" class="su-signin-link">Sign in →</a></p>
+          </div>
+
+          ${error ? `<div class="lf-error su-anim" style="--d:40ms">${escapeHtml(error)}</div>` : ""}
+
+          <form method="post" action="/signup" class="lf-form" id="signupForm">
+
+            <div class="lf-field su-anim" style="--d:80ms">
+              <label for="suFullName">Full name</label>
+              <input id="suFullName" name="fullName" type="text" autocomplete="name" placeholder="e.g. Rahim Hossain" value="${escapeHtml(values.fullName || "")}" required />
+            </div>
+
+            <div class="lf-field su-anim" style="--d:130ms">
+              <label for="suEmail">Email address</label>
+              <input id="suEmail" name="email" type="email" autocomplete="email" placeholder="you@company.com" value="${escapeHtml(values.email || values.username || "")}" required />
+            </div>
+
+            <div class="su-row su-anim" style="--d:180ms">
+              <div class="lf-field">
+                <label for="suCountry">Country</label>
+                <select id="suCountry" name="country" class="su-select">${countryOptions}</select>
+              </div>
+              <div class="lf-field">
+                <label for="suPhone">Phone</label>
+                <input id="suPhone" name="phone" type="tel" autocomplete="tel" placeholder="1712345678" value="${escapeHtml(values.phone || "")}" required />
+              </div>
+            </div>
+
+            <div class="lf-field su-anim" style="--d:230ms">
+              <label for="suPw">Password</label>
+              <div class="lf-pw-wrap">
+                <input id="suPw" name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" required minlength="8" />
+                <button type="button" class="lf-pw-toggle" id="pw1Toggle" aria-label="Show password">${eyeSvg("eye1")}</button>
+              </div>
+            </div>
+
+            <div class="lf-field su-anim" style="--d:280ms">
+              <label for="suPwConfirm">Confirm password</label>
+              <div class="lf-pw-wrap">
+                <input id="suPwConfirm" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Repeat password" required minlength="8" />
+                <button type="button" class="lf-pw-toggle" id="pw2Toggle" aria-label="Show password">${eyeSvg("eye2")}</button>
+              </div>
+            </div>
+
+            <div class="lf-field su-anim" style="--d:330ms">
+              <label for="suReferral">How did you find us? <span class="su-optional">(optional)</span></label>
+              <select id="suReferral" name="referral" class="su-select">${referralOptions}</select>
+            </div>
+
+            <button type="submit" class="lf-btn-primary su-anim" style="--d:380ms" id="suSubmit">
+              Create account →
+            </button>
+          </form>
+
+          <p class="su-back-row su-anim" style="--d:420ms">
+            <a href="/" class="su-back-link">← Back to homepage</a>
+          </p>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      function setupPwToggle(inputId, toggleId, showId, hideId) {
+        const input = document.getElementById(inputId);
+        const btn = document.getElementById(toggleId);
+        const show = document.getElementById(showId);
+        const hide = document.getElementById(hideId);
+        btn.addEventListener("click", () => {
+          const isText = input.type === "text";
+          input.type = isText ? "password" : "text";
+          show.style.display = isText ? "" : "none";
+          hide.style.display = isText ? "none" : "";
+        });
+      }
+      setupPwToggle("suPw", "pw1Toggle", "eye1Show", "eye1Hide");
+      setupPwToggle("suPwConfirm", "pw2Toggle", "eye2Show", "eye2Hide");
+
+      document.getElementById("signupForm").addEventListener("submit", () => {
+        const btn = document.getElementById("suSubmit");
+        btn.textContent = "Creating account…";
+        btn.disabled = true;
+      });
+    </script>
   </body>
 </html>`;
 }

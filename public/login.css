@@ -401,6 +401,153 @@
   padding: 8px 0;
 }
 
+/* ─── Signup page additions ────────────────────────────────── */
+
+/* Staggered fade-up animation */
+@keyframes su-fadein {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.su-anim {
+  opacity: 0;
+  animation: su-fadein 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--d, 0ms);
+}
+
+/* Scrollable form panel for taller signup form */
+.su-form-panel {
+  align-items: flex-start;
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+/* Sticky brand panel so it stays visible while form scrolls */
+.login-layout .login-brand {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.su-form-wrap {
+  width: min(440px, 100%);
+  padding-bottom: 16px;
+}
+
+/* Country + phone side-by-side */
+.su-row {
+  display: grid;
+  grid-template-columns: 0.9fr 1fr;
+  gap: 14px;
+}
+
+/* Styled select (matches lf-form inputs) */
+.su-select {
+  width: 100%;
+  height: 48px;
+  border: 1.5px solid rgba(91,33,182,0.18);
+  border-radius: 10px;
+  padding: 0 36px 0 14px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: #0F0A1E;
+  background: #FAFAFE url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6L8 10L12 6' stroke='%239BA8C0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.su-select:focus {
+  border-color: #5B21B6;
+  box-shadow: 0 0 0 3px rgba(91,33,182,0.10);
+  background-color: #fff;
+}
+
+/* Optional label tag */
+.su-optional {
+  font-weight: 400;
+  color: #9BA8C0;
+  font-size: 0.78rem;
+}
+
+/* Sign in inline link */
+.su-signin-link {
+  color: #5B21B6;
+  font-weight: 700;
+  text-decoration: none;
+}
+.su-signin-link:hover { text-decoration: underline; }
+
+/* Back to homepage row */
+.su-back-row {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.su-back-link {
+  font-size: 0.85rem;
+  color: #9BA8C0;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 120ms;
+}
+.su-back-link:hover { color: #5B21B6; }
+
+/* Disabled submit state */
+.lf-btn-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Steps on brand panel */
+.su-steps {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.su-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.38);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.su-step--active {
+  color: rgba(255,255,255,0.92);
+}
+
+.su-step-num {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.18);
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.38);
+  flex-shrink: 0;
+  transition: background 200ms;
+}
+
+.su-step--active .su-step-num {
+  background: #F97316;
+  border-color: #F97316;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(249,115,22,0.5);
+}
+
 /* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 820px) {
   .login-layout {
@@ -423,6 +570,8 @@
   .lb-footer { margin-top: 16px; }
 
   .login-form-panel { padding: 36px 20px; }
+  .su-form-panel { padding-top: 32px; padding-bottom: 32px; }
+  .su-row { grid-template-columns: 1fr; }
 }
 
 
