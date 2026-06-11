@@ -1034,6 +1034,44 @@ h2 {
   color: var(--color-text);
 }
 
+/* Event groups inside code tabs */
+.event-group {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 0 var(--space-lg) var(--space-md);
+}
+.event-group:last-child { margin-bottom: var(--space-lg); }
+.event-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 14px;
+  background: var(--color-surface-raised, rgba(0,0,0,.03));
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+.event-label {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+}
+.event-trigger {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+.event-group .instructions-code {
+  margin: 0;
+  border-radius: 0;
+  border: none;
+}
+
 /* Checklist */
 .instructions-checklist {
   padding: 0 var(--space-lg) var(--space-lg);

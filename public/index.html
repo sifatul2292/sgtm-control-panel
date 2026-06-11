@@ -1001,8 +1001,8 @@
             </div>
 
             <div class="instructions-code-section">
-              <h3>Required dataLayer push structure</h3>
-              <p>Use this pattern on every page event. Push <code>user_data</code> whenever the user's session contains it — even on PageView.</p>
+              <h3>dataLayer push — all events</h3>
+              <p>Each event below maps to a GTM trigger in your imported template. The GA4 tag forwards everything (including <code>user_data</code> and <code>ecommerce</code>) to sGTM → Meta CAPI. Always push <code>{ ecommerce: null }</code> before any ecommerce event to clear previous data.</p>
 
               <div class="instructions-tabs" role="tablist">
                 <button class="instructions-tab is-active" data-tab="custom" role="tab">Custom / JS</button>
@@ -1010,41 +1010,159 @@
                 <button class="instructions-tab" data-tab="woo" role="tab">WooCommerce</button>
               </div>
 
+              <!-- ── Custom / JS ── -->
               <div class="instructions-tab-panel is-active" data-tab-panel="custom">
-<pre class="instructions-code"><code>// Push on PageView (and every subsequent event) when user is known
-window.dataLayer = window.dataLayer || [];
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">page_view</span>
+                    <span class="event-trigger">GTM trigger: DOM Ready · fires on every page load</span>
+                  </div>
+<pre class="instructions-code"><code>window.dataLayer = window.dataLayer || [];
 window.dataLayer.push({
-  event: 'page_view',          // or view_item / add_to_cart / begin_checkout / purchase
-  event_id: crypto.randomUUID(), // unique per event for deduplication
+  event:    'page_view',
+  event_id: crypto.randomUUID(),   // unique per fire — required for deduplication
+  user_data: {                     // push whenever user session has this data
+    email_address: 'user@example.com',  // lowercase
+    phone_number:  '+8801700000000',    // E.164 with country code
+    first_name:    'john',              // lowercase
+    last_name:     'doe',               // lowercase
+    external_id:   'user_12345'         // your DB / CRM user ID
+  }
+  // no ecommerce object on page_view
+});</code></pre>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">view_item</span>
+                    <span class="event-trigger">GTM trigger: custom event "view_item" · fire on product page load</span>
+                  </div>
+<pre class="instructions-code"><code>window.dataLayer.push({ ecommerce: null }); // always clear first
+window.dataLayer.push({
+  event:    'view_item',
+  event_id: crypto.randomUUID(),
   user_data: {
-    email_address: 'user@example.com',   // lowercase
-    phone_number:  '+8801700000000',     // E.164
-    first_name:    'john',               // lowercase
-    last_name:     'doe',                // lowercase
-    external_id:   'user_12345'          // your DB user ID
+    email_address: 'user@example.com',
+    phone_number:  '+8801700000000',
+    first_name:    'john',
+    last_name:     'doe',
+    external_id:   'user_12345'
   },
-  ecommerce: {                 // include for ecommerce events
+  ecommerce: {
     currency: 'BDT',
-    value: 1200,
-    transaction_id: 'ORDER-001',         // purchase only
+    value:    1200,       // viewed product price
+    items: [{
+      item_id:       'SKU-123',
+      item_name:     'Product Name',
+      item_brand:    'Brand',
+      item_category: 'Category',
+      price:         1200,
+      quantity:      1
+    }]
+  }
+});</code></pre>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">add_to_cart</span>
+                    <span class="event-trigger">GTM trigger: custom event "add_to_cart" · fire when item added</span>
+                  </div>
+<pre class="instructions-code"><code>window.dataLayer.push({ ecommerce: null });
+window.dataLayer.push({
+  event:    'add_to_cart',
+  event_id: crypto.randomUUID(),
+  user_data: {                     // critical — often missing, always include
+    email_address: 'user@example.com',
+    phone_number:  '+8801700000000',
+    first_name:    'john',
+    last_name:     'doe',
+    external_id:   'user_12345'
+  },
+  ecommerce: {
+    currency: 'BDT',
+    value:    2400,       // price × quantity of items being added
     items: [{
       item_id:   'SKU-123',
       item_name: 'Product Name',
       price:     1200,
-      quantity:  1
+      quantity:  2
     }]
   }
 });</code></pre>
-              </div>
+                </div>
 
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">begin_checkout</span>
+                    <span class="event-trigger">GTM trigger: custom event "begin_checkout" · fire when user starts checkout</span>
+                  </div>
+<pre class="instructions-code"><code>window.dataLayer.push({ ecommerce: null });
+window.dataLayer.push({
+  event:    'begin_checkout',
+  event_id: crypto.randomUUID(),
+  user_data: {                     // email now usually known from checkout form
+    email_address: 'user@example.com',
+    phone_number:  '+8801700000000',
+    first_name:    'john',
+    last_name:     'doe',
+    external_id:   'user_12345'
+  },
+  ecommerce: {
+    currency: 'BDT',
+    value:    3600,       // full cart total
+    items: [              // all cart items
+      { item_id: 'SKU-123', item_name: 'Product A', price: 1200, quantity: 2 },
+      { item_id: 'SKU-456', item_name: 'Product B', price: 1200, quantity: 1 }
+    ]
+  }
+});</code></pre>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">purchase</span>
+                    <span class="event-trigger">GTM trigger: custom event "purchase" · fire once on order confirmation page</span>
+                  </div>
+<pre class="instructions-code"><code>window.dataLayer.push({ ecommerce: null });
+window.dataLayer.push({
+  event:    'purchase',
+  event_id: 'ORDER-001',           // use order ID — deduplicates Pixel + CAPI conversion
+  user_data: {
+    email_address: 'user@example.com',
+    phone_number:  '+8801700000000',
+    first_name:    'john',
+    last_name:     'doe',
+    external_id:   'user_12345'
+  },
+  ecommerce: {
+    currency:       'BDT',
+    value:          3600,          // order total
+    transaction_id: 'ORDER-001',   // same as event_id — prevents duplicate conversions
+    items: [
+      { item_id: 'SKU-123', item_name: 'Product A', price: 1200, quantity: 2 },
+      { item_id: 'SKU-456', item_name: 'Product B', price: 1200, quantity: 1 }
+    ]
+  }
+});</code></pre>
+                </div>
+
+              </div><!-- /custom tab -->
+
+              <!-- ── Shopify ── -->
               <div class="instructions-tab-panel" data-tab-panel="shopify">
-<pre class="instructions-code"><code>// In Shopify theme (theme.liquid or customer-specific sections)
-// Use Liquid to inject user data for logged-in customers
-{% if customer %}
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">page_view</span>
+                    <span class="event-trigger">theme.liquid — inside &lt;head&gt; or before &lt;/body&gt;</span>
+                  </div>
+<pre class="instructions-code"><code>{% if customer %}
 window.dataLayer = window.dataLayer || [];
 window.dataLayer.push({
-  event: 'page_view',
-  event_id: '{{ 'now' | date: '%s' }}-{{ customer.id }}',
+  event:    'page_view',
+  event_id: '{{ 'now' | date: '%s' }}-{{ customer.id }}-pv',
   user_data: {
     email_address: '{{ customer.email | downcase }}',
     phone_number:  '{{ customer.phone }}',
@@ -1053,12 +1171,142 @@ window.dataLayer.push({
     external_id:   '{{ customer.id }}'
   }
 });
-{% endif %}
+{% endif %}</code></pre>
+                </div>
 
-// On purchase (Shopify checkout thank_you / order_status page)
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">view_item</span>
+                    <span class="event-trigger">product.liquid or product section template</span>
+                  </div>
+<pre class="instructions-code"><code>window.dataLayer.push({ ecommerce: null });
 window.dataLayer.push({
-  event: 'purchase',
-  event_id: '{{ order.id }}-purchase',
+  event:    'view_item',
+  event_id: '{{ product.id }}-{{ 'now' | date: '%s' }}-vi',
+  {% if customer %}
+  user_data: {
+    email_address: '{{ customer.email | downcase }}',
+    phone_number:  '{{ customer.phone }}',
+    first_name:    '{{ customer.first_name | downcase }}',
+    last_name:     '{{ customer.last_name | downcase }}',
+    external_id:   '{{ customer.id }}'
+  },
+  {% endif %}
+  ecommerce: {
+    currency: '{{ shop.currency }}',
+    value:    {{ product.selected_or_first_available_variant.price | divided_by: 100.0 }},
+    items: [{
+      item_id:       '{{ product.selected_or_first_available_variant.sku }}',
+      item_name:     '{{ product.title | escape }}',
+      item_brand:    '{{ product.vendor | escape }}',
+      item_category: '{{ product.type | escape }}',
+      price:         {{ product.selected_or_first_available_variant.price | divided_by: 100.0 }},
+      quantity:      1
+    }]
+  }
+});</code></pre>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">add_to_cart</span>
+                    <span class="event-trigger">JavaScript — intercept Shopify cart/add.js AJAX response</span>
+                  </div>
+<pre class="instructions-code"><code>// Listen for Shopify's native cart:add event (Shopify 2.0 themes)
+document.addEventListener('cart:add', function(e) {
+  const item = e.detail.cartItem;
+  window.dataLayer.push({ ecommerce: null });
+  window.dataLayer.push({
+    event:    'add_to_cart',
+    event_id: item.key + '-atc',
+    {% if customer %}
+    user_data: {
+      email_address: '{{ customer.email | downcase }}',
+      phone_number:  '{{ customer.phone }}',
+      first_name:    '{{ customer.first_name | downcase }}',
+      last_name:     '{{ customer.last_name | downcase }}',
+      external_id:   '{{ customer.id }}'
+    },
+    {% endif %}
+    ecommerce: {
+      currency: '{{ shop.currency }}',
+      value:    item.price / 100 * item.quantity,
+      items: [{
+        item_id:   item.sku,
+        item_name: item.product_title,
+        price:     item.price / 100,
+        quantity:  item.quantity
+      }]
+    }
+  });
+});
+
+// For themes without cart:add — intercept fetch to /cart/add.js
+const _fetch = window.fetch;
+window.fetch = function(...args) {
+  const res = _fetch.apply(this, args);
+  if (String(args[0]).includes('/cart/add')) {
+    res.then(r => r.clone().json()).then(item => {
+      window.dataLayer.push({ ecommerce: null });
+      window.dataLayer.push({
+        event: 'add_to_cart', event_id: item.key + '-atc',
+        ecommerce: { currency: '{{ shop.currency }}',
+          value: item.price / 100 * item.quantity,
+          items: [{ item_id: item.sku, item_name: item.product_title,
+            price: item.price / 100, quantity: item.quantity }] }
+      });
+    });
+  }
+  return res;
+};</code></pre>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">begin_checkout</span>
+                    <span class="event-trigger">cart.liquid — on checkout button click, or cart page load</span>
+                  </div>
+<pre class="instructions-code"><code>// Inject in cart.liquid — fires when cart page loads
+// (user_data now available from checkout form pre-fill or session)
+window.dataLayer.push({ ecommerce: null });
+window.dataLayer.push({
+  event:    'begin_checkout',
+  event_id: 'cart-{{ cart.token }}-bc',
+  {% if customer %}
+  user_data: {
+    email_address: '{{ customer.email | downcase }}',
+    phone_number:  '{{ customer.phone }}',
+    first_name:    '{{ customer.first_name | downcase }}',
+    last_name:     '{{ customer.last_name | downcase }}',
+    external_id:   '{{ customer.id }}'
+  },
+  {% endif %}
+  ecommerce: {
+    currency: '{{ cart.currency.iso_code }}',
+    value:    {{ cart.total_price | divided_by: 100.0 }},
+    items: [{% for item in cart.items %}{
+      item_id:   '{{ item.sku }}',
+      item_name: '{{ item.product.title | escape }}',
+      price:     {{ item.price | divided_by: 100.0 }},
+      quantity:  {{ item.quantity }}
+    }{% unless forloop.last %},{% endunless %}{% endfor %}]
+  }
+});</code></pre>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">purchase</span>
+                    <span class="event-trigger">Settings → Checkout → Additional scripts (all plans) or order_status.liquid (Plus)</span>
+                  </div>
+<pre class="instructions-code"><code>// Paste in Shopify Admin → Settings → Checkout → Additional scripts
+// Shopify renders this on the Thank You page after purchase
+{% if first_time_accessed %}
+window.dataLayer = window.dataLayer || [];
+window.dataLayer.push({ ecommerce: null });
+window.dataLayer.push({
+  event:    'purchase',
+  event_id: '{{ order.order_number }}-purchase',   // order number as event_id
   user_data: {
     email_address: '{{ customer.email | downcase }}',
     phone_number:  '{{ customer.phone }}',
@@ -1067,48 +1315,206 @@ window.dataLayer.push({
     external_id:   '{{ customer.id }}'
   },
   ecommerce: {
-    currency: '{{ order.currency }}',
-    value: {{ order.total_price | money_without_currency | remove: ',' }},
+    currency:       '{{ order.currency }}',
+    value:          {{ order.total_price | money_without_currency | remove: ',' }},
     transaction_id: '{{ order.order_number }}',
     items: [{% for item in order.line_items %}{
-      item_id: '{{ item.sku }}',
+      item_id:   '{{ item.sku | default: item.product_id }}',
       item_name: '{{ item.title | escape }}',
-      price: {{ item.price | money_without_currency }},
-      quantity: {{ item.quantity }}
+      price:     {{ item.price | money_without_currency | remove: ',' }},
+      quantity:  {{ item.quantity }}
     }{% unless forloop.last %},{% endunless %}{% endfor %}]
   }
-});</code></pre>
-              </div>
+});
+{% endif %}</code></pre>
+                </div>
 
+              </div><!-- /shopify tab -->
+
+              <!-- ── WooCommerce ── -->
               <div class="instructions-tab-panel" data-tab-panel="woo">
-<pre class="instructions-code"><code>// In WooCommerce (functions.php or a custom plugin)
-// Hook into wp_footer to inject user_data for logged-in users
-add_action('wp_footer', function() {
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">page_view</span>
+                    <span class="event-trigger">wp_footer hook — fires on every page for logged-in users</span>
+                  </div>
+<pre class="instructions-code"><code>add_action('wp_footer', function() {
   if (!is_user_logged_in()) return;
-  $user = wp_get_current_user();
+  $user  = wp_get_current_user();
   $phone = get_user_meta($user->ID, 'billing_phone', true);
+  $ext   = (string) $user->ID;
   echo "&lt;script&gt;
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({
-    event: 'page_view',
-    event_id: '" . wp_generate_uuid4() . "',
-    user_data: {
-      email_address: '" . strtolower(esc_js($user->user_email)) . "',
-      phone_number:  '" . esc_js($phone) . "',
-      first_name:    '" . strtolower(esc_js($user->first_name)) . "',
-      last_name:     '" . strtolower(esc_js($user->last_name)) . "',
-      external_id:   '" . esc_js($user->ID) . "'
-    }
-  });
-  &lt;/script&gt;";
+window.dataLayer = window.dataLayer || [];
+window.dataLayer.push({
+  event:    'page_view',
+  event_id: '" . wp_generate_uuid4() . "',
+  user_data: {
+    email_address: '" . strtolower(esc_js($user->user_email)) . "',
+    phone_number:  '" . esc_js($phone) . "',
+    first_name:    '" . strtolower(esc_js($user->first_name)) . "',
+    last_name:     '" . strtolower(esc_js($user->last_name)) . "',
+    external_id:   '" . esc_js($ext) . "'
+  }
+});&lt;/script&gt;";
+}, 20);</code></pre>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">view_item</span>
+                    <span class="event-trigger">woocommerce_after_single_product hook — fires on single product page</span>
+                  </div>
+<pre class="instructions-code"><code>add_action('woocommerce_after_single_product', function() {
+  global $product;
+  $user  = wp_get_current_user();
+  $ud    = is_user_logged_in() ? [
+    'email_address' => strtolower($user->user_email),
+    'phone_number'  => get_user_meta($user->ID, 'billing_phone', true),
+    'first_name'    => strtolower($user->first_name),
+    'last_name'     => strtolower($user->last_name),
+    'external_id'   => (string) $user->ID,
+  ] : [];
+  echo "&lt;script&gt;
+window.dataLayer.push({ ecommerce: null });
+window.dataLayer.push({
+  event:     'view_item',
+  event_id:  '" . wp_generate_uuid4() . "',
+  user_data: " . wp_json_encode($ud) . ",
+  ecommerce: {
+    currency: '" . get_woocommerce_currency() . "',
+    value:    " . wc_format_decimal($product->get_price(), 2) . ",
+    items: [{
+      item_id:       '" . esc_js($product->get_sku() ?: $product->get_id()) . "',
+      item_name:     '" . esc_js($product->get_name()) . "',
+      item_category: '" . esc_js(implode('/', wp_get_post_terms($product->get_id(), 'product_cat', ['fields' => 'names']))) . "',
+      price:         " . wc_format_decimal($product->get_price(), 2) . ",
+      quantity:      1
+    }]
+  }
+});&lt;/script&gt;";
+});</code></pre>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">add_to_cart</span>
+                    <span class="event-trigger">woocommerce_ajax_added_to_cart + wp_enqueue_scripts JS for AJAX carts</span>
+                  </div>
+<pre class="instructions-code"><code>// PHP: pass product data to JS on page load
+add_action('wp_footer', function() {
+  if (!is_product()) return;
+  global $product;
+  echo "&lt;script&gt;
+window._wc_atc_data = {
+  item_id:   '" . esc_js($product->get_sku() ?: $product->get_id()) . "',
+  item_name: '" . esc_js($product->get_name()) . "',
+  price:     " . wc_format_decimal($product->get_price(), 2) . ",
+  currency:  '" . get_woocommerce_currency() . "'
+};&lt;/script&gt;";
 });
 
-// For purchase event use WooCommerce hook: woocommerce_thankyou
-add_action('woocommerce_thankyou', function($order_id) {
-  $order = wc_get_order($order_id);
-  // push purchase event with same user_data structure + ecommerce object
+// JS: intercept WooCommerce AJAX add-to-cart (classic themes)
+jQuery(document).on('added_to_cart', function(e, fragments, cart_hash, button) {
+  const qty = parseInt(jQuery(button).closest('form').find('[name=quantity]').val()) || 1;
+  const d   = window._wc_atc_data || {};
+  window.dataLayer.push({ ecommerce: null });
+  window.dataLayer.push({
+    event:    'add_to_cart',
+    event_id: d.item_id + '-' + Date.now(),
+    ecommerce: {
+      currency: d.currency,
+      value:    +(d.price * qty).toFixed(2),
+      items: [{ item_id: d.item_id, item_name: d.item_name, price: d.price, quantity: qty }]
+    }
+  });
 });</code></pre>
-              </div>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">begin_checkout</span>
+                    <span class="event-trigger">woocommerce_before_checkout_form hook</span>
+                  </div>
+<pre class="instructions-code"><code>add_action('woocommerce_before_checkout_form', function() {
+  $cart  = WC()->cart;
+  $user  = wp_get_current_user();
+  $ud    = is_user_logged_in() ? [
+    'email_address' => strtolower($user->user_email),
+    'phone_number'  => get_user_meta($user->ID, 'billing_phone', true),
+    'first_name'    => strtolower($user->first_name),
+    'last_name'     => strtolower($user->last_name),
+    'external_id'   => (string) $user->ID,
+  ] : [];
+  $items = [];
+  foreach ($cart->get_cart() as $item) {
+    $p = $item['data'];
+    $items[] = [
+      'item_id'   => $p->get_sku() ?: $p->get_id(),
+      'item_name' => $p->get_name(),
+      'price'     => (float) wc_format_decimal($p->get_price(), 2),
+      'quantity'  => $item['quantity'],
+    ];
+  }
+  echo "&lt;script&gt;
+window.dataLayer.push({ ecommerce: null });
+window.dataLayer.push({
+  event:     'begin_checkout',
+  event_id:  '" . wp_generate_uuid4() . "',
+  user_data: " . wp_json_encode($ud) . ",
+  ecommerce: {
+    currency: '" . get_woocommerce_currency() . "',
+    value:    " . wc_format_decimal($cart->get_cart_contents_total(), 2) . ",
+    items:    " . wp_json_encode($items) . "
+  }
+});&lt;/script&gt;";
+});</code></pre>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
+                    <span class="event-label">purchase</span>
+                    <span class="event-trigger">woocommerce_thankyou hook — fires once on order confirmation</span>
+                  </div>
+<pre class="instructions-code"><code>add_action('woocommerce_thankyou', function($order_id) {
+  if (get_post_meta($order_id, '_tagioo_purchase_fired', true)) return; // fire once only
+  update_post_meta($order_id, '_tagioo_purchase_fired', '1');
+
+  $order = wc_get_order($order_id);
+  $ud = [
+    'email_address' => strtolower($order->get_billing_email()),
+    'phone_number'  => $order->get_billing_phone(),
+    'first_name'    => strtolower($order->get_billing_first_name()),
+    'last_name'     => strtolower($order->get_billing_last_name()),
+    'external_id'   => (string) $order->get_customer_id() ?: $order->get_billing_email(),
+  ];
+  $items = [];
+  foreach ($order->get_items() as $item) {
+    $p = $item->get_product();
+    $items[] = [
+      'item_id'   => $p ? ($p->get_sku() ?: $p->get_id()) : $item->get_product_id(),
+      'item_name' => $item->get_name(),
+      'price'     => (float) wc_format_decimal($order->get_item_total($item, false, true), 2),
+      'quantity'  => $item->get_quantity(),
+    ];
+  }
+  echo "&lt;script&gt;
+window.dataLayer.push({ ecommerce: null });
+window.dataLayer.push({
+  event:     'purchase',
+  event_id:  'order-" . $order_id . "',
+  user_data: " . wp_json_encode($ud) . ",
+  ecommerce: {
+    currency:       '" . $order->get_currency() . "',
+    value:          " . wc_format_decimal($order->get_total(), 2) . ",
+    transaction_id: '" . $order_id . "',
+    items:          " . wp_json_encode($items) . "
+  }
+});&lt;/script&gt;";
+}, 10);</code></pre>
+                </div>
+
+              </div><!-- /woo tab -->
             </div>
 
             <div class="instructions-checklist">
