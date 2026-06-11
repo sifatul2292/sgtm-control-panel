@@ -570,8 +570,13 @@ function tagiooGalleryTemplateGuide(destinations) {
         { field: "Transaction ID", value: "{{ed - transaction_id}}" },
         { field: "Email", value: "{{ed - email_address}}" },
         { field: "Phone", value: "{{ed - phone_number}}" },
+        { field: "First Name", value: "{{ed - first_name}}" },
+        { field: "Last Name", value: "{{ed - last_name}}" },
+        { field: "External ID", value: "{{ed - external_id}}" },
+        { field: "Country", value: "{{rh - country}}" },
         { field: "fbp (Browser ID)", value: "{{rh - fb_browser_id}}" },
-        { field: "fbc (Click ID)", value: "{{rh - fb_click_id}}" }
+        { field: "fbc (Click ID)", value: "{{rh - fb_click_cookie}}" },
+        { field: "Client IP Address", value: "{{rh - fb_client_ipv6}}" }
       ]
     });
   }
@@ -718,7 +723,13 @@ function buildServerGtmTemplate(input) {
     gtmEventDataVariable(29, "ed - user_agent", "user_agent"),
     gtmEventDataVariable(30, "ed - ip_override", "ip_override"),
     gtmRequestHeaderVariable(31, "rh - fb_browser_id", "X-FB-Browser-ID", "4"),
-    gtmRequestHeaderVariable(32, "rh - fb_click_id", "X-FB-Click-ID", "4")
+    gtmRequestHeaderVariable(32, "rh - fb_click_id", "X-FB-Click-ID", "4"),
+    gtmEventDataVariable(33, "ed - first_name", "user_data.first_name"),
+    gtmEventDataVariable(34, "ed - last_name", "user_data.last_name"),
+    gtmEventDataVariable(35, "ed - external_id", "user_data.external_id"),
+    gtmRequestHeaderVariable(36, "rh - fb_click_cookie", "X-FB-Click-Cookie", "4"),
+    gtmRequestHeaderVariable(37, "rh - fb_client_ipv6", "X-FB-Client-IPv6", "4"),
+    gtmRequestHeaderVariable(38, "rh - country", "X-Tagioo-Country", "4")
   ];
   const triggers = [
     { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - GA4 Client", type: "ALWAYS", filter: [{ type: "CONTAINS", parameter: [gtmTemplateParam("arg0", "{{Client Name}}"), gtmTemplateParam("arg1", "GA4")] }], fingerprint: String(Date.now()) },
@@ -1017,6 +1028,10 @@ function generatePowerUpMapsContent() {
     "    ~*(?i)(Googlebot|Googlebot-Image|bingbot|Baiduspider|YandexBot|DuckDuckBot|facebookexternalhit|AhrefsBot|SemrushBot|MJ12bot|Dotbot) 1;",
     "}",
     "",
+    "# Meta IPv6: prefer visitor's IPv6 address (from Cloudflare) for higher EMQ",
+    "# nginx skips proxy_set_header when map value is empty — safe for non-CF or IPv4-only visitors",
+    `map $http_cf_connecting_ipv6 $tagioo_fb_client_ipv6 { default $http_cf_connecting_ipv6; "" ""; }`,
+    "",
     "# User Agent Info: device type classification for sGTM segmentation",
     "map $http_user_agent $tagioo_device_type {",
     "    default                                                                      \"desktop\";",
@@ -1121,7 +1136,12 @@ function buildNginxConfig({ domain, port, accessLogLine, errorLog }) {
         # Device type (mobile/tablet/desktop) and raw UA for sGTM segmentation.
         # Use as sGTM Request Header variables: X-Tagioo-Device, X-Tagioo-UA.
         proxy_set_header X-Tagioo-Device $tagioo_device_type;
-        proxy_set_header X-Tagioo-UA $http_user_agent;` : "";
+        proxy_set_header X-Tagioo-UA $http_user_agent;
+        # ── Meta IPv6 ───────────────────────────────────────────────────────────
+        # Forwards Cloudflare visitor IPv6 so Meta CAPI prefers IPv6 over IPv4 (higher EMQ).
+        # Map $tagioo_fb_client_ipv6 is defined in tagioo-powerups-maps.conf.
+        # nginx drops this header automatically when value is empty (IPv4-only or non-CF visitors).
+        proxy_set_header X-FB-Client-IPv6 $tagioo_fb_client_ipv6;` : "";
 
   const customLoaderLocation = powerUpsActive ? `
     # ── Custom Loader ────────────────────────────────────────────────────────
