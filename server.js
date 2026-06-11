@@ -1103,15 +1103,43 @@ async function regenNginxForContainer(request) {
   // Re-run certbot to restore SSL after rebuilding the nginx config from template.
   // buildNginxConfig generates HTTP-only (port 80); certbot --nginx re-adds the SSL block
   // without re-issuing the certificate (idempotent when cert is still valid).
-  const certbotResult = await command(
-    "sudo",
-    ["certbot", "--nginx", "-d", request.domain, "--non-interactive", "--agree-tos", "--redirect"],
-    { timeout: 60000, maxBuffer: 1024 * 1024 }
-  ).catch((err) => ({ ok: false, stdout: "", stderr: err.message }));
+  const runCertbot = () =>
+    command(
+      "sudo",
+      ["certbot", "--nginx", "-d", request.domain, "--non-interactive", "--agree-tos", "--redirect"],
+      { timeout: 60000, maxBuffer: 1024 * 1024 }
+    ).catch((err) => ({ ok: false, stdout: "", stderr: err.message }));
+
+  let certbotResult = await runCertbot();
+
+  // Verify certbot actually injected the SSL block. If the live config still has no
+  // "listen 443", certbot silently failed (rate-limit, DNS hiccup, 60s timeout).
+  // Retry once — this is the recurring cause of HTTPS events stopping.
+  const nginxLivePath = join(config.nginxSitesAvailableDir, request.domain);
+  const liveConfig = await readFile(nginxLivePath, "utf8").catch(() => "");
+  const hasSSL = liveConfig.includes("listen 443") || liveConfig.includes("ssl_certificate");
+
+  if (!hasSSL) {
+    certbotResult = await runCertbot();
+    const liveConfigRetry = await readFile(nginxLivePath, "utf8").catch(() => "");
+    const hasSSLRetry = liveConfigRetry.includes("listen 443") || liveConfigRetry.includes("ssl_certificate");
+    if (hasSSLRetry) {
+      // Reload nginx to pick up the SSL block added on retry
+      await command("sudo", ["systemctl", "reload", "nginx"], { timeout: 10000 });
+    } else {
+      // Certbot failed twice — return error so caller knows SSL is broken
+      return {
+        ok: false,
+        error: `Certbot failed to add SSL for ${request.domain}. HTTPS events will not arrive until SSL is restored. Run manually: certbot --nginx -d ${request.domain} --non-interactive --agree-tos --redirect`,
+        certbot: "ssl-failed",
+        certbotError: certbotResult.stderr || certbotResult.stdout || null
+      };
+    }
+  }
 
   return {
     ok: true,
-    certbot: certbotResult.ok ? "ssl-restored" : "ssl-skipped",
+    certbot: certbotResult.ok ? "ssl-restored" : "ssl-restored-on-retry",
     certbotError: certbotResult.ok ? null : (certbotResult.stderr || certbotResult.stdout || null)
   };
 }
