@@ -822,29 +822,141 @@ function loginPage(error = "") {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Login - Tagioo</title>
-    <link rel="stylesheet" href="/tokens.css" />
+    <title>Sign in — Tagioo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
   </head>
-  <body>
-    <main class="login-shell">
-      <form class="login-card" method="post" action="/login">
-        <span class="brand-mark">T</span>
-        <h1>Tagioo</h1>
-        <p>Sign in as owner or customer to view your tracking dashboard.</p>
-        ${error ? `<div class="login-error">${error}</div>` : ""}
-        <label>
-          Username
-          <input name="username" autocomplete="username" required />
-        </label>
-        <label>
-          Password
-          <input name="password" type="password" autocomplete="current-password" required />
-        </label>
-        <button type="submit">Sign in</button>
-        <p class="login-links">New customer? <a href="/signup">Create an account</a></p>
-      </form>
-    </main>
+  <body class="login-body">
+    <div class="login-layout">
+
+      <!-- ── Brand panel ── -->
+      <aside class="login-brand">
+        <a class="lb-logo" href="/">
+          <span class="lb-mark">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
+              <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
+            </svg>
+          </span>
+          <span>Tagioo</span>
+        </a>
+        <div class="lb-hero">
+          <h2>Track every purchase.<br>Boost every campaign.</h2>
+          <p>Server-side GTM built for Bangladesh ecommerce. Recover lost conversions and feed Meta &amp; Google clean data.</p>
+        </div>
+        <div class="lb-stats">
+          <div class="lb-stat">
+            <span class="lb-stat-num">+31%</span>
+            <small>avg ROAS lift</small>
+          </div>
+          <div class="lb-stat">
+            <span class="lb-stat-num">+58%</span>
+            <small>more purchases seen</small>
+          </div>
+          <div class="lb-stat">
+            <span class="lb-stat-num">15ms</span>
+            <small>BDIX response</small>
+          </div>
+        </div>
+        <div class="lb-trust">
+          <span class="lb-trust-item">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 7L5 10L11 3" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            SSL Secured
+          </span>
+          <span class="lb-trust-item">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 7L5 10L11 3" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            BDIX Hosted
+          </span>
+          <span class="lb-trust-item">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 7L5 10L11 3" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            99.9% Uptime
+          </span>
+        </div>
+        <p class="lb-footer">© 2025 Tagioo · Made in Bangladesh 🇧🇩</p>
+      </aside>
+
+      <!-- ── Form panel ── -->
+      <main class="login-form-panel">
+        <div class="login-form-wrap">
+
+          <!-- Sign in view -->
+          <div id="loginView">
+            <div class="lf-header">
+              <h1>Welcome back</h1>
+              <p class="lf-subtitle">Sign in to view your tracking dashboard.</p>
+            </div>
+            ${error ? `<div class="lf-error">${error}</div>` : ""}
+            <form method="post" action="/login" class="lf-form">
+              <div class="lf-field">
+                <label for="username">Username</label>
+                <input id="username" name="username" type="text" autocomplete="username" placeholder="your-username" required />
+              </div>
+              <div class="lf-field">
+                <div class="lf-label-row">
+                  <label for="password">Password</label>
+                  <button type="button" id="forgotBtn" class="lf-forgot-link">Forgot password?</button>
+                </div>
+                <div class="lf-pw-wrap">
+                  <input id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+                  <button type="button" class="lf-pw-toggle" id="pwToggle" aria-label="Show password">
+                    <svg id="eyeShow" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1 9C1 9 4 3 9 3C14 3 17 9 17 9C17 9 14 15 9 15C4 15 1 9 1 9Z" stroke="currentColor" stroke-width="1.4"/><circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.4"/></svg>
+                    <svg id="eyeHide" width="18" height="18" viewBox="0 0 18 18" fill="none" style="display:none"><path d="M1 1L17 17M7.5 4.2C8 4.07 8.5 4 9 4C14 4 17 9 17 9C16.4 10.1 15.5 11.3 14.4 12.3M10.6 13.8C10.1 13.93 9.6 14 9 14C4 14 1 9 1 9C1.6 7.9 2.5 6.7 3.6 5.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                  </button>
+                </div>
+              </div>
+              <button type="submit" class="lf-btn-primary">Sign in →</button>
+            </form>
+            <p class="lf-signup-prompt">New customer? <a href="/signup">Create an account</a></p>
+          </div>
+
+          <!-- Forgot password view -->
+          <div id="forgotView" class="lf-forgot-panel" hidden>
+            <button type="button" id="backBtn" class="lf-back-btn">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Back to sign in
+            </button>
+            <div class="lf-header" style="margin-top:8px">
+              <h1>Forgot password?</h1>
+              <p class="lf-subtitle">No worries. Chat with our team on WhatsApp and we'll reset your password within minutes.</p>
+            </div>
+            <a href="https://wa.me/+8801XXXXXXXXX?text=Hi%2C%20I%20need%20help%20resetting%20my%20Tagioo%20password." class="lf-btn-whatsapp" target="_blank" rel="noopener">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              Chat on WhatsApp
+            </a>
+            <p class="lf-forgot-alt">Or email us at <a href="mailto:hello@tagioo.com">hello@tagioo.com</a></p>
+          </div>
+
+        </div>
+      </main>
+    </div>
+
+    <script>
+      // Toggle password visibility
+      const pwInput = document.getElementById("password");
+      const pwToggle = document.getElementById("pwToggle");
+      const eyeShow = document.getElementById("eyeShow");
+      const eyeHide = document.getElementById("eyeHide");
+      pwToggle.addEventListener("click", () => {
+        const isText = pwInput.type === "text";
+        pwInput.type = isText ? "password" : "text";
+        eyeShow.style.display = isText ? "" : "none";
+        eyeHide.style.display = isText ? "none" : "";
+      });
+
+      // Forgot password toggle
+      const loginView = document.getElementById("loginView");
+      const forgotView = document.getElementById("forgotView");
+      document.getElementById("forgotBtn").addEventListener("click", () => {
+        loginView.hidden = true;
+        forgotView.hidden = false;
+      });
+      document.getElementById("backBtn").addEventListener("click", () => {
+        forgotView.hidden = true;
+        loginView.hidden = false;
+      });
+    </script>
   </body>
 </html>`;
 }
