@@ -965,6 +965,9 @@ function buildWebGtmTemplate(input) {
     gtmDataLayerVariable(11, "dlv - ecommerce.currency", "ecommerce.currency"),
     gtmDataLayerVariable(12, "dlv - ecommerce.transaction_id", "ecommerce.transaction_id"),
     gtmDataLayerVariable(13, "dlv - ecommerce.items", "ecommerce.items"),
+    gtmDataLayerVariable(23, "dlv - ecommerce.coupon", "ecommerce.coupon"),
+    gtmDataLayerVariable(24, "dlv - ecommerce.shipping", "ecommerce.shipping"),
+    gtmDataLayerVariable(25, "dlv - ecommerce.tax", "ecommerce.tax"),
     gtmDataLayerVariable(14, "dlv - user_data.email_address", "user_data.email_address"),
     gtmDataLayerVariable(15, "dlv - user_data.phone_number", "user_data.phone_number"),
     gtmDataLayerVariable(16, "dlv - user_data.first_name", "user_data.first_name"),
@@ -1030,16 +1033,22 @@ function buildWebGtmTemplate(input) {
           { parameter: "currency", parameterValue: "{{dlv - ecommerce.currency}}" },
           { parameter: "value", parameterValue: "{{dlv - ecommerce.value}}" },
           { parameter: "transaction_id", parameterValue: "{{dlv - ecommerce.transaction_id}}" },
-          { parameter: "items", parameterValue: "{{dlv - ecommerce.items}}" }
+          { parameter: "items", parameterValue: "{{dlv - ecommerce.items}}" },
+          { parameter: "coupon", parameterValue: "{{dlv - ecommerce.coupon}}" },
+          { parameter: "shipping", parameterValue: "{{dlv - ecommerce.shipping}}" },
+          { parameter: "tax", parameterValue: "{{dlv - ecommerce.tax}}" }
         );
       }
-      tags.push(gtmTag(tags.length + 1, `Tagioo GA4 - ${eventName}`, "gaawe", [
+      const isFiringOnce = eventName === "purchase";
+      const tagObj = gtmTag(tags.length + 1, `Tagioo GA4 - ${eventName}`, "gaawe", [
         gtmBooleanParam("sendEcommerceData", false),
         gtmBooleanParam("enhancedUserId", false),
         gtmTemplateParam("eventName", eventName),
         gtmTemplateParam("measurementIdOverride", "{{Tagioo - ga4_measurement_id}}"),
         gtmListParam("eventSettingsTable", eventSettingsRows)
-      ], [triggerId], "3"));
+      ], [triggerId], "3");
+      if (isFiringOnce) tagObj.tagFiringOption = "ONCE_PER_PAGE";
+      tags.push(tagObj);
     }
   }
   if (destinations.includes("meta")) {
@@ -1124,7 +1133,15 @@ function buildServerGtmTemplate(input) {
       clientId: "1",
       name: "Tagioo - GA4 Client",
       type: "gaaw_client",
-      parameter: [],
+      parameter: [
+        gtmTemplateParam("cookieDomain", "auto"),
+        gtmBooleanParam("activateDefaultPaths", true),
+        gtmTemplateParam("cookieMaxAgeInSec", "63072000"),
+        gtmTemplateParam("cookiePath", "/"),
+        gtmBooleanParam("migrateFromJsClientId", false),
+        gtmTemplateParam("cookieManagement", "server"),
+        gtmTemplateParam("cookieName", "FPID")
+      ],
       fingerprint: String(Date.now())
     });
     const ga4Params = [
