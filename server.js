@@ -604,6 +604,12 @@ function gtmExport(kind, name, payload, content) {
   if (payload.fieldMappings) {
     tagiooSetup.fieldMappings = payload.fieldMappings;
   }
+  if (Array.isArray(content.variable)) {
+    // GTM import rejects constant variables whose value is empty.
+    content.variable = content.variable.filter(
+      (variable) => variable.type !== "c" || (variable.parameter?.[0]?.value || "") !== ""
+    );
+  }
   return {
     exportFormatVersion: 2,
     exportTime: new Date().toISOString(),
