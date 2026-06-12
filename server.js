@@ -1047,7 +1047,7 @@ function buildWebGtmTemplate(input) {
         gtmTemplateParam("measurementIdOverride", "{{Tagioo - ga4_measurement_id}}"),
         gtmListParam("eventSettingsTable", eventSettingsRows)
       ], [triggerId], "3");
-      if (isFiringOnce) tagObj.tagFiringOption = "ONCE_PER_PAGE";
+      if (isFiringOnce) tagObj.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tagObj);
     }
   }
