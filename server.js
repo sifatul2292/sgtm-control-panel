@@ -2390,6 +2390,11 @@ function storeTenantEventSnapshot(data, tenantId, summary, date = localDateKey()
   if (!tenantId || !summary?.available) return;
   if (!data.tenantEventHistory) data.tenantEventHistory = {};
   if (!data.tenantEventHistory[tenantId]) data.tenantEventHistory[tenantId] = {};
+  // After logrotate or a container restart the fresh access log undercounts the day,
+  // so a tail-based summary can come back smaller than what we already recorded.
+  // Never replace a stored snapshot with a smaller one for the same date.
+  const existing = data.tenantEventHistory[tenantId][date];
+  if (existing && Number(existing.total || 0) > Number(summary.count || 0)) return;
   data.tenantEventHistory[tenantId][date] = historySnapshotFromSummary(summary, date);
 }
 
@@ -4408,7 +4413,11 @@ async function enrichProvisioningRequest(request) {
 
 async function persistDailySummary(summary) {
   const loaded = await readDatabase();
-  if (!loaded.available || !summary.available) {
+  // Only a DB read failure blocks persistence. An unavailable shared-log summary must
+  // NOT skip the per-tenant section below — tenants with dedicated per-container logs
+  // would otherwise never get daily snapshots stored, and their event history would
+  // reset after every nightly logrotate or watchdog container restart.
+  if (!loaded.available) {
     return {
       available: loaded.available,
       path: databasePath,
@@ -4420,9 +4429,16 @@ async function persistDailySummary(summary) {
 
   const data = loaded.data;
   const today = localDateKey();
-  data.daily[today] = historySnapshotFromSummary(summary, today);
-  data.daily[today].purchases = (summary.recentEvents || []).filter((item) => item.eventName === "Purchase").slice(0, 50);
-  pruneDailyHistory(data.daily);
+  if (summary.available) {
+    // Same guard as storeTenantEventSnapshot: a freshly rotated log undercounts the
+    // day, so never replace today's stored snapshot with a smaller one.
+    const existingToday = data.daily[today];
+    if (!existingToday || Number(existingToday.total || 0) <= Number(summary.count || 0)) {
+      data.daily[today] = historySnapshotFromSummary(summary, today);
+      data.daily[today].purchases = (summary.recentEvents || []).filter((item) => item.eventName === "Purchase").slice(0, 50);
+    }
+    pruneDailyHistory(data.daily);
+  }
 
   // Persist per-tenant daily request counts so billing-period totals survive log rotation.
   // After nightly logrotate the per-container access log starts fresh; without this,
@@ -4452,8 +4468,10 @@ async function persistDailySummary(summary) {
         : Number(summary.count || 0);
       if (!data.tenantDailyRequests[tenant.id]) data.tenantDailyRequests[tenant.id] = {};
       if (tenantHostCount > 0) {
-        // Only overwrite if the shared log actually has data for this tenant
-        data.tenantDailyRequests[tenant.id][today] = tenantHostCount;
+        // Only overwrite if the shared log actually has data for this tenant,
+        // and never lower today's stored count (rotated log undercounts the day).
+        const existingCount = Number(data.tenantDailyRequests[tenant.id][today] || 0);
+        data.tenantDailyRequests[tenant.id][today] = Math.max(existingCount, tenantHostCount);
         storeTenantEventSnapshot(data, tenant.id, filterRequestSummaryForTenant(summary, tenant), today);
       }
     }
@@ -6220,6 +6238,27 @@ const server = createServer(async (req, res) => {
     // Non-fatal; power-ups default to off
   }
 })();
+
+// Persist daily event snapshots in the background. Previously snapshots were only
+// written when the owner dashboard API ran, so on days with only customer logins
+// (or no logins) nothing was stored — and the nightly logrotate / watchdog container
+// restart then erased that day's events for good, making dashboard totals "reset".
+const persistSnapshotIntervalMs = Number(process.env.PERSIST_SNAPSHOT_INTERVAL_MS || 10 * 60 * 1000);
+let persistSnapshotRunning = false;
+async function persistSnapshotTick() {
+  if (persistSnapshotRunning) return;
+  persistSnapshotRunning = true;
+  try {
+    const summary = await summarizeRequestsToday(config.accessLog);
+    await persistDailySummary(summary);
+  } catch (error) {
+    console.error(`[history] scheduled snapshot persist failed: ${error.message}`);
+  } finally {
+    persistSnapshotRunning = false;
+  }
+}
+setInterval(persistSnapshotTick, persistSnapshotIntervalMs).unref();
+setTimeout(persistSnapshotTick, 30 * 1000).unref();
 
 server.listen(config.port, config.host, () => {
   console.log(`SGTM control panel running at http://${config.host}:${config.port}`);
