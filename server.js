@@ -738,6 +738,13 @@ function buildWebGtmTemplate(input) {
         { parameter: "user_data.last_name", parameterValue: "{{dlv - user_data.last_name}}" },
         { parameter: "user_data.external_id", parameterValue: "{{dlv - user_data.external_id}}" }
       ];
+      if (["view_item", "add_to_cart", "begin_checkout"].includes(eventName)) {
+        eventSettingsRows.push(
+          { parameter: "currency", parameterValue: "{{dlv - ecommerce.currency}}" },
+          { parameter: "value", parameterValue: "{{dlv - ecommerce.value}}" },
+          { parameter: "items", parameterValue: "{{dlv - ecommerce.items}}" }
+        );
+      }
       if (eventName === "purchase") {
         eventSettingsRows.push(
           { parameter: "currency", parameterValue: "{{dlv - ecommerce.currency}}" },
