@@ -5558,7 +5558,7 @@ async function customerDashboardData(data, session) {
     renewalDate: tenant?.renewalDate || data.usage.renewalDate,
     monthlyAmount: tenant?.monthlyAmount ?? data.usage.monthlyAmount,
     containerLimit: tenant?.containerLimit || data.usage.containerLimit,
-    requestsToday: tenantRequestSummary.count,
+    requestsToday: todayLiveCount,
     requestsMonth,
     requestLimit,
     period: billingPeriod.label,

@@ -128,7 +128,7 @@ export function openEventStore(dataDir) {
 
     // Tenant's own lines plus shared-log lines (tenant resolved later by host match).
     linesForTenantDate(tenantId, dateKey) {
-      return linesForDateStmt.all(tenantId || "", dateKey).map((row) => row.line);
+      return linesForDateStmt.all(dateKey, tenantId || "").map((row) => row.line);
     },
 
     dateCountsForTenant(tenantId, fromDateKey) {
