@@ -523,19 +523,6 @@ function gtmEventDataVariable(id, name, key, folderId = "2") {
   };
 }
 
-function gtmRequestHeaderVariable(id, name, headerName, folderId = "2") {
-  return {
-    accountId: "0",
-    containerId: "0",
-    variableId: String(id),
-    name,
-    type: "smhttp_request_header",
-    parameter: [gtmTemplateParam("headerName", headerName)],
-    fingerprint: String(Date.now()),
-    parentFolderId: folderId
-  };
-}
-
 function gtmTrigger(id, name, eventName, filterClient = "") {
   const trigger = {
     accountId: "0",
@@ -659,10 +646,7 @@ function tagiooGalleryTemplateGuide(destinations) {
         { field: "First Name", value: "{{ed - first_name}}" },
         { field: "Last Name", value: "{{ed - last_name}}" },
         { field: "External ID", value: "{{ed - external_id}}" },
-        { field: "Country", value: "{{rh - country}}" },
-        { field: "fbp (Browser ID)", value: "{{rh - fb_browser_id}}" },
-        { field: "fbc (Click ID)", value: "{{rh - fb_click_cookie}}" },
-        { field: "Client IP Address", value: "{{rh - fb_client_ipv6}}" }
+        { field: "Country / fbp / fbc / Client IP", value: "Leave on automatic — the template reads these from cookies and the incoming request." }
       ]
     });
   }
@@ -823,14 +807,9 @@ function buildServerGtmTemplate(input) {
     gtmEventDataVariable(28, "ed - page_location", "page_location"),
     gtmEventDataVariable(29, "ed - user_agent", "user_agent"),
     gtmEventDataVariable(30, "ed - ip_override", "ip_override"),
-    gtmRequestHeaderVariable(31, "rh - fb_browser_id", "X-FB-Browser-ID", "4"),
-    gtmRequestHeaderVariable(32, "rh - fb_click_id", "X-FB-Click-ID", "4"),
     gtmEventDataVariable(33, "ed - first_name", "user_data.first_name"),
     gtmEventDataVariable(34, "ed - last_name", "user_data.last_name"),
-    gtmEventDataVariable(35, "ed - external_id", "user_data.external_id"),
-    gtmRequestHeaderVariable(36, "rh - fb_click_cookie", "X-FB-Click-Cookie", "4"),
-    gtmRequestHeaderVariable(37, "rh - fb_client_ipv6", "X-FB-Client-IPv6", "4"),
-    gtmRequestHeaderVariable(38, "rh - country", "X-Tagioo-Country", "4")
+    gtmEventDataVariable(35, "ed - external_id", "user_data.external_id")
   ];
   const triggers = [
     { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - GA4 Client", type: "ALWAYS", filter: [{ type: "CONTAINS", parameter: [gtmTemplateParam("arg0", "{{Client Name}}"), gtmTemplateParam("arg1", "GA4")] }], fingerprint: String(Date.now()) },
