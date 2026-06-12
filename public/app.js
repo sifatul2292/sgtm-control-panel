@@ -828,7 +828,7 @@ function eventDetail(item) {
 }
 
 function serverEventRows(data) {
-  const rows = data.nginx?.todayEvents?.recentEvents;
+  const rows = (data.nginx?.retainedEvents?.recentEvents?.length ? data.nginx.retainedEvents : data.nginx?.todayEvents)?.recentEvents;
   if (!Array.isArray(rows) || !rows.length) return [];
   return rows.map((item) => ({
     source: "access",
@@ -875,7 +875,7 @@ function renderEventLogStats(allItems, visibleItems, summary) {
 }
 
 function renderEventTable(data) {
-  const summary = data.nginx?.todayEvents;
+  const summary = data.nginx?.retainedEvents?.available ? data.nginx.retainedEvents : data.nginx?.todayEvents;
   const serverItems = serverEventRows(data);
   const log = data.nginx?.accessLog;
 
@@ -885,8 +885,9 @@ function renderEventTable(data) {
     renderEventLogStats(serverItems, visibleItems, summary);
     const errors = visibleItems.filter((item) => Number(item.status) >= 400).length;
     const limit = Number(els.eventLimitFilter?.value || 50);
-    els.eventLogSummary.textContent = `Showing ${Math.min(visibleItems.length, limit).toLocaleString()} of ${visibleItems.length.toLocaleString()} matching events from the latest ${serverItems.length.toLocaleString()} today (${errors.toLocaleString()} errors).`;
-    renderEventRows(visibleItems, "No matching tracking events found for today's filters.");
+    const rangeLabel = summary?.retentionDays ? `last ${summary.retentionDays} days` : "today";
+    els.eventLogSummary.textContent = `Showing ${Math.min(visibleItems.length, limit).toLocaleString()} of ${visibleItems.length.toLocaleString()} matching events from the latest ${serverItems.length.toLocaleString()} retained records (${rangeLabel}, ${errors.toLocaleString()} errors).`;
+    renderEventRows(visibleItems, "No matching tracking events found for the selected filters.");
     return;
   }
 
@@ -1647,6 +1648,7 @@ function renderCustomerSetup(data) {
 
 function renderCustomerPerformance(data) {
   const summary = data.nginx?.todayEvents || {};
+  const retainedSummary = data.nginx?.retainedEvents?.available ? data.nginx.retainedEvents : summary;
   const purchases = purchaseSummary(data);
   const totalEvents = Number(summary.count || 0);
   const periodEvents = Number(data.usage?.requestsMonth ?? totalEvents);
@@ -1659,10 +1661,10 @@ function renderCustomerPerformance(data) {
     { label: "Conversion", value: `${conversion}%`, detail: `${purchaseCount.toLocaleString()} / ${totalEvents.toLocaleString()}` },
     { label: "Purchases", value: purchaseCount.toLocaleString(), detail: "This month" }
   ]);
-  renderCustomerAnalytics(summary, data.history?.daily || [], customerChartRange);
+  renderCustomerAnalytics(summary, data.history?.daily || [], customerChartRange, retainedSummary);
 }
 
-function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h") {
+function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", eventSummary = summary) {
   if (els.customerEventChart) {
     const SERIES = [
       { key: "total",         label: "Total Events",     color: "#e55a3a", width: 2.5, fill: true  },
@@ -1931,7 +1933,7 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h") {
     });
   }
 
-  const events = (summary.events || []).filter((row) => Number(row.count || 0) > 0);
+  const events = (eventSummary.events || []).filter((row) => Number(row.count || 0) > 0);
   if (els.customerTopEvents) {
     const purchaseEvent = events.find((event) => event.name === "Purchase");
     const topEvents = events.slice(0, 5);
@@ -4279,7 +4281,8 @@ document.addEventListener("click", (e) => {
   document.querySelectorAll("[data-chart-range]").forEach((b) => b.classList.toggle("is-active", b === btn));
   if (latestData) {
     const summary = latestData.nginx?.todayEvents || {};
-    renderCustomerAnalytics(summary, latestData.history?.daily || [], customerChartRange);
+    const retainedSummary = latestData.nginx?.retainedEvents?.available ? latestData.nginx.retainedEvents : summary;
+    renderCustomerAnalytics(summary, latestData.history?.daily || [], customerChartRange, retainedSummary);
   }
 });
 

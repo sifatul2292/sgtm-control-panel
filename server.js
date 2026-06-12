@@ -2289,6 +2289,7 @@ async function readDatabase() {
     settings: {},
     daily: {},
     tenantDailyRequests: {},
+    tenantEventHistory: {},
     provisioning: { requests: [] },
     workerNodes: [],
     orders: [],
@@ -2310,6 +2311,7 @@ async function readDatabase() {
         settings: parsed.settings || {},
         daily: parsed.daily || {},
         tenantDailyRequests: parsed.tenantDailyRequests || {},
+        tenantEventHistory: parsed.tenantEventHistory || {},
         provisioning: parsed.provisioning || { requests: [] },
         workerNodes: parsed.workerNodes || [],
         orders: parsed.orders || [],
@@ -2351,6 +2353,138 @@ function pruneDailyHistory(daily) {
 
 function topRows(rows, limit = 12) {
   return (rows || []).slice(0, limit).map((item) => ({ ...item }));
+}
+
+function historySnapshotFromSummary(summary, date = localDateKey()) {
+  return {
+    date,
+    token: summary.token,
+    updatedAt: new Date().toISOString(),
+    total: Number(summary.count || 0),
+    errors: Number(summary.errors || 0),
+    totalLines: Number(summary.totalLines || 0),
+    noise: Number(summary.noise || 0),
+    botNoise: Number(summary.botNoise || 0),
+    events: topRows(summary.events),
+    clients: topRows(summary.clients),
+    hosts: topRows(summary.hosts),
+    noiseReasons: topRows(summary.noiseReasons),
+    hourly: summary.hourly || [],
+    purchaseSummary: summary.purchases || {
+      rawCount: 0,
+      uniqueCount: 0,
+      duplicateCount: 0,
+      keyedCount: 0,
+      estimatedKeyCount: 0,
+      missingKeyCount: 0,
+      uniqueRevenue: 0,
+      rawRevenue: 0,
+      averageOrderValue: 0,
+      currency: ""
+    },
+    recentEvents: (summary.recentEvents || []).slice(0, config.eventLogLimit)
+  };
+}
+
+function storeTenantEventSnapshot(data, tenantId, summary, date = localDateKey()) {
+  if (!tenantId || !summary?.available) return;
+  if (!data.tenantEventHistory) data.tenantEventHistory = {};
+  if (!data.tenantEventHistory[tenantId]) data.tenantEventHistory[tenantId] = {};
+  data.tenantEventHistory[tenantId][date] = historySnapshotFromSummary(summary, date);
+}
+
+function pruneTenantEventHistory(history, days = 30) {
+  const cutoffDate = localDateKey(addDays(new Date(), -(days - 1)));
+  for (const tenantId of Object.keys(history || {})) {
+    for (const dateKey of Object.keys(history[tenantId] || {})) {
+      if (dateKey < cutoffDate) delete history[tenantId][dateKey];
+    }
+    if (!Object.keys(history[tenantId] || {}).length) delete history[tenantId];
+  }
+}
+
+function mergeHistoryRows(snapshots, key) {
+  const rows = new Map();
+  for (const snapshot of snapshots) {
+    for (const row of snapshot[key] || []) {
+      const name = row.name || "Other";
+      const current = rows.get(name) || { name, lastSeen: null };
+      for (const [field, value] of Object.entries(row)) {
+        if (field === "name" || field === "lastSeen") continue;
+        if (typeof value === "number") current[field] = Number(current[field] || 0) + value;
+        else if (current[field] === undefined) current[field] = value;
+      }
+      if (row.lastSeen && (!current.lastSeen || new Date(row.lastSeen) > new Date(current.lastSeen))) {
+        current.lastSeen = row.lastSeen;
+      }
+      rows.set(name, current);
+    }
+  }
+  return [...rows.values()].sort((a, b) => Number(b.count || 0) - Number(a.count || 0));
+}
+
+function mergeHistoryHourly(snapshots) {
+  const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0, pageView: 0, viewItem: 0, addToCart: 0, beginCheckout: 0 }));
+  for (const snapshot of snapshots) {
+    for (const row of snapshot.hourly || []) {
+      const bucket = hourly[Number(row.hour)];
+      if (!bucket) continue;
+      for (const key of Object.keys(bucket)) {
+        if (key !== "hour") bucket[key] += Number(row[key] || 0);
+      }
+    }
+  }
+  return hourly;
+}
+
+function mergeHistoryPurchases(snapshots) {
+  const rows = snapshots.map((snapshot) => snapshot.purchaseSummary || {});
+  const uniqueCount = rows.reduce((total, row) => total + Number(row.uniqueCount || 0), 0);
+  const uniqueRevenue = rows.reduce((total, row) => total + Number(row.uniqueRevenue || 0), 0);
+  const currencies = new Set(rows.map((row) => row.currency).filter(Boolean));
+  return {
+    rawCount: rows.reduce((total, row) => total + Number(row.rawCount || 0), 0),
+    uniqueCount,
+    duplicateCount: rows.reduce((total, row) => total + Number(row.duplicateCount || 0), 0),
+    keyedCount: rows.reduce((total, row) => total + Number(row.keyedCount || 0), 0),
+    estimatedKeyCount: rows.reduce((total, row) => total + Number(row.estimatedKeyCount || 0), 0),
+    missingKeyCount: rows.reduce((total, row) => total + Number(row.missingKeyCount || 0), 0),
+    uniqueRevenue,
+    rawRevenue: rows.reduce((total, row) => total + Number(row.rawRevenue || 0), 0),
+    averageOrderValue: uniqueCount ? uniqueRevenue / uniqueCount : 0,
+    currency: currencies.size === 1 ? [...currencies][0] : ""
+  };
+}
+
+function retainedSummaryFromSnapshots(snapshots, fallbackSummary = null) {
+  const rows = (snapshots || [])
+    .filter(Boolean)
+    .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+  if (!rows.length) return fallbackSummary || emptyCustomerRequestSummary();
+  const recentEvents = rows
+    .flatMap((snapshot) => snapshot.recentEvents || [])
+    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+    .slice(0, config.eventLogLimit);
+  return {
+    ...(fallbackSummary || {}),
+    available: true,
+    count: rows.reduce((total, row) => total + Number(row.total || 0), 0),
+    errors: rows.reduce((total, row) => total + Number(row.errors || 0), 0),
+    totalLines: rows.reduce((total, row) => total + Number(row.totalLines || 0), 0),
+    noise: rows.reduce((total, row) => total + Number(row.noise || 0), 0),
+    botNoise: rows.reduce((total, row) => total + Number(row.botNoise || 0), 0),
+    token: `last ${rows.length} day${rows.length === 1 ? "" : "s"}`,
+    retentionDays: 30,
+    dateRange: { start: rows[0].date, end: rows.at(-1).date },
+    events: mergeHistoryRows(rows, "events"),
+    clients: mergeHistoryRows(rows, "clients"),
+    hosts: mergeHistoryRows(rows, "hosts"),
+    noiseReasons: mergeHistoryRows(rows, "noiseReasons"),
+    purchases: mergeHistoryPurchases(rows),
+    hourly: mergeHistoryHourly(rows),
+    recentEvents,
+    eventLogLimit: config.eventLogLimit
+  };
 }
 
 function firstValue(source, keys) {
@@ -4286,35 +4420,8 @@ async function persistDailySummary(summary) {
 
   const data = loaded.data;
   const today = localDateKey();
-  const purchases = (summary.recentEvents || []).filter((item) => item.eventName === "Purchase").slice(0, 50);
-  data.daily[today] = {
-    date: today,
-    token: summary.token,
-    updatedAt: new Date().toISOString(),
-    total: summary.count,
-    errors: summary.errors,
-    totalLines: summary.totalLines,
-    noise: summary.noise,
-    botNoise: summary.botNoise,
-    events: topRows(summary.events),
-    clients: topRows(summary.clients),
-    hosts: topRows(summary.hosts),
-    noiseReasons: topRows(summary.noiseReasons),
-    hourly: summary.hourly || [],
-    purchaseSummary: summary.purchases || {
-      rawCount: 0,
-      uniqueCount: 0,
-      duplicateCount: 0,
-      keyedCount: 0,
-      estimatedKeyCount: 0,
-      missingKeyCount: 0,
-      uniqueRevenue: 0,
-      rawRevenue: 0,
-      averageOrderValue: 0,
-      currency: ""
-    },
-    purchases
-  };
+  data.daily[today] = historySnapshotFromSummary(summary, today);
+  data.daily[today].purchases = (summary.recentEvents || []).filter((item) => item.eventName === "Purchase").slice(0, 50);
   pruneDailyHistory(data.daily);
 
   // Persist per-tenant daily request counts so billing-period totals survive log rotation.
@@ -4326,20 +4433,28 @@ async function persistDailySummary(summary) {
   //  2. Dedicated per-container logs — covers tenants with their own sgtm-access.log.
   //     These tenants never appear in summary.hosts so source-1 always stored 0 for them,
   //     causing requestsMonth to reset to today-only after every nightly log rotation.
-  const allTenants = [...(data.owner?.customers || []), ...(data.customers?.tenants || [])];
+  const allTenants = [...(data.tenants || []), ...(data.owner?.customers || []), ...(data.customers?.tenants || [])];
   if (!data.tenantDailyRequests) data.tenantDailyRequests = {};
+  if (!data.tenantEventHistory) data.tenantEventHistory = {};
 
   // Source 1: shared log host counts (multi-tenant setups where one log covers all)
   if (allTenants.length && Array.isArray(summary.hosts) && summary.hosts.length) {
+    const summaryHasHostInfo = (summary.recentEvents || []).some((event) => {
+      const host = normalizeHost(event.host);
+      return host && host !== "unknown host";
+    });
     for (const tenant of allTenants) {
       if (!tenant?.id) continue;
-      const tenantHostCount = summary.hosts
-        .filter((h) => hostMatchesTenant(h.key, tenant))
-        .reduce((s, h) => s + Number(h.count || 0), 0);
+      const tenantHostCount = summaryHasHostInfo
+        ? summary.hosts
+          .filter((h) => hostMatchesTenant(h.key || h.name, tenant))
+          .reduce((s, h) => s + Number(h.count || 0), 0)
+        : Number(summary.count || 0);
       if (!data.tenantDailyRequests[tenant.id]) data.tenantDailyRequests[tenant.id] = {};
       if (tenantHostCount > 0) {
         // Only overwrite if the shared log actually has data for this tenant
         data.tenantDailyRequests[tenant.id][today] = tenantHostCount;
+        storeTenantEventSnapshot(data, tenant.id, filterRequestSummaryForTenant(summary, tenant), today);
       }
     }
   }
@@ -4362,6 +4477,7 @@ async function persistDailySummary(summary) {
         // Take the max: dedicated log count wins over the shared-log count (which would be 0)
         const existing = Number(data.tenantDailyRequests[tenant.id][today] || 0);
         data.tenantDailyRequests[tenant.id][today] = Math.max(existing, liveCount);
+        storeTenantEventSnapshot(data, tenant.id, todaySummary, today);
       }
     }));
   }
@@ -4375,6 +4491,7 @@ async function persistDailySummary(summary) {
       }
     }
   }
+  pruneTenantEventHistory(data.tenantEventHistory, 30);
 
   try {
     await writeDatabase(data);
@@ -4383,6 +4500,7 @@ async function persistDailySummary(summary) {
       path: databasePath,
       retentionDays: config.historyRetentionDays,
       tenantDailyRequests: data.tenantDailyRequests || {},
+      tenantEventHistory: data.tenantEventHistory || {},
       daily: Object.values(data.daily).sort((a, b) => b.date.localeCompare(a.date))
     };
   } catch (error) {
@@ -4392,6 +4510,7 @@ async function persistDailySummary(summary) {
       message: "Summary database could not be written.",
       detail: error.message,
       tenantDailyRequests: data.tenantDailyRequests || {},
+      tenantEventHistory: data.tenantEventHistory || {},
       daily: Object.values(data.daily).sort((a, b) => b.date.localeCompare(a.date))
     };
   }
@@ -5029,6 +5148,7 @@ async function getDashboardData() {
   const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers, tenantUsage });
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
+  const retainedEvents = retainedSummaryFromSnapshots((history.daily || []).slice(0, 30), requestSummary);
   void sendAlertHooks(alerts);
 
   return {
@@ -5038,6 +5158,7 @@ async function getDashboardData() {
     nginx: {
       requestCountToday: requestSummary,
       todayEvents: requestSummary,
+      retainedEvents,
       accessLog,
       errorLog
     },
@@ -5170,6 +5291,7 @@ async function getCustomerDashboardData(session) {
     nginx: {
       requestCountToday: requestSummary,
       todayEvents: requestSummary,
+      retainedEvents: requestSummary,
       accessLog: unavailable("Container access log is loaded after a live container is found."),
       errorLog: unavailable("Nginx error logs are owner-only.")
     },
@@ -5181,7 +5303,7 @@ async function getCustomerDashboardData(session) {
       message: loaded.detail || loaded.message || "Could not read customer records."
     }],
     deploymentChecks: [],
-    history: { available: loaded.available, daily: [], tenantDailyRequests: raw.tenantDailyRequests || {} },
+    history: { available: loaded.available, daily: [], tenantDailyRequests: raw.tenantDailyRequests || {}, tenantEventHistory: raw.tenantEventHistory || {} },
     orders,
     customers,
     customerAccounts: { available: true, path: "", accounts: [] },
@@ -5317,6 +5439,16 @@ async function customerDashboardData(data, session) {
   const tenantRequestSummary = filterRequestSummaryForTenant(rawTodaySummary, tenant);
   const tenantPeriodSummary = rawPeriodSummary;
   const requestLimit = tenant?.requestLimit || data.usage.requestLimit;
+  const todayKey = localDateKey();
+  const tenantEventHistory = (data.history?.tenantEventHistory || data.tenantEventHistory || {})[session.tenantId] || {};
+  const eventHistoryCutoff = localDateKey(addDays(new Date(), -29));
+  const retainedSnapshotsByDate = Object.fromEntries(
+    Object.entries(tenantEventHistory).filter(([dateKey]) => dateKey >= eventHistoryCutoff)
+  );
+  if (tenantRequestSummary.available) {
+    retainedSnapshotsByDate[todayKey] = historySnapshotFromSummary(tenantRequestSummary, todayKey);
+  }
+  const retainedEventsSummary = retainedSummaryFromSnapshots(Object.values(retainedSnapshotsByDate), tenantRequestSummary);
 
   // Compute billing-period event count that survives nightly log rotation.
   // Strategy: sum stored per-tenant daily counts for past days (from persistDailySummary)
@@ -5329,7 +5461,6 @@ async function customerDashboardData(data, session) {
     .slice(0, 30)
     .map(([date, count]) => ({ date, total: Number(count) }));
   const billingStartKey = localDateKey(billingPeriod.start);
-  const todayKey = localDateKey();
   const historicCount = Object.entries(tenantDailyReqs)
     .filter(([d]) => d >= billingStartKey && d < todayKey)
     .reduce((sum, [, c]) => sum + Number(c), 0);
@@ -5399,10 +5530,11 @@ async function customerDashboardData(data, session) {
       ...data.nginx,
       requestCountToday: tenantRequestSummary,
       todayEvents: tenantRequestSummary,
+      retainedEvents: retainedEventsSummary,
       accessLog: tenantAccessLog,
       errorLog: unavailable("Nginx error logs are owner-only.")
     },
-    history: { available: data.history.available, daily: tenantDailyHistory },
+    history: { available: data.history.available, daily: tenantDailyHistory, tenantEventHistory: data.history?.tenantEventHistory || data.tenantEventHistory || {} },
     orders: tenantOrders,
     usage: tenantUsage,
     reconciliation: tenantReconciliation,
