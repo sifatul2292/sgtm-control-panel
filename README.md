@@ -77,6 +77,17 @@ curl -X POST https://sgtm.example.com/api/orders/webhook \
 
 The Business Snapshot uses webhook orders first, then falls back to SGTM purchase-log estimates.
 
+### WooCommerce / WordPress (no plugin)
+
+WooCommerce stores can use the native webhook system instead of custom code. In the WordPress admin:
+
+1. Go to WooCommerce → Settings → Advanced → Webhooks → Add webhook.
+2. Topic: `Order created`. API Version: `WP REST API Integration v3`.
+3. Delivery URL: `https://sgtm.example.com/api/orders/woocommerce` (append `?tenant=<tenant-id>` for multi-tenant panels).
+4. Secret: the panel's `ORDER_WEBHOOK_SECRET`.
+
+The panel verifies the `x-wc-webhook-signature` HMAC header against the raw body and maps `id` → `order_id`, `total`, `currency`, and `date_created_gmt` → `created_at` automatically. The activation ping WooCommerce sends when the webhook is saved is acknowledged with `200`.
+
 ## Productization Settings
 
 To operate this as a customer-facing service, set tenant and billing metadata:

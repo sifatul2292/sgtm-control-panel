@@ -1071,6 +1071,24 @@ h2 {
   border-radius: 0;
   border: none;
 }
+.woo-webhook-steps {
+  margin: var(--space-sm) 0;
+  padding: 0 var(--space-md) 0 calc(var(--space-md) + 1.2em);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text);
+}
+.woo-webhook-note {
+  margin: var(--space-sm) 0;
+  padding: 0 var(--space-md) var(--space-sm);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+[data-woo-webhook-url] {
+  color: var(--color-primary);
+  font-weight: 700;
+}
 
 /* Checklist */
 .instructions-checklist {

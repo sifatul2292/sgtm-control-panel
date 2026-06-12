@@ -2567,6 +2567,35 @@ function isOrderWebhookAuthorized(req) {
   return safeEqual(String(secret || ""), config.orderWebhookSecret);
 }
 
+function isWooOrderWebhookAuthorized(req, rawBody) {
+  if (!config.orderWebhookSecret) return false;
+  const signature = String(req.headers["x-wc-webhook-signature"] || "");
+  if (!signature) return false;
+  const expected = createHmac("sha256", config.orderWebhookSecret).update(rawBody).digest("base64");
+  return safeEqual(signature, expected);
+}
+
+// WooCommerce sends date_created_gmt as "2026-06-12T08:00:00" with no timezone
+// marker, so it must be pinned to UTC before Date parses it as local time.
+function wooGmtDate(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return /(Z|[+-]\d{2}:?\d{2})$/.test(text) ? text : `${text}Z`;
+}
+
+function normalizeWooOrderPayload(body, tenantId) {
+  return {
+    order_id: String(body.id ?? body.order_id ?? "").trim(),
+    total: body.total,
+    currency: body.currency,
+    created_at: wooGmtDate(body.date_created_gmt || body.date_created),
+    tenant_id: tenantId || config.tenantId,
+    order_type: sanitizeId(body.created_via || "") || "store",
+    status: body.status,
+    source: "woocommerce"
+  };
+}
+
 async function addOrderWebhook(body) {
   const loaded = await readDatabase();
   if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
@@ -3837,9 +3866,9 @@ function getIntegrationSummary({ orders, requestSummary }) {
       fields: ["order_id", "total_price", "currency", "created_at", "order_type"]
     },
     woocommerce: {
-      status: "planned",
-      endpoint: "/api/orders/webhook",
-      fields: ["id", "total", "currency", "date_created_gmt", "order_type"]
+      status: config.orderWebhookSecret ? "ready" : "missing",
+      endpoint: "/api/orders/woocommerce",
+      fields: ["id", "total", "currency", "date_created_gmt", "created_via", "status"]
     },
     metaCapi: {
       status: purchaseRows.length ? "detected" : "waiting",
@@ -5985,6 +6014,45 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await addOrderWebhook(body);
+      jsonResponse(res, result.ok ? 202 : 400, result.ok ? { order: result.order, created: result.created } : { errors: result.errors });
+      return;
+    }
+
+    // Native WooCommerce webhook target. WooCommerce cannot send custom headers;
+    // it signs the raw body with HMAC-SHA256 (base64) in x-wc-webhook-signature
+    // using the webhook Secret field, so this verifies against the raw bytes and
+    // must stay above the session auth gate below.
+    if (pathname === "/api/orders/woocommerce" && req.method === "POST") {
+      if (!config.orderWebhookSecret) {
+        jsonResponse(res, 503, { error: "ORDER_WEBHOOK_SECRET is not configured on the panel." });
+        return;
+      }
+      let rawBody;
+      try {
+        rawBody = await readRawBody(req);
+      } catch (error) {
+        jsonResponse(res, 413, { error: error.message });
+        return;
+      }
+      if (!isWooOrderWebhookAuthorized(req, rawBody)) {
+        jsonResponse(res, 401, { error: "Invalid WooCommerce webhook signature." });
+        return;
+      }
+      const rawText = rawBody.toString("utf8");
+      // WooCommerce verifies a new webhook with a form-encoded ping (webhook_id=N).
+      if (/^webhook_id=\d+/.test(rawText.trim())) {
+        jsonResponse(res, 200, { ping: true });
+        return;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(rawText);
+      } catch {
+        jsonResponse(res, 400, { error: "Invalid JSON payload." });
+        return;
+      }
+      const tenantId = sanitizeId(reqUrl.searchParams.get("tenant") || "");
+      const result = await addOrderWebhook(normalizeWooOrderPayload(payload, tenantId));
       jsonResponse(res, result.ok ? 202 : 400, result.ok ? { order: result.order, created: result.created } : { errors: result.errors });
       return;
     }

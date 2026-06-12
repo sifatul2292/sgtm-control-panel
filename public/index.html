@@ -1323,6 +1323,28 @@ window.dataLayer.push({
 
                 <div class="event-group">
                   <div class="event-group-header">
+                    <span class="event-label">Step 1 — order sync (no plugin)</span>
+                    <span class="event-trigger">WooCommerce native webhook — built into every WordPress store, nothing to install</span>
+                  </div>
+                  <ol class="woo-webhook-steps">
+                    <li>In your WordPress admin, go to <strong>WooCommerce → Settings → Advanced → Webhooks</strong> and click <strong>Add webhook</strong>.</li>
+                    <li>Fill the form exactly like this:</li>
+                  </ol>
+<pre class="instructions-code"><code>Name:          Tagioo order sync
+Status:        Active
+Topic:         Order created
+Delivery URL:  <span data-woo-webhook-url>https://your-panel-domain/api/orders/woocommerce</span>
+Secret:        your Tagioo webhook secret
+API Version:   WP REST API Integration v3</code></pre>
+                  <ol class="woo-webhook-steps" start="3">
+                    <li>Click <strong>Save webhook</strong>. WooCommerce sends a test ping — the status should stay <strong>Active</strong>.</li>
+                    <li>Place a test order. It appears in your Tagioo dashboard within seconds and is matched against tracked purchases automatically.</li>
+                  </ol>
+                  <p class="woo-webhook-note">Your webhook secret is provided during onboarding. Tagioo verifies every delivery with the <code>x-wc-webhook-signature</code> header, so no plugin, code snippet, or API key is needed on your site. Order ID, total, currency, and date are mapped automatically.</p>
+                </div>
+
+                <div class="event-group">
+                  <div class="event-group-header">
                     <span class="event-label">page_view</span>
                     <span class="event-trigger">wp_footer hook — fires on every page for logged-in users</span>
                   </div>

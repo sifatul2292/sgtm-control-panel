@@ -2631,6 +2631,12 @@ function renderSetupAssistant(data) {
   if (trackingDomainInput && !trackingDomainInput.value && latest?.trackingDomain) {
     trackingDomainInput.value = `https://${latest.trackingDomain}`;
   }
+  const wooUrlEl = document.querySelector("[data-woo-webhook-url]");
+  if (wooUrlEl) {
+    const base = (data.config?.publicBaseUrl || window.location.origin).replace(/\/$/, "");
+    const tenantId = data.session?.tenantId || currentSession.tenantId || "";
+    wooUrlEl.textContent = `${base}/api/orders/woocommerce${tenantId ? `?tenant=${tenantId}` : ""}`;
+  }
   updateSetupAssistantStep();
 }
 
@@ -3886,8 +3892,8 @@ function renderIntegrations(data) {
       body: `order_id: order.name or order.id\ntotal: total_price\ncurrency: currency\ncreated_at: created_at\norder_type: shopify`
     },
     {
-      title: "WooCommerce mapping",
-      body: `order_id: id or number\ntotal: total\ncurrency: currency\ncreated_at: date_created_gmt\norder_type: woocommerce`
+      title: "WooCommerce / WordPress (no plugin)",
+      body: `WooCommerce → Settings → Advanced → Webhooks → Add webhook\nTopic: Order created\nDelivery URL: https://<panel-domain>/api/orders/woocommerce\nSecret: <ORDER_WEBHOOK_SECRET>\n\nThe panel verifies x-wc-webhook-signature and maps id, total, currency, date_created_gmt automatically.`
     }
   ];
   renderDocsGrid(els.integrationExamples, examples);
