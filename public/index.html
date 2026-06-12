@@ -1334,13 +1334,18 @@ window.dataLayer.push({
 Status:        Active
 Topic:         Order created
 Delivery URL:  <span data-woo-webhook-url>https://your-panel-domain/api/orders/woocommerce</span>
-Secret:        your Tagioo webhook secret
+Secret:        <span data-woo-webhook-secret>click “Generate secret” below</span>
 API Version:   WP REST API Integration v3</code></pre>
+                  <div class="woo-webhook-actions">
+                    <button id="generateWooSecret" class="button" type="button">Generate secret</button>
+                    <button id="copyWooSecret" class="button" type="button" hidden>Copy secret</button>
+                    <span id="wooSecretMessage" class="form-message"></span>
+                  </div>
                   <ol class="woo-webhook-steps" start="3">
                     <li>Click <strong>Save webhook</strong>. WooCommerce sends a test ping — the status should stay <strong>Active</strong>.</li>
                     <li>Place a test order. It appears in your Tagioo dashboard within seconds and is matched against tracked purchases automatically.</li>
                   </ol>
-                  <p class="woo-webhook-note">Your webhook secret is provided during onboarding. Tagioo verifies every delivery with the <code>x-wc-webhook-signature</code> header, so no plugin, code snippet, or API key is needed on your site. Order ID, total, currency, and date are mapped automatically.</p>
+                  <p class="woo-webhook-note">Generating a new secret replaces the old one, so update the WooCommerce webhook if you regenerate. Tagioo verifies every delivery with the <code>x-wc-webhook-signature</code> header, so no plugin, code snippet, or API key is needed on your site. Order ID, total, currency, and date are mapped automatically.</p>
                 </div>
 
                 <div class="event-group">

@@ -1085,9 +1085,21 @@ h2 {
   color: var(--color-text-muted);
   line-height: 1.6;
 }
-[data-woo-webhook-url] {
+[data-woo-webhook-url],
+[data-woo-webhook-secret] {
   color: var(--color-primary);
   font-weight: 700;
+}
+.woo-webhook-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  padding: var(--space-sm) var(--space-md) 0;
+}
+.woo-webhook-actions .button {
+  flex: 0 0 auto;
+  width: auto;
 }
 
 /* Checklist */

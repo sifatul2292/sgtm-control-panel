@@ -2567,11 +2567,11 @@ function isOrderWebhookAuthorized(req) {
   return safeEqual(String(secret || ""), config.orderWebhookSecret);
 }
 
-function isWooOrderWebhookAuthorized(req, rawBody) {
-  if (!config.orderWebhookSecret) return false;
+function isWooOrderWebhookAuthorized(req, rawBody, secret) {
+  if (!secret) return false;
   const signature = String(req.headers["x-wc-webhook-signature"] || "");
   if (!signature) return false;
-  const expected = createHmac("sha256", config.orderWebhookSecret).update(rawBody).digest("base64");
+  const expected = createHmac("sha256", secret).update(rawBody).digest("base64");
   return safeEqual(signature, expected);
 }
 
@@ -2986,6 +2986,32 @@ async function selectCustomerPlan(input, session) {
 
   await writeDatabase(data);
   return { ok: true, tenant: data.tenants[tenantIndex] };
+}
+
+async function rotateCustomerWebhookSecret(session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  const loaded = await readDatabase();
+  if (!loaded.available) {
+    return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  }
+  const data = loaded.data;
+  data.tenants ||= [];
+  const tenantIndex = data.tenants.findIndex((tenant) => tenant.id === session.tenantId);
+  if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+
+  const webhookSecret = randomBytes(24).toString("hex");
+  data.tenants[tenantIndex] = {
+    ...data.tenants[tenantIndex],
+    webhookSecret,
+    webhookSecretUpdatedAt: new Date().toISOString()
+  };
+  await writeDatabase(data);
+  return { ok: true, webhookSecret };
+}
+
+function tenantWebhookSecret(data, tenantId) {
+  if (!tenantId) return "";
+  return (data.tenants || []).find((tenant) => tenant.id === tenantId)?.webhookSecret || "";
 }
 
 async function markCustomerAccountLogin(id) {
@@ -5405,7 +5431,8 @@ async function getCustomerDashboardData(session) {
     provisioning,
     workers: { available: true, nodes: [], metrics: {} },
     ssl: unavailable("SSL is checked by the owner dashboard."),
-    config: publicRuntimeConfig()
+    config: publicRuntimeConfig(),
+    webhookSecret: tenantWebhookSecret(raw, session.tenantId)
   };
 
   return customerDashboardData(data, session);
@@ -6023,8 +6050,14 @@ const server = createServer(async (req, res) => {
     // using the webhook Secret field, so this verifies against the raw bytes and
     // must stay above the session auth gate below.
     if (pathname === "/api/orders/woocommerce" && req.method === "POST") {
-      if (!config.orderWebhookSecret) {
-        jsonResponse(res, 503, { error: "ORDER_WEBHOOK_SECRET is not configured on the panel." });
+      const tenantParam = sanitizeId(reqUrl.searchParams.get("tenant") || "");
+      // Per-tenant secret (generated from the customer dashboard) wins; the
+      // global ORDER_WEBHOOK_SECRET stays as fallback for single-tenant setups.
+      const loadedForSecret = await readDatabase();
+      const perTenantSecret = loadedForSecret.available ? tenantWebhookSecret(loadedForSecret.data, tenantParam) : "";
+      const webhookSecret = perTenantSecret || config.orderWebhookSecret;
+      if (!webhookSecret) {
+        jsonResponse(res, 503, { error: "No webhook secret is configured. Generate one from the Setup Assistant." });
         return;
       }
       let rawBody;
@@ -6034,7 +6067,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 413, { error: error.message });
         return;
       }
-      if (!isWooOrderWebhookAuthorized(req, rawBody)) {
+      if (!isWooOrderWebhookAuthorized(req, rawBody, webhookSecret)) {
         jsonResponse(res, 401, { error: "Invalid WooCommerce webhook signature." });
         return;
       }
@@ -6051,8 +6084,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 400, { error: "Invalid JSON payload." });
         return;
       }
-      const tenantId = sanitizeId(reqUrl.searchParams.get("tenant") || "");
-      const result = await addOrderWebhook(normalizeWooOrderPayload(payload, tenantId));
+      const result = await addOrderWebhook(normalizeWooOrderPayload(payload, tenantParam));
       jsonResponse(res, result.ok ? 202 : 400, result.ok ? { order: result.order, created: result.created } : { errors: result.errors });
       return;
     }
@@ -6149,6 +6181,17 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await addCustomerSetupRequest(body, session);
       jsonResponse(res, result.ok ? 201 : 400, result.ok ? { request: result.request } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/webhook-secret" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const result = await rotateCustomerWebhookSecret(session);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { webhookSecret: result.webhookSecret } : { errors: result.errors });
       return;
     }
 

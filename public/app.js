@@ -2637,7 +2637,19 @@ function renderSetupAssistant(data) {
     const tenantId = data.session?.tenantId || currentSession.tenantId || "";
     wooUrlEl.textContent = `${base}/api/orders/woocommerce${tenantId ? `?tenant=${tenantId}` : ""}`;
   }
+  setWooWebhookSecret(data.webhookSecret || "");
   updateSetupAssistantStep();
+}
+
+function setWooWebhookSecret(secret) {
+  const secretEl = document.querySelector("[data-woo-webhook-secret]");
+  const copyButton = document.querySelector("#copyWooSecret");
+  const generateButton = document.querySelector("#generateWooSecret");
+  if (!secretEl) return;
+  secretEl.dataset.secret = secret || "";
+  secretEl.textContent = secret || "click “Generate secret” below";
+  if (copyButton) copyButton.hidden = !secret;
+  if (generateButton) generateButton.textContent = secret ? "Regenerate secret" : "Generate secret";
 }
 
 function updateSetupAssistantStep() {
@@ -4314,6 +4326,38 @@ els.assistantNext?.addEventListener("click", async () => {
 });
 els.downloadWebTemplate?.addEventListener("click", () => downloadGeneratedTemplate("web"));
 els.downloadServerTemplate?.addEventListener("click", () => downloadGeneratedTemplate("server"));
+
+document.querySelector("#generateWooSecret")?.addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  const message = document.querySelector("#wooSecretMessage");
+  const hasSecret = Boolean(document.querySelector("[data-woo-webhook-secret]")?.dataset.secret);
+  if (hasSecret && !window.confirm("Generating a new secret invalidates the current one. WooCommerce webhooks using the old secret will stop working until updated. Continue?")) return;
+  button.disabled = true;
+  if (message) message.textContent = "Generating...";
+  try {
+    const response = await fetch("/api/customer/webhook-secret", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Could not generate secret."]).join(" "));
+    setWooWebhookSecret(result.webhookSecret);
+    if (message) message.textContent = "Secret generated. Paste it into the WooCommerce webhook form.";
+  } catch (error) {
+    if (message) message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.querySelector("#copyWooSecret")?.addEventListener("click", async () => {
+  const secret = document.querySelector("[data-woo-webhook-secret]")?.dataset.secret;
+  const message = document.querySelector("#wooSecretMessage");
+  if (!secret) return;
+  try {
+    await navigator.clipboard.writeText(secret);
+    if (message) message.textContent = "Secret copied to clipboard.";
+  } catch {
+    if (message) message.textContent = "Copy failed — select the secret text manually.";
+  }
+});
 
 document.addEventListener("click", (e) => {
   const tab = e.target.closest(".instructions-tab");
