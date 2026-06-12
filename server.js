@@ -976,7 +976,15 @@ function buildWebGtmTemplate(input) {
     gtmDataLayerVariable(19, "dlv - user_data.city", "user_data.city"),
     gtmDataLayerVariable(20, "dlv - user_data.country", "user_data.country"),
     gtmDataLayerVariable(21, "dlv - user_data.postal_code", "user_data.postal_code"),
-    gtmDataLayerVariable(22, "dlv - user_data.region", "user_data.region")
+    gtmDataLayerVariable(22, "dlv - user_data.region", "user_data.region"),
+    {
+      accountId: "0", containerId: "0", variableId: "30",
+      name: "Tagioo - ga4 event settings", type: "gtes",
+      parameter: [gtmListParam("eventSettingsTable", [
+        { parameter: "server_container_url", parameterValue: "{{Tagioo - server_container_url}}" }
+      ])],
+      fingerprint: String(Date.now()), parentFolderId: "3"
+    }
   ];
   const triggers = [
     { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - DOM Ready PageView", type: "DOM_READY", fingerprint: String(Date.now()) },
@@ -1004,7 +1012,6 @@ function buildWebGtmTemplate(input) {
     ];
     for (const [eventName, triggerId] of eventMap) {
       const eventSettingsRows = [
-        { parameter: "server_container_url", parameterValue: "{{Tagioo - server_container_url}}" },
         { parameter: "event_id", parameterValue: "{{dlv - event_id}}" },
         { parameter: "user_data.email_address", parameterValue: "{{dlv - user_data.email_address}}" },
         { parameter: "user_data.phone_number", parameterValue: "{{dlv - user_data.phone_number}}" },
@@ -1045,6 +1052,7 @@ function buildWebGtmTemplate(input) {
         gtmBooleanParam("enhancedUserId", false),
         gtmTemplateParam("eventName", eventName),
         gtmTemplateParam("measurementIdOverride", "{{Tagioo - ga4_measurement_id}}"),
+        gtmTemplateParam("eventSettingsVariable", "{{Tagioo - ga4 event settings}}"),
         gtmListParam("eventSettingsTable", eventSettingsRows)
       ], [triggerId], "3");
       if (isFiringOnce) tagObj.tagFiringOption = "ONCE_PER_LOAD";
