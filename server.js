@@ -646,6 +646,7 @@ const getTimestampMillis = require('getTimestampMillis');
 const getType = require('getType');
 const JSON = require('JSON');
 const logToConsole = require('logToConsole');
+const Math = require('Math');
 const makeString = require('makeString');
 const sendHttpRequest = require('sendHttpRequest');
 const sha256Sync = require('sha256Sync');
