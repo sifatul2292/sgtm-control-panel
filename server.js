@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
@@ -28,6 +28,11 @@ const config = {
   eventLogLimit: Number(process.env.EVENT_LOG_LIMIT || 500),
   dataDir: configuredDataDir,
   historyRetentionDays: Number(process.env.HISTORY_RETENTION_DAYS || 90),
+  // SQLite event store: raw event lines kept 35 days (30-day dashboard window + buffer)
+  eventRetentionDays: Number(process.env.EVENT_RETENTION_DAYS || 35),
+  ingestIntervalMs: Number(process.env.INGEST_INTERVAL_MS || 60000),
+  ingestMaxBytesPerTick: Number(process.env.INGEST_MAX_BYTES_PER_TICK || 5 * 1024 * 1024),
+  workerIngestSecret: process.env.WORKER_INGEST_SECRET || "",
   provisionPortStart: Number(process.env.PROVISION_PORT_START || 8200),
   provisionPortEnd: Number(process.env.PROVISION_PORT_END || 8999),
   provisionDnsTarget: process.env.PROVISION_DNS_TARGET || "",
@@ -99,6 +104,18 @@ const alertMemory = new Map();
 const summaryCache = new Map();
 const resetTokens = new Map();
 const databasePath = join(config.dataDir, "history.json");
+
+// SQLite event store (data/events.db). Optional: if the native module fails to load
+// the panel keeps working on the log-tail + history.json path, so a bad build can
+// never take the dashboard down.
+let eventStore = null;
+try {
+  const { openEventStore } = await import("./db.js");
+  eventStore = openEventStore(config.dataDir);
+  console.log(`[events] SQLite event store ready: ${join(config.dataDir, "events.db")}`);
+} catch (error) {
+  console.error(`[events] SQLite event store unavailable (${error.message}); using log tail + history.json only`);
+}
 const powerUpMapsPath = join(config.nginxConfdDir, "tagioo-powerups-maps.conf");
 let powerUpsActive = false;
 
@@ -389,6 +406,24 @@ function readForm(req) {
       }
     });
     req.on("end", () => resolve(new URLSearchParams(body)));
+    req.on("error", reject);
+  });
+}
+
+function readRawBody(req, maxBytes = 4 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        reject(new Error("Body too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
 }
@@ -4576,6 +4611,14 @@ async function summarizeRequestsTodayUncached(pathname, lineLimit = config.summa
     };
   }
 
+  return aggregateTrackingLines(splitLines(tail.stdout), { token, path: pathname, lineLimit });
+}
+
+// Shared aggregation over raw access-log lines. Used by both the live tail path and
+// the SQLite event store, so dashboard numbers are identical regardless of source.
+// `token` (nginx date token like "12/Jun/2026") filters lines to a single day; pass
+// an empty token when the lines are already scoped to one day.
+function aggregateTrackingLines(lines, { token = "", path: pathname = "", lineLimit = config.summaryTailLines } = {}) {
   let count = 0;
   let errors = 0;
   let totalLines = 0;
@@ -4593,10 +4636,9 @@ async function summarizeRequestsTodayUncached(pathname, lineLimit = config.summa
   const eventDedupe = { exact: new Set(), estimated: new Map() };
   const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0, pageView: 0, viewItem: 0, addToCart: 0, beginCheckout: 0 }));
   const recentEvents = [];
-  const lines = splitLines(tail.stdout);
 
   for (const line of lines) {
-    if (!line.includes(token)) continue;
+    if (token && !line.includes(token)) continue;
     totalLines += 1;
     const parsed = parseTrackingAccessLine(line);
     if (!parsed) {
@@ -5466,6 +5508,16 @@ async function customerDashboardData(data, session) {
   if (tenantRequestSummary.available) {
     retainedSnapshotsByDate[todayKey] = historySnapshotFromSummary(tenantRequestSummary, todayKey);
   }
+  // SQLite event store: per-day snapshots rebuilt from raw ingested lines. Survives
+  // log rotation and works across worker VPSes. Per date, keep whichever source saw
+  // more events (tail summaries undercount after rotation; SQLite may lag a tick).
+  const sqliteSnapshotsByDate = sqliteSnapshotsForTenant(session.tenantId, tenant);
+  for (const [dateKey, snapshot] of Object.entries(sqliteSnapshotsByDate)) {
+    const existing = retainedSnapshotsByDate[dateKey];
+    if (!existing || Number(snapshot.total || 0) > Number(existing.total || 0)) {
+      retainedSnapshotsByDate[dateKey] = snapshot;
+    }
+  }
   const retainedEventsSummary = retainedSummaryFromSnapshots(Object.values(retainedSnapshotsByDate), tenantRequestSummary);
 
   // Compute billing-period event count that survives nightly log rotation.
@@ -5479,10 +5531,20 @@ async function customerDashboardData(data, session) {
     .slice(0, 30)
     .map(([date, count]) => ({ date, total: Number(count) }));
   const billingStartKey = localDateKey(billingPeriod.start);
-  const historicCount = Object.entries(tenantDailyReqs)
-    .filter(([d]) => d >= billingStartKey && d < todayKey)
-    .reduce((sum, [, c]) => sum + Number(c), 0);
-  const todayLiveCount = Number(tenantRequestSummary.count || 0);
+  // Per past day take the larger of the JSON-stored count and the SQLite snapshot
+  // total (clean events), so a day missed by one source is covered by the other.
+  const billingDayKeys = new Set([
+    ...Object.keys(tenantDailyReqs).filter((d) => d >= billingStartKey && d < todayKey),
+    ...Object.keys(sqliteSnapshotsByDate).filter((d) => d >= billingStartKey && d < todayKey)
+  ]);
+  const historicCount = [...billingDayKeys].reduce((sum, d) => sum + Math.max(
+    Number(tenantDailyReqs[d] || 0),
+    Number(sqliteSnapshotsByDate[d]?.total || 0)
+  ), 0);
+  const todayLiveCount = Math.max(
+    Number(tenantRequestSummary.count || 0),
+    Number(sqliteSnapshotsByDate[todayKey]?.total || 0)
+  );
   const accumulatedCount = historicCount + todayLiveCount;
   // Keep whichever is higher: accumulated (rotation-safe) vs live log period scan
   const livePeriodCount = tenantPeriodSummary.available ? Number(tenantPeriodSummary.count || 0) : 0;
@@ -5927,6 +5989,59 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Worker VPS agents ship raw tracking log lines here. Authenticated by HMAC
+    // signature over the raw body (shared WORKER_INGEST_SECRET), not by session,
+    // so this route must stay above the session auth gate below.
+    if (pathname === "/api/worker/ingest" && req.method === "POST") {
+      if (!eventStore) {
+        jsonResponse(res, 503, { error: "Event store is not available on this panel." });
+        return;
+      }
+      if (!config.workerIngestSecret) {
+        jsonResponse(res, 503, { error: "WORKER_INGEST_SECRET is not configured on the panel." });
+        return;
+      }
+      let rawBody;
+      try {
+        rawBody = await readRawBody(req);
+      } catch (error) {
+        jsonResponse(res, 413, { error: error.message });
+        return;
+      }
+      const signature = String(req.headers["x-worker-signature"] || "");
+      const expected = createHmac("sha256", config.workerIngestSecret).update(rawBody).digest("hex");
+      if (signature.length !== expected.length || !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+        jsonResponse(res, 401, { error: "Invalid worker signature." });
+        return;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        jsonResponse(res, 400, { error: "Invalid JSON body." });
+        return;
+      }
+      const workerId = String(payload.workerId || "").slice(0, 100);
+      const batchId = String(payload.batchId || "").slice(0, 200);
+      const tenantId = String(payload.tenantId || "").slice(0, 200);
+      const source = String(payload.source || "").slice(0, 500);
+      const lines = Array.isArray(payload.lines) ? payload.lines.slice(0, 20000) : [];
+      if (!workerId || !batchId) {
+        jsonResponse(res, 400, { error: "workerId and batchId are required." });
+        return;
+      }
+      // At-least-once delivery from agents: a retried batch must not double-count.
+      if (eventStore.hasBatch(batchId)) {
+        jsonResponse(res, 200, { ok: true, inserted: 0, duplicate: true });
+        return;
+      }
+      const rows = trackingRowsFromLines(lines, { tenantId, workerId, source });
+      const inserted = rows.length ? eventStore.insertLines(rows) : 0;
+      eventStore.markBatch(batchId, workerId);
+      jsonResponse(res, 200, { ok: true, inserted, skipped: lines.length - rows.length });
+      return;
+    }
+
     if (pathname !== "/login" && pathname !== "/signup" && pathname !== "/tokens.css" && pathname !== "/login.css" && !isAuthenticated(req)) {
       if (pathname.startsWith("/api/")) {
         jsonResponse(res, 401, { error: "Authentication required." });
@@ -6238,6 +6353,149 @@ const server = createServer(async (req, res) => {
     // Non-fatal; power-ups default to off
   }
 })();
+
+// ---------------------------------------------------------------------------
+// SQLite event ingest
+// ---------------------------------------------------------------------------
+// Tails local access logs by byte offset (rotation-aware via inode) and stores raw
+// tracking lines per tenant per day, so event history survives logrotate and
+// container restarts. Remote worker VPSes ship their lines to /api/worker/ingest.
+
+const NGINX_MONTH_KEYS = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
+
+function dateKeyFromNginxLine(line) {
+  const match = String(line || "").match(/\[(\d{2})\/([A-Za-z]{3})\/(\d{4}):/);
+  if (!match) return "";
+  const month = NGINX_MONTH_KEYS[match[2]];
+  return month ? `${match[3]}-${month}-${match[1]}` : "";
+}
+
+function trackingRowsFromLines(lines, { tenantId = "", workerId = "local", source = "" } = {}) {
+  const rows = [];
+  for (const raw of lines) {
+    const line = String(raw || "").trim();
+    if (!line || !isTrackingLogLine(line)) continue;
+    const dateKey = dateKeyFromNginxLine(line) || localDateKey();
+    rows.push({ tenantId, workerId, source, dateKey, line });
+  }
+  return rows;
+}
+
+// Read new bytes from a log file since the stored cursor. Inode change or shrink
+// means the file was rotated, so reading restarts from byte 0 of the new file.
+async function ingestLogFile(source, tenantId) {
+  if (!eventStore) return;
+  const fileStat = await stat(source).catch(() => null);
+  if (!fileStat) return;
+  const cursor = eventStore.getCursor(source);
+  let offset = Number(cursor.offset) || 0;
+  if (Number(cursor.inode) !== Number(fileStat.ino) || fileStat.size < offset) offset = 0;
+  if (fileStat.size === offset) {
+    if (Number(cursor.inode) !== Number(fileStat.ino)) eventStore.setCursor(source, fileStat.ino, offset);
+    return;
+  }
+  const handle = await open(source, "r");
+  try {
+    const toRead = Math.min(fileStat.size - offset, config.ingestMaxBytesPerTick);
+    const buffer = Buffer.alloc(toRead);
+    const { bytesRead } = await handle.read(buffer, 0, toRead, offset);
+    if (!bytesRead) return;
+    const chunk = buffer.subarray(0, bytesRead).toString("utf8");
+    const lastNewline = chunk.lastIndexOf("\n");
+    if (lastNewline === -1) {
+      // Only a partial line so far; try again next tick once the line completes.
+      eventStore.setCursor(source, fileStat.ino, offset);
+      return;
+    }
+    const complete = chunk.slice(0, lastNewline);
+    const consumedBytes = Buffer.byteLength(chunk.slice(0, lastNewline + 1), "utf8");
+    const rows = trackingRowsFromLines(complete.split("\n"), { tenantId, source });
+    if (rows.length) eventStore.insertLines(rows);
+    eventStore.setCursor(source, fileStat.ino, offset + consumedBytes);
+  } finally {
+    await handle.close();
+  }
+}
+
+let ingestTickRunning = false;
+let lastEventPruneDate = "";
+async function ingestLocalLogsTick() {
+  if (!eventStore || ingestTickRunning) return;
+  ingestTickRunning = true;
+  try {
+    // Shared nginx log: tenant resolved at query time via host matching (tenant_id '').
+    if (config.accessLog) await ingestLogFile(config.accessLog, "");
+    // Dedicated per-container logs: tenant known from the provisioning record.
+    const loaded = await readDatabase();
+    if (loaded.available) {
+      const dbShape = {
+        customerSetup: { requests: loaded.data.customerSetupRequests || [] },
+        provisioning: loaded.data.provisioning || { requests: [] }
+      };
+      const tenantIds = new Set([
+        ...(loaded.data.tenants || []).map((tenant) => tenant?.id),
+        ...(loaded.data.customerSetupRequests || []).map((request) => request?.tenantId)
+      ].filter(Boolean));
+      for (const tenantId of tenantIds) {
+        for (const logPath of customerAccessLogPaths(dbShape, tenantId)) {
+          await ingestLogFile(logPath, tenantId);
+        }
+      }
+    }
+    // Retention: prune once per day.
+    const today = localDateKey();
+    if (lastEventPruneDate !== today) {
+      lastEventPruneDate = today;
+      const pruned = eventStore.prune(config.eventRetentionDays);
+      if (pruned.lines || pruned.summaries) {
+        console.log(`[events] pruned ${pruned.lines} lines, ${pruned.summaries} summaries older than ${pruned.cutoff}`);
+      }
+    }
+  } catch (error) {
+    console.error(`[events] ingest tick failed: ${error.message}`);
+  } finally {
+    ingestTickRunning = false;
+  }
+}
+
+// Build per-day snapshots for a tenant from the SQLite store, in the exact shape
+// history.json snapshots use. Closed days are computed once and cached; today is
+// always computed live from the stored lines.
+function sqliteSnapshotsForTenant(tenantId, tenant, days = 30) {
+  if (!eventStore) return {};
+  const fromKey = localDateKey(addDays(new Date(), -(days - 1)));
+  const todayKey = localDateKey();
+  const snapshots = {};
+  try {
+    for (const dateKey of eventStore.tenantDates(tenantId, fromKey)) {
+      if (dateKey !== todayKey) {
+        const cached = eventStore.getDailySummary(tenantId, dateKey);
+        if (cached) {
+          snapshots[dateKey] = cached;
+          continue;
+        }
+      }
+      const lines = eventStore.linesForTenantDate(tenantId, dateKey);
+      if (!lines.length) continue;
+      const summary = filterRequestSummaryForTenant(
+        aggregateTrackingLines(lines, { path: "sqlite:events.db" }),
+        tenant
+      );
+      if (!summary?.available) continue;
+      const snapshot = historySnapshotFromSummary(summary, dateKey);
+      snapshots[dateKey] = snapshot;
+      if (dateKey !== todayKey) eventStore.setDailySummary(tenantId, dateKey, snapshot);
+    }
+  } catch (error) {
+    console.error(`[events] snapshot build failed for tenant ${tenantId}: ${error.message}`);
+  }
+  return snapshots;
+}
+
+if (eventStore) {
+  setInterval(ingestLocalLogsTick, config.ingestIntervalMs).unref();
+  setTimeout(ingestLocalLogsTick, 5 * 1000).unref();
+}
 
 // Persist daily event snapshots in the background. Previously snapshots were only
 // written when the owner dashboard API ran, so on days with only customer logins

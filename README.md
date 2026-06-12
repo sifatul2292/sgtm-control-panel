@@ -15,6 +15,7 @@ Tagioo landing page and new-server setup notes are included. For the `tagioo.com
 - Noise filtering for bot scans and non-tracking traffic
 - Deployment health checklist for auth, logs, Docker, SSL, and host visibility
 - Local persisted daily/hourly summary history
+- SQLite event store with 30-day raw event retention that survives log rotation and container restarts, with multi-VPS worker ingest ([docs/event-store.md](docs/event-store.md))
 - Optional store order webhook for accurate Business Snapshot sales/revenue
 - Purchase reconciliation between actual store orders and SGTM purchase tracking
 - Customer/tenant overview for running the panel as a managed service
