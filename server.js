@@ -6062,14 +6062,16 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 413, { error: error.message });
         return;
       }
-      if (!isWooOrderWebhookAuthorized(req, rawBody, webhookSecret)) {
-        jsonResponse(res, 401, { error: "Invalid WooCommerce webhook signature." });
-        return;
-      }
       const rawText = rawBody.toString("utf8");
       // WooCommerce verifies a new webhook with a form-encoded ping (webhook_id=N).
-      if (/^webhook_id=\d+/.test(rawText.trim())) {
+      // deliver_ping() skips the normal delivery path and sends NO signature
+      // header, so the ping must be accepted before the signature check.
+      if (/^webhook_id=\d+$/.test(rawText.trim())) {
         jsonResponse(res, 200, { ping: true });
+        return;
+      }
+      if (!isWooOrderWebhookAuthorized(req, rawBody, webhookSecret)) {
+        jsonResponse(res, 401, { error: "Invalid WooCommerce webhook signature." });
         return;
       }
       let payload;
