@@ -791,7 +791,7 @@ function buildServerGtmTemplate(input) {
     gtmConstVariable(1, "Tagioo - ga4_api_secret", cleanTemplateValue(input.ga4ApiSecret), "1"),
     gtmConstVariable(2, "Tagioo - meta_pixel_id", cleanTemplateValue(input.metaPixelId), "1"),
     gtmConstVariable(3, "Tagioo - meta_capi_token", cleanTemplateValue(input.metaAccessToken), "1"),
-    gtmConstVariable(4, "Tagioo - meta_test_event_code", cleanTemplateValue(input.metaTestEventCode, ""), "1"),
+    gtmConstVariable(4, "Tagioo - meta_test_event_code", cleanTemplateValue(input.metaTestEventCode, "ENTER_YOUR_TEST_CODE"), "1"),
     gtmConstVariable(5, "Tagioo - google_ads_conversion_id", cleanTemplateValue(input.googleAdsConversionId), "1"),
     gtmConstVariable(6, "Tagioo - google_ads_purchase_label", cleanTemplateValue(input.googleAdsPurchaseLabel), "1"),
     gtmConstVariable(7, "Tagioo - tiktok_pixel_id", cleanTemplateValue(input.tiktokPixelId), "1"),
