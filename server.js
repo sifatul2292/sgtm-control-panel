@@ -832,7 +832,8 @@ function buildServerGtmTemplate(input) {
     tags.push(gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", [
       gtmBooleanParam("redactVisitorIp", false),
       gtmTemplateParam("epToIncludeDropdown", "all"),
-      gtmTemplateParam("upToIncludeDropdown", "all")
+      gtmTemplateParam("upToIncludeDropdown", "all"),
+      gtmTemplateParam("apiSecret", "{{Tagioo - ga4_api_secret}}")
     ], ["1"], "3"));
   }
   if (destinations.includes("googleAds")) {
