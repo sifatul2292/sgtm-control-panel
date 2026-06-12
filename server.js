@@ -573,7 +573,7 @@ ___INFO___
 
 {
   "type": "TAG",
-  "id": "cvt_TAGIOO_META_CAPI",
+  "id": "cvt_0_101",
   "version": 1,
   "securityGroups": [],
   "displayName": "Tagioo Meta CAPI",
@@ -969,14 +969,21 @@ function buildWebGtmTemplate(input) {
     gtmDataLayerVariable(15, "dlv - user_data.phone_number", "user_data.phone_number"),
     gtmDataLayerVariable(16, "dlv - user_data.first_name", "user_data.first_name"),
     gtmDataLayerVariable(17, "dlv - user_data.last_name", "user_data.last_name"),
-    gtmDataLayerVariable(18, "dlv - user_data.external_id", "user_data.external_id")
+    gtmDataLayerVariable(18, "dlv - user_data.external_id", "user_data.external_id"),
+    gtmDataLayerVariable(19, "dlv - user_data.city", "user_data.city"),
+    gtmDataLayerVariable(20, "dlv - user_data.country", "user_data.country"),
+    gtmDataLayerVariable(21, "dlv - user_data.postal_code", "user_data.postal_code"),
+    gtmDataLayerVariable(22, "dlv - user_data.region", "user_data.region")
   ];
   const triggers = [
     { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - DOM Ready PageView", type: "DOM_READY", fingerprint: String(Date.now()) },
     gtmTrigger(2, "Tagioo - view_item", "view_item"),
     gtmTrigger(3, "Tagioo - add_to_cart", "add_to_cart"),
     gtmTrigger(4, "Tagioo - begin_checkout", "begin_checkout"),
-    gtmTrigger(5, "Tagioo - purchase", "purchase")
+    gtmTrigger(5, "Tagioo - purchase", "purchase"),
+    gtmTrigger(6, "Tagioo - add_payment_info", "add_payment_info"),
+    gtmTrigger(7, "Tagioo - add_shipping_info", "add_shipping_info"),
+    gtmTrigger(8, "Tagioo - view_item_list", "view_item_list")
   ];
   const tags = [];
   if (destinations.includes("ga4")) {
@@ -987,7 +994,11 @@ function buildWebGtmTemplate(input) {
         { parameter: "send_page_view", parameterValue: "false" }
       ])
     ], ["2147479573"], "3"));
-    const eventMap = [["page_view", "1"], ["view_item", "2"], ["add_to_cart", "3"], ["begin_checkout", "4"], ["purchase", "5"]];
+    const eventMap = [
+      ["page_view", "1"], ["view_item", "2"], ["add_to_cart", "3"],
+      ["begin_checkout", "4"], ["purchase", "5"],
+      ["add_payment_info", "6"], ["add_shipping_info", "7"], ["view_item_list", "8"]
+    ];
     for (const [eventName, triggerId] of eventMap) {
       const eventSettingsRows = [
         { parameter: "server_container_url", parameterValue: "{{Tagioo - server_container_url}}" },
@@ -996,12 +1007,21 @@ function buildWebGtmTemplate(input) {
         { parameter: "user_data.phone_number", parameterValue: "{{dlv - user_data.phone_number}}" },
         { parameter: "user_data.first_name", parameterValue: "{{dlv - user_data.first_name}}" },
         { parameter: "user_data.last_name", parameterValue: "{{dlv - user_data.last_name}}" },
-        { parameter: "user_data.external_id", parameterValue: "{{dlv - user_data.external_id}}" }
+        { parameter: "user_data.external_id", parameterValue: "{{dlv - user_data.external_id}}" },
+        { parameter: "user_data.city", parameterValue: "{{dlv - user_data.city}}" },
+        { parameter: "user_data.country", parameterValue: "{{dlv - user_data.country}}" },
+        { parameter: "user_data.postal_code", parameterValue: "{{dlv - user_data.postal_code}}" },
+        { parameter: "user_data.region", parameterValue: "{{dlv - user_data.region}}" }
       ];
-      if (["view_item", "add_to_cart", "begin_checkout"].includes(eventName)) {
+      if (["view_item", "add_to_cart", "begin_checkout", "add_payment_info", "add_shipping_info"].includes(eventName)) {
         eventSettingsRows.push(
           { parameter: "currency", parameterValue: "{{dlv - ecommerce.currency}}" },
           { parameter: "value", parameterValue: "{{dlv - ecommerce.value}}" },
+          { parameter: "items", parameterValue: "{{dlv - ecommerce.items}}" }
+        );
+      }
+      if (eventName === "view_item_list") {
+        eventSettingsRows.push(
           { parameter: "items", parameterValue: "{{dlv - ecommerce.items}}" }
         );
       }
@@ -1081,13 +1101,19 @@ function buildServerGtmTemplate(input) {
     gtmEventDataVariable(30, "ed - ip_override", "ip_override"),
     gtmEventDataVariable(33, "ed - first_name", "user_data.first_name"),
     gtmEventDataVariable(34, "ed - last_name", "user_data.last_name"),
-    gtmEventDataVariable(35, "ed - external_id", "user_data.external_id")
+    gtmEventDataVariable(35, "ed - external_id", "user_data.external_id"),
+    gtmEventDataVariable(36, "ed - city", "user_data.city"),
+    gtmEventDataVariable(37, "ed - country", "user_data.country"),
+    gtmEventDataVariable(38, "ed - postal_code", "user_data.postal_code"),
+    gtmEventDataVariable(39, "ed - region", "user_data.region")
   ];
   const triggers = [
     { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - GA4 Client", type: "ALWAYS", filter: [{ type: "CONTAINS", parameter: [gtmTemplateParam("arg0", "{{Client Name}}"), gtmTemplateParam("arg1", "GA4")] }], fingerprint: String(Date.now()) },
     gtmTrigger(2, "Tagioo - GA4 purchase", "purchase", "GA4"),
     gtmTrigger(3, "Tagioo - GA4 add_to_cart", "add_to_cart", "GA4"),
-    gtmTrigger(4, "Tagioo - GA4 begin_checkout", "begin_checkout", "GA4")
+    gtmTrigger(4, "Tagioo - GA4 begin_checkout", "begin_checkout", "GA4"),
+    gtmTrigger(5, "Tagioo - GA4 add_payment_info", "add_payment_info", "GA4"),
+    gtmTrigger(6, "Tagioo - GA4 view_item_list", "view_item_list", "GA4")
   ];
   const tags = [];
   const clients = [];
@@ -1112,7 +1138,7 @@ function buildServerGtmTemplate(input) {
     tags.push(gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", ga4Params, ["1"], "3"));
   }
   if (destinations.includes("meta")) {
-    tags.push(gtmTag(tags.length + 1, "Tagioo Meta CAPI - All Events", "cvt_TAGIOO_META_CAPI", [
+    tags.push(gtmTag(tags.length + 1, "Tagioo Meta CAPI - All Events", "cvt_0_101", [
       gtmTemplateParam("pixelId", "{{Tagioo - meta_pixel_id}}"),
       gtmTemplateParam("accessToken", "{{Tagioo - meta_capi_token}}"),
       gtmTemplateParam("testEventCode", metaTestEventCode ? "{{Tagioo - meta_test_event_code}}" : ""),
