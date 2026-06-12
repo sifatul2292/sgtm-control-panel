@@ -5670,7 +5670,10 @@ async function customerDashboardData(data, session) {
       accessLog: tenantAccessLog,
       errorLog: unavailable("Nginx error logs are owner-only.")
     },
-    history: { available: data.history.available, daily: tenantDailyHistory, tenantEventHistory: data.history?.tenantEventHistory || data.tenantEventHistory || {} },
+    // tenantEventHistory is only consumed server-side to build tenantDailyHistory;
+    // shipping the all-tenants map to the browser leaked cross-tenant data and
+    // inflated the payload, so the customer response carries an empty map.
+    history: { available: data.history.available, daily: tenantDailyHistory, tenantEventHistory: {} },
     orders: tenantOrders,
     usage: tenantUsage,
     reconciliation: tenantReconciliation,
@@ -6572,17 +6575,29 @@ async function ingestLocalLogsTick() {
 // Build per-day snapshots for a tenant from the SQLite store, in the exact shape
 // history.json snapshots use. Closed days are computed once and cached; today is
 // always computed live from the stored lines.
+// Today's snapshot is recomputed from raw lines on demand. Aggregating tens of
+// thousands of lines is synchronous and was blocking every dashboard load for
+// seconds, so reuse the result until new lines arrive for that tenant+day.
+const todaySnapshotCache = new Map();
+
 function sqliteSnapshotsForTenant(tenantId, tenant, days = 30) {
   if (!eventStore) return {};
   const fromKey = localDateKey(addDays(new Date(), -(days - 1)));
   const todayKey = localDateKey();
   const snapshots = {};
   try {
+    const lineCounts = eventStore.dateCountsForTenant(tenantId, fromKey);
     for (const dateKey of eventStore.tenantDates(tenantId, fromKey)) {
       if (dateKey !== todayKey) {
         const cached = eventStore.getDailySummary(tenantId, dateKey);
         if (cached) {
           snapshots[dateKey] = cached;
+          continue;
+        }
+      } else {
+        const cached = todaySnapshotCache.get(tenantId);
+        if (cached && cached.dateKey === todayKey && cached.lineCount === (lineCounts[dateKey] || 0)) {
+          snapshots[dateKey] = cached.snapshot;
           continue;
         }
       }
@@ -6596,6 +6611,7 @@ function sqliteSnapshotsForTenant(tenantId, tenant, days = 30) {
       const snapshot = historySnapshotFromSummary(summary, dateKey);
       snapshots[dateKey] = snapshot;
       if (dateKey !== todayKey) eventStore.setDailySummary(tenantId, dateKey, snapshot);
+      else todaySnapshotCache.set(tenantId, { dateKey, lineCount: lines.length, snapshot });
     }
   } catch (error) {
     console.error(`[events] snapshot build failed for tenant ${tenantId}: ${error.message}`);
