@@ -523,6 +523,17 @@ function gtmEventDataVariable(id, name, key, folderId = "2") {
   };
 }
 
+function gtmCustomTemplate(id, name, templateData) {
+  return {
+    accountId: "0",
+    containerId: "0",
+    templateId: String(id),
+    name,
+    fingerprint: String(Date.now()),
+    templateData
+  };
+}
+
 function gtmTrigger(id, name, eventName, filterClient = "") {
   const trigger = {
     accountId: "0",
@@ -547,6 +558,264 @@ function gtmTrigger(id, name, eventName, filterClient = "") {
     ];
   }
   return trigger;
+}
+
+function tagiooMetaCapiTemplateData() {
+  return `___TERMS_OF_SERVICE___
+
+By creating or modifying this file you agree to Google Tag Manager's Community
+Template Gallery Developer Terms of Service available at
+https://developers.google.com/tag-manager/gallery-tos (or such other URL as
+Google may provide), as modified from time to time.
+
+
+___INFO___
+
+{
+  "type": "TAG",
+  "id": "cvt_TAGIOO_META_CAPI",
+  "version": 1,
+  "securityGroups": [],
+  "displayName": "Tagioo Meta CAPI",
+  "categories": ["ADVERTISING", "ANALYTICS", "CONVERSIONS"],
+  "brand": {
+    "id": "tagioo",
+    "displayName": "Tagioo"
+  },
+  "description": "Sends GA4-client server events from Tagioo Server GTM to Meta Conversions API.",
+  "containerContexts": ["SERVER"]
+}
+
+
+___TEMPLATE_PARAMETERS___
+
+[
+  {
+    "type": "TEXT",
+    "name": "pixelId",
+    "displayName": "Meta Pixel ID",
+    "simpleValueType": true,
+    "valueValidators": [{ "type": "NON_EMPTY" }]
+  },
+  {
+    "type": "TEXT",
+    "name": "accessToken",
+    "displayName": "Meta CAPI Access Token",
+    "simpleValueType": true,
+    "valueValidators": [{ "type": "NON_EMPTY" }]
+  },
+  {
+    "type": "TEXT",
+    "name": "testEventCode",
+    "displayName": "Meta Test Event Code",
+    "simpleValueType": true
+  },
+  {
+    "type": "SELECT",
+    "name": "actionSource",
+    "displayName": "Action Source",
+    "simpleValueType": true,
+    "selectItems": [
+      { "value": "website", "displayValue": "Website" },
+      { "value": "email", "displayValue": "Email" },
+      { "value": "app", "displayValue": "App" },
+      { "value": "phone_call", "displayValue": "Phone Call" },
+      { "value": "chat", "displayValue": "Chat" },
+      { "value": "physical_store", "displayValue": "Physical Store" },
+      { "value": "system_generated", "displayValue": "System Generated" },
+      { "value": "other", "displayValue": "Other" }
+    ],
+    "defaultValue": "website"
+  },
+  {
+    "type": "CHECKBOX",
+    "name": "enableDebugLog",
+    "checkboxText": "Log Meta response in Server GTM preview",
+    "simpleValueType": true,
+    "defaultValue": true
+  }
+]
+
+
+___SANDBOXED_JS_FOR_SERVER___
+
+const getAllEventData = require('getAllEventData');
+const getCookieValues = require('getCookieValues');
+const getRequestHeader = require('getRequestHeader');
+const getTimestampMillis = require('getTimestampMillis');
+const getType = require('getType');
+const JSON = require('JSON');
+const logToConsole = require('logToConsole');
+const makeString = require('makeString');
+const sendHttpRequest = require('sendHttpRequest');
+const sha256Sync = require('sha256Sync');
+
+const eventData = getAllEventData();
+const eventMap = {
+  page_view: 'PageView',
+  view_item: 'ViewContent',
+  add_to_cart: 'AddToCart',
+  begin_checkout: 'InitiateCheckout',
+  add_payment_info: 'AddPaymentInfo',
+  purchase: 'Purchase',
+  search: 'Search',
+  sign_up: 'CompleteRegistration',
+  generate_lead: 'Lead'
+};
+
+function firstValue() {
+  for (let i = 0; i < arguments.length; i++) {
+    const value = arguments[i];
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return undefined;
+}
+
+function isHash(value) {
+  return value && makeString(value).match('^[A-Fa-f0-9]{64}$') !== null;
+}
+
+function hash(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  const stringValue = makeString(value).trim().toLowerCase();
+  if (!stringValue) return undefined;
+  if (isHash(stringValue)) return stringValue;
+  return sha256Sync(stringValue, { outputEncoding: 'hex' });
+}
+
+function addHashed(target, key, value) {
+  const hashed = hash(value);
+  if (hashed !== undefined) target[key] = hashed;
+}
+
+function addRaw(target, key, value) {
+  if (value !== undefined && value !== null && value !== '') target[key] = makeString(value);
+}
+
+const userData = eventData.user_data || {};
+const event = {
+  event_name: eventMap[eventData.event_name] || eventData.event_name,
+  event_time: eventData.event_time || Math.round(getTimestampMillis() / 1000),
+  action_source: eventData.action_source || data.actionSource || 'website',
+  event_source_url: eventData.page_location,
+  event_id: firstValue(eventData.event_id, eventData.transaction_id),
+  user_data: {},
+  custom_data: {}
+};
+
+addHashed(event.user_data, 'em', firstValue(userData.email_address, userData.email));
+addHashed(event.user_data, 'ph', userData.phone_number);
+addHashed(event.user_data, 'fn', userData.first_name);
+addHashed(event.user_data, 'ln', userData.last_name);
+addHashed(event.user_data, 'external_id', userData.external_id);
+addHashed(event.user_data, 'ct', firstValue(userData.city, eventData.city));
+addHashed(event.user_data, 'st', firstValue(userData.region, eventData.region));
+addHashed(event.user_data, 'zp', firstValue(userData.postal_code, eventData.postal_code));
+addHashed(event.user_data, 'country', firstValue(userData.country, eventData.country));
+
+addRaw(event.user_data, 'fbp', firstValue(eventData.fbp, eventData._fbp, getCookieValues('_fbp', true)[0]));
+addRaw(event.user_data, 'fbc', firstValue(eventData.fbc, eventData._fbc, getCookieValues('_fbc', true)[0]));
+addRaw(event.user_data, 'client_ip_address', firstValue(eventData.ip_override, getRequestHeader('x-forwarded-for'), getRequestHeader('x-real-ip')));
+addRaw(event.user_data, 'client_user_agent', firstValue(eventData.user_agent, getRequestHeader('user-agent')));
+
+addRaw(event.custom_data, 'currency', eventData.currency);
+if (eventData.value !== undefined && eventData.value !== null && eventData.value !== '') {
+  event.custom_data.value = eventData.value;
+}
+addRaw(event.custom_data, 'order_id', firstValue(eventData.transaction_id, eventData.order_id));
+if (getType(eventData.items) === 'array') {
+  event.custom_data.contents = eventData.items.map((item) => ({
+    id: firstValue(item.item_id, item.id, item.item_name),
+    quantity: item.quantity,
+    item_price: item.price
+  }));
+  event.custom_data.content_type = 'product';
+}
+
+const body = { data: [event], partner_agent: 'tagioo-sgtm-1.0' };
+if (data.testEventCode) body.test_event_code = data.testEventCode;
+
+const url = 'https://graph.facebook.com/v20.0/' + data.pixelId + '/events?access_token=' + data.accessToken;
+sendHttpRequest(url, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' }
+}, JSON.stringify(body)).then((response) => {
+  if (data.enableDebugLog) {
+    logToConsole('Tagioo Meta CAPI response: ' + response.statusCode + ' ' + response.body);
+  }
+  if (response.statusCode >= 200 && response.statusCode < 300) {
+    data.gtmOnSuccess();
+  } else {
+    data.gtmOnFailure();
+  }
+}, () => data.gtmOnFailure());
+
+
+___SERVER_PERMISSIONS___
+
+[
+  {
+    "instance": {
+      "key": { "publicId": "read_event_data", "versionId": "1" },
+      "param": [{ "key": "eventDataAccess", "value": { "type": 1, "string": "any" } }]
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": { "publicId": "send_http", "versionId": "1" },
+      "param": [
+        { "key": "allowedUrls", "value": { "type": 1, "string": "specific" } },
+        { "key": "urls", "value": { "type": 2, "listItem": [{ "type": 1, "string": "https://graph.facebook.com/" }] } }
+      ]
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": { "publicId": "get_cookies", "versionId": "1" },
+      "param": [
+        { "key": "cookieAccess", "value": { "type": 1, "string": "specific" } },
+        { "key": "cookieNames", "value": { "type": 2, "listItem": [{ "type": 1, "string": "_fbp" }, { "type": 1, "string": "_fbc" }] } }
+      ]
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": { "publicId": "read_request", "versionId": "1" },
+      "param": [
+        { "key": "requestAccess", "value": { "type": 1, "string": "specific" } },
+        { "key": "headerAccess", "value": { "type": 1, "string": "specific" } },
+        { "key": "headersAllowed", "value": { "type": 8, "boolean": true } },
+        {
+          "key": "headerWhitelist",
+          "value": {
+            "type": 2,
+            "listItem": [
+              { "type": 3, "mapKey": [{ "type": 1, "string": "headerName" }], "mapValue": [{ "type": 1, "string": "x-forwarded-for" }] },
+              { "type": 3, "mapKey": [{ "type": 1, "string": "headerName" }], "mapValue": [{ "type": 1, "string": "x-real-ip" }] },
+              { "type": 3, "mapKey": [{ "type": 1, "string": "headerName" }], "mapValue": [{ "type": 1, "string": "user-agent" }] }
+            ]
+          }
+        }
+      ]
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": { "publicId": "logging", "versionId": "1" },
+      "param": [{ "key": "environments", "value": { "type": 1, "string": "debug" } }]
+    },
+    "isRequired": true
+  }
+]
+
+
+___NOTES___
+
+Generated by Tagioo Setup Assistant.`;
 }
 
 function gtmTag(id, name, type, parameters, triggerIds, folderId = "1") {
@@ -773,25 +1042,27 @@ function buildWebGtmTemplate(input) {
 
 function buildServerGtmTemplate(input) {
   const destinations = selectedDestinations(input);
+  const ga4ApiSecret = String(input.ga4ApiSecret || "").trim();
+  const metaTestEventCode = String(input.metaTestEventCode || "").trim();
   const payload = {
     businessType: cleanTemplateValue(input.businessType, "ecommerce"),
     platform: cleanTemplateValue(input.platform, "custom"),
     destinations,
     trackingDomain: cleanTemplateValue(input.trackingDomain, "https://track.yourdomain.com"),
-    galleryTemplates: tagiooGalleryTemplateGuide(destinations),
+    galleryTemplates: tagiooGalleryTemplateGuide(destinations.filter((destination) => destination !== "meta")),
     fieldMappings: {
-      ga4: "Native server-side GA4 forwarding tag is included.",
+      ga4: ga4ApiSecret ? "Native server-side GA4 forwarding tag is included with the provided API secret." : "Native server-side GA4 forwarding tag is included. No placeholder API secret is sent.",
       googleAds: "Native Google Ads Conversion Linker, Purchase, and Remarketing tags are included.",
-      meta: destinations.includes("meta") ? "Install the Facebook Conversion API template from the Server GTM Community Template Gallery, then map the fields listed in tagiooSetup.galleryTemplates." : "Not selected.",
+      meta: destinations.includes("meta") ? "Tagioo Meta CAPI custom template and all-events server tag are included. Import server.json into Server GTM, preview, then publish." : "Not selected.",
       tiktok: destinations.includes("tiktok") ? "Install the TikTok Events API template from the Server GTM Community Template Gallery, then map the fields listed in tagiooSetup.galleryTemplates." : "Not selected."
     }
   };
   const folders = [gtmFolder(1, "Tagioo - Config"), gtmFolder(2, "Tagioo - Event Data"), gtmFolder(3, "Tagioo - GA4"), gtmFolder(4, "Tagioo - Meta"), gtmFolder(5, "Tagioo - Google Ads"), gtmFolder(6, "Tagioo - TikTok")];
   const variables = [
-    gtmConstVariable(1, "Tagioo - ga4_api_secret", cleanTemplateValue(input.ga4ApiSecret), "1"),
+    gtmConstVariable(1, "Tagioo - ga4_api_secret", ga4ApiSecret, "1"),
     gtmConstVariable(2, "Tagioo - meta_pixel_id", cleanTemplateValue(input.metaPixelId), "1"),
     gtmConstVariable(3, "Tagioo - meta_capi_token", cleanTemplateValue(input.metaAccessToken), "1"),
-    gtmConstVariable(4, "Tagioo - meta_test_event_code", cleanTemplateValue(input.metaTestEventCode, "ENTER_YOUR_TEST_CODE"), "1"),
+    gtmConstVariable(4, "Tagioo - meta_test_event_code", metaTestEventCode, "1"),
     gtmConstVariable(5, "Tagioo - google_ads_conversion_id", cleanTemplateValue(input.googleAdsConversionId), "1"),
     gtmConstVariable(6, "Tagioo - google_ads_purchase_label", cleanTemplateValue(input.googleAdsPurchaseLabel), "1"),
     gtmConstVariable(7, "Tagioo - tiktok_pixel_id", cleanTemplateValue(input.tiktokPixelId), "1"),
@@ -829,12 +1100,24 @@ function buildServerGtmTemplate(input) {
       parameter: [],
       fingerprint: String(Date.now())
     });
-    tags.push(gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", [
+    const ga4Params = [
       gtmBooleanParam("redactVisitorIp", false),
       gtmTemplateParam("epToIncludeDropdown", "all"),
-      gtmTemplateParam("upToIncludeDropdown", "all"),
-      gtmTemplateParam("apiSecret", "{{Tagioo - ga4_api_secret}}")
-    ], ["1"], "3"));
+      gtmTemplateParam("upToIncludeDropdown", "all")
+    ];
+    if (ga4ApiSecret) {
+      ga4Params.push(gtmTemplateParam("apiSecret", "{{Tagioo - ga4_api_secret}}"));
+    }
+    tags.push(gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", ga4Params, ["1"], "3"));
+  }
+  if (destinations.includes("meta")) {
+    tags.push(gtmTag(tags.length + 1, "Tagioo Meta CAPI - All Events", "cvt_TAGIOO_META_CAPI", [
+      gtmTemplateParam("pixelId", "{{Tagioo - meta_pixel_id}}"),
+      gtmTemplateParam("accessToken", "{{Tagioo - meta_capi_token}}"),
+      gtmTemplateParam("testEventCode", metaTestEventCode ? "{{Tagioo - meta_test_event_code}}" : ""),
+      gtmTemplateParam("actionSource", "website"),
+      gtmBooleanParam("enableDebugLog", true)
+    ], ["1"], "4"));
   }
   if (destinations.includes("googleAds")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Conversion Linker", "sgtmadscl", [
@@ -857,7 +1140,7 @@ function buildServerGtmTemplate(input) {
       gtmBooleanParam("rdp", false)
     ], ["1"], "5"));
   }
-  return gtmExport("server", "Tagioo Server GTM Template", payload, {
+  const content = {
     tag: tags,
     trigger: triggers,
     variable: variables,
@@ -867,7 +1150,11 @@ function buildServerGtmTemplate(input) {
       { accountId: "0", containerId: "0", type: "CLIENT_NAME", name: "Client Name" }
     ],
     client: clients
-  });
+  };
+  if (destinations.includes("meta")) {
+    content.customTemplate = [gtmCustomTemplate(101, "Tagioo Meta CAPI", tagiooMetaCapiTemplateData())];
+  }
+  return gtmExport("server", "Tagioo Server GTM Template", payload, content);
 }
 
 function buildSetupAssistantTemplates(input) {
@@ -875,8 +1162,11 @@ function buildSetupAssistantTemplates(input) {
   const web = buildWebGtmTemplate({ ...input, destinations });
   const server = buildServerGtmTemplate({ ...input, destinations });
   const warnings = [];
-  if (destinations.includes("meta") || destinations.includes("tiktok")) {
-    warnings.push("Before importing server.json, add the selected Meta/TikTok templates from the Server GTM Community Template Gallery. The downloaded server.json includes Tagioo variables and field mappings for those templates.");
+  if (destinations.includes("tiktok")) {
+    warnings.push("TikTok still requires the TikTok Events API template from the Server GTM Community Template Gallery before import.");
+  }
+  if (destinations.includes("meta")) {
+    warnings.push("Meta CAPI is now included in server.json. Import, preview Server GTM, confirm the Meta tag returns 2xx, then publish.");
   }
   return {
     fileNames: {

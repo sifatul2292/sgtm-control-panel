@@ -880,21 +880,20 @@
                     <h3>How to import</h3>
                     <ol>
                       <li>Open Web GTM → Admin → Import Container → upload <strong>web.json</strong>. Choose <em>Merge</em>.</li>
-                      <li>Open Server GTM → Templates → Search Gallery → add <strong>Facebook Conversion API</strong> (and TikTok if selected).</li>
-                      <li>Import <strong>server.json</strong> into Server GTM → Merge.</li>
-                      <li>In Server GTM create one tag per platform using the gallery template + mappings below.</li>
-                      <li>Preview both containers, fire a Purchase event, verify in Tagioo Event Logs and Meta Test Events.</li>
+                      <li>Import <strong>server.json</strong> into Server GTM → Merge. The GA4 forwarding tag and Meta CAPI tag are included.</li>
+                      <li>If TikTok is selected, open Server GTM → Templates → Search Gallery → add <strong>TikTok Events API</strong>.</li>
+                      <li>Preview both containers, fire a Purchase event, then verify Tagioo Event Logs, GA4 Realtime, and Meta Test Events.</li>
                     </ol>
 
                     <div class="assistant-template-prereqs assistant-template-prereqs--wide">
                       <div>
                         <h4>Meta CAPI — full field mapping</h4>
-                        <p>Template: <strong>Facebook Conversion API</strong> (Community Gallery)</p>
+                        <p>Template: <strong>Tagioo Meta CAPI</strong> (included in server.json)</p>
                         <div class="mapping-grid">
                           <span class="mapping-label">Pixel ID</span><code>{{Tagioo - meta_pixel_id}}</code>
                           <span class="mapping-label">Access Token</span><code>{{Tagioo - meta_capi_token}}</code>
                           <span class="mapping-label">Test Event Code</span><code>{{Tagioo - meta_test_event_code}}</code>
-                          <span class="mapping-label">Event Name</span><code>{{Event Name}}</code>
+                          <span class="mapping-label">Event Name</span><code>Auto-mapped from GA4 event name</code>
                           <span class="mapping-label">Event ID</span><code>{{ed - event_id}}</code>
                           <span class="mapping-label">Action Source</span><code>website</code>
                           <span class="mapping-label">Value</span><code>{{ed - value}}</code>
@@ -905,10 +904,8 @@
                           <span class="mapping-label">First Name</span><code>{{ed - first_name}}</code>
                           <span class="mapping-label">Last Name</span><code>{{ed - last_name}}</code>
                           <span class="mapping-label">External ID</span><code>{{ed - external_id}}</code>
-                          <span class="mapping-label">Country</span><code>{{rh - country}}</code>
-                          <span class="mapping-label">fbp (Browser ID)</span><code>{{rh - fb_browser_id}}</code>
-                          <span class="mapping-label">fbc (Click ID)</span><code>{{rh - fb_click_cookie}}</code>
-                          <span class="mapping-label">Client IP Address</span><code>{{rh - fb_client_ipv6}}</code>
+                          <span class="mapping-label">fbp / fbc</span><code>Read automatically from first-party cookies</code>
+                          <span class="mapping-label">Client IP / User Agent</span><code>Read automatically from request headers</code>
                         </div>
                       </div>
                       <div>
