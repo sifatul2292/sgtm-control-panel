@@ -5959,6 +5959,41 @@ async function getCustomerDashboardData(session) {
   return customerDashboardData(data, session);
 }
 
+// Stale-while-revalidate cache for the customer dashboard payload, keyed by tenant.
+// Data is tenant-scoped (no per-user secrets), so two sessions of the same tenant can
+// safely share it. A fresh hit (< FRESH_MS) returns instantly; a stale hit returns the
+// last payload immediately and refreshes in the background, so a hard refresh or a
+// logout→login round-trip paints real numbers right away instead of waiting on log parsing.
+const CUSTOMER_DASHBOARD_FRESH_MS = Number(process.env.CUSTOMER_DASHBOARD_FRESH_MS || 8000);
+const CUSTOMER_DASHBOARD_STALE_MS = Number(process.env.CUSTOMER_DASHBOARD_STALE_MS || 120000);
+const customerDashboardCache = new Map();
+
+async function getCustomerDashboardDataCached(session) {
+  const key = session.tenantId;
+  const now = Date.now();
+  const entry = customerDashboardCache.get(key);
+
+  if (entry && now - entry.at < CUSTOMER_DASHBOARD_FRESH_MS) {
+    return { ...entry.payload, timing: { ...entry.payload.timing, cache: "fresh" } };
+  }
+
+  if (entry && now - entry.at < CUSTOMER_DASHBOARD_STALE_MS) {
+    if (!entry.refreshing) {
+      entry.refreshing = true;
+      getCustomerDashboardData(session)
+        .then((payload) => { customerDashboardCache.set(key, { payload, at: Date.now(), refreshing: false }); })
+        .catch(() => { entry.refreshing = false; });
+    }
+    return { ...entry.payload, timing: { ...entry.payload.timing, cache: "stale" } };
+  }
+
+  const startedAt = Date.now();
+  const payload = await getCustomerDashboardData(session);
+  payload.timing = { dashboardMs: Date.now() - startedAt, role: "customer", cache: "miss" };
+  customerDashboardCache.set(key, { payload, at: Date.now(), refreshing: false });
+  return payload;
+}
+
 function provisioningRequestsForTenant(data, tenantId) {
   const setupIds = new Set((data.customerSetup?.requests || [])
     .filter((request) => request.tenantId === tenantId && !isDeletedStatus(request.status))
@@ -6103,10 +6138,32 @@ async function customerDashboardData(data, session) {
   // (tail-based) returns a higher value—meaning the log hasn't rotated yet and covers
   // the full billing period—we use that instead so we never under-report.
   const tenantDailyReqs = (data.history?.tenantDailyRequests || data.tenantDailyRequests || {})[session.tenantId] || {};
-  const tenantDailyHistory = Object.entries(tenantDailyReqs)
-    .sort(([a], [b]) => b.localeCompare(a))
-    .slice(0, 30)
-    .map(([date, count]) => ({ date, total: Number(count) }));
+  // Build per-day rows enriched with per-event-type counts + purchase totals so the
+  // browser can drive the 24h/7d/30d KPI slider and multi-series daily chart without
+  // another request. `total` is kept for back-compat with the existing chart.
+  const dailyDateKeys = [...new Set([...Object.keys(tenantDailyReqs), ...Object.keys(retainedSnapshotsByDate)])]
+    .sort((a, b) => b.localeCompare(a))
+    .slice(0, 30);
+  const tenantDailyHistory = dailyDateKeys.map((date) => {
+    const snap = retainedSnapshotsByDate[date];
+    const events = snap?.events || [];
+    const byType = (name) => Number((events.find((e) => e.name === name) || {}).count || 0);
+    const ps = snap?.purchaseSummary || {};
+    const purchaseCount = Number(ps.uniqueCount || 0) || byType("Purchase");
+    return {
+      date,
+      total: Math.max(Number(tenantDailyReqs[date] || 0), Number(snap?.total || 0)),
+      errors: Number(snap?.errors || 0),
+      pageView: byType("PageView"),
+      viewItem: byType("ViewItem"),
+      addToCart: byType("AddToCart"),
+      beginCheckout: byType("BeginCheckout"),
+      purchases: purchaseCount,
+      purchaseCount,
+      purchaseRevenue: Number(ps.uniqueRevenue || ps.rawRevenue || 0),
+      currency: ps.currency || ""
+    };
+  });
   const billingStartKey = localDateKey(billingPeriod.start);
   // Per past day take the larger of the JSON-stored count and the SQLite snapshot
   // total (clean events), so a day missed by one source is covered by the other.
@@ -6328,8 +6385,36 @@ function filterOrdersForTenant(orders, tenant) {
   };
 }
 
+// In-memory static-asset cache: avoids re-reading + re-gzipping large files
+// (app.js ~208KB, styles.css ~80KB) on every cold request. Keyed by path; the
+// stored entry is invalidated when the file's mtime/size changes on disk.
+const staticAssetCache = new Map();
+
+async function loadStaticAsset(absolutePath) {
+  const fileStat = await stat(absolutePath);
+  const sig = `${fileStat.mtimeMs}-${fileStat.size}`;
+  const cached = staticAssetCache.get(absolutePath);
+  if (cached && cached.sig === sig) return cached;
+
+  const content = await readFile(absolutePath);
+  const mime = mimeTypes[extname(absolutePath)] || "application/octet-stream";
+  const compressible = /javascript|css|html|json|text\//.test(mime);
+  const gzipped = compressible && content.length > 1024 ? await gzipAsync(content) : null;
+  const entry = {
+    sig,
+    content,
+    gzipped,
+    mime,
+    etag: `"${fileStat.mtime.getTime().toString(16)}-${fileStat.size.toString(16)}"`,
+    lastModified: fileStat.mtime.toUTCString()
+  };
+  staticAssetCache.set(absolutePath, entry);
+  return entry;
+}
+
 async function serveStatic(req, res) {
-  const requestPath = new URL(req.url, `http://${req.headers.host}`).pathname;
+  const reqUrl = new URL(req.url, `http://${req.headers.host}`);
+  const requestPath = reqUrl.pathname;
   const filePath = requestPath === "/" ? "/index.html" : requestPath;
   const normalizedPath = normalize(filePath).replace(/^(\.\.[/\\])+/, "");
   const absolutePath = join(publicDir, normalizedPath);
@@ -6341,37 +6426,40 @@ async function serveStatic(req, res) {
   }
 
   try {
-    const [content, fileStat] = await Promise.all([readFile(absolutePath), stat(absolutePath)]);
-    const etag = `"${fileStat.mtime.getTime().toString(16)}-${fileStat.size.toString(16)}"`;
+    const asset = await loadStaticAsset(absolutePath);
 
     // Ctrl+R sends If-None-Match; 304 means browser uses cached copy → zero download
-    if (req.headers["if-none-match"] === etag) {
+    if (req.headers["if-none-match"] === asset.etag) {
       res.writeHead(304);
       res.end();
       return;
     }
 
-    const mime = mimeTypes[extname(absolutePath)] || "application/octet-stream";
-    const acceptsGzip = /gzip/.test(req.headers["accept-encoding"] || "");
-    const compressible = /javascript|css|html|json|text\//.test(mime);
+    // Versioned assets (?v=…) are content-addressed by the caller (e.g. app.js?v=3):
+    // serve them immutable for a year so normal navigation (login → dashboard) reuses
+    // the cached copy with zero revalidation round-trips. Unversioned files keep
+    // must-revalidate so edits show up immediately.
+    const versioned = reqUrl.searchParams.has("v");
+    const cacheControl = versioned
+      ? "public, max-age=31536000, immutable"
+      : "public, max-age=0, must-revalidate";
 
     const headers = {
-      "content-type": mime,
-      // max-age=0 + must-revalidate: browser always validates via ETag (Ctrl+R gets 304, not full download)
-      "cache-control": "public, max-age=0, must-revalidate",
-      "etag": etag,
-      "last-modified": fileStat.mtime.toUTCString()
+      "content-type": asset.mime,
+      "cache-control": cacheControl,
+      "etag": asset.etag,
+      "last-modified": asset.lastModified
     };
 
-    if (acceptsGzip && compressible && content.length > 1024) {
-      const compressed = await gzipAsync(content);
+    const acceptsGzip = /gzip/.test(req.headers["accept-encoding"] || "");
+    if (acceptsGzip && asset.gzipped) {
       headers["content-encoding"] = "gzip";
       headers["vary"] = "Accept-Encoding";
       res.writeHead(200, headers);
-      res.end(compressed);
+      res.end(asset.gzipped);
     } else {
       res.writeHead(200, headers);
-      res.end(content);
+      res.end(asset.content);
     }
   } catch {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
@@ -6681,9 +6769,8 @@ const server = createServer(async (req, res) => {
       const session = getSession(req);
       const startedAt = Date.now();
       if (session?.role === "customer") {
-        const payload = await getCustomerDashboardData(session);
-        payload.timing = { dashboardMs: Date.now() - startedAt, role: "customer" };
-        if (payload.timing.dashboardMs > 2000) {
+        const payload = await getCustomerDashboardDataCached(session);
+        if (payload.timing?.dashboardMs > 2000) {
           console.warn(`[dashboard] customer dashboard took ${payload.timing.dashboardMs}ms for tenant ${session.tenantId}`);
         }
         await jsonResponseGzip(req, res, 200, payload);

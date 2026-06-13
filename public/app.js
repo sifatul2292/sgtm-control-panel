@@ -163,7 +163,13 @@ const els = {
   customerPasswordForm: document.querySelector("#customerPasswordForm"),
   customerPasswordFormMessage: document.querySelector("#customerPasswordFormMessage"),
   accountProfilePanel: document.querySelector("#accountProfilePanel"),
-  accountPasswordPanel: document.querySelector("#accountPasswordPanel")
+  accountPasswordPanel: document.querySelector("#accountPasswordPanel"),
+  accountOverviewGrid: document.querySelector("#accountOverviewGrid"),
+  accountIdentityName: document.querySelector("#accountIdentityName"),
+  accountIdentityEmail: document.querySelector("#accountIdentityEmail"),
+  accountIdentitySince: document.querySelector("#accountIdentitySince"),
+  accountAvatar: document.querySelector("#accountAvatar"),
+  accountPlanBadge: document.querySelector("#accountPlanBadge")
 };
 
 document.body.classList.remove("app-loading");
@@ -187,6 +193,8 @@ const viewTitles = {
 
 let latestData = null;
 let customerChartRange = "24h";
+let customerKpiRange = "24h";
+let purchaseRange = "day";
 let selectedCustomerContainerId = "";
 let setupAssistantStep = 1;
 let generatedAssistantTemplates = null;
@@ -1003,7 +1011,13 @@ function cleanPurchaseRows(data) {
 
 function renderPurchaseInspector(data) {
   const query = els.purchaseSearch.value.trim().toLowerCase();
+  const windowMs = { day: 86400000, week: 604800000, month: 2592000000 }[purchaseRange];
+  const cutoff = windowMs ? Date.now() - windowMs : 0;
   const rows = cleanPurchaseRows(data).filter((item) => {
+    if (cutoff) {
+      const ts = item.date instanceof Date ? item.date.getTime() : Number(item.date) || 0;
+      if (ts && ts < cutoff) return false;
+    }
     const haystack = [
       item.eventId,
       item.transactionId,
@@ -1016,9 +1030,10 @@ function renderPurchaseInspector(data) {
     return !query || haystack.includes(query);
   });
 
+  const rangeWord = { day: "today", week: "this week", month: "this month", all: "all time" }[purchaseRange] || "";
   els.purchaseInspectorBadge.className = "badge";
   els.purchaseInspectorBadge.classList.add(rows.length ? "ok" : "warn");
-  els.purchaseInspectorBadge.textContent = `${rows.length} purchase${rows.length === 1 ? "" : "s"}`;
+  els.purchaseInspectorBadge.textContent = `${rows.length} purchase${rows.length === 1 ? "" : "s"} · ${rangeWord}`;
 
   if (!rows.length) {
     els.purchaseInspector.innerHTML = '<div class="empty-log">No purchase requests matched.</div>';
@@ -1216,20 +1231,68 @@ function purchaseSummary(data) {
     };
   }
 
-  const summary = data.nginx?.todayEvents?.purchases;
+  const summary = data.nginx?.todayEvents?.purchases || {};
   const stat = reliableEventStats(data).get("Purchase");
+  // Use `||` (not `??`) so a deduped count of 0 falls through to the raw event count.
+  // Otherwise a server-sent uniqueCount:0 would hide the real Purchase events (e.g. 55
+  // tracked purchases would render as "0" purchases / "0" revenue on the dashboard).
+  const rawCount = Number(summary.rawCount) || Number(eventRawCount(stat)) || 0;
+  const uniqueCount = Number(summary.uniqueCount) || Number(eventDisplayCount("Purchase", stat)) || rawCount;
+  const uniqueRevenue = Number(summary.uniqueRevenue) || Number(stat?.uniqueRevenue) || Number(summary.rawRevenue) || Number(stat?.rawRevenue) || 0;
   return {
-    rawCount: Number(summary?.rawCount ?? eventRawCount(stat)) || 0,
-    uniqueCount: Number(summary?.uniqueCount ?? eventDisplayCount("Purchase", stat)) || 0,
-    duplicateCount: Number(summary?.duplicateCount ?? stat?.duplicateCount) || 0,
-    keyedCount: Number(summary?.keyedCount ?? stat?.keyedCount) || 0,
-    estimatedKeyCount: Number(summary?.estimatedKeyCount ?? stat?.estimatedKeyCount) || 0,
-    uniqueRevenue: Number(summary?.uniqueRevenue ?? stat?.uniqueRevenue) || 0,
-    rawRevenue: Number(summary?.rawRevenue ?? stat?.rawRevenue) || 0,
-    averageOrderValue: Number(summary?.averageOrderValue ?? stat?.averageOrderValue) || 0,
-    currency: summary?.currency || stat?.currency || "",
+    rawCount,
+    uniqueCount,
+    duplicateCount: Number(summary.duplicateCount ?? stat?.duplicateCount) || 0,
+    keyedCount: Number(summary.keyedCount ?? stat?.keyedCount) || 0,
+    estimatedKeyCount: Number(summary.estimatedKeyCount ?? stat?.estimatedKeyCount) || 0,
+    uniqueRevenue,
+    rawRevenue: Number(summary.rawRevenue) || Number(stat?.rawRevenue) || uniqueRevenue,
+    averageOrderValue: uniqueCount ? uniqueRevenue / uniqueCount : 0,
+    currency: summary.currency || stat?.currency || "",
     source: "tracking"
   };
+}
+
+// Aggregate purchases + events across a 24h / 7d / 30d window. 24h prefers reconciled
+// orders (then falls back to today's purchase events); 7d/30d sum the enriched daily
+// history snapshots so revenue/conversion stay consistent with the selected range.
+function rangeDays(range) {
+  return range === "7d" ? 7 : range === "30d" ? 30 : 1;
+}
+
+function metricsForRange(data, range = "24h") {
+  const todayPurchases = purchaseSummary(data);
+  const todayEvents = Number(data.usage?.requestsToday || data.nginx?.todayEvents?.count || 0);
+  if (range === "24h") {
+    return {
+      events: todayEvents,
+      purchaseCount: Number(todayPurchases.uniqueCount || 0),
+      revenue: Number(todayPurchases.uniqueRevenue || 0),
+      currency: todayPurchases.currency || ""
+    };
+  }
+  const days = rangeDays(range);
+  const rows = (Array.isArray(data.history?.daily) ? data.history.daily : []).slice(0, days);
+  const todayKey = rows[0]?.date;
+  let events = 0;
+  let purchaseCount = 0;
+  let revenue = 0;
+  let currency = "";
+  for (const row of rows) {
+    events += Number(row.total || 0);
+    let dayPurchases = Number(row.purchaseCount || row.purchases || 0);
+    let dayRevenue = Number(row.purchaseRevenue || 0);
+    // Prefer reconciled orders for today when available (more accurate than events).
+    if (row.date === todayKey && Number(todayPurchases.uniqueCount || 0) > dayPurchases) {
+      dayPurchases = Number(todayPurchases.uniqueCount || 0);
+      dayRevenue = Number(todayPurchases.uniqueRevenue || 0) || dayRevenue;
+    }
+    purchaseCount += dayPurchases;
+    revenue += dayRevenue;
+    if (!currency && row.currency) currency = row.currency;
+  }
+  if (!currency) currency = todayPurchases.currency || "";
+  return { events, purchaseCount, revenue, currency };
 }
 
 function formatMoney(amount, currency) {
@@ -1646,20 +1709,20 @@ function renderCustomerSetup(data) {
   }
 }
 
-function renderCustomerPerformance(data) {
+function renderCustomerPerformance(data, range = customerKpiRange) {
   const summary = data.nginx?.todayEvents || {};
   const retainedSummary = data.nginx?.retainedEvents?.available ? data.nginx.retainedEvents : summary;
-  const purchases = purchaseSummary(data);
-  const totalEvents = Number(summary.count || 0);
-  const periodEvents = Number(data.usage?.requestsMonth ?? totalEvents);
-  const purchaseCount = Number(purchases.uniqueCount || 0);
-  const conversion = totalEvents ? Math.round((purchaseCount / totalEvents) * 100) : 0;
+  const m = metricsForRange(data, range);
+  const periodEvents = Number(data.usage?.requestsMonth ?? Number(summary.count || 0));
+  // Conversion is now window-aligned: purchases and events both come from `range`.
+  const conversion = m.events ? Math.round((m.purchaseCount / m.events) * 1000) / 10 : 0;
+  const rangeLabel = { "24h": "last 24 hours", "7d": "last 7 days", "30d": "last 30 days" }[range] || "last 24 hours";
   renderBusinessGrid(els.customerPerformanceGrid, [
     { label: "Events", value: periodEvents.toLocaleString(), detail: `${Number(data.usage?.usagePercent || 0)}% used this billing period` },
-    { label: "Today", value: Number(data.usage?.requestsToday || totalEvents || 0).toLocaleString(), detail: "Clean tracking requests" },
-    { label: "Revenue", value: purchases.uniqueRevenue ? formatMoney(purchases.uniqueRevenue, purchases.currency) : "0", detail: "Tracked purchase value" },
-    { label: "Conversion", value: `${conversion}%`, detail: `${purchaseCount.toLocaleString()} / ${totalEvents.toLocaleString()}` },
-    { label: "Purchases", value: purchaseCount.toLocaleString(), detail: "This month" }
+    { label: range === "24h" ? "Today" : "Window", value: m.events.toLocaleString(), detail: `Clean requests · ${rangeLabel}` },
+    { label: "Revenue", value: m.revenue ? formatMoney(m.revenue, m.currency) : "0", detail: `Tracked purchase value · ${rangeLabel}` },
+    { label: "Conversion", value: `${conversion}%`, detail: `${m.purchaseCount.toLocaleString()} / ${m.events.toLocaleString()}` },
+    { label: "Purchases", value: m.purchaseCount.toLocaleString(), detail: rangeLabel }
   ]);
   renderCustomerAnalytics(summary, data.history?.daily || [], customerChartRange, retainedSummary);
 }
@@ -1667,7 +1730,7 @@ function renderCustomerPerformance(data) {
 function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", eventSummary = summary) {
   if (els.customerEventChart) {
     const SERIES = [
-      { key: "total",         label: "Total Events",     color: "#e55a3a", width: 2.5, fill: true  },
+      { key: "total",         label: "Total Events",     color: "#7c3aed", width: 2.5, fill: true  },
       { key: "pageView",      label: "PageView",         color: "#6366f1", width: 1.5, fill: false },
       { key: "viewItem",      label: "ViewContent",      color: "#8b5cf6", width: 1.5, fill: false },
       { key: "addToCart",     label: "AddToCart",        color: "#10b981", width: 1.5, fill: false },
@@ -1739,8 +1802,9 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
         <svg class="customer-analytics-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily event analytics">
           <defs>
             <linearGradient id="chartTotalFill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stop-color="#e55a3a" stop-opacity="0.18" />
-              <stop offset="100%" stop-color="#e55a3a" stop-opacity="0.01" />
+              <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.26" />
+              <stop offset="55%" stop-color="#7c3aed" stop-opacity="0.10" />
+              <stop offset="100%" stop-color="#7c3aed" stop-opacity="0" />
             </linearGradient>
             <clipPath id="chartClip">
               <rect x="${pad.left}" y="${pad.top - 4}" width="${plotW}" height="${plotH + 4}" />
@@ -1750,7 +1814,7 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
           <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" />
           <g clip-path="url(#chartClip)">
             <path d="${areaPath}" fill="url(#chartTotalFill)" />
-            <path d="${linePath}" stroke="#e55a3a" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round" />
+            <path d="${linePath}" stroke="#7c3aed" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round" />
           </g>
           <line class="chart-crosshair-line" x1="0" y1="${pad.top}" x2="0" y2="${pad.top + plotH}" style="display:none" />
           <g class="chart-dots"></g>
@@ -1760,7 +1824,7 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
       `;
 
       if (els.customerChartLegend) {
-        els.customerChartLegend.innerHTML = `<span class="chart-legend-item" style="--dot-color:#e55a3a"><span class="chart-legend-dot"></span>Total Events</span>`;
+        els.customerChartLegend.innerHTML = `<span class="chart-legend-item" style="--dot-color:#7c3aed"><span class="chart-legend-dot"></span>Total Events</span>`;
       }
 
       const tooltip = document.getElementById("customerChartTooltip");
@@ -1774,8 +1838,8 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
           const total = Number(rect.dataset.total);
           crosshairLine.setAttribute("x1", x); crosshairLine.setAttribute("x2", x);
           crosshairLine.style.display = "";
-          dotsGroup.innerHTML = `<circle cx="${x}" cy="${toY(total).toFixed(1)}" r="4" fill="#e55a3a" stroke="white" stroke-width="2" />`;
-          tooltip.innerHTML = `<div class="tooltip-hour">${escapeHtml(rect.dataset.date || "")}</div><div class="tooltip-row"><span class="tooltip-dot" style="background:#e55a3a"></span><span>Total Events</span><strong>${total.toLocaleString()}</strong></div>`;
+          dotsGroup.innerHTML = `<circle cx="${x}" cy="${toY(total).toFixed(1)}" r="4" fill="#7c3aed" stroke="white" stroke-width="2" />`;
+          tooltip.innerHTML = `<div class="tooltip-hour">${escapeHtml(rect.dataset.date || "")}</div><div class="tooltip-row"><span class="tooltip-dot" style="background:#7c3aed"></span><span>Total Events</span><strong>${total.toLocaleString()}</strong></div>`;
           tooltip.style.display = "block";
         });
         rect.addEventListener("mousemove", (e) => {
@@ -1859,8 +1923,9 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
       <svg class="customer-analytics-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly event analytics">
         <defs>
           <linearGradient id="chartTotalFill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stop-color="#e55a3a" stop-opacity="0.18" />
-            <stop offset="100%" stop-color="#e55a3a" stop-opacity="0.01" />
+            <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.26" />
+              <stop offset="55%" stop-color="#7c3aed" stop-opacity="0.10" />
+              <stop offset="100%" stop-color="#7c3aed" stop-opacity="0" />
           </linearGradient>
           <clipPath id="chartClip">
             <rect x="${pad.left}" y="${pad.top - 4}" width="${plotW}" height="${plotH + 4}" />
@@ -2636,6 +2701,11 @@ function renderSetupAssistant(data) {
     const base = (data.config?.publicBaseUrl || window.location.origin).replace(/\/$/, "");
     const tenantId = data.session?.tenantId || currentSession.tenantId || "";
     wooUrlEl.textContent = `${base}/api/orders/woocommerce${tenantId ? `?tenant=${tenantId}` : ""}`;
+  }
+  const wooDomainEl = document.querySelector("[data-woo-tracking-domain]");
+  if (wooDomainEl) {
+    const domain = latest?.trackingDomain || data.config?.tenantDomain || data.config?.sslDomain || "your tracking domain";
+    wooDomainEl.textContent = domain;
   }
   setWooWebhookSecret(data.webhookSecret || "");
   updateSetupAssistantStep();
@@ -3453,7 +3523,7 @@ function renderAnalytics(data) {
   const errors = items.filter((item) => Number(item.status) >= 400).length;
   const counts = eventCounts(items);
   const clients = clientCounts(items);
-  els.analyticsModeBadge.textContent = "Recent sample";
+  els.analyticsModeBadge.textContent = "Live event logs";
   els.analyticsSummary.textContent = `${items.length.toLocaleString()} requests across ${counts.size.toLocaleString()} event types and ${clients.size.toLocaleString()} clients.`;
   els.analyticsTotal.textContent = `Total requests: ${items.length.toLocaleString()}`;
   renderLegend(counts);
@@ -4103,85 +4173,74 @@ function renderEventLogDailyChart(dailyHistory) {
     els.customerEventLogChart.innerHTML = '<div class="empty-log" style="padding:2rem 1rem;text-align:center;color:var(--color-muted);font-size:.85rem">No daily history yet.</div>';
     return;
   }
-  const W = 640; const H = 180;
-  const pad = { left: 46, right: 20, top: 16, bottom: 34 };
+  const W = 700; const H = 220;
+  const pad = { left: 44, right: 16, top: 18, bottom: 36 };
   const plotW = W - pad.left - pad.right;
   const plotH = H - pad.top - pad.bottom;
-  const maxVal = Math.max(1, ...rows.map((r) => Number(r.total || 0)));
-  const toX = (i) => rows.length < 2 ? pad.left + plotW / 2 : pad.left + (i / (rows.length - 1)) * plotW;
-  const toY = (v) => Math.max(pad.top, pad.top + plotH - Math.min(Number(v) / maxVal, 1) * plotH);
-  const baseY = (pad.top + plotH).toFixed(1);
+  const maxRaw = Math.max(1, ...rows.map((r) => Number(r.total || 0)));
+  // Round the top gridline up to a "nice" number so the axis reads cleanly.
+  const niceMax = (() => {
+    const pow = Math.pow(10, Math.floor(Math.log10(maxRaw)));
+    const n = maxRaw / pow;
+    const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+    return step * pow;
+  })();
+  const baseY = pad.top + plotH;
+  const slot = plotW / rows.length;
+  const barW = Math.max(3, Math.min(26, slot * 0.55));
+  const barX = (i) => pad.left + slot * i + (slot - barW) / 2;
+  const toY = (v) => baseY - Math.min(Number(v) / niceMax, 1) * plotH;
 
-  function smoothPath(pts) {
-    if (!pts.length) return "";
-    let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
-      const cp1x = p1.x + (p2.x - p0.x) / 6, cp1y = Math.max(pad.top, Math.min(pad.top + plotH, p1.y + (p2.y - p0.y) / 6));
-      const cp2x = p2.x - (p3.x - p1.x) / 6, cp2y = Math.max(pad.top, Math.min(pad.top + plotH, p2.y - (p3.y - p1.y) / 6));
-      d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-    }
-    return d;
-  }
-
-  const pts = rows.map((r, i) => ({ x: toX(i), y: toY(Number(r.total || 0)) }));
-  const line = smoothPath(pts);
-  const area = `${line} L ${toX(rows.length - 1).toFixed(1)},${baseY} L ${toX(0).toFixed(1)},${baseY} Z`;
-
-  const yTicks = [0, 0.5, 1].map((pct) => {
-    const y = (pad.top + plotH * (1 - pct)).toFixed(1);
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
+    const y = (baseY - plotH * pct).toFixed(1);
+    const val = Math.round(niceMax * pct);
     return `<line class="${pct === 0 ? "chart-axis-line" : "chart-grid-line-dashed"}" x1="${pad.left}" y1="${y}" x2="${pad.left + plotW}" y2="${y}" />
-            <text class="chart-axis-label" x="${pad.left - 8}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end">${Math.round(maxVal * pct)}</text>`;
+            <text class="chart-axis-label" x="${pad.left - 8}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end">${val.toLocaleString()}</text>`;
   }).join("");
 
-  const labelStep = rows.length <= 10 ? 1 : rows.length <= 20 ? 2 : 5;
+  const labelStep = rows.length <= 10 ? 1 : rows.length <= 16 ? 2 : 3;
   const xLabels = rows.map((r, i) => {
     if (i % labelStep !== 0 && i !== rows.length - 1) return "";
-    return `<text class="chart-axis-label" x="${toX(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${escapeHtml((r.date || "").slice(5))}</text>`;
+    const cx = barX(i) + barW / 2;
+    return `<text class="chart-axis-label" x="${cx.toFixed(1)}" y="${H - 10}" text-anchor="middle">${escapeHtml((r.date || "").slice(5))}</text>`;
   }).join("");
 
-  const slotW = rows.length > 1 ? plotW / (rows.length - 1) : plotW;
-  const hoverRects = rows.map((r, i) =>
-    `<rect class="chart-hover-rect" x="${(toX(i) - slotW / 2).toFixed(1)}" y="${pad.top}" width="${slotW.toFixed(1)}" height="${plotH}" data-idx="${i}" data-date="${escapeHtml(r.date || "")}" data-total="${Number(r.total || 0)}" />`
-  ).join("");
+  const bars = rows.map((r, i) => {
+    const total = Number(r.total || 0);
+    const y = toY(total);
+    const h = Math.max(total > 0 ? 2 : 0, baseY - y);
+    const x = barX(i);
+    const rx = Math.min(barW / 2, 4);
+    return `<rect class="log-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="${rx}" fill="url(#logBarFill)" data-idx="${i}" data-date="${escapeHtml(r.date || "")}" data-total="${total}" data-purchases="${Number(r.purchases || 0)}" />`;
+  }).join("");
 
   els.customerEventLogChart.innerHTML = `
     <div class="chart-tooltip" id="logChartTooltip" style="display:none;pointer-events:none"></div>
-    <svg class="customer-analytics-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily event trend">
+    <svg class="customer-analytics-svg log-bar-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily event volume">
       <defs>
-        <linearGradient id="logChartFill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stop-color="#6366f1" stop-opacity="0.15" />
-          <stop offset="100%" stop-color="#6366f1" stop-opacity="0.01" />
+        <linearGradient id="logBarFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#7c3aed" />
+          <stop offset="100%" stop-color="#5b21b6" />
         </linearGradient>
-        <clipPath id="logChartClip">
-          <rect x="${pad.left}" y="${pad.top - 4}" width="${plotW}" height="${plotH + 4}" />
-        </clipPath>
       </defs>
       <g>${yTicks}</g>
-      <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" />
-      <g clip-path="url(#logChartClip)">
-        <path d="${area}" fill="url(#logChartFill)" />
-        <path d="${line}" stroke="#6366f1" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round" />
-      </g>
-      <line class="chart-crosshair-line" x1="0" y1="${pad.top}" x2="0" y2="${pad.top + plotH}" style="display:none" />
-      <g class="chart-dots"></g>
-      <g>${hoverRects}</g>
+      <g class="log-bars">${bars}</g>
       ${xLabels}
     </svg>
   `;
 
   const tooltip = document.getElementById("logChartTooltip");
-  const crosshairLine = els.customerEventLogChart.querySelector(".chart-crosshair-line");
-  const dotsGroup = els.customerEventLogChart.querySelector(".chart-dots");
-  els.customerEventLogChart.querySelectorAll(".chart-hover-rect").forEach((rect) => {
-    rect.addEventListener("mouseenter", () => {
-      const i = Number(rect.dataset.idx); const x = toX(i).toFixed(1); const total = Number(rect.dataset.total);
-      crosshairLine.setAttribute("x1", x); crosshairLine.setAttribute("x2", x); crosshairLine.style.display = "";
-      dotsGroup.innerHTML = `<circle cx="${x}" cy="${toY(total).toFixed(1)}" r="4" fill="#6366f1" stroke="white" stroke-width="2" />`;
-      tooltip.innerHTML = `<div class="tooltip-hour">${escapeHtml(rect.dataset.date || "")}</div><div class="tooltip-row"><span class="tooltip-dot" style="background:#6366f1"></span><span>Events</span><strong>${total.toLocaleString()}</strong></div>`;
+  els.customerEventLogChart.querySelectorAll(".log-bar").forEach((bar) => {
+    bar.addEventListener("mouseenter", () => {
+      const total = Number(bar.dataset.total);
+      const purchases = Number(bar.dataset.purchases);
+      bar.classList.add("is-active");
+      tooltip.innerHTML = `<div class="tooltip-hour">${escapeHtml(bar.dataset.date || "")}</div>`
+        + `<div class="tooltip-row"><span class="tooltip-dot" style="background:var(--color-accent)"></span><span>Events</span><strong>${total.toLocaleString()}</strong></div>`
+        + (purchases ? `<div class="tooltip-row"><span class="tooltip-dot" style="background:var(--c-purchase)"></span><span>Purchases</span><strong>${purchases.toLocaleString()}</strong></div>` : "");
       tooltip.style.display = "block";
     });
-    rect.addEventListener("mousemove", (e) => {
+    bar.addEventListener("mousemove", (e) => {
       const cr = els.customerEventLogChart.getBoundingClientRect();
       const tw = tooltip.offsetWidth || 150; const th = tooltip.offsetHeight || 60;
       let left = e.clientX - cr.left + 16; let top = e.clientY - cr.top - th - 12;
@@ -4189,8 +4248,8 @@ function renderEventLogDailyChart(dailyHistory) {
       if (top < 0) top = e.clientY - cr.top + 12;
       tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
     });
-    rect.addEventListener("mouseleave", () => {
-      tooltip.style.display = "none"; crosshairLine.style.display = "none"; dotsGroup.innerHTML = "";
+    bar.addEventListener("mouseleave", () => {
+      tooltip.style.display = "none"; bar.classList.remove("is-active");
     });
   });
 }
@@ -4302,6 +4361,22 @@ document.addEventListener("click", (e) => {
     const retainedSummary = latestData.nginx?.retainedEvents?.available ? latestData.nginx.retainedEvents : summary;
     renderCustomerAnalytics(summary, latestData.history?.daily || [], customerChartRange, retainedSummary);
   }
+});
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-kpi-range]");
+  if (!btn) return;
+  customerKpiRange = btn.dataset.kpiRange;
+  document.querySelectorAll("[data-kpi-range]").forEach((b) => b.classList.toggle("is-active", b === btn));
+  if (latestData) renderCustomerPerformance(latestData, customerKpiRange);
+});
+
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-purchase-range]");
+  if (!btn) return;
+  purchaseRange = btn.dataset.purchaseRange;
+  document.querySelectorAll("[data-purchase-range]").forEach((b) => b.classList.toggle("is-active", b === btn));
+  if (latestData) renderPurchaseInspector(latestData);
 });
 
 els.refreshButton.addEventListener("click", loadDashboard);
@@ -4429,6 +4504,7 @@ els.workerNodeForm.addEventListener("submit", async (event) => {
   }
 });
 function renderCustomerAccountSettings() {
+  if (latestData) renderAccountOverview(latestData, null);
   fetch("/api/customer/me")
     .then((r) => r.json())
     .then((result) => {
@@ -4437,8 +4513,56 @@ function renderCustomerAccountSettings() {
       if (els.customerProfileName) els.customerProfileName.value = fullName || "";
       if (els.customerProfileEmail) els.customerProfileEmail.value = email || "";
       if (els.customerProfilePhone) els.customerProfilePhone.value = phone || "";
+      renderAccountOverview(latestData, result.account);
     })
     .catch(() => {});
+}
+
+function renderAccountOverview(data, account) {
+  if (!els.accountOverviewGrid) return;
+  const usage = data?.usage || {};
+  const tenant = data?.customers?.tenants?.[0] || {};
+  const name = account?.fullName || tenant.fullName || tenant.name || "Your account";
+  const email = account?.email || tenant.email || "—";
+  const created = account?.createdAt || tenant.createdAt;
+  const domain = data?.config?.tenantDomain || tenant.trackingDomain || "Not set up yet";
+  const plan = usage.plan || tenant.plan || "Starter";
+  const subStatus = (usage.subscriptionStatus || tenant.subscriptionStatus || "trial");
+  const payStatus = (usage.paymentStatus || tenant.paymentStatus || "");
+  const requestsMonth = Number(usage.requestsMonth || 0);
+  const requestLimit = Number(usage.requestLimit || 0);
+  const usagePercent = Number(usage.usagePercent || 0);
+  const renewal = usage.renewalDate || usage.periodEnd;
+  const webhookConfigured = Boolean(data?.webhookSecret) || Boolean(data?.orders?.configured);
+
+  if (els.accountIdentityName) els.accountIdentityName.textContent = name;
+  if (els.accountIdentityEmail) els.accountIdentityEmail.textContent = email;
+  if (els.accountAvatar) els.accountAvatar.textContent = (name.trim()[0] || "T").toUpperCase();
+  if (els.accountIdentitySince) {
+    els.accountIdentitySince.textContent = created ? `Member since ${formatDate(created).split(",")[0]}` : "";
+  }
+  if (els.accountPlanBadge) {
+    const ok = subStatus === "active";
+    els.accountPlanBadge.innerHTML = `<span class="badge ${ok ? "ok" : "warn"}">${escapeHtml(plan)} · ${escapeHtml(subStatus)}</span>`;
+  }
+
+  const statusTone = subStatus === "active" ? "healthy" : subStatus === "trial" ? "warn" : "bad";
+  const cards = [
+    { label: "Plan", value: plan, detail: payStatus ? `Payment: ${payStatus}` : "Subscription plan", tone: "accent" },
+    { label: "Subscription", value: subStatus.charAt(0).toUpperCase() + subStatus.slice(1), detail: renewal ? `Renews ${formatDate(renewal).split(",")[0]}` : "—", tone: statusTone },
+    { label: "Usage this period", value: requestLimit ? `${usagePercent}%` : requestsMonth.toLocaleString(), detail: requestLimit ? `${requestsMonth.toLocaleString()} / ${requestLimit.toLocaleString()} requests` : "Requests this period", tone: usagePercent >= 90 ? "bad" : usagePercent >= 75 ? "warn" : "healthy" },
+    { label: "Tracking domain", value: domain, detail: "Your first-party endpoint", tone: domain.includes(".") ? "healthy" : "warn", mono: true },
+    { label: "Order webhook", value: webhookConfigured ? "Connected" : "Not connected", detail: webhookConfigured ? "Server-side purchase recovery active" : "Set up in Setup Assistant", tone: webhookConfigured ? "healthy" : "warn" },
+    { label: "Support", value: "tagioo.com", detail: "We reply within a few hours", tone: "accent" }
+  ];
+
+  els.accountOverviewGrid.innerHTML = cards.map((c) => `
+    <article class="account-card account-card-${c.tone || "healthy"}">
+      <span class="account-card-label">${escapeHtml(c.label)}</span>
+      <strong class="account-card-value${c.mono ? " mono" : ""}">${escapeHtml(String(c.value))}</strong>
+      <span class="account-card-detail">${escapeHtml(c.detail)}</span>
+    </article>
+  `).join("");
 }
 
 els.accountSettingsTabs.addEventListener("click", (event) => {

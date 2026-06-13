@@ -6,9 +6,12 @@
     <title>Tagioo Control Panel</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/tokens.css" />
-    <link rel="stylesheet" href="/styles.css?v=3" />
+    <!-- Load Google Fonts non-render-blocking: text paints immediately in the system
+         fallback (display=swap), then swaps to the brand fonts once they arrive. -->
+    <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
+    <link rel="stylesheet" href="/tokens.css?v=5" />
+    <link rel="stylesheet" href="/styles.css?v=5" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -137,7 +140,20 @@
               </div>
             </article>
 
-            <section id="customerPerformanceGrid" class="business-grid customer-performance-grid" aria-label="Customer performance"></section>
+            <div class="kpi-block">
+              <div class="kpi-block-header">
+                <div>
+                  <h2>Business Performance</h2>
+                  <p>Revenue, conversion and purchases for the selected window.</p>
+                </div>
+                <div class="chart-range-toggle" role="group" aria-label="Metric time range">
+                  <button class="chart-range-btn is-active" type="button" data-kpi-range="24h">24h</button>
+                  <button class="chart-range-btn" type="button" data-kpi-range="7d">7d</button>
+                  <button class="chart-range-btn" type="button" data-kpi-range="30d">30d</button>
+                </div>
+              </div>
+              <section id="customerPerformanceGrid" class="business-grid customer-performance-grid" aria-label="Customer performance"></section>
+            </div>
 
             <section class="customer-analytics-grid">
               <article class="panel customer-chart-panel">
@@ -412,7 +428,7 @@
                 <h2>Incoming Requests</h2>
                 <p id="eventLogSummary">Waiting for access logs.</p>
               </div>
-              <span class="badge">Recent sample</span>
+              <span class="badge badge-live">Live event logs</span>
             </div>
             <div class="event-table-wrap">
               <table class="event-table">
@@ -445,6 +461,12 @@
             </div>
             <div class="inspector-tools">
               <input id="purchaseSearch" type="search" placeholder="Search purchase metadata" />
+              <div class="chart-range-toggle" role="group" aria-label="Purchase time range">
+                <button class="chart-range-btn is-active" type="button" data-purchase-range="day">Day</button>
+                <button class="chart-range-btn" type="button" data-purchase-range="week">Week</button>
+                <button class="chart-range-btn" type="button" data-purchase-range="month">Month</button>
+                <button class="chart-range-btn" type="button" data-purchase-range="all">All</button>
+              </div>
             </div>
             <div id="purchaseInspector" class="inspector-list"></div>
           </section>
@@ -998,13 +1020,13 @@
               <p>Each event below maps to a GTM trigger in your imported template. The GA4 tag forwards everything (including <code>user_data</code> and <code>ecommerce</code>) to sGTM → Meta CAPI. Always push <code>{ ecommerce: null }</code> before any ecommerce event to clear previous data.</p>
 
               <div class="instructions-tabs" role="tablist">
-                <button class="instructions-tab is-active" data-tab="custom" role="tab">Custom / JS</button>
+                <button class="instructions-tab is-active" data-tab="woo" role="tab">WooCommerce</button>
                 <button class="instructions-tab" data-tab="shopify" role="tab">Shopify</button>
-                <button class="instructions-tab" data-tab="woo" role="tab">WooCommerce</button>
+                <button class="instructions-tab" data-tab="custom" role="tab">Custom / JS</button>
               </div>
 
               <!-- ── Custom / JS ── -->
-              <div class="instructions-tab-panel is-active" data-tab-panel="custom">
+              <div class="instructions-tab-panel" data-tab-panel="custom">
 
                 <div class="event-group">
                   <div class="event-group-header">
@@ -1325,9 +1347,23 @@ window.dataLayer.push({
               </div><!-- /shopify tab -->
 
               <!-- ── WooCommerce ── -->
-              <div class="instructions-tab-panel" data-tab-panel="woo">
+              <div class="instructions-tab-panel is-active" data-tab-panel="woo">
 
-                <div class="event-group">
+                <div class="setup-quickstart">
+                  <div class="setup-quickstart-head">
+                    <span class="badge ok">10-minute setup</span>
+                    <h3>WooCommerce → Tagioo in 4 steps</h3>
+                    <p>Follow these in order. Each step takes ~2 minutes. By the end your store sends clean, server-side, deduplicated events to GA4, Meta and TikTok — and recovers purchases even when the browser pixel is blocked.</p>
+                  </div>
+                  <ol class="setup-stepper">
+                    <li><span class="setup-step-no">1</span><div><strong>Order sync webhook</strong><span>Native WooCommerce webhook → Tagioo. No plugin. ~2 min.</span><a href="#wooStep1" data-scroll-target="wooStep1">Jump to step 1 ↓</a></div></li>
+                    <li><span class="setup-step-no">2</span><div><strong>Install GTM4WP plugin</strong><span>Free WordPress plugin that pushes the dataLayer e-commerce events. ~3 min.</span><a href="#wooStep2" data-scroll-target="wooStep2">Jump to step 2 ↓</a></div></li>
+                    <li><span class="setup-step-no">3</span><div><strong>Import GTM containers</strong><span>Import the two ready-made JSON files (web + server). ~3 min.</span><a href="#wooStep3" data-scroll-target="wooStep3">Jump to step 3 ↓</a></div></li>
+                    <li><span class="setup-step-no">4</span><div><strong>Test &amp; go live</strong><span>Fire a test purchase and confirm it lands everywhere. ~2 min.</span><a href="#wooStep4" data-scroll-target="wooStep4">Jump to step 4 ↓</a></div></li>
+                  </ol>
+                </div>
+
+                <div class="event-group" id="wooStep1">
                   <div class="event-group-header">
                     <span class="event-label">Step 1 — order sync (no plugin)</span>
                     <span class="event-trigger">WooCommerce native webhook — built into every WordPress store, nothing to install</span>
@@ -1353,6 +1389,65 @@ API Version:   WP REST API Integration v3</code></pre>
                   </ol>
                   <p class="woo-webhook-note">Generating a new secret replaces the old one, so update the WooCommerce webhook if you regenerate. Tagioo verifies every delivery with the <code>x-wc-webhook-signature</code> header, so no plugin, code snippet, or API key is needed on your site. Order ID, total, currency, and date are mapped automatically.</p>
                 </div>
+
+                <div class="event-group" id="wooStep2">
+                  <div class="event-group-header">
+                    <span class="event-label">Step 2 — install GTM4WP</span>
+                    <span class="event-trigger">Free plugin that pushes WooCommerce e-commerce events into the dataLayer — no code</span>
+                  </div>
+                  <ol class="woo-webhook-steps">
+                    <li>In WordPress admin go to <strong>Plugins → Add New</strong>, search <strong>“GTM4WP”</strong> (by Thomas Geiger), then <strong>Install</strong> and <strong>Activate</strong>.</li>
+                    <li>Open <strong>Settings → Google Tag Manager</strong> and enter your <strong>web</strong> container ID in <strong>General → Google Tag Manager ID</strong> (format <code>GTM-XXXXXXX</code>). Set <strong>Container code placement</strong> to <em>Codeless / off</em> only if you load GTM yourself; otherwise leave <em>On</em>.</li>
+                    <li>Open the <strong>Integration → WooCommerce</strong> tab and turn ON these settings:</li>
+                  </ol>
+<pre class="instructions-code"><code>✅ Track enhanced e-commerce          (master switch)
+✅ Track classic e-commerce            OFF — use enhanced only
+✅ purchase / view_item / add_to_cart / begin_checkout / view_item_list
+✅ Use new GA4 ecommerce data structure   ← REQUIRED (items[], not products[])
+✅ Include tax in product price        (match your GA4 / Meta value)
+✅ Send user data (email, phone) on order   ← powers Meta CAPI / Google EC matching</code></pre>
+                  <p class="woo-webhook-note">The <strong>“new GA4 ecommerce data structure”</strong> toggle is the one people miss — without it events arrive in the old Universal Analytics shape and Tagioo’s GA4/Meta tags won’t read the items array. Save changes. GTM4WP now pushes <code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code> and <code>purchase</code> automatically — you can skip the manual PHP snippets at the bottom of this page.</p>
+                </div>
+
+                <div class="event-group" id="wooStep3">
+                  <div class="event-group-header">
+                    <span class="event-label">Step 3 — import GTM containers</span>
+                    <span class="event-trigger">Two ready-made JSON files: one web container, one server container</span>
+                  </div>
+                  <ol class="woo-webhook-steps">
+                    <li>Download the two container files generated for your store using the buttons in the <strong>“Container templates”</strong> panel above (Web container JSON + Server container JSON).</li>
+                    <li><strong>Web container:</strong> open <a href="https://tagmanager.google.com" target="_blank" rel="noopener">tagmanager.google.com</a> → your <em>web</em> container → <strong>Admin → Import Container</strong>. Choose the web JSON, pick <strong>Existing</strong> workspace, and select <strong>Merge → Overwrite conflicting tags</strong>. Click <strong>Confirm</strong>.</li>
+                    <li><strong>Server container:</strong> switch to your <em>server</em> container → <strong>Admin → Import Container</strong>, choose the server JSON, <strong>Merge → Overwrite</strong>, <strong>Confirm</strong>.</li>
+                    <li>In the server container open <strong>Clients</strong> and confirm the <em>GA4</em> client and the <em>Data tag</em> point to <code><span data-woo-tracking-domain>your tracking domain</span></code>.</li>
+                    <li>Click <strong>Submit → Publish</strong> on <em>both</em> containers.</li>
+                  </ol>
+                  <p class="woo-webhook-note">The JSON files already contain the GA4, Meta CAPI and TikTok tags, all triggers, and the variables that read GTM4WP’s dataLayer — including <code>transaction_id</code> for deduplication. You only fill in your own pixel/measurement IDs, which are pre-populated from the form above.</p>
+                </div>
+
+                <div class="event-group" id="wooStep4">
+                  <div class="event-group-header">
+                    <span class="event-label">Step 4 — test &amp; go live</span>
+                    <span class="event-trigger">Confirm one real purchase reaches every destination, then you’re done</span>
+                  </div>
+                  <ol class="woo-webhook-steps">
+                    <li>In each GTM container click <strong>Preview</strong> and enter your store URL to open Tag Assistant.</li>
+                    <li>On your store: view a product, add to cart, begin checkout, and place a <strong>test order</strong> (a 1-unit cheap product or 100% coupon).</li>
+                    <li>In Tag Assistant confirm <code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code> and <code>purchase</code> fire, and that the GA4 / Meta / TikTok tags fired on <code>purchase</code>.</li>
+                    <li>Verify the event landed everywhere:
+                      <ul>
+                        <li><strong>Tagioo → Event Logs:</strong> the request appears within seconds; the <strong>Purchase Inspector</strong> shows the order with its <code>transaction_id</code>.</li>
+                        <li><strong>GA4:</strong> Reports → Realtime shows the purchase with revenue.</li>
+                        <li><strong>Meta:</strong> Events Manager → Test Events shows <code>Purchase</code> (server) — and no duplicate vs the browser pixel, because both share <code>transaction_id</code>.</li>
+                      </ul>
+                    </li>
+                    <li>Refund/cancel the test order. Done — your store is now tracking server-side. 🎉</li>
+                  </ol>
+                  <p class="woo-webhook-note">Seeing duplicate purchases in Meta? Make sure the browser pixel and the CAPI/server tag both send the same <code>event_id</code>/<code>transaction_id</code> (the order ID). Tagioo and the supplied containers already do this — duplicates almost always mean a second, older pixel is still hard-coded in your theme.</p>
+                </div>
+
+                <details class="woo-advanced">
+                  <summary>Advanced — manual dataLayer snippets (skip if you installed GTM4WP)</summary>
+                  <p class="woo-webhook-note">Only use these if you are <em>not</em> using GTM4WP and want to push the dataLayer yourself from your theme’s <code>functions.php</code>.</p>
 
                 <div class="event-group">
                   <div class="event-group-header">
@@ -1533,6 +1628,7 @@ window.dataLayer.push({
 });&lt;/script&gt;";
 }, 10);</code></pre>
                 </div>
+                </details>
 
               </div><!-- /woo tab -->
             </div>
@@ -1939,9 +2035,22 @@ window.dataLayer.push({
           <section class="customer-page-head">
             <div>
               <p class="breadcrumb">Account / Settings</p>
-              <h2>Account Settings</h2>
-              <p>Update your profile information and password.</p>
+              <h2>Account &amp; Settings</h2>
+              <p>Your account overview, billing, tracking setup, and security — all in one place.</p>
             </div>
+            <div id="accountPlanBadge"></div>
+          </section>
+
+          <section class="account-overview" aria-label="Account overview">
+            <article class="account-identity panel">
+              <div class="account-avatar" id="accountAvatar">T</div>
+              <div class="account-identity-meta">
+                <strong id="accountIdentityName">—</strong>
+                <span id="accountIdentityEmail">—</span>
+                <span class="account-identity-since" id="accountIdentitySince"></span>
+              </div>
+            </article>
+            <div id="accountOverviewGrid" class="account-overview-grid"></div>
           </section>
 
           <div class="account-settings-layout">
@@ -2065,6 +2174,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=3" type="module"></script>
+    <script src="/app.js?v=5" type="module"></script>
   </body>
 </html>
