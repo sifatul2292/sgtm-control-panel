@@ -749,6 +749,14 @@ h2 {
   font-weight: 850;
 }
 
+.label-optional {
+  font-weight: 600;
+  font-size: 0.75em;
+  color: var(--color-accent, #7c3aed);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .assistant-destination-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
