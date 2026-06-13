@@ -3,7 +3,7 @@ import { mkdir, open, readFile, rename, stat, writeFile } from "node:fs/promises
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -693,9 +693,18 @@ function addRaw(target, key, value) {
   if (value !== undefined && value !== null && value !== '') target[key] = makeString(value);
 }
 
+const mappedEventName = eventMap[eventData.event_name];
+if (!mappedEventName) {
+  if (data.enableDebugLog) {
+    logToConsole('Tagioo Meta CAPI: skipping unmapped event ' + eventData.event_name);
+  }
+  data.gtmOnSuccess();
+  return;
+}
+
 const userData = eventData.user_data || {};
 const event = {
-  event_name: eventMap[eventData.event_name] || eventData.event_name,
+  event_name: mappedEventName,
   event_time: eventData.event_time || Math.round(getTimestampMillis() / 1000),
   action_source: eventData.action_source || data.actionSource || 'website',
   event_source_url: eventData.page_location,
@@ -943,6 +952,20 @@ function tagiooGalleryTemplateGuide(destinations) {
   return guide;
 }
 
+// Browser-side Meta Pixel event tag. Reads ecommerce + event_id from dataLayer
+// at runtime. event_id falls back to ecommerce.transaction_id so it matches the
+// server CAPI hit (which uses the same fallback) and dedupes. eventID is omitted
+// entirely when no id exists, to avoid sending the literal string "undefined".
+function metaPixelEventScript(metaEventName) {
+  const orderId = metaEventName === "Purchase" ? "if(ec.transaction_id)p.order_id=ec.transaction_id;" : "";
+  return "<script>(function(){var dl=window.dataLayer||[];var ec=null,eid='';for(var i=dl.length-1;i>=0;i--){var e=dl[i];if(!e)continue;if(!eid&&e.event_id)eid=e.event_id;if(!ec&&e.ecommerce)ec=e.ecommerce;}ec=ec||{};if(!eid&&ec.transaction_id)eid=ec.transaction_id;var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;" + orderId + "if(window.fbq)fbq('track','" + metaEventName + "',p,eid?{eventID:String(eid)}:{});})();</script>";
+}
+
+// Browser-side TikTok Pixel event tag. Same runtime-read + event_id fallback.
+function tiktokPixelEventScript(tiktokEventName) {
+  return "<script>(function(){var dl=window.dataLayer||[];var ec=null,eid='';for(var i=dl.length-1;i>=0;i--){var e=dl[i];if(!e)continue;if(!eid&&e.event_id)eid=e.event_id;if(!ec&&e.ecommerce)ec=e.ecommerce;}ec=ec||{};if(!eid&&ec.transaction_id)eid=ec.transaction_id;var items=ec.items||[];var contents=items.map(function(it){return {content_id:String(it.item_id||it.id||''),content_name:it.item_name,quantity:it.quantity||1,price:it.price};});var p={contents:contents,content_type:'product'};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;if(window.ttq)ttq.track('" + tiktokEventName + "',p,eid?{event_id:String(eid)}:{});})();</script>";
+}
+
 function buildWebGtmTemplate(input) {
   const destinations = selectedDestinations(input);
   const payload = {
@@ -1046,7 +1069,7 @@ function buildWebGtmTemplate(input) {
           { parameter: "tax", parameterValue: "{{dlv - ecommerce.tax}}" }
         );
       }
-      const isFiringOnce = eventName === "purchase";
+      const isFiringOnce = true;
       const tagObj = gtmTag(tags.length + 1, `Tagioo GA4 - ${eventName}`, "gaawe", [
         gtmBooleanParam("sendEcommerceData", false),
         gtmBooleanParam("enhancedUserId", false),
@@ -1061,13 +1084,43 @@ function buildWebGtmTemplate(input) {
   }
   if (destinations.includes("meta")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo Meta - Pixel Base", "html", [
-      gtmTemplateParam("html", "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{Tagioo - meta_pixel_id}}');fbq('track','PageView');</script>")
+      gtmTemplateParam("html", "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{Tagioo - meta_pixel_id}}');(function(){var dl=window.dataLayer||[],eid='';for(var i=dl.length-1;i>=0;i--){if(dl[i]&&dl[i].event_id){eid=dl[i].event_id;break;}}fbq('track','PageView',{},eid?{eventID:String(eid)}:{});})();</script>")
     ], ["2147479553"], "4"));
+    // Browser pixel events, deduped with server CAPI via event_id.
+    const metaEventMap = [
+      ["view_item", "ViewContent", "2"],
+      ["add_to_cart", "AddToCart", "3"],
+      ["begin_checkout", "InitiateCheckout", "4"],
+      ["add_payment_info", "AddPaymentInfo", "6"],
+      ["purchase", "Purchase", "5"]
+    ];
+    for (const [eventName, metaEventName, triggerId] of metaEventMap) {
+      const metaTag = gtmTag(tags.length + 1, `Tagioo Meta - ${metaEventName}`, "html", [
+        gtmTemplateParam("html", metaPixelEventScript(metaEventName))
+      ], [triggerId], "4");
+      metaTag.tagFiringOption = "ONCE_PER_LOAD";
+      tags.push(metaTag);
+    }
   }
   if (destinations.includes("tiktok")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo TikTok - Pixel Base", "html", [
       gtmTemplateParam("html", "<script>!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=['page','track','identify','instances','debug','on','off','once','ready','alias','group','enableCookie','disableCookie'];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.load=function(e){var i='https://analytics.tiktok.com/i18n/pixel/events.js';ttq._i=ttq._i||{};ttq._i[e]=[];var n=d.createElement('script');n.type='text/javascript';n.async=!0;n.src=i;var a=d.getElementsByTagName('script')[0];a.parentNode.insertBefore(n,a)};ttq.load('{{Tagioo - tiktok_pixel_id}}');ttq.page();}(window,document,'ttq');</script>")
     ], ["2147479553"], "6"));
+    // Browser pixel events, deduped with server Events API via event_id.
+    const tiktokEventMap = [
+      ["view_item", "ViewContent", "2"],
+      ["add_to_cart", "AddToCart", "3"],
+      ["begin_checkout", "InitiateCheckout", "4"],
+      ["add_payment_info", "AddPaymentInfo", "6"],
+      ["purchase", "CompletePayment", "5"]
+    ];
+    for (const [eventName, tiktokEventName, triggerId] of tiktokEventMap) {
+      const tiktokTag = gtmTag(tags.length + 1, `Tagioo TikTok - ${tiktokEventName}`, "html", [
+        gtmTemplateParam("html", tiktokPixelEventScript(tiktokEventName))
+      ], [triggerId], "6");
+      tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
+      tags.push(tiktokTag);
+    }
   }
   return gtmExport("web", "Tagioo Web GTM Template", payload, {
     tag: tags,
@@ -1103,6 +1156,8 @@ function buildServerGtmTemplate(input) {
     gtmConstVariable(4, "Tagioo - meta_test_event_code", metaTestEventCode, "1"),
     gtmConstVariable(5, "Tagioo - google_ads_conversion_id", cleanTemplateValue(input.googleAdsConversionId), "1"),
     gtmConstVariable(6, "Tagioo - google_ads_purchase_label", cleanTemplateValue(input.googleAdsPurchaseLabel), "1"),
+    gtmConstVariable(9, "Tagioo - google_ads_atc_label", cleanTemplateValue(input.googleAdsAddToCartLabel), "1"),
+    gtmConstVariable(10, "Tagioo - google_ads_begin_checkout_label", cleanTemplateValue(input.googleAdsBeginCheckoutLabel), "1"),
     gtmConstVariable(7, "Tagioo - tiktok_pixel_id", cleanTemplateValue(input.tiktokPixelId), "1"),
     gtmConstVariable(8, "Tagioo - tiktok_access_token", cleanTemplateValue(input.tiktokAccessToken), "1"),
     gtmEventDataVariable(20, "ed - value", "value"),
@@ -1191,6 +1246,28 @@ function buildServerGtmTemplate(input) {
       gtmTemplateParam("conversionId", "{{Tagioo - google_ads_conversion_id}}"),
       gtmBooleanParam("rdp", false)
     ], ["1"], "5"));
+    // Optional micro-conversions — only emitted when a label is supplied (wires the
+    // previously-unused add_to_cart / begin_checkout server triggers).
+    if (String(input.googleAdsAddToCartLabel || "").trim()) {
+      tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Add to Cart", "sgtmadsct", [
+        gtmTemplateParam("productReportingDataSource", "EVENT"),
+        gtmBooleanParam("enableConversionLinker", true),
+        gtmBooleanParam("enableProductReporting", true),
+        gtmTemplateParam("conversionId", "{{Tagioo - google_ads_conversion_id}}"),
+        gtmTemplateParam("conversionLabel", "{{Tagioo - google_ads_atc_label}}"),
+        gtmBooleanParam("rdp", false)
+      ], ["3"], "5"));
+    }
+    if (String(input.googleAdsBeginCheckoutLabel || "").trim()) {
+      tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Begin Checkout", "sgtmadsct", [
+        gtmTemplateParam("productReportingDataSource", "EVENT"),
+        gtmBooleanParam("enableConversionLinker", true),
+        gtmBooleanParam("enableProductReporting", true),
+        gtmTemplateParam("conversionId", "{{Tagioo - google_ads_conversion_id}}"),
+        gtmTemplateParam("conversionLabel", "{{Tagioo - google_ads_begin_checkout_label}}"),
+        gtmBooleanParam("rdp", false)
+      ], ["4"], "5"));
+    }
   }
   const content = {
     tag: tags,
@@ -2944,8 +3021,117 @@ async function addOrderWebhook(body) {
   if (index === -1) data.orders.push(order);
   else data.orders[index] = { ...data.orders[index], ...order, updatedAt: new Date().toISOString() };
 
+  // Server-side purchase recovery: a real order arrived, so forward it to the
+  // tenant's own sGTM as a GA4 Measurement Protocol purchase. GA4 dedupes by
+  // transaction_id and Meta CAPI dedupes by event_id (both = order id), so this
+  // recovers purchases the browser missed (ad blockers, iOS, payment redirects)
+  // without double-counting the ones it caught. Fire-and-forget; never blocks
+  // or fails the webhook response.
+  const tenant = (data.tenants || []).find((item) => item.id === order.tenantId);
+  const tracking = tenant?.tracking || null;
+  const alreadyForwarded = index !== -1 && data.orders[index].forwardedToSgtmAt;
+  const shouldForward =
+    index === -1 &&
+    !alreadyForwarded &&
+    order.amount > 0 &&
+    isPaidOrderStatus(order) &&
+    tracking &&
+    tracking.measurementId &&
+    tracking.apiSecret &&
+    tracking.domain;
+  if (shouldForward) {
+    const stored = data.orders.find((item) => item.id === order.id);
+    if (stored) stored.forwardedToSgtmAt = new Date().toISOString();
+  }
+
   await writeDatabase(data);
+
+  if (shouldForward) forwardOrderToSgtm(order, tracking).catch(() => {});
   return { ok: true, order, created: index === -1 };
+}
+
+// Woo / generic statuses that represent a paid conversion. Unpaid carts
+// (pending, failed, cancelled, refunded, draft) must not be forwarded.
+const UNPAID_ORDER_STATUSES = new Set([
+  "pending", "failed", "cancelled", "canceled", "refunded", "trash", "checkout-draft", "draft", "on-hold"
+]);
+function isPaidOrderStatus(order) {
+  const status = String(order.raw?.status || "").trim().toLowerCase();
+  if (!status) return true; // generic webhooks without a status are assumed paid orders
+  return !UNPAID_ORDER_STATUSES.has(status);
+}
+
+// Deterministic GA4 client_id (format "uint32.uint32") derived from the order id,
+// so webhook retries reuse the same pseudo-user instead of inflating user counts.
+function mpClientId(seed) {
+  const digest = createHash("sha256").update(String(seed)).digest();
+  return `${digest.readUInt32BE(0)}.${digest.readUInt32BE(4)}`;
+}
+
+async function forwardOrderToSgtm(order, tracking) {
+  const endpoint = `${tracking.domain}/mp/collect?measurement_id=${encodeURIComponent(tracking.measurementId)}&api_secret=${encodeURIComponent(tracking.apiSecret)}`;
+  const payload = {
+    client_id: mpClientId(order.id),
+    non_personalized_ads: false,
+    events: [{
+      name: "purchase",
+      params: {
+        transaction_id: order.id,
+        event_id: order.id,
+        currency: order.currency || "BDT",
+        value: order.amount,
+        engagement_time_msec: 1
+      }
+    }]
+  };
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      console.warn(`[orders] sGTM purchase forward for ${order.id} returned ${response.status}`);
+    }
+  } catch (error) {
+    console.warn(`[orders] sGTM purchase forward for ${order.id} failed: ${error.message}`);
+  }
+}
+
+async function saveTenantTrackingConfig(tenantId, input) {
+  if (!tenantId) return;
+  try {
+    const loaded = await readDatabase();
+    if (!loaded.available) return;
+    const data = loaded.data;
+    data.tenants ||= [];
+    const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
+    if (index === -1) return;
+    const measurementId = String(input.ga4MeasurementId || "").trim();
+    const apiSecret = String(input.ga4ApiSecret || "").trim();
+    const domain = trackingOrigin(input.trackingDomain);
+    const tracking = { ...(data.tenants[index].tracking || {}) };
+    if (measurementId) tracking.measurementId = measurementId;
+    if (apiSecret) tracking.apiSecret = apiSecret;
+    if (domain) tracking.domain = domain;
+    tracking.updatedAt = new Date().toISOString();
+    data.tenants[index] = { ...data.tenants[index], tracking };
+    await writeDatabase(data);
+  } catch {
+    // Persisting tracking config must never block template generation.
+  }
+}
+
+// Reduce a tracking-domain input to a clean origin ("https://host"), no path.
+function trackingOrigin(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    return new URL(withProtocol).origin;
+  } catch {
+    return "";
+  }
 }
 
 function getOrderSummaryFromData(loadedDb) {
@@ -6543,6 +6729,9 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const templates = buildSetupAssistantTemplates(body);
+      // Persist GA4 creds + tracking origin so the order webhook can forward
+      // server-side purchase recovery events to this tenant's sGTM.
+      await saveTenantTrackingConfig(session.tenantId, body);
       jsonResponse(res, 200, templates);
       return;
     }

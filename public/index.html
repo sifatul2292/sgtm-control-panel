@@ -831,8 +831,8 @@
                       <input name="ga4MeasurementId" placeholder="G-XXXXXXXXXX" />
                     </label>
                     <label>
-                      GA4 API Secret
-                      <input name="ga4ApiSecret" placeholder="Optional for Measurement Protocol" />
+                      GA4 API Secret <span class="label-optional">enables purchase recovery</span>
+                      <input name="ga4ApiSecret" placeholder="Required for server-side purchase recovery" />
                     </label>
                     <label>
                       Meta Pixel ID
@@ -853,6 +853,14 @@
                     <label>
                       Google Ads Purchase Label
                       <input name="googleAdsPurchaseLabel" placeholder="Purchase conversion label" />
+                    </label>
+                    <label>
+                      Google Ads Add to Cart Label <span class="label-optional">optional</span>
+                      <input name="googleAdsAddToCartLabel" placeholder="Add to cart conversion label" />
+                    </label>
+                    <label>
+                      Google Ads Begin Checkout Label <span class="label-optional">optional</span>
+                      <input name="googleAdsBeginCheckoutLabel" placeholder="Begin checkout conversion label" />
                     </label>
                     <label>
                       TikTok Pixel ID
@@ -882,6 +890,7 @@
                       <li>Open Web GTM → Admin → Import Container → upload <strong>web.json</strong>. Choose <em>Merge</em>.</li>
                       <li>Import <strong>server.json</strong> into Server GTM → Merge. The GA4 forwarding tag and Meta CAPI tag are included.</li>
                       <li>If TikTok is selected, open Server GTM → Templates → Search Gallery → add <strong>TikTok Events API</strong>.</li>
+                      <li>web.json now fires browser-side Meta &amp; TikTok pixel events (ViewContent, AddToCart, InitiateCheckout, AddPaymentInfo, Purchase) stamped with the same <code>event_id</code> as the server CAPI hit — the platforms dedupe automatically, so you get browser + server coverage without double-counting.</li>
                       <li>Preview both containers, fire a Purchase event, then verify Tagioo Event Logs, GA4 Realtime, and Meta Test Events.</li>
                     </ol>
 
