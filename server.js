@@ -1059,7 +1059,7 @@ function buildWebGtmTemplate(input) {
           { parameter: "tax", parameterValue: "{{dlv - ecommerce.tax}}" }
         );
       }
-      const isFiringOnce = eventName === "purchase";
+      const isFiringOnce = true;
       const tagObj = gtmTag(tags.length + 1, `Tagioo GA4 - ${eventName}`, "gaawe", [
         gtmBooleanParam("sendEcommerceData", false),
         gtmBooleanParam("enhancedUserId", false),
@@ -1088,7 +1088,7 @@ function buildWebGtmTemplate(input) {
       const metaTag = gtmTag(tags.length + 1, `Tagioo Meta - ${metaEventName}`, "html", [
         gtmTemplateParam("html", metaPixelEventScript(metaEventName))
       ], [triggerId], "4");
-      if (eventName === "purchase") metaTag.tagFiringOption = "ONCE_PER_LOAD";
+      metaTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(metaTag);
     }
   }
@@ -1108,7 +1108,7 @@ function buildWebGtmTemplate(input) {
       const tiktokTag = gtmTag(tags.length + 1, `Tagioo TikTok - ${tiktokEventName}`, "html", [
         gtmTemplateParam("html", tiktokPixelEventScript(tiktokEventName))
       ], [triggerId], "6");
-      if (eventName === "purchase") tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
+      tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tiktokTag);
     }
   }
