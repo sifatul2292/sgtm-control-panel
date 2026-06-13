@@ -693,9 +693,18 @@ function addRaw(target, key, value) {
   if (value !== undefined && value !== null && value !== '') target[key] = makeString(value);
 }
 
+const mappedEventName = eventMap[eventData.event_name];
+if (!mappedEventName) {
+  if (data.enableDebugLog) {
+    logToConsole('Tagioo Meta CAPI: skipping unmapped event ' + eventData.event_name);
+  }
+  data.gtmOnSuccess();
+  return;
+}
+
 const userData = eventData.user_data || {};
 const event = {
-  event_name: eventMap[eventData.event_name] || eventData.event_name,
+  event_name: mappedEventName,
   event_time: eventData.event_time || Math.round(getTimestampMillis() / 1000),
   action_source: eventData.action_source || data.actionSource || 'website',
   event_source_url: eventData.page_location,
@@ -943,17 +952,18 @@ function tagiooGalleryTemplateGuide(destinations) {
   return guide;
 }
 
-// Browser-side Meta Pixel event tag. Reads the latest ecommerce object from
-// dataLayer at runtime (objects can't be interpolated through {{var}} safely),
-// and stamps eventID = dlv - event_id so it dedupes against the server CAPI hit.
+// Browser-side Meta Pixel event tag. Reads ecommerce + event_id from dataLayer
+// at runtime. event_id falls back to ecommerce.transaction_id so it matches the
+// server CAPI hit (which uses the same fallback) and dedupes. eventID is omitted
+// entirely when no id exists, to avoid sending the literal string "undefined".
 function metaPixelEventScript(metaEventName) {
   const orderId = metaEventName === "Purchase" ? "if(ec.transaction_id)p.order_id=ec.transaction_id;" : "";
-  return "<script>(function(){var dl=window.dataLayer||[];var ec={};for(var i=dl.length-1;i>=0;i--){if(dl[i]&&dl[i].ecommerce){ec=dl[i].ecommerce;break;}}var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;" + orderId + "if(window.fbq)fbq('track','" + metaEventName + "',p,{eventID:\"{{dlv - event_id}}\"});})();</script>";
+  return "<script>(function(){var dl=window.dataLayer||[];var ec=null,eid='';for(var i=dl.length-1;i>=0;i--){var e=dl[i];if(!e)continue;if(!eid&&e.event_id)eid=e.event_id;if(!ec&&e.ecommerce)ec=e.ecommerce;}ec=ec||{};if(!eid&&ec.transaction_id)eid=ec.transaction_id;var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;" + orderId + "if(window.fbq)fbq('track','" + metaEventName + "',p,eid?{eventID:String(eid)}:{});})();</script>";
 }
 
-// Browser-side TikTok Pixel event tag. Same runtime-read pattern, deduped via event_id.
+// Browser-side TikTok Pixel event tag. Same runtime-read + event_id fallback.
 function tiktokPixelEventScript(tiktokEventName) {
-  return "<script>(function(){var dl=window.dataLayer||[];var ec={};for(var i=dl.length-1;i>=0;i--){if(dl[i]&&dl[i].ecommerce){ec=dl[i].ecommerce;break;}}var items=ec.items||[];var contents=items.map(function(it){return {content_id:String(it.item_id||it.id||''),content_name:it.item_name,quantity:it.quantity||1,price:it.price};});var p={contents:contents,content_type:'product'};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;if(window.ttq)ttq.track('" + tiktokEventName + "',p,{event_id:\"{{dlv - event_id}}\"});})();</script>";
+  return "<script>(function(){var dl=window.dataLayer||[];var ec=null,eid='';for(var i=dl.length-1;i>=0;i--){var e=dl[i];if(!e)continue;if(!eid&&e.event_id)eid=e.event_id;if(!ec&&e.ecommerce)ec=e.ecommerce;}ec=ec||{};if(!eid&&ec.transaction_id)eid=ec.transaction_id;var items=ec.items||[];var contents=items.map(function(it){return {content_id:String(it.item_id||it.id||''),content_name:it.item_name,quantity:it.quantity||1,price:it.price};});var p={contents:contents,content_type:'product'};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;if(window.ttq)ttq.track('" + tiktokEventName + "',p,eid?{event_id:String(eid)}:{});})();</script>";
 }
 
 function buildWebGtmTemplate(input) {
@@ -1074,7 +1084,7 @@ function buildWebGtmTemplate(input) {
   }
   if (destinations.includes("meta")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo Meta - Pixel Base", "html", [
-      gtmTemplateParam("html", "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{Tagioo - meta_pixel_id}}');fbq('track','PageView',{},{eventID:\"{{dlv - event_id}}\"});</script>")
+      gtmTemplateParam("html", "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{Tagioo - meta_pixel_id}}');(function(){var dl=window.dataLayer||[],eid='';for(var i=dl.length-1;i>=0;i--){if(dl[i]&&dl[i].event_id){eid=dl[i].event_id;break;}}fbq('track','PageView',{},eid?{eventID:String(eid)}:{});})();</script>")
     ], ["2147479553"], "4"));
     // Browser pixel events, deduped with server CAPI via event_id.
     const metaEventMap = [
