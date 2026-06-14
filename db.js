@@ -126,6 +126,34 @@ export function openEventStore(dataDir) {
       markBatchStmt.run(batchId, workerId || "");
     },
 
+    // One-time backfill: re-key existing event_lines so date_key matches the
+    // Dhaka calendar day derived from each line's own offset. Touches only the
+    // analytics store (never the live nginx/sGTM tracking path). Guarded by a
+    // sentinel cursor so it runs once; idempotent if forced (only updates
+    // mismatches). Clears cached daily summaries so they recompute on the new keys.
+    rekeyDateKeys(keyFromLine, { sentinel = "__migration_dhaka_datekey_v1" } = {}) {
+      if (getCursorStmt.get(sentinel)) return { migrated: false, updated: 0, scanned: 0 };
+      const selectAll = db.prepare("SELECT id, date_key, line FROM event_lines");
+      const updateStmt = db.prepare("UPDATE event_lines SET date_key = ? WHERE id = ?");
+      // Materialize first: better-sqlite3 forbids writing on a connection that
+      // is mid-iteration over a live statement, so collect the changes, then apply.
+      const changes = [];
+      let scanned = 0;
+      for (const row of selectAll.all()) {
+        scanned += 1;
+        const key = keyFromLine(row.line);
+        if (key && key !== row.date_key) changes.push({ id: row.id, key });
+      }
+      const run = db.transaction(() => {
+        for (const change of changes) updateStmt.run(change.key, change.id);
+        db.prepare("DELETE FROM daily_summaries").run();
+        return { updated: changes.length, scanned };
+      });
+      const result = run();
+      setCursorStmt.run(sentinel, 1, 0);
+      return { migrated: true, ...result };
+    },
+
     // Tenant's own lines plus shared-log lines (tenant resolved later by host match).
     linesForTenantDate(tenantId, dateKey) {
       return linesForDateStmt.all(dateKey, tenantId || "").map((row) => row.line);

@@ -880,7 +880,7 @@ function renderEventLogStats(allItems, visibleItems, summary) {
     { label: "Filtered", value: visible.toLocaleString(), detail: `${total.toLocaleString()} latest loaded` },
     { label: "Success", value: Math.max(0, visible - errors).toLocaleString(), detail: "2xx / 3xx requests" },
     { label: "Errors", value: errors.toLocaleString(), detail: "4xx / 5xx requests" },
-    { label: "Purchases", value: purchases.toLocaleString(), detail: `${clients.toLocaleString()} client${clients === 1 ? "" : "s"}` }
+    { label: "Purchases", value: purchases.toLocaleString(), detail: summary?.retentionDays ? `unique · last ${summary.retentionDays} days` : `${clients.toLocaleString()} client${clients === 1 ? "" : "s"} · today` }
   ]);
 }
 
@@ -993,6 +993,8 @@ function cleanPurchaseRows(data) {
 
   const grouped = new Map();
   for (const item of rows) {
+    // Group by transaction first so the same order sent to sGTM on multiple days
+    // collapses into one card instead of inflating the count.
     const key = item.transactionId
       ? `tx:${item.transactionId}`
       : item.eventId
@@ -1001,7 +1003,20 @@ function cleanPurchaseRows(data) {
           ? `value:${item.value}:${item.currency}:${Math.floor(item.date.getTime() / 60000)}`
           : `raw:${item.path}:${item.date?.getTime() || ""}`;
     const current = grouped.get(key);
-    if (!current || item.completeness > current.completeness) grouped.set(key, item);
+    const ts = item.date instanceof Date ? item.date.getTime() : 0;
+    if (!current) {
+      grouped.set(key, { ...item, sentCount: 1, firstDate: item.date, lastDate: item.date });
+      continue;
+    }
+    // Keep the richest record's fields, but track how many times this transaction
+    // hit sGTM and the true first/last times it was seen.
+    const winner = item.completeness > current.completeness ? { ...item } : { ...current };
+    winner.sentCount = current.sentCount + 1;
+    const firstTs = current.firstDate instanceof Date ? current.firstDate.getTime() : Infinity;
+    const lastTs = current.lastDate instanceof Date ? current.lastDate.getTime() : -Infinity;
+    winner.firstDate = ts && ts < firstTs ? item.date : current.firstDate;
+    winner.lastDate = ts && ts > lastTs ? item.date : current.lastDate;
+    grouped.set(key, winner);
   }
 
   const deduped = [...grouped.values()];
@@ -1011,13 +1026,34 @@ function cleanPurchaseRows(data) {
     : deduped;
 }
 
+// Day boundaries pinned to Asia/Dhaka (UTC+6, no DST) so "today" starts at
+// 12:00 AM Bangladesh time regardless of server or viewer timezone.
+const DHAKA_OFFSET_MS = 6 * 3600000;
+function dhakaDayStartMs(ts = Date.now()) {
+  // Midnight Dhaka for the calendar day containing ts, as a UTC epoch ms value.
+  return Math.floor((ts + DHAKA_OFFSET_MS) / 86400000) * 86400000 - DHAKA_OFFSET_MS;
+}
+function dhakaDateKey(ts = Date.now()) {
+  return new Date(ts + DHAKA_OFFSET_MS).toISOString().slice(0, 10);
+}
+
 function renderPurchaseInspector(data) {
   const query = els.purchaseSearch.value.trim().toLowerCase();
-  const windowMs = { day: 86400000, week: 604800000, month: 2592000000 }[purchaseRange];
-  const cutoff = windowMs ? Date.now() - windowMs : 0;
+  // Calendar-day ranges anchored to Dhaka midnight, not rolling milliseconds,
+  // so Day / Week / Month each select a distinct, predictable set of days.
+  const todayStart = dhakaDayStartMs();
+  const cutoff = {
+    day: todayStart,
+    week: todayStart - 6 * 86400000,
+    month: todayStart - 29 * 86400000,
+    all: 0
+  }[purchaseRange] || 0;
   const rows = cleanPurchaseRows(data).filter((item) => {
     if (cutoff) {
-      const ts = item.date instanceof Date ? item.date.getTime() : Number(item.date) || 0;
+      // Filter by the FIRST time the order was seen (true purchase day), so a
+      // re-sent order lands in its original day, not the day it was re-sent.
+      const anchor = item.firstDate instanceof Date ? item.firstDate : item.date;
+      const ts = anchor instanceof Date ? anchor.getTime() : Number(anchor) || 0;
       if (ts && ts < cutoff) return false;
     }
     const haystack = [
@@ -1032,10 +1068,18 @@ function renderPurchaseInspector(data) {
     return !query || haystack.includes(query);
   });
 
-  const rangeWord = { day: "today", week: "this week", month: "this month", all: "all time" }[purchaseRange] || "";
+  const rangeWord = { day: "today", week: "last 7 days", month: "last 30 days", all: "all retained" }[purchaseRange] || "";
+  // On the Day view, show real store orders alongside tracked requests so any
+  // tracking gap (orders that never fired a Purchase request) is visible.
+  const realOrders = Number(data.orders?.today?.count);
+  const realPart = purchaseRange === "day" && Number.isFinite(realOrders)
+    ? ` · ${realOrders} order${realOrders === 1 ? "" : "s"}`
+    : "";
   els.purchaseInspectorBadge.className = "badge";
-  els.purchaseInspectorBadge.classList.add(rows.length ? "ok" : "warn");
-  els.purchaseInspectorBadge.textContent = `${rows.length} purchase${rows.length === 1 ? "" : "s"} · ${rangeWord}`;
+  els.purchaseInspectorBadge.classList.add(
+    rows.length && (!realPart || rows.length >= realOrders) ? "ok" : "warn"
+  );
+  els.purchaseInspectorBadge.textContent = `${rows.length} tracked · ${rangeWord}${realPart}`;
 
   if (!rows.length) {
     els.purchaseInspector.innerHTML = '<div class="empty-log">No purchase requests matched.</div>';
@@ -1047,13 +1091,22 @@ function renderPurchaseInspector(data) {
       const card = document.createElement("article");
       card.className = "inspector-card";
       const hasValue = item.value && item.currency;
+      // Show the order's first-seen time as the purchase time. If it hit sGTM more
+      // than once, flag it so duplicate/re-sent transactions are obvious.
+      const firstSeen = item.firstDate instanceof Date ? formatDate(item.firstDate) : item.displayDate;
+      const sentCount = Number(item.sentCount || 1);
+      const resentBadge = sentCount > 1
+        ? `<span class="badge warn" title="This transaction reached sGTM ${sentCount} times — likely a re-send or duplicate fire.">re-sent ×${sentCount}</span>`
+        : "";
       card.innerHTML = `
         <div class="inspector-card-top">
           <div>
             <strong>${escapeHtml(hasValue ? formatMoney(item.value, item.currency) : "Purchase")}</strong>
-            <small>${escapeHtml(item.displayDate)}</small>
+            <small>${escapeHtml(firstSeen)}</small>
           </div>
-          <span class="status-code ${Number(item.status) >= 400 ? "bad" : "good"}">${escapeHtml(item.status)}</span>
+          <div class="inspector-card-flags">${resentBadge}
+            <span class="status-code ${Number(item.status) >= 400 ? "bad" : "good"}">${escapeHtml(item.status)}</span>
+          </div>
         </div>
         <div class="inspector-grid">
           <span>Client</span><strong>${escapeHtml(item.client || "Other")}</strong>
@@ -4176,8 +4229,18 @@ async function deleteCustomerContainer(id) {
 
 function renderEventLogDailyChart(dailyHistory) {
   if (!els.customerEventLogChart) return;
-  const rows = (Array.isArray(dailyHistory) ? dailyHistory : []).slice(0, 30).reverse();
-  if (!rows.length) {
+  // Build a contiguous 30-day axis ending on the newest snapshot. Days without a
+  // snapshot render as zero bars instead of stretching a few bars across the width.
+  const list = (Array.isArray(dailyHistory) ? dailyHistory : []).slice(0, 30);
+  const byDate = new Map(list.map((r) => [r.date, r]));
+  const anchor = list[0]?.date || dhakaDateKey();
+  const anchorMs = Date.parse(`${anchor}T12:00:00Z`);
+  const rows = [];
+  for (let i = 29; i >= 0; i--) {
+    const key = new Date(anchorMs - i * 86400000).toISOString().slice(0, 10);
+    rows.push(byDate.get(key) || { date: key, total: 0, purchases: 0 });
+  }
+  if (!list.length) {
     els.customerEventLogChart.innerHTML = '<div class="empty-log" style="padding:2rem 1rem;text-align:center;color:var(--color-muted);font-size:.85rem">No daily history yet.</div>';
     return;
   }

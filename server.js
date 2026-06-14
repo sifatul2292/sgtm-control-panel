@@ -113,6 +113,15 @@ try {
   const { openEventStore } = await import("./db.js");
   eventStore = openEventStore(config.dataDir);
   console.log(`[events] SQLite event store ready: ${join(config.dataDir, "events.db")}`);
+  // One-time backfill: re-key stored event lines to their Asia/Dhaka day so
+  // historical dashboard counts align with the live Dhaka-pinned aggregation.
+  // Analytics-only; the live tracking path is untouched.
+  try {
+    const rekey = eventStore.rekeyDateKeys(nginxLineDhakaKey);
+    if (rekey.migrated) console.log(`[events] Dhaka date_key backfill: ${rekey.updated}/${rekey.scanned} rows re-keyed`);
+  } catch (error) {
+    console.error(`[events] Dhaka date_key backfill skipped (${error.message})`);
+  }
 } catch (error) {
   console.error(`[events] SQLite event store unavailable (${error.message}); using log tail + history.json only`);
 }
@@ -2328,18 +2337,40 @@ async function tailFile(pathname, lineCount) {
   };
 }
 
+// Tagioo serves Bangladesh ecommerce, so every "day" boundary — order counts,
+// daily history snapshots, the today log window — is pinned to Asia/Dhaka
+// (UTC+6, no DST) by offset math. This is independent of the server OS / nginx
+// timezone: absolute instants are derived from each log line's own offset, then
+// shifted into Dhaka, so day buckets are correct even on a UTC host.
+const DHAKA_OFFSET_MS = 6 * 3600000;
+
+function dhakaShifted(date = new Date()) {
+  const ms = date instanceof Date ? date.getTime() : new Date(date).getTime();
+  return new Date(ms + DHAKA_OFFSET_MS);
+}
+
 function nginxDateToken(date = new Date()) {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = date.toLocaleString("en-US", { month: "short" });
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+  // Dhaka calendar date as an nginx-style "DD/Mon/YYYY" token (cache key only).
+  const d = dhakaShifted(date);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${String(d.getUTCDate()).padStart(2, "0")}/${months[d.getUTCMonth()]}/${d.getUTCFullYear()}`;
 }
 
 function localDateKey(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  // YYYY-MM-DD in Asia/Dhaka regardless of process timezone.
+  return dhakaShifted(date).toISOString().slice(0, 10);
+}
+
+// Dhaka calendar day (YYYY-MM-DD) for a raw nginx access-log line, using the
+// line's own timezone offset. Returns null if the timestamp can't be parsed.
+function nginxLineDhakaKey(line) {
+  const m = String(line || "").match(/\[(\d{2})\/([A-Za-z]{3})\/(\d{4}):(\d{2}):(\d{2}):(\d{2}) ([+-]\d{4})\]/);
+  if (!m) return null;
+  const [, day, mon, year, hh, mm, ss, zone] = m;
+  const months = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
+  if (!months[mon]) return null;
+  const date = new Date(`${year}-${months[mon]}-${day}T${hh}:${mm}:${ss}${zone.slice(0, 3)}:${zone.slice(3)}`);
+  return Number.isNaN(date.getTime()) ? null : localDateKey(date);
 }
 
 function isTrackingLogLine(line) {
@@ -5457,14 +5488,15 @@ async function summarizeRequestsTodayUncached(pathname, lineLimit = config.summa
     };
   }
 
-  return aggregateTrackingLines(splitLines(tail.stdout), { token, path: pathname, lineLimit });
+  return aggregateTrackingLines(splitLines(tail.stdout), { token, dayKey: localDateKey(), path: pathname, lineLimit });
 }
 
 // Shared aggregation over raw access-log lines. Used by both the live tail path and
 // the SQLite event store, so dashboard numbers are identical regardless of source.
-// `token` (nginx date token like "12/Jun/2026") filters lines to a single day; pass
-// an empty token when the lines are already scoped to one day.
-function aggregateTrackingLines(lines, { token = "", path: pathname = "", lineLimit = config.summaryTailLines } = {}) {
+// `dayKey` (Asia/Dhaka "YYYY-MM-DD") filters lines to a single Dhaka calendar day
+// using each line's own offset; pass an empty dayKey when the lines are already
+// scoped to one day. `token` is retained only for the response/cache metadata.
+function aggregateTrackingLines(lines, { token = "", dayKey = "", path: pathname = "", lineLimit = config.summaryTailLines } = {}) {
   let count = 0;
   let errors = 0;
   let totalLines = 0;
@@ -5484,7 +5516,12 @@ function aggregateTrackingLines(lines, { token = "", path: pathname = "", lineLi
   const recentEvents = [];
 
   for (const line of lines) {
-    if (token && !line.includes(token)) continue;
+    if (dayKey) {
+      // Keep only lines whose Dhaka calendar day matches today. Unparseable
+      // timestamps fall through (kept) rather than being silently dropped.
+      const lineKey = nginxLineDhakaKey(line);
+      if (lineKey && lineKey !== dayKey) continue;
+    }
     totalLines += 1;
     const parsed = parseTrackingAccessLine(line);
     if (!parsed) {
@@ -5511,7 +5548,7 @@ function aggregateTrackingLines(lines, { token = "", path: pathname = "", lineLi
     count += 1;
     if (Number(parsed.status) >= 400) errors += 1;
     if (parsed.date) {
-      const bucket = hourly[parsed.date.getHours()];
+      const bucket = hourly[dhakaShifted(parsed.date).getUTCHours()];
       bucket.total += 1;
       if (Number(parsed.status) >= 400) bucket.errors += 1;
       if (parsed.eventName === "Purchase") bucket.purchases += 1;
@@ -6596,7 +6633,7 @@ function filterRequestSummaryForTenant(summary, tenant) {
 
     const date = event.date ? new Date(event.date) : null;
     if (date && !Number.isNaN(date.getTime())) {
-      const bucket = hourly[date.getHours()];
+      const bucket = hourly[dhakaShifted(date).getUTCHours()];
       bucket.total += 1;
       if (Number(event.status) >= 400) bucket.errors += 1;
       if (event.eventName === "Purchase") bucket.purchases += 1;
@@ -7398,6 +7435,11 @@ const server = createServer(async (req, res) => {
 const NGINX_MONTH_KEYS = { Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06", Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12" };
 
 function dateKeyFromNginxLine(line) {
+  // Store each line under its Asia/Dhaka calendar day (using the line's own
+  // offset) so event_lines keys match the Dhaka date keys queried by the
+  // dashboard. Falls back to the raw date if the offset can't be parsed.
+  const dhaka = nginxLineDhakaKey(line);
+  if (dhaka) return dhaka;
   const match = String(line || "").match(/\[(\d{2})\/([A-Za-z]{3})\/(\d{4}):/);
   if (!match) return "";
   const month = NGINX_MONTH_KEYS[match[2]];

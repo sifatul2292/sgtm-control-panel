@@ -2580,6 +2580,13 @@ textarea::placeholder {
   gap: 2px;
 }
 
+.inspector-card-top > .inspector-card-flags {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
 .inspector-card-top strong {
   font-size: var(--text-lg);
 }
