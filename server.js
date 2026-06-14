@@ -2563,7 +2563,7 @@ function parseTrackingAccessLine(line) {
       payloadValue(payload, ["currency", "currencyCode"])
     ),
     eventId: firstNonEmpty(
-      queryValueFromParams(params, ["event_id", "eventId", "eid", "x-fb-event-id"]),
+      queryValueFromParams(params, ["event_id", "eventId", "eid", "x-fb-event-id", "ep.event_id", "ep.eventId"]),
       payloadValue(payload, ["event_id", "eventId", "fb_event_id"])
     ),
     transactionId: firstNonEmpty(
