@@ -3695,9 +3695,13 @@ a.button.button-primary {
 }
 
 .customer-analytics-svg {
+  /* width:100% would stretch to the full panel; cap it so the chart renders at
+     ~half footprint. viewBox aspect is locked, so height shrinks proportionally. */
   width: 100%;
+  max-width: 460px;
   height: auto;
   display: block;
+  margin-inline: auto;
   overflow: visible;
 }
 
