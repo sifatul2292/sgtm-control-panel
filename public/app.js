@@ -1818,23 +1818,32 @@ function renderCustomerPerformance(data, range = customerKpiRange) {
 function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", eventSummary = summary) {
   if (els.customerEventChart) {
     const SERIES = [
-      { key: "total",         label: "Total Events",     color: "#7c3aed", width: 2.5, fill: true  },
-      { key: "pageView",      label: "PageView",         color: "#6366f1", width: 1.5, fill: false },
-      { key: "viewItem",      label: "ViewContent",      color: "#8b5cf6", width: 1.5, fill: false },
-      { key: "addToCart",     label: "AddToCart",        color: "#10b981", width: 1.5, fill: false },
-      { key: "beginCheckout", label: "InitiateCheckout", color: "#d97706", width: 1.5, fill: false },
-      { key: "purchases",     label: "Purchase",         color: "#22c55e", width: 1.5, fill: false }
+      { key: "total",         label: "Total Events",     color: "#7c3aed", width: 2,    fill: true,  opacity: 1    },
+      { key: "pageView",      label: "PageView",         color: "#6366f1", width: 1.25, fill: false, opacity: 0.55 },
+      { key: "viewItem",      label: "ViewContent",      color: "#8b5cf6", width: 1.25, fill: false, opacity: 0.55 },
+      { key: "addToCart",     label: "AddToCart",        color: "#10b981", width: 1.25, fill: false, opacity: 0.55 },
+      { key: "beginCheckout", label: "InitiateCheckout", color: "#d97706", width: 1.25, fill: false, opacity: 0.55 },
+      { key: "purchases",     label: "Purchase",         color: "#22c55e", width: 1.25, fill: false, opacity: 0.55 }
     ];
+    // Round the axis top up to a clean value with modest headroom (~10-25%),
+    // so the curve fills the plot instead of being squashed by a 2x axis.
+    const niceCeil = (v) => {
+      const n = Math.max(1, Number(v) || 0);
+      const pow = Math.pow(10, Math.floor(Math.log10(n)));
+      const lead = n / pow;
+      const step = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((s) => s >= lead - 1e-9) ?? 10;
+      return step * pow;
+    };
 
     if (range !== "24h") {
       // 7d / 30d daily chart
       const days = range === "7d" ? 7 : 30;
       const rows = Array.isArray(dailyHistory) ? dailyHistory.slice(0, days).reverse() : [];
-      const W = 640; const H = 220;
-      const pad = { left: 46, right: 20, top: 20, bottom: 38 };
+      const W = 560; const H = 150;
+      const pad = { left: 32, right: 14, top: 14, bottom: 26 };
       const plotW = W - pad.left - pad.right;
       const plotH = H - pad.top - pad.bottom;
-      const maxVal = Math.max(1, ...rows.map((r) => Number(r.total || 0)));
+      const maxVal = niceCeil(Math.max(1, ...rows.map((r) => Number(r.total || 0))));
       const toX = (i) => rows.length < 2 ? pad.left + plotW / 2 : pad.left + (i / (rows.length - 1)) * plotW;
       const toY = (v) => Math.max(pad.top, pad.top + plotH - Math.min(Number(v) / maxVal, 1) * plotH);
       const baseY = (pad.top + plotH).toFixed(1);
@@ -1856,11 +1865,11 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
         return d;
       }
 
-      const yTicks = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
+      const yTicks = [0, 0.5, 1].map((pct) => {
         const y = (pad.top + plotH * (1 - pct)).toFixed(1);
         const val = Math.round(maxVal * pct);
         return `<line class="${pct === 0 ? "chart-axis-line" : "chart-grid-line-dashed"}" x1="${pad.left}" y1="${y}" x2="${pad.left + plotW}" y2="${y}" />
-                <text class="chart-axis-label" x="${pad.left - 8}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end">${val}</text>`;
+                <text class="chart-axis-label" x="${pad.left - 8}" y="${(Number(y) + 3.5).toFixed(1)}" text-anchor="end">${val}</text>`;
       }).join("");
 
       const labelStep = rows.length <= 7 ? 1 : rows.length <= 14 ? 2 : 5;
@@ -1899,7 +1908,6 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
             </clipPath>
           </defs>
           <g>${yTicks}</g>
-          <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" />
           <g clip-path="url(#chartClip)">
             <path d="${areaPath}" fill="url(#chartTotalFill)" />
             <path d="${linePath}" stroke="#7c3aed" stroke-width="2.5" fill="none" stroke-linejoin="round" stroke-linecap="round" />
@@ -1952,7 +1960,7 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
       return found || { hour: i, total: 0, errors: 0, purchases: 0, pageView: 0, viewItem: 0, addToCart: 0, beginCheckout: 0 };
     });
 
-    const maxVal = Math.max(1, ...sorted.map((h) => h.total));
+    const maxVal = niceCeil(Math.max(1, ...sorted.map((h) => h.total)));
     const W = 640; const H = 220;
     const pad = { left: 46, right: 20, top: 20, bottom: 38 };
     const plotW = W - pad.left - pad.right;
@@ -1981,24 +1989,26 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
     const getPts = (key) => sorted.map((h, i) => ({ x: toX(i), y: toY(h[key] || 0) }));
     const baseY = (pad.top + plotH).toFixed(1);
 
-    const yTicks = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
+    const yTicks = [0, 0.5, 1].map((pct) => {
       const y = (pad.top + plotH * (1 - pct)).toFixed(1);
       const val = Math.round(maxVal * pct);
       const isBase = pct === 0;
       return `<line class="${isBase ? "chart-axis-line" : "chart-grid-line-dashed"}" x1="${pad.left}" y1="${y}" x2="${pad.left + plotW}" y2="${y}" />
-              <text class="chart-axis-label" x="${pad.left - 8}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end">${val}</text>`;
+              <text class="chart-axis-label" x="${pad.left - 8}" y="${(Number(y) + 3.5).toFixed(1)}" text-anchor="end">${val}</text>`;
     }).join("");
 
-    const xLabels = [0, 4, 8, 12, 16, 20, 23].map((i) =>
-      `<text class="chart-axis-label" x="${toX(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">${i}:00</text>`
+    const xLabels = [0, 6, 12, 18, 23].map((i) =>
+      `<text class="chart-axis-label" x="${toX(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${String(i).padStart(2, "0")}:00</text>`
     ).join("");
 
     const visibleSeries = SERIES.filter((s) => s.key === "total" || sorted.some((h) => Number(h[s.key] || 0) > 0));
 
-    const seriesSVG = visibleSeries.map((s) => {
+    // Draw secondary series first (dimmed, thin) so the Total hero line + area sit on top.
+    const orderedSeries = [...visibleSeries].sort((a, b) => (a.key === "total" ? 1 : 0) - (b.key === "total" ? 1 : 0));
+    const seriesSVG = orderedSeries.map((s) => {
       const line = catmullRom(getPts(s.key));
       const areaEl = s.fill ? `<path d="${line} L ${toX(23).toFixed(1)},${baseY} L ${toX(0).toFixed(1)},${baseY} Z" fill="url(#chartTotalFill)" />` : "";
-      return `${areaEl}<path d="${line}" stroke="${s.color}" stroke-width="${s.width}" fill="none" stroke-linejoin="round" stroke-linecap="round" />`;
+      return `${areaEl}<path d="${line}" stroke="${s.color}" stroke-width="${s.width}" stroke-opacity="${s.opacity}" fill="none" stroke-linejoin="round" stroke-linecap="round" />`;
     }).join("");
 
     const slotW = plotW / 23;
@@ -2020,7 +2030,6 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
           </clipPath>
         </defs>
         <g>${yTicks}</g>
-        <line class="chart-axis-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${pad.top + plotH}" />
         <g clip-path="url(#chartClip)">${seriesSVG}</g>
         <line class="chart-crosshair-line" x1="0" y1="${pad.top}" x2="0" y2="${pad.top + plotH}" style="display:none" />
         <g class="chart-dots"></g>

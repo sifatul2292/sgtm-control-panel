@@ -3717,6 +3717,22 @@ a.button.button-primary {
   stroke-dasharray: 4 4;
 }
 
+/* Apple-style refinements scoped to the customer analytics chart: hairline
+   baseline, faint fine-dashed gridlines, smaller muted axis labels. */
+.customer-analytics-svg .chart-axis-line {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+.customer-analytics-svg .chart-grid-line-dashed {
+  stroke-opacity: 0.5;
+  stroke-dasharray: 2 6;
+}
+.customer-analytics-svg .chart-axis-label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
 /* Crosshair */
 .chart-crosshair-line {
   stroke: var(--color-muted);
