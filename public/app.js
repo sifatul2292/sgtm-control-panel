@@ -1332,11 +1332,29 @@ function metricsForRange(data, range = "24h") {
   const todayPurchases = purchaseSummary(data);
   const todayEvents = Number(data.usage?.requestsToday || data.nginx?.todayEvents?.count || 0);
   if (range === "24h") {
+    // Woo order feed is the most accurate when wired up — use it directly.
+    if (todayPurchases.source === "orders") {
+      return {
+        events: todayEvents,
+        purchaseCount: Number(todayPurchases.uniqueCount || 0),
+        revenue: Number(todayPurchases.uniqueRevenue || 0),
+        currency: todayPurchases.currency || ""
+      };
+    }
+    // No order feed: count the exact same deduped purchase rows the Purchase
+    // Inspector lists for today, so the two views never disagree.
+    const start = dhakaDayStartMs();
+    const todayPurchaseRows = cleanPurchaseRows(data).filter((row) => {
+      const anchor = row.firstDate instanceof Date ? row.firstDate : row.date;
+      const ts = anchor instanceof Date ? anchor.getTime() : 0;
+      return ts >= start;
+    });
+    const rowRevenue = todayPurchaseRows.reduce((total, row) => total + (Number(row.value) || 0), 0);
     return {
       events: todayEvents,
-      purchaseCount: Number(todayPurchases.uniqueCount || 0),
-      revenue: Number(todayPurchases.uniqueRevenue || 0),
-      currency: todayPurchases.currency || ""
+      purchaseCount: todayPurchaseRows.length,
+      revenue: rowRevenue || Number(todayPurchases.uniqueRevenue || 0),
+      currency: todayPurchases.currency || todayPurchaseRows.find((row) => row.currency)?.currency || ""
     };
   }
   const days = rangeDays(range);
@@ -1784,7 +1802,9 @@ function renderCustomerPerformance(data, range = customerKpiRange) {
   const periodEvents = Number(data.usage?.requestsMonth ?? Number(summary.count || 0));
   // Conversion is now window-aligned: purchases and events both come from `range`.
   const conversion = m.events ? Math.round((m.purchaseCount / m.events) * 1000) / 10 : 0;
-  const rangeLabel = { "24h": "last 24 hours", "7d": "last 7 days", "30d": "last 30 days" }[range] || "last 24 hours";
+  // 24h is really the Dhaka calendar day (today's log), not a rolling 24h window —
+  // label it honestly so the number matches "today" everywhere else in the panel.
+  const rangeLabel = { "24h": "today", "7d": "last 7 days", "30d": "last 30 days" }[range] || "today";
   renderBusinessGrid(els.customerPerformanceGrid, [
     { label: "Events", value: periodEvents.toLocaleString(), detail: `${Number(data.usage?.usagePercent || 0)}% used this billing period` },
     { label: range === "24h" ? "Today" : "Window", value: m.events.toLocaleString(), detail: `Clean requests · ${rangeLabel}` },
