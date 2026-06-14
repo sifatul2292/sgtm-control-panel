@@ -1839,8 +1839,8 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
       // 7d / 30d daily chart
       const days = range === "7d" ? 7 : 30;
       const rows = Array.isArray(dailyHistory) ? dailyHistory.slice(0, days).reverse() : [];
-      const W = 560; const H = 150;
-      const pad = { left: 32, right: 14, top: 14, bottom: 26 };
+      const W = 880; const H = 150;
+      const pad = { left: 36, right: 18, top: 16, bottom: 26 };
       const plotW = W - pad.left - pad.right;
       const plotH = H - pad.top - pad.bottom;
       const maxVal = niceCeil(Math.max(1, ...rows.map((r) => Number(r.total || 0))));
