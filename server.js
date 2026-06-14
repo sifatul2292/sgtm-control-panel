@@ -2406,7 +2406,11 @@ function queryEventName(pathname) {
 }
 
 function inferEventName(pathname, method, status, params = null) {
-  let raw = String(pathname || "").toLowerCase();
+  // Only the endpoint path may feed substring heuristics. The query string of a
+  // GA4 /g/collect hit carries dl/dr (the visited *website* page URLs), so e.g.
+  // dl=/shop/?orderby=price would match the "order" needle and be mislabeled a
+  // Purchase. Event truth lives in the en= param, parsed separately below.
+  let raw = String(pathname || "").split("?")[0].toLowerCase();
   try {
     raw = decodeURIComponent(raw);
   } catch {
