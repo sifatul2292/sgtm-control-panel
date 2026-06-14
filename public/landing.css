@@ -824,6 +824,8 @@ h1 {
   transition: border-color 200ms, transform 200ms, box-shadow 200ms;
 }
 .feature-card:hover { border-color: var(--border-2); transform: translateY(-3px); box-shadow: var(--shadow); }
+.feature-card-highlight { position: relative; border-color: rgba(91,33,182,0.32); box-shadow: 0 12px 32px -16px rgba(91,33,182,0.45); }
+.feature-badge { position: absolute; top: 16px; right: 16px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #fff; background: var(--accent, #5B21B6); padding: 3px 9px; border-radius: 999px; }
 
 .feature-icon-wrap {
   display: grid;

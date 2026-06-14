@@ -4054,3 +4054,29 @@ a.button.button-primary {
   .account-settings-layout { grid-template-columns: 1fr; }
   .account-settings-tabs { flex-direction: row; flex-wrap: wrap; }
 }
+
+/* ── Offline conversions + cookie life extension ─────────────── */
+.panel-sub { color: var(--text-2, #64748b); font-size: 0.85rem; margin-top: 4px; }
+.muted-note { color: var(--text-2, #64748b); font-size: 0.82rem; }
+.muted-note.ok-text { color: #059669; }
+.muted-note.warn-text { color: #dc2626; }
+.field-label { display: block; font-size: 0.82rem; font-weight: 600; margin: 14px 0 6px; color: var(--text-1, #1e293b); }
+.offline-upload textarea,
+.offline-upload input[type="file"],
+.cookie-ext input[type="number"] {
+  width: 100%; box-sizing: border-box; padding: 10px 12px;
+  border: 1px solid var(--border, #e2e8f0); border-radius: 10px;
+  font-family: inherit; font-size: 0.85rem; background: #fff; color: inherit;
+}
+.offline-upload textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; margin-bottom: 12px; }
+.cookie-ext input[type="number"] { max-width: 220px; }
+.offline-actions-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+.offline-result { margin-top: 12px; font-size: 0.85rem; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.offline-result-errs { width: 100%; margin: 8px 0 0; padding-left: 18px; color: #b45309; font-size: 0.8rem; }
+.offline-history-wrap { margin-top: 22px; border-top: 1px solid var(--border, #e2e8f0); padding-top: 16px; }
+.offline-history { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.offline-history li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.84rem; }
+.offline-history-err { width: 100%; color: #b45309; }
+.offline-empty { display: grid; gap: 10px; justify-items: start; text-align: left; padding: 22px; }
+.cookie-ext .toggle-row { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 600; }
+.cookie-ext .toggle-row input { width: 16px; height: 16px; }

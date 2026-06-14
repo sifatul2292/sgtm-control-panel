@@ -1135,6 +1135,9 @@ function buildServerGtmTemplate(input) {
   const destinations = selectedDestinations(input);
   const ga4ApiSecret = String(input.ga4ApiSecret || "").trim();
   const metaTestEventCode = String(input.metaTestEventCode || "").trim();
+  // Cookie life extension: drive the GA4 server client's FPID max-age. When the
+  // power-up is off we keep the long-lived 730d default; when on, use the chosen days.
+  const cookieMaxAgeInSec = String((input.cookieExtensionEnabled ? clampCookieDays(input.cookieExtensionDays) : COOKIE_DAYS_DEFAULT) * 86400);
   const payload = {
     businessType: cleanTemplateValue(input.businessType, "ecommerce"),
     platform: cleanTemplateValue(input.platform, "custom"),
@@ -1199,7 +1202,7 @@ function buildServerGtmTemplate(input) {
       parameter: [
         gtmTemplateParam("cookieDomain", "auto"),
         gtmBooleanParam("activateDefaultPaths", true),
-        gtmTemplateParam("cookieMaxAgeInSec", "63072000"),
+        gtmTemplateParam("cookieMaxAgeInSec", cookieMaxAgeInSec),
         gtmTemplateParam("cookiePath", "/"),
         gtmBooleanParam("migrateFromJsClientId", false),
         gtmTemplateParam("cookieManagement", "server"),
@@ -3110,16 +3113,67 @@ async function saveTenantTrackingConfig(tenantId, input) {
     const measurementId = String(input.ga4MeasurementId || "").trim();
     const apiSecret = String(input.ga4ApiSecret || "").trim();
     const domain = trackingOrigin(input.trackingDomain);
+    const metaPixelId = String(input.metaPixelId || "").trim();
+    const metaCapiToken = String(input.metaAccessToken || input.metaCapiToken || "").trim();
+    const metaTestEventCode = String(input.metaTestEventCode || "").trim();
     const tracking = { ...(data.tenants[index].tracking || {}) };
     if (measurementId) tracking.measurementId = measurementId;
     if (apiSecret) tracking.apiSecret = apiSecret;
     if (domain) tracking.domain = domain;
+    // Persist Meta CAPI creds so server-side offline conversion uploads can reuse them.
+    if (metaPixelId || metaCapiToken || metaTestEventCode) {
+      const meta = { ...(tracking.meta || {}) };
+      if (metaPixelId) meta.pixelId = metaPixelId;
+      if (metaCapiToken) meta.capiToken = metaCapiToken;
+      if (metaTestEventCode) meta.testEventCode = metaTestEventCode;
+      tracking.meta = meta;
+    }
+    // Cookie life extension: drives the GA4 server client's FPID cookie max-age.
+    if (input.cookieExtensionEnabled !== undefined || input.cookieExtensionDays !== undefined) {
+      const prev = tracking.cookieExtension || {};
+      tracking.cookieExtension = {
+        enabled: input.cookieExtensionEnabled !== undefined ? Boolean(input.cookieExtensionEnabled) : Boolean(prev.enabled),
+        days: clampCookieDays(input.cookieExtensionDays !== undefined ? input.cookieExtensionDays : prev.days)
+      };
+    }
     tracking.updatedAt = new Date().toISOString();
     data.tenants[index] = { ...data.tenants[index], tracking };
     await writeDatabase(data);
   } catch {
     // Persisting tracking config must never block template generation.
   }
+}
+
+// Cookie life extension days → clamped int. Baseline 730 (matches the GA4 server
+// client default of 63072000s); Meta/Google cap first-party cookie life at ~730d.
+const COOKIE_DAYS_DEFAULT = 730;
+const COOKIE_DAYS_MAX = 730;
+function clampCookieDays(value) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n) || n <= 0) return COOKIE_DAYS_DEFAULT;
+  return Math.min(Math.max(n, 1), COOKIE_DAYS_MAX);
+}
+
+// Client-safe view of a tenant's tracking config — never leaks the CAPI token.
+function publicTenantTracking(tenant) {
+  const tracking = (tenant && tenant.tracking) || {};
+  const meta = tracking.meta || {};
+  const cookieExtension = tracking.cookieExtension || {};
+  return {
+    domain: tracking.domain || "",
+    measurementId: tracking.measurementId || "",
+    meta: {
+      pixelId: meta.pixelId || "",
+      hasToken: Boolean(meta.capiToken),
+      testEventCode: meta.testEventCode || ""
+    },
+    cookieExtension: {
+      enabled: Boolean(cookieExtension.enabled),
+      days: clampCookieDays(cookieExtension.days)
+    },
+    offlineUploads: Array.isArray(tracking.offlineUploads) ? tracking.offlineUploads.slice(0, 20) : [],
+    updatedAt: tracking.updatedAt || ""
+  };
 }
 
 // Reduce a tracking-domain input to a clean origin ("https://host"), no path.
@@ -3132,6 +3186,204 @@ function trackingOrigin(value) {
   } catch {
     return "";
   }
+}
+
+// ===========================================================================
+// Offline conversion upload (Meta CAPI offline events from a CSV)
+// ===========================================================================
+
+const OFFLINE_CSV_COLUMNS = [
+  "event_name", "event_time", "value", "currency", "order_id",
+  "email", "phone", "first_name", "last_name", "city", "state", "zip", "country"
+];
+
+// Minimal RFC4180-ish CSV parser (handles quoted fields, commas, CRLF). Returns
+// { rows: [{...}], errors: [string] } keyed by lowercased header names.
+function parseOfflineCsv(text) {
+  const errors = [];
+  const records = [];
+  let field = "";
+  let row = [];
+  let inQuotes = false;
+  const src = String(text || "").replace(/^﻿/, "");
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (src[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += ch;
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      row.push(field); field = "";
+    } else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && src[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      if (row.some((cell) => cell.trim() !== "")) records.push(row);
+      row = [];
+    } else field += ch;
+  }
+  if (field !== "" || row.length) { row.push(field); if (row.some((cell) => cell.trim() !== "")) records.push(row); }
+  if (!records.length) return { rows: [], errors: ["CSV is empty."] };
+
+  const header = records[0].map((h) => h.trim().toLowerCase());
+  if (!header.includes("event_name")) errors.push("Missing required column: event_name.");
+  if (!header.includes("event_time")) errors.push("Missing required column: event_time.");
+  const rows = [];
+  for (let r = 1; r < records.length; r++) {
+    const cells = records[r];
+    const obj = {};
+    header.forEach((key, idx) => { obj[key] = (cells[idx] ?? "").trim(); });
+    rows.push(obj);
+  }
+  return { rows, errors };
+}
+
+// Normalize + SHA-256 hash a PII value the way Meta expects (lowercase, trimmed).
+function sha256Hex(value, { digitsOnly = false } = {}) {
+  let normalized = String(value || "").trim().toLowerCase();
+  if (digitsOnly) normalized = normalized.replace(/[^0-9]/g, "");
+  else normalized = normalized.replace(/\s+/g, " ");
+  if (!normalized) return undefined;
+  return createHash("sha256").update(normalized).digest("hex");
+}
+
+// Coerce a CSV event_time cell (unix seconds, unix ms, or ISO date) to unix seconds.
+function offlineEventTime(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return Math.floor(Date.now() / 1000);
+  if (/^\d{13}$/.test(raw)) return Math.floor(Number(raw) / 1000);
+  if (/^\d{10}$/.test(raw)) return Number(raw);
+  const ms = Date.parse(raw);
+  if (!Number.isNaN(ms)) return Math.floor(ms / 1000);
+  return Math.floor(Date.now() / 1000);
+}
+
+// Build Meta CAPI events from parsed CSV rows. Mirrors the field/hashing map used
+// by the in-container Meta template (server.js Meta CAPI block).
+function buildOfflineMetaEvents(rows) {
+  const events = [];
+  const rowErrors = [];
+  rows.forEach((row, idx) => {
+    const eventName = row.event_name || "";
+    if (!eventName) { rowErrors.push(`Row ${idx + 2}: missing event_name.`); return; }
+    const userData = {};
+    const em = sha256Hex(row.email); if (em) userData.em = [em];
+    const ph = sha256Hex(row.phone, { digitsOnly: true }); if (ph) userData.ph = [ph];
+    const fn = sha256Hex(row.first_name); if (fn) userData.fn = [fn];
+    const ln = sha256Hex(row.last_name); if (ln) userData.ln = [ln];
+    const ct = sha256Hex(row.city); if (ct) userData.ct = [ct];
+    const st = sha256Hex(row.state); if (st) userData.st = [st];
+    const zp = sha256Hex(row.zip); if (zp) userData.zp = [zp];
+    const country = sha256Hex(row.country); if (country) userData.country = [country];
+    if (!Object.keys(userData).length) { rowErrors.push(`Row ${idx + 2}: no usable customer match key (email/phone/etc).`); return; }
+    const customData = {};
+    if (row.currency) customData.currency = String(row.currency).trim().toUpperCase();
+    if (row.value !== "" && row.value !== undefined) {
+      const v = Number(row.value);
+      if (Number.isFinite(v)) customData.value = v;
+    }
+    if (row.order_id) customData.order_id = row.order_id;
+    events.push({
+      event_name: eventName,
+      event_time: offlineEventTime(row.event_time),
+      action_source: "physical_store",
+      event_id: row.order_id || undefined,
+      user_data: userData,
+      custom_data: customData
+    });
+  });
+  return { events, rowErrors };
+}
+
+// Send offline events to Meta's Conversions API, batched ≤1000 per request.
+async function sendMetaOfflineConversions(tenant, events) {
+  const meta = (tenant && tenant.tracking && tenant.tracking.meta) || {};
+  const pixelId = meta.pixelId;
+  const token = meta.capiToken;
+  if (!pixelId || !token) return { ok: false, reason: "no_meta_creds" };
+  const url = `https://graph.facebook.com/v20.0/${encodeURIComponent(pixelId)}/events?access_token=${encodeURIComponent(token)}`;
+  let sent = 0;
+  const fbErrors = [];
+  for (let i = 0; i < events.length; i += 1000) {
+    const batch = events.slice(i, i + 1000);
+    const body = { data: batch, partner_agent: "tagioo-sgtm-1.0" };
+    if (meta.testEventCode) body.test_event_code = meta.testEventCode;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const json = await response.json().catch(() => ({}));
+      if (response.ok) {
+        sent += typeof json.events_received === "number" ? json.events_received : batch.length;
+      } else {
+        fbErrors.push(json.error ? `${json.error.message || json.error.type || "Meta error"}` : `HTTP ${response.status}`);
+      }
+    } catch (error) {
+      fbErrors.push(error.message || "Network error reaching Meta.");
+    }
+  }
+  return { ok: fbErrors.length === 0, sent, fbErrors };
+}
+
+// Append an offline-upload summary to the tenant's tracking log (cap last 20).
+async function recordOfflineUpload(tenantId, summary) {
+  if (!tenantId) return;
+  try {
+    const loaded = await readDatabase();
+    if (!loaded.available) return;
+    const data = loaded.data;
+    data.tenants ||= [];
+    const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
+    if (index === -1) return;
+    const tracking = { ...(data.tenants[index].tracking || {}) };
+    const log = Array.isArray(tracking.offlineUploads) ? tracking.offlineUploads.slice(0, 19) : [];
+    tracking.offlineUploads = [{ at: new Date().toISOString(), ...summary }, ...log];
+    data.tenants[index] = { ...data.tenants[index], tracking };
+    await writeDatabase(data);
+  } catch {
+    // Logging the upload must never fail the upload itself.
+  }
+}
+
+// Resolve the tenant record for a customer session.
+async function tenantForSession(session) {
+  const loaded = await readDatabase();
+  if (!loaded.available) return null;
+  return (loaded.data.tenants || []).find((t) => t.id === session.tenantId) || null;
+}
+
+// Handle an offline-conversion upload. validateOnly=true parses + reports without sending.
+async function handleOfflineConversionUpload(session, csvText, { validateOnly = false } = {}) {
+  const { rows, errors } = parseOfflineCsv(csvText);
+  if (errors.length) return { ok: false, status: 400, errors };
+  if (!rows.length) return { ok: false, status: 400, errors: ["No data rows found in CSV."] };
+  const { events, rowErrors } = buildOfflineMetaEvents(rows);
+  if (!events.length) return { ok: false, status: 400, errors: rowErrors.length ? rowErrors : ["No valid rows to send."] };
+
+  const tenant = await tenantForSession(session);
+  const meta = (tenant && tenant.tracking && tenant.tracking.meta) || {};
+  if (!meta.pixelId || !meta.capiToken) {
+    return { ok: false, status: 409, errors: ["Connect your Meta pixel + CAPI token in the Setup Assistant before uploading offline conversions."] };
+  }
+
+  if (validateOnly) {
+    return { ok: true, received: rows.length, valid: events.length, rowErrors, willSend: events.length };
+  }
+
+  const result = await sendMetaOfflineConversions(tenant, events);
+  const summary = {
+    received: rows.length,
+    sent: result.sent || 0,
+    failed: rows.length - (result.sent || 0),
+    status: result.ok ? "sent" : "error",
+    errors: [...rowErrors, ...(result.fbErrors || [])].slice(0, 10)
+  };
+  await recordOfflineUpload(session.tenantId, summary);
+  return { ok: result.ok, status: result.ok ? 200 : 502, ...summary };
 }
 
 function getOrderSummaryFromData(loadedDb) {
@@ -4156,8 +4408,22 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
     const brokenPurchaseTracking = isDefaultCustomer && ["undertracked", "overtracked", "waiting"].includes(reconciliation.status);
     const noTrackingToday = ["active", "trial"].includes(subscriptionStatus) && requestsToday === 0;
 
+    // Offline-conversion + cookie-extension summary for the admin panel.
+    const safeTracking = publicTenantTracking(customer);
+    const thirtyDaysAgo = Date.now() - 30 * 86400000;
+    const recentUploads = (safeTracking.offlineUploads || []).filter((u) => u.at && Date.parse(u.at) >= thirtyDaysAgo);
+    const offlineUploads30d = recentUploads.length;
+    const offlineEventsSent30d = recentUploads.reduce((sum, u) => sum + Number(u.sent || 0), 0);
+    const offlineLastStatus = safeTracking.offlineUploads[0]?.status || "";
+
     return {
       ...customer,
+      tracking: safeTracking,
+      offlineUploads30d,
+      offlineEventsSent30d,
+      offlineLastStatus,
+      cookieExtensionEnabled: safeTracking.cookieExtension.enabled,
+      cookieExtensionDays: safeTracking.cookieExtension.days,
       plan,
       subscriptionStatus,
       paymentStatus: unpaid && paymentStatus === "paid" ? "expired" : paymentStatus,
@@ -6221,7 +6487,7 @@ async function customerDashboardData(data, session) {
         available: data.customers.available,
         active: tenant.subscriptionStatus === "active" ? 1 : 0,
         queued: 0,
-        tenants: [tenant]
+        tenants: [{ ...tenant, tracking: publicTenantTracking(tenant) }]
       }
       : { available: data.customers.available, active: 0, queued: 0, tenants: [] },
     provisioning: { available: true, path: "", requests: [] },
@@ -6498,6 +6764,11 @@ const server = createServer(async (req, res) => {
 
     if (pathname === "/landing.css" || pathname === "/terms.css" || pathname.startsWith("/assets/")) {
       await serveStatic(req, res);
+      return;
+    }
+
+    if (pathname === "/features") {
+      await servePublicPage(res, "features.html");
       return;
     }
 
@@ -6823,6 +7094,37 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if ((pathname === "/api/customer/offline-conversions" || pathname === "/api/customer/offline-conversions/validate") && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const body = await readJson(req);
+      const csvText = typeof body === "string" ? body : String(body.csv || "");
+      const validateOnly = pathname.endsWith("/validate");
+      const result = await handleOfflineConversionUpload(session, csvText, { validateOnly });
+      const { ok, status, ...rest } = result;
+      jsonResponse(res, status || (ok ? 200 : 400), rest);
+      return;
+    }
+
+    if (pathname === "/api/customer/cookie-extension" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const body = await readJson(req);
+      await saveTenantTrackingConfig(session.tenantId, {
+        cookieExtensionEnabled: Boolean(body.enabled),
+        cookieExtensionDays: body.days
+      });
+      const tenant = await tenantForSession(session);
+      jsonResponse(res, 200, { tracking: publicTenantTracking(tenant) });
+      return;
+    }
+
     const customerDeleteMatch = pathname.match(/^\/api\/customer\/containers\/([^/]+)$/);
     if (customerDeleteMatch && req.method === "DELETE") {
       const session = getSession(req);
@@ -6863,7 +7165,8 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 404, { error: "Account not found." });
         return;
       }
-      jsonResponse(res, 200, { account: publicCustomerAccount(account) });
+      const tenant = (loaded.data.tenants || []).find((t) => t.id === account.tenantId) || null;
+      jsonResponse(res, 200, { account: publicCustomerAccount(account), tracking: publicTenantTracking(tenant) });
       return;
     }
 

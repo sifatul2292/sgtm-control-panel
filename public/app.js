@@ -5,6 +5,7 @@ const els = {
   pageTitle: document.querySelector("#pageTitle"),
   navItems: document.querySelectorAll("[data-view-target]"),
   views: document.querySelectorAll("[data-view]"),
+  offlineConversionsBody: document.querySelector("#offlineConversionsBody"),
   containerTotal: document.querySelector("#containerTotal"),
   containerDetail: document.querySelector("#containerDetail"),
   dockerHealth: document.querySelector("#dockerHealth"),
@@ -180,6 +181,7 @@ const viewTitles = {
   analytics: ["Tracking / Analytics", "Analytics"],
   customerContainers: ["Containers / List", "Containers"],
   powerUps: ["Containers / Power-Ups", "Power-Ups"],
+  offlineConversions: ["Tracking / Offline Conversions", "Offline Conversions"],
   setupAssistant: ["Setup Assistant / GTM Templates", "Setup Assistant"],
   customerAccountSettings: ["Account / Settings", "Account Settings"],
   settings: ["Account & Others / Settings", "Settings"],
@@ -201,7 +203,7 @@ let generatedAssistantTemplates = null;
 let currentSession = { role: "pending" };
 let currentViewName = "dashboard";
 const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
-const customerOnlyViews = new Set(["customerContainers", "setupAssistant", "customerAccountSettings"]);
+const customerOnlyViews = new Set(["customerContainers", "setupAssistant", "customerAccountSettings", "offlineConversions"]);
 const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "customerAccountSettings", "billing"]);
 const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs", "powerUps"]);
 try {
@@ -3903,11 +3905,17 @@ function renderAdmin(data) {
   renderSummaryList(
     els.customersList,
     customers.length
-      ? customers.map((customer) => ({
-        label: customer.name || customer.id,
-        value: `${customer.domain || "No domain"} · ${customer.plan || "No plan"} · ${String(customer.subscriptionStatus || customer.status || "unknown").replaceAll("_", " ")}`,
-        status: customer.subscriptionStatus === "active" && !customer.unpaid ? "healthy" : "warning"
-      }))
+      ? customers.map((customer) => {
+        const offline = customer.offlineUploads30d
+          ? `Offline ${customer.offlineEventsSent30d || 0} sent/30d${customer.offlineLastStatus === "error" ? " ⚠" : ""}`
+          : "Offline none";
+        const cookie = customer.cookieExtensionEnabled ? `Cookie ${customer.cookieExtensionDays}d` : "Cookie default";
+        return {
+          label: customer.name || customer.id,
+          value: `${customer.domain || "No domain"} · ${customer.plan || "No plan"} · ${String(customer.subscriptionStatus || customer.status || "unknown").replaceAll("_", " ")} · ${offline} · ${cookie}`,
+          status: customer.subscriptionStatus === "active" && !customer.unpaid ? "healthy" : "warning"
+        };
+      })
       : [{ label: "Customer model", value: "Configure TENANT_* or create provisioning requests", status: "warning" }]
   );
 
@@ -4266,6 +4274,185 @@ function renderLogs(data) {
     : "Preview from the first running container.";
 }
 
+const OFFLINE_CSV_HEADER = "event_name,event_time,value,currency,order_id,email,phone,first_name,last_name,city,state,zip,country";
+const OFFLINE_CSV_SAMPLE = `${OFFLINE_CSV_HEADER}\nPurchase,2026-06-14,1499,BDT,A-1001,customer@example.com,8801712345678,Karim,Rahman,Dhaka,Dhaka,1207,BD`;
+let offlineTracking = null;
+
+function offlineUploadHistoryHtml(uploads) {
+  if (!uploads || !uploads.length) return `<p class="muted-note">No uploads yet.</p>`;
+  return `<ul class="offline-history">${uploads.map((u) => {
+    const tone = u.status === "sent" ? "ok" : "warn";
+    const when = u.at ? formatShortDate(u.at) : "";
+    const errs = (u.errors && u.errors.length) ? `<small class="offline-history-err">${escapeHtml(u.errors.slice(0, 3).join(" · "))}</small>` : "";
+    return `<li><span class="badge ${tone}">${escapeHtml(u.status || "—")}</span> <span>${u.sent || 0}/${u.received || 0} sent</span> <small>${escapeHtml(when)}</small>${errs}</li>`;
+  }).join("")}</ul>`;
+}
+
+function renderOfflineConversions() {
+  const mount = els.offlineConversionsBody;
+  if (!mount) return;
+  mount.innerHTML = `<p class="muted-note">Loading…</p>`;
+  fetch("/api/customer/me")
+    .then((r) => r.json())
+    .then((result) => {
+      offlineTracking = result.tracking || null;
+      paintOfflineConversions();
+    })
+    .catch(() => { mount.innerHTML = `<div class="empty-log">Could not load your tracking settings.</div>`; });
+}
+
+function paintOfflineConversions() {
+  const mount = els.offlineConversionsBody;
+  if (!mount) return;
+  const tracking = offlineTracking || {};
+  const meta = tracking.meta || {};
+  const cookie = tracking.cookieExtension || { enabled: false, days: 730 };
+  const hasToken = Boolean(meta.hasToken);
+
+  const uploadCard = hasToken
+    ? `<div class="offline-upload">
+        <p>Upload phone, COD, or in-store orders as CSV to push them to Meta as offline conversions. Customer match keys are hashed in your browser's request and sent server-side.</p>
+        <div class="offline-actions-row">
+          <button class="button" type="button" id="offlineTemplateBtn">Download CSV template</button>
+          <span class="muted-note">Columns: ${escapeHtml(OFFLINE_CSV_HEADER)}</span>
+        </div>
+        <label class="field-label" for="offlineCsvInput">Paste CSV rows or choose a file</label>
+        <input type="file" id="offlineCsvFile" accept=".csv,text/csv" />
+        <textarea id="offlineCsvInput" rows="7" placeholder="${escapeHtml(OFFLINE_CSV_HEADER)}\n..."></textarea>
+        <div class="offline-actions-row">
+          <button class="button" type="button" id="offlineValidateBtn">Validate</button>
+          <button class="button button-primary" type="button" id="offlineSendBtn">Upload to Meta</button>
+        </div>
+        <div id="offlineResult" class="offline-result"></div>
+      </div>`
+    : `<div class="empty-log offline-empty">
+        <strong>Connect Meta first.</strong>
+        <p>Add your Meta Pixel ID and Conversions API token in the Setup Assistant, then come back to upload offline conversions.</p>
+        <button class="button button-primary" type="button" id="offlineGoSetupBtn">Open Setup Assistant</button>
+      </div>`;
+
+  mount.innerHTML = `
+    <section class="panel">
+      <div class="panel-header">
+        <div><h2>Offline conversion upload</h2><p class="panel-sub">Send offline orders to Meta CAPI${meta.pixelId ? ` · Pixel ${escapeHtml(meta.pixelId)}` : ""}${meta.testEventCode ? ` · test ${escapeHtml(meta.testEventCode)}` : ""}</p></div>
+      </div>
+      ${uploadCard}
+      <div class="offline-history-wrap">
+        <h3>Recent uploads</h3>
+        ${offlineUploadHistoryHtml(tracking.offlineUploads)}
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-header">
+        <div><h2>Cookie life extension</h2><p class="panel-sub">Resist Safari ITP's 7-day cap by writing the first-party FPID cookie server-side with a long lifetime.</p></div>
+      </div>
+      <div class="cookie-ext">
+        <label class="toggle-row"><input type="checkbox" id="cookieExtEnabled" ${cookie.enabled ? "checked" : ""}/> <span>Enable extended cookie lifetime</span></label>
+        <label class="field-label" for="cookieExtDays">Cookie lifetime (days, max 730)</label>
+        <input type="number" id="cookieExtDays" min="1" max="730" value="${escapeHtml(String(cookie.days || 730))}" />
+        <div class="offline-actions-row">
+          <button class="button button-primary" type="button" id="cookieExtSaveBtn">Save</button>
+          <span id="cookieExtMsg" class="muted-note"></span>
+        </div>
+        <p class="muted-note">After changing this, regenerate your Server GTM template in the Setup Assistant and re-import it to apply.</p>
+      </div>
+    </section>`;
+
+  wireOfflineConversions();
+}
+
+function downloadOfflineTemplate() {
+  const blob = new Blob([OFFLINE_CSV_SAMPLE], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "tagioo-offline-conversions-template.csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function postOffline(path, csv) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ csv })
+  });
+  return { status: res.status, body: await res.json().catch(() => ({})) };
+}
+
+function wireOfflineConversions() {
+  const templateBtn = document.querySelector("#offlineTemplateBtn");
+  if (templateBtn) templateBtn.addEventListener("click", downloadOfflineTemplate);
+
+  const goSetup = document.querySelector("#offlineGoSetupBtn");
+  if (goSetup) goSetup.addEventListener("click", () => setView("setupAssistant"));
+
+  const fileInput = document.querySelector("#offlineCsvFile");
+  const textarea = document.querySelector("#offlineCsvInput");
+  if (fileInput && textarea) {
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { textarea.value = String(reader.result || ""); };
+      reader.readAsText(file);
+    });
+  }
+
+  const resultEl = document.querySelector("#offlineResult");
+  const showResult = (status, body, validateOnly) => {
+    if (!resultEl) return;
+    if (status >= 200 && status < 300) {
+      if (validateOnly) {
+        const errs = (body.rowErrors && body.rowErrors.length) ? `<ul class="offline-result-errs">${body.rowErrors.slice(0, 8).map((e) => `<li>${escapeHtml(e)}</li>`).join("")}</ul>` : "";
+        resultEl.innerHTML = `<div class="badge ok">Valid</div> ${body.willSend} of ${body.received} rows ready to send.${errs}`;
+      } else {
+        resultEl.innerHTML = `<div class="badge ok">Uploaded</div> ${body.sent || 0} of ${body.received || 0} events sent to Meta.`;
+        offlineTracking = null;
+        renderOfflineConversions();
+      }
+    } else {
+      const errs = (body.errors && body.errors.length) ? body.errors.join(" · ") : (body.error || "Upload failed.");
+      resultEl.innerHTML = `<div class="badge warn">Error</div> ${escapeHtml(errs)}`;
+    }
+  };
+
+  const validateBtn = document.querySelector("#offlineValidateBtn");
+  if (validateBtn) validateBtn.addEventListener("click", async () => {
+    const csv = (textarea.value || "").trim();
+    if (!csv) { showResult(400, { error: "Paste CSV rows or choose a file first." }); return; }
+    validateBtn.disabled = true;
+    try { const { status, body } = await postOffline("/api/customer/offline-conversions/validate", csv); showResult(status, body, true); }
+    finally { validateBtn.disabled = false; }
+  });
+
+  const sendBtn = document.querySelector("#offlineSendBtn");
+  if (sendBtn) sendBtn.addEventListener("click", async () => {
+    const csv = (textarea.value || "").trim();
+    if (!csv) { showResult(400, { error: "Paste CSV rows or choose a file first." }); return; }
+    if (!window.confirm("Upload these offline conversions to Meta?")) return;
+    sendBtn.disabled = true;
+    try { const { status, body } = await postOffline("/api/customer/offline-conversions", csv); showResult(status, body, false); }
+    finally { sendBtn.disabled = false; }
+  });
+
+  const saveCookie = document.querySelector("#cookieExtSaveBtn");
+  if (saveCookie) saveCookie.addEventListener("click", async () => {
+    const enabled = document.querySelector("#cookieExtEnabled").checked;
+    const days = Number(document.querySelector("#cookieExtDays").value) || 730;
+    const msg = document.querySelector("#cookieExtMsg");
+    saveCookie.disabled = true;
+    try {
+      const res = await fetch("/api/customer/cookie-extension", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled, days })
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) { offlineTracking = body.tracking || offlineTracking; if (msg) { msg.textContent = "Saved."; msg.className = "muted-note ok-text"; } }
+      else if (msg) { msg.textContent = body.error || "Save failed."; msg.className = "muted-note warn-text"; }
+    } finally { saveCookie.disabled = false; }
+  });
+}
+
 function renderCurrentView(data) {
   switch (currentViewName) {
     case "logs":
@@ -4294,6 +4481,9 @@ function renderCurrentView(data) {
       break;
     case "powerUps":
       renderPowerUps(data);
+      break;
+    case "offlineConversions":
+      renderOfflineConversions(data);
       break;
     case "setupAssistant":
       renderSetupAssistant(data);

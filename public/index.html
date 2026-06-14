@@ -11,7 +11,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=5" />
+    <link rel="stylesheet" href="/styles.css?v=6" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -42,6 +42,10 @@
           <button class="nav-item" type="button" data-view-target="powerUps" aria-label="Power-Ups" title="Power-Ups">
             <span class="nav-icon" aria-hidden="true">◆</span>
             <span>Power-Ups</span>
+          </button>
+          <button class="nav-item" type="button" data-view-target="offlineConversions" data-customer-only hidden aria-label="Offline Conversions" title="Offline Conversions">
+            <span class="nav-icon" aria-hidden="true">⇪</span>
+            <span>Offline Conversions</span>
           </button>
           <button class="nav-item" type="button" data-view-target="setupAssistant" data-customer-only hidden aria-label="Setup Assistant" title="Setup Assistant">
             <span class="nav-icon" aria-hidden="true">⇣</span>
@@ -753,6 +757,17 @@
             <div id="powerUpsGrid" class="powerups-grid"></div>
             <p id="powerUpsMessage" class="form-message"></p>
           </section>
+        </section>
+
+        <section id="offlineConversionsView" class="view" data-view="offlineConversions" data-customer-only hidden>
+          <section class="customer-page-head">
+            <div>
+              <p class="breadcrumb">Tracking / Offline Conversions</p>
+              <h2>Offline Conversions</h2>
+              <p>Upload offline orders to Meta and extend your first-party cookie lifetime to recover conversions browsers and offline channels normally cost you.</p>
+            </div>
+          </section>
+          <div id="offlineConversionsBody"></div>
         </section>
 
         <section id="setupAssistantView" class="view" data-view="setupAssistant" data-customer-only hidden>
@@ -2174,6 +2189,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=5" type="module"></script>
+    <script src="/app.js?v=6" type="module"></script>
   </body>
 </html>
