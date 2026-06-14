@@ -2955,6 +2955,13 @@ function retainedSummaryFromSnapshots(snapshots, fallbackSummary = null) {
     .flatMap((snapshot) => snapshot.recentEvents || [])
     .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
     .slice(0, config.eventLogLimit);
+  // Dedicated multi-day Purchase feed for the Purchase Inspector. The generic
+  // recentEvents cap is dominated by a busy day's traffic, which starves the
+  // Week/Month views; pull Purchase rows across all retained days separately.
+  const purchaseEvents = rows
+    .flatMap((snapshot) => (snapshot.recentEvents || []).filter((event) => event.eventName === "Purchase"))
+    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+    .slice(0, 2000);
   return {
     ...(fallbackSummary || {}),
     available: true,
@@ -2973,6 +2980,7 @@ function retainedSummaryFromSnapshots(snapshots, fallbackSummary = null) {
     purchases: mergeHistoryPurchases(rows),
     hourly: mergeHistoryHourly(rows),
     recentEvents,
+    purchaseEvents,
     eventLogLimit: config.eventLogLimit
   };
 }

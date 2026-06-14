@@ -837,10 +837,8 @@ function eventDetail(item) {
   ].filter(Boolean).join(" - ");
 }
 
-function serverEventRows(data) {
-  const rows = (data.nginx?.retainedEvents?.recentEvents?.length ? data.nginx.retainedEvents : data.nginx?.todayEvents)?.recentEvents;
-  if (!Array.isArray(rows) || !rows.length) return [];
-  return rows.map((item) => ({
+function mapServerEventRow(item) {
+  return {
     source: "access",
     level: Number(item.status) >= 500 ? "error" : Number(item.status) >= 400 ? "warn" : "info",
     status: item.status,
@@ -858,7 +856,21 @@ function serverEventRows(data) {
     eventId: item.eventId,
     transactionId: item.transactionId,
     detail: eventDetail(item)
-  }));
+  };
+}
+
+function serverEventRows(data) {
+  const rows = (data.nginx?.retainedEvents?.recentEvents?.length ? data.nginx.retainedEvents : data.nginx?.todayEvents)?.recentEvents;
+  if (!Array.isArray(rows) || !rows.length) return [];
+  return rows.map(mapServerEventRow);
+}
+
+// Purchase rows for the inspector. Prefer the dedicated multi-day purchaseEvents
+// feed (covers Week/Month) and fall back to the generic today/retained rows.
+function inspectorPurchaseRows(data) {
+  const purchaseEvents = data.nginx?.retainedEvents?.purchaseEvents;
+  if (Array.isArray(purchaseEvents) && purchaseEvents.length) return purchaseEvents.map(mapServerEventRow);
+  return purchaseRows(data);
 }
 
 function renderEventLogStats(allItems, visibleItems, summary) {
@@ -979,7 +991,7 @@ function purchaseCompleteness(item) {
 
 function cleanPurchaseRows(data) {
   const fallbackHost = customerFallbackHost(data);
-  const rows = purchaseRows(data)
+  const rows = inspectorPurchaseRows(data)
     .map((item) => ({
       ...item,
       displayHost: item.host && item.host !== "Unknown host" ? item.host : fallbackHost || "Tracking domain",
@@ -1070,14 +1082,15 @@ function renderPurchaseInspector(data) {
 
   const rangeWord = { day: "today", week: "last 7 days", month: "last 30 days", all: "all retained" }[purchaseRange] || "";
   // On the Day view, show real store orders alongside tracked requests so any
-  // tracking gap (orders that never fired a Purchase request) is visible.
+  // tracking gap (orders that never fired a Purchase request) is visible. Only
+  // shown when the order feed (Woo webhook) actually reports orders — otherwise
+  // a "0 orders" reads as a bug when really no order webhook is wired up.
   const realOrders = Number(data.orders?.today?.count);
-  const realPart = purchaseRange === "day" && Number.isFinite(realOrders)
-    ? ` · ${realOrders} order${realOrders === 1 ? "" : "s"}`
-    : "";
+  const showOrders = purchaseRange === "day" && Number.isFinite(realOrders) && realOrders > 0;
+  const realPart = showOrders ? ` · ${realOrders} order${realOrders === 1 ? "" : "s"}` : "";
   els.purchaseInspectorBadge.className = "badge";
   els.purchaseInspectorBadge.classList.add(
-    rows.length && (!realPart || rows.length >= realOrders) ? "ok" : "warn"
+    rows.length && (!showOrders || rows.length >= realOrders) ? "ok" : "warn"
   );
   els.purchaseInspectorBadge.textContent = `${rows.length} tracked · ${rangeWord}${realPart}`;
 
