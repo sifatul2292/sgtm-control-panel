@@ -91,6 +91,7 @@ const els = {
   eventLogStats: document.querySelector("#eventLogStats"),
   dailyEventLogBody: document.querySelector("#dailyEventLogBody"),
   lastEventFreshness: document.querySelector("#lastEventFreshness"),
+  purchaseGapAlert: document.querySelector("#purchaseGapAlert"),
   purchaseSearch: document.querySelector("#purchaseSearch"),
   purchaseInspector: document.querySelector("#purchaseInspector"),
   purchaseInspectorBadge: document.querySelector("#purchaseInspectorBadge"),
@@ -4437,6 +4438,29 @@ function renderDailyEventLog(dailyHistory) {
 
 }
 
+function renderPurchaseGapAlert(dailyHistory) {
+  const el = els.purchaseGapAlert;
+  if (!el) return;
+  const rows = (Array.isArray(dailyHistory) ? dailyHistory : []).slice(0, 8);
+  if (rows.length < 2) { el.hidden = true; return; }
+
+  const today = rows[0];
+  const past7 = rows.slice(1, 8);
+  const todayPurchases = Number(today.purchases || today.purchaseCount || 0);
+  const avg7 = past7.reduce((s, r) => s + Number(r.purchases || r.purchaseCount || 0), 0) / past7.length;
+
+  if (avg7 < 1 || todayPurchases >= avg7 * 0.5) { el.hidden = true; return; }
+
+  const pct = avg7 > 0 ? Math.round((todayPurchases / avg7) * 100) : 0;
+  el.hidden = false;
+  el.innerHTML =
+    `<span class="gap-alert-icon">⚠</span>` +
+    `<div><strong>Purchase tracking may be down.</strong> ` +
+    `Today: <strong>${todayPurchases}</strong> purchase${todayPurchases !== 1 ? "s" : ""} — ` +
+    `${pct}% of 7-day avg (${Math.round(avg7)}). ` +
+    `Check sGTM container and incoming requests for errors.</div>`;
+}
+
 function renderLastEventFreshness(data) {
   if (!els.lastEventFreshness) return;
   const rows = serverEventRows(data);
@@ -4460,6 +4484,7 @@ function renderLogs(data) {
   renderPurchaseInspector(data);
   renderEventLogDailyChart(data.history?.daily || []);
   renderDailyEventLog(data.history?.daily || []);
+  renderPurchaseGapAlert(data.history?.daily || []);
   renderLastEventFreshness(data);
   setLog(els.errorLog, data.nginx.errorLog, "error");
   setLog(els.dockerLog, data.dockerLogs, "docker");

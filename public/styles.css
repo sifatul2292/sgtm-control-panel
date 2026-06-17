@@ -2765,6 +2765,26 @@ textarea::placeholder {
 .freshness-warn { color: var(--c-warn, #f59e0b); }
 .freshness-bad { color: var(--c-error, #ef4444); }
 
+.purchase-gap-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  background: color-mix(in srgb, var(--c-warn, #f59e0b) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-warn, #f59e0b) 40%, transparent);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.purchase-gap-alert[hidden] { display: none; }
+.gap-alert-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  color: var(--c-warn, #f59e0b);
+  margin-top: 1px;
+}
+
 .event-detail-box {
   max-width: 100%;
   overflow-wrap: anywhere;
