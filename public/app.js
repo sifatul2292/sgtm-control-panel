@@ -4287,29 +4287,34 @@ function renderEventLogDailyChart(dailyHistory) {
   const rows = [];
   for (let i = 29; i >= 0; i--) {
     const key = new Date(anchorMs - i * 86400000).toISOString().slice(0, 10);
-    rows.push(byDate.get(key) || { date: key, total: 0, purchases: 0 });
+    rows.push(byDate.get(key) || { date: key, total: 0, purchases: 0, purchaseRevenue: 0 });
   }
   if (!list.length) {
     els.customerEventLogChart.innerHTML = '<div class="empty-log" style="padding:2rem 1rem;text-align:center;color:var(--color-muted);font-size:.85rem">No daily history yet.</div>';
     return;
   }
   const W = 700; const H = 220;
-  const pad = { left: 44, right: 16, top: 18, bottom: 36 };
+  const pad = { left: 44, right: 60, top: 18, bottom: 36 };
   const plotW = W - pad.left - pad.right;
   const plotH = H - pad.top - pad.bottom;
   const maxRaw = Math.max(1, ...rows.map((r) => Number(r.total || 0)));
-  // Round the top gridline up to a "nice" number so the axis reads cleanly.
   const niceMax = (() => {
     const pow = Math.pow(10, Math.floor(Math.log10(maxRaw)));
     const n = maxRaw / pow;
     const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
     return step * pow;
   })();
+  const maxRevenue = Math.max(1, ...rows.map((r) => Number(r.purchaseRevenue || 0)));
+  const hasRevenue = rows.some((r) => Number(r.purchaseRevenue || 0) > 0);
+  const revCurrency = list.find((r) => r.currency)?.currency || "";
+
   const baseY = pad.top + plotH;
   const slot = plotW / rows.length;
   const barW = Math.max(3, Math.min(26, slot * 0.55));
   const barX = (i) => pad.left + slot * i + (slot - barW) / 2;
+  const barCx = (i) => pad.left + slot * i + slot / 2;
   const toY = (v) => baseY - Math.min(Number(v) / niceMax, 1) * plotH;
+  const toRevY = (v) => baseY - Math.min(Number(v) / maxRevenue, 1) * plotH;
 
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((pct) => {
     const y = (baseY - plotH * pct).toFixed(1);
@@ -4317,6 +4322,14 @@ function renderEventLogDailyChart(dailyHistory) {
     return `<line class="${pct === 0 ? "chart-axis-line" : "chart-grid-line-dashed"}" x1="${pad.left}" y1="${y}" x2="${pad.left + plotW}" y2="${y}" />
             <text class="chart-axis-label" x="${pad.left - 8}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="end">${val.toLocaleString()}</text>`;
   }).join("");
+
+  // Right-axis revenue labels (only when revenue data exists)
+  const revTicks = hasRevenue ? [0, 0.5, 1].map((pct) => {
+    const y = (baseY - plotH * pct).toFixed(1);
+    const val = Math.round(maxRevenue * pct);
+    const label = val >= 1000 ? `${Math.round(val / 1000)}k` : val.toString();
+    return `<text class="chart-axis-label" x="${pad.left + plotW + 8}" y="${(Number(y) + 4).toFixed(1)}" text-anchor="start" fill="#f59e0b">${label}</text>`;
+  }).join("") : "";
 
   const labelStep = rows.length <= 10 ? 1 : rows.length <= 16 ? 2 : 3;
   const xLabels = rows.map((r, i) => {
@@ -4331,12 +4344,22 @@ function renderEventLogDailyChart(dailyHistory) {
     const h = Math.max(total > 0 ? 2 : 0, baseY - y);
     const x = barX(i);
     const rx = Math.min(barW / 2, 4);
-    return `<rect class="log-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="${rx}" fill="url(#logBarFill)" data-idx="${i}" data-date="${escapeHtml(r.date || "")}" data-total="${total}" data-purchases="${Number(r.purchases || 0)}" />`;
+    return `<rect class="log-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="${rx}" fill="url(#logBarFill)" data-idx="${i}" data-date="${escapeHtml(r.date || "")}" data-total="${total}" data-purchases="${Number(r.purchases || 0)}" data-revenue="${Number(r.purchaseRevenue || 0)}" data-currency="${escapeHtml(r.currency || revCurrency)}" />`;
   }).join("");
+
+  // Revenue line + dots overlay
+  const revPoints = rows.map((r, i) => {
+    const rev = Number(r.purchaseRevenue || 0);
+    return [barCx(i).toFixed(1), toRevY(rev).toFixed(1), rev];
+  });
+  const revPath = hasRevenue
+    ? `<polyline class="rev-line" points="${revPoints.map(([x, y]) => `${x},${y}`).join(" ")}" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="0.85" />`
+    + revPoints.map(([x, y, rev]) => rev > 0 ? `<circle class="rev-dot" cx="${x}" cy="${y}" r="3" fill="#f59e0b" opacity="0.9" />` : "").join("")
+    : "";
 
   els.customerEventLogChart.innerHTML = `
     <div class="chart-tooltip" id="logChartTooltip" style="display:none;pointer-events:none"></div>
-    <svg class="customer-analytics-svg log-bar-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily event volume">
+    <svg class="customer-analytics-svg log-bar-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily event volume and revenue">
       <defs>
         <linearGradient id="logBarFill" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stop-color="#7c3aed" />
@@ -4344,7 +4367,9 @@ function renderEventLogDailyChart(dailyHistory) {
         </linearGradient>
       </defs>
       <g>${yTicks}</g>
+      ${revTicks}
       <g class="log-bars">${bars}</g>
+      ${revPath}
       ${xLabels}
     </svg>
   `;
@@ -4354,10 +4379,13 @@ function renderEventLogDailyChart(dailyHistory) {
     bar.addEventListener("mouseenter", () => {
       const total = Number(bar.dataset.total);
       const purchases = Number(bar.dataset.purchases);
+      const revenue = Number(bar.dataset.revenue);
+      const currency = bar.dataset.currency || "";
       bar.classList.add("is-active");
       tooltip.innerHTML = `<div class="tooltip-hour">${escapeHtml(bar.dataset.date || "")}</div>`
         + `<div class="tooltip-row"><span class="tooltip-dot" style="background:var(--color-accent)"></span><span>Events</span><strong>${total.toLocaleString()}</strong></div>`
-        + (purchases ? `<div class="tooltip-row"><span class="tooltip-dot" style="background:var(--c-purchase)"></span><span>Purchases</span><strong>${purchases.toLocaleString()}</strong></div>` : "");
+        + (purchases ? `<div class="tooltip-row"><span class="tooltip-dot" style="background:var(--c-purchase)"></span><span>Purchases</span><strong>${purchases.toLocaleString()}</strong></div>` : "")
+        + (revenue ? `<div class="tooltip-row"><span class="tooltip-dot" style="background:#f59e0b"></span><span>Revenue</span><strong>${escapeHtml(formatMoney(revenue, currency))}</strong></div>` : "");
       tooltip.style.display = "block";
     });
     bar.addEventListener("mousemove", (e) => {
