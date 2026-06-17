@@ -89,6 +89,7 @@ const els = {
   eventLimitFilter: document.querySelector("#eventLimitFilter"),
   requestUrlFilter: document.querySelector("#requestUrlFilter"),
   eventLogStats: document.querySelector("#eventLogStats"),
+  dailyEventLogBody: document.querySelector("#dailyEventLogBody"),
   purchaseSearch: document.querySelector("#purchaseSearch"),
   purchaseInspector: document.querySelector("#purchaseInspector"),
   purchaseInspectorBadge: document.querySelector("#purchaseInspectorBadge"),
@@ -4367,10 +4368,42 @@ function renderEventLogDailyChart(dailyHistory) {
   });
 }
 
+function renderDailyEventLog(dailyHistory) {
+  if (!els.dailyEventLogBody) return;
+  const rows = (Array.isArray(dailyHistory) ? dailyHistory : []).slice(0, 30);
+  if (!rows.length) {
+    els.dailyEventLogBody.innerHTML = '<tr><td colspan="8" style="color:var(--color-muted);text-align:center;padding:2rem">No daily history yet.</td></tr>';
+    return;
+  }
+  const today = dhakaDateKey();
+  els.dailyEventLogBody.innerHTML = rows.map((r) => {
+    const isToday = r.date === today;
+    const purchases = Number(r.purchases || r.purchaseCount || 0);
+    const revenue = Number(r.purchaseRevenue || 0);
+    const pageView = Number(r.pageView || 0);
+    const addToCart = Number(r.addToCart || 0);
+    const beginCheckout = Number(r.beginCheckout || 0);
+    const total = Number(r.total || 0);
+    const errors = Number(r.errors || 0);
+    const dash = `<span style="color:var(--color-muted)">—</span>`;
+    return `<tr${isToday ? ' class="daily-log-today"' : ''}>
+      <td><strong>${escapeHtml(r.date || "")}</strong>${isToday ? ' <span class="badge badge-live" style="font-size:.65rem;padding:2px 6px;margin-left:6px">Today</span>' : ""}</td>
+      <td>${purchases ? `<strong>${purchases.toLocaleString()}</strong>` : dash}</td>
+      <td>${revenue > 0 ? escapeHtml(formatMoney(revenue, r.currency || "")) : dash}</td>
+      <td>${pageView ? pageView.toLocaleString() : dash}</td>
+      <td>${addToCart ? addToCart.toLocaleString() : dash}</td>
+      <td>${beginCheckout ? beginCheckout.toLocaleString() : dash}</td>
+      <td>${total.toLocaleString()}</td>
+      <td>${errors > 0 ? `<span class="status-code bad">${errors.toLocaleString()}</span>` : dash}</td>
+    </tr>`;
+  }).join("");
+}
+
 function renderLogs(data) {
   renderEventTable(data);
   renderPurchaseInspector(data);
   renderEventLogDailyChart(data.history?.daily || []);
+  renderDailyEventLog(data.history?.daily || []);
   setLog(els.errorLog, data.nginx.errorLog, "error");
   setLog(els.dockerLog, data.dockerLogs, "docker");
   els.dockerLogSource.textContent = data.dockerLogs.container || "tail";

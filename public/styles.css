@@ -2726,6 +2726,14 @@ textarea::placeholder {
   background: var(--color-surface-2);
 }
 
+.daily-event-table {
+  min-width: 800px;
+}
+
+.daily-log-today td {
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent);
+}
+
 .event-detail-box {
   max-width: 100%;
   overflow-wrap: anywhere;

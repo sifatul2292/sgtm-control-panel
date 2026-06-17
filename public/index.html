@@ -11,7 +11,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=10" />
+    <link rel="stylesheet" href="/styles.css?v=11" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -424,6 +424,35 @@
               <span class="badge">30 days</span>
             </div>
             <div id="customerEventLogChart" class="customer-event-chart"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Event Log by Day</h2>
+                <p>Purchases and events per day, stored from tracking history.</p>
+              </div>
+              <span class="badge">30 days</span>
+            </div>
+            <div class="event-table-wrap">
+              <table class="event-table compact-table daily-event-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Purchases</th>
+                    <th>Revenue</th>
+                    <th>Page Views</th>
+                    <th>Add to Cart</th>
+                    <th>Begin Checkout</th>
+                    <th>Total Events</th>
+                    <th>Errors</th>
+                  </tr>
+                </thead>
+                <tbody id="dailyEventLogBody">
+                  <tr><td colspan="8">Loading daily event history…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section id="nginx" class="panel log-panel" data-log-panel="access">
@@ -2189,6 +2218,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=11" type="module"></script>
+    <script src="/app.js?v=12" type="module"></script>
   </body>
 </html>
