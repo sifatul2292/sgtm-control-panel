@@ -4449,14 +4449,27 @@ function renderPurchaseGapAlert(dailyHistory) {
   const todayPurchases = Number(today.purchases || today.purchaseCount || 0);
   const avg7 = past7.reduce((s, r) => s + Number(r.purchases || r.purchaseCount || 0), 0) / past7.length;
 
-  if (avg7 < 1 || todayPurchases >= avg7 * 0.5) { el.hidden = true; return; }
+  if (avg7 < 1) { el.hidden = true; return; }
 
-  const pct = avg7 > 0 ? Math.round((todayPurchases / avg7) * 100) : 0;
+  // Scale today's count by Dhaka day progress (UTC+6) to project full-day pace
+  const nowDhaka = new Date(Date.now() + 6 * 3600_000);
+  const minuteOfDay = nowDhaka.getUTCHours() * 60 + nowDhaka.getUTCMinutes();
+  const dayFraction = minuteOfDay / 1440;
+
+  // Too early in Dhaka day (before ~2:24am) — not enough signal yet
+  if (dayFraction < 0.1) { el.hidden = true; return; }
+
+  const projected = todayPurchases / dayFraction;
+
+  if (projected >= avg7 * 0.5) { el.hidden = true; return; }
+
+  const pct = Math.round((projected / avg7) * 100);
+  const projRounded = Math.round(projected);
   el.hidden = false;
   el.innerHTML =
     `<span class="gap-alert-icon">⚠</span>` +
     `<div><strong>Purchase tracking may be down.</strong> ` +
-    `Today: <strong>${todayPurchases}</strong> purchase${todayPurchases !== 1 ? "s" : ""} — ` +
+    `Today: <strong>${todayPurchases}</strong> so far (projected ~${projRounded}/day at current pace) — ` +
     `${pct}% of 7-day avg (${Math.round(avg7)}). ` +
     `Check sGTM container and incoming requests for errors.</div>`;
 }
