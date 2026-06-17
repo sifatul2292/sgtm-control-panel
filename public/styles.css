@@ -2734,6 +2734,24 @@ textarea::placeholder {
   background: color-mix(in srgb, var(--color-accent) 5%, transparent);
 }
 
+.freshness-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.freshness-dot {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.freshness-ok { color: var(--c-ok, #22c55e); }
+.freshness-warn { color: var(--c-warn, #f59e0b); }
+.freshness-bad { color: var(--c-error, #ef4444); }
+
 .event-detail-box {
   max-width: 100%;
   overflow-wrap: anywhere;

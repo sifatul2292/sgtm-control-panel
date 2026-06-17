@@ -90,6 +90,7 @@ const els = {
   requestUrlFilter: document.querySelector("#requestUrlFilter"),
   eventLogStats: document.querySelector("#eventLogStats"),
   dailyEventLogBody: document.querySelector("#dailyEventLogBody"),
+  lastEventFreshness: document.querySelector("#lastEventFreshness"),
   purchaseSearch: document.querySelector("#purchaseSearch"),
   purchaseInspector: document.querySelector("#purchaseInspector"),
   purchaseInspectorBadge: document.querySelector("#purchaseInspectorBadge"),
@@ -4404,11 +4405,30 @@ function renderDailyEventLog(dailyHistory) {
   }).join("");
 }
 
+function renderLastEventFreshness(data) {
+  if (!els.lastEventFreshness) return;
+  const rows = serverEventRows(data);
+  const latest = rows.find((r) => r.date instanceof Date && !isNaN(r.date));
+  if (!latest) {
+    els.lastEventFreshness.innerHTML = "";
+    return;
+  }
+  const ageMs = Date.now() - latest.date.getTime();
+  const ageSec = Math.round(ageMs / 1000);
+  const label = relativeTime(latest.date);
+  const tone = ageSec < 300 ? "ok" : ageSec < 900 ? "warn" : "bad";
+  const dot = tone === "ok" ? "●" : tone === "warn" ? "◉" : "○";
+  els.lastEventFreshness.innerHTML =
+    `<span class="freshness-dot freshness-${tone}">${dot}</span>` +
+    `<span class="freshness-label">Last event <strong>${escapeHtml(label)}</strong></span>`;
+}
+
 function renderLogs(data) {
   renderEventTable(data);
   renderPurchaseInspector(data);
   renderEventLogDailyChart(data.history?.daily || []);
   renderDailyEventLog(data.history?.daily || []);
+  renderLastEventFreshness(data);
   setLog(els.errorLog, data.nginx.errorLog, "error");
   setLog(els.dockerLog, data.dockerLogs, "docker");
   els.dockerLogSource.textContent = data.dockerLogs.container || "tail";
