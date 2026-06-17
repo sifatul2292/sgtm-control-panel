@@ -4431,9 +4431,10 @@ function renderDailyEventLog(dailyHistory) {
       <td>${addToCart ? addToCart.toLocaleString() : dash}</td>
       <td>${beginCheckout ? beginCheckout.toLocaleString() : dash}</td>
       <td>${total.toLocaleString()}</td>
-      <td>${errors > 0 ? `<span class="status-code bad">${errors.toLocaleString()}</span>` : dash}</td>
+      <td>${errors > 0 ? `<button class="error-drill-btn status-code bad" title="Filter to errors" data-drill="errors">${errors.toLocaleString()}</button>` : dash}</td>
     </tr>`;
   }).join("");
+
 }
 
 function renderLastEventFreshness(data) {
@@ -4764,6 +4765,13 @@ document.addEventListener("click", (e) => {
 });
 
 els.refreshButton.addEventListener("click", loadDashboard);
+els.dailyEventLogBody?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-drill='errors']");
+  if (!btn || !els.eventStatusFilter) return;
+  els.eventStatusFilter.value = "400";
+  els.eventStatusFilter.dispatchEvent(new Event("change"));
+  document.getElementById("nginx")?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 els.eventStatusFilter.addEventListener("change", () => latestData && renderLogs(latestData));
 els.eventTypeFilter.addEventListener("change", () => latestData && renderLogs(latestData));
 els.clientFilter.addEventListener("change", () => latestData && renderLogs(latestData));
