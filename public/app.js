@@ -4368,17 +4368,34 @@ function renderEventLogDailyChart(dailyHistory) {
   });
 }
 
-function renderDailyEventLog(dailyHistory) {
+function dailyPurchaseCountsByFirstSeen(data) {
+  // Use the same firstDate logic as the purchase inspector so re-sent orders
+  // are counted on the day they were FIRST seen, not every day they re-appear.
+  const counts = {};
+  for (const item of cleanPurchaseRows(data)) {
+    const anchor = item.firstDate instanceof Date ? item.firstDate : item.date;
+    if (!anchor) continue;
+    const key = dhakaDateKey(anchor.getTime());
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return counts;
+}
+
+function renderDailyEventLog(dailyHistory, data) {
   if (!els.dailyEventLogBody) return;
   const rows = (Array.isArray(dailyHistory) ? dailyHistory : []).slice(0, 30);
   if (!rows.length) {
     els.dailyEventLogBody.innerHTML = '<tr><td colspan="8" style="color:var(--color-muted);text-align:center;padding:2rem">No daily history yet.</td></tr>';
     return;
   }
+  // Per-day purchase counts keyed by firstDate (matches inspector logic).
+  // Overrides server uniqueCount for days inside the retained window.
+  const firstSeenCounts = data ? dailyPurchaseCountsByFirstSeen(data) : {};
   const today = dhakaDateKey();
   els.dailyEventLogBody.innerHTML = rows.map((r) => {
     const isToday = r.date === today;
-    const purchases = Number(r.purchases || r.purchaseCount || 0);
+    const serverPurchases = Number(r.purchases || r.purchaseCount || 0);
+    const purchases = firstSeenCounts[r.date] !== undefined ? firstSeenCounts[r.date] : serverPurchases;
     const revenue = Number(r.purchaseRevenue || 0);
     const pageView = Number(r.pageView || 0);
     const addToCart = Number(r.addToCart || 0);
@@ -4403,7 +4420,7 @@ function renderLogs(data) {
   renderEventTable(data);
   renderPurchaseInspector(data);
   renderEventLogDailyChart(data.history?.daily || []);
-  renderDailyEventLog(data.history?.daily || []);
+  renderDailyEventLog(data.history?.daily || [], data);
   setLog(els.errorLog, data.nginx.errorLog, "error");
   setLog(els.dockerLog, data.dockerLogs, "docker");
   els.dockerLogSource.textContent = data.dockerLogs.container || "tail";
