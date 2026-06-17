@@ -4378,7 +4378,7 @@ function renderDailyEventLog(dailyHistory) {
   if (!els.dailyEventLogBody) return;
   const rows = (Array.isArray(dailyHistory) ? dailyHistory : []).slice(0, 30);
   if (!rows.length) {
-    els.dailyEventLogBody.innerHTML = '<tr><td colspan="8" style="color:var(--color-muted);text-align:center;padding:2rem">No daily history yet.</td></tr>';
+    els.dailyEventLogBody.innerHTML = '<tr><td colspan="9" style="color:var(--color-muted);text-align:center;padding:2rem">No daily history yet.</td></tr>';
     return;
   }
   const today = dhakaDateKey();
@@ -4391,11 +4391,14 @@ function renderDailyEventLog(dailyHistory) {
     const beginCheckout = Number(r.beginCheckout || 0);
     const total = Number(r.total || 0);
     const errors = Number(r.errors || 0);
+    const convRate = beginCheckout > 0 ? Math.round((purchases / beginCheckout) * 100) : null;
+    const convColor = convRate === null ? "" : convRate >= 50 ? "color:var(--c-ok,#22c55e)" : convRate >= 25 ? "color:var(--c-warn,#f59e0b)" : "color:var(--c-error,#ef4444)";
     const dash = `<span style="color:var(--color-muted)">—</span>`;
     return `<tr${isToday ? ' class="daily-log-today"' : ''}>
       <td><strong>${escapeHtml(r.date || "")}</strong>${isToday ? ' <span class="badge badge-live" style="font-size:.65rem;padding:2px 6px;margin-left:6px">Today</span>' : ""}</td>
       <td>${purchases ? `<strong>${purchases.toLocaleString()}</strong>` : dash}</td>
       <td>${revenue > 0 ? escapeHtml(formatMoney(revenue, r.currency || "")) : dash}</td>
+      <td>${convRate !== null ? `<strong style="${convColor}">${convRate}%</strong>` : dash}</td>
       <td>${pageView ? pageView.toLocaleString() : dash}</td>
       <td>${addToCart ? addToCart.toLocaleString() : dash}</td>
       <td>${beginCheckout ? beginCheckout.toLocaleString() : dash}</td>
