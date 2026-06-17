@@ -1126,7 +1126,7 @@ function renderPurchaseInspector(data) {
           <span>Client</span><strong>${escapeHtml(item.client || "Other")}</strong>
           <span>Domain</span><strong>${escapeHtml(item.displayHost)}</strong>
           <span>Transaction ID</span><strong>${escapeHtml(item.transactionId || "Not provided")}</strong>
-          <span>Event ID</span><strong>${escapeHtml(item.eventId || "Not provided")}</strong>
+          <span>Event ID</span><strong>${item.eventId ? escapeHtml(item.eventId) : item.transactionId ? `<span style="color:var(--color-muted)">${escapeHtml(item.transactionId)} <small>(via transaction ID)</small></span>` : "Not provided"}</strong>
         </div>
         <details class="inspector-details">
           <summary>Request details</summary>
