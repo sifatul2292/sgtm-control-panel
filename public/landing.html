@@ -26,7 +26,8 @@
         <span>Tagioo</span>
       </a>
       <nav aria-label="Primary navigation">
-        <a href="/features">Features</a>
+        <a href="#platform">Platform</a>
+        <a href="#features">Features</a>
         <a href="#how">How it works</a>
         <a href="#pricing">Pricing</a>
         <a href="#faq">FAQ</a>
@@ -41,7 +42,8 @@
     <!-- ── MOBILE NAV ─────────────────────────────────────────── -->
     <div class="mobile-nav" id="mobileNav" aria-hidden="true">
       <nav>
-        <a href="/features" onclick="closeMobileNav()">Features</a>
+        <a href="#platform" onclick="closeMobileNav()">Platform</a>
+        <a href="#features" onclick="closeMobileNav()">Features</a>
         <a href="#how" onclick="closeMobileNav()">How it works</a>
         <a href="#pricing" onclick="closeMobileNav()">Pricing</a>
         <a href="#faq" onclick="closeMobileNav()">FAQ</a>
@@ -64,8 +66,8 @@
               <span class="badge-dot"></span>
               BDIX-hosted &nbsp;·&nbsp; Dedicated containers &nbsp;·&nbsp; Bangladesh
             </div>
-            <h1>Boost ROAS with<br><span class="hero-accent">server-side tracking</span><br>built for Bangladesh.</h1>
-            <p class="hero-copy">Recover 30–60% of lost conversions. Feed Meta &amp; Google clean data. Run on BDIX-fast infrastructure — no server skills needed.</p>
+            <h1>Stop losing sales to<br><span class="hero-accent">broken tracking.</span><br>Fix it in 30 min.</h1>
+            <p class="hero-copy">Server-side GTM for Bangladesh ecommerce — recover lost conversions, feed Meta &amp; Google accurate data, and watch your ROAS climb. No server skills needed.</p>
 
             <div class="hero-result-proof">
               <div class="hrp-item">
@@ -125,7 +127,7 @@
                 </div>
               </div>
               <div class="dash-chart">
-                <div class="dc-label">Hourly events</div>
+                <div class="dc-label">Hourly events &amp; revenue</div>
                 <div class="dc-bars">
                   <div class="dc-bar" style="--h:45%"></div>
                   <div class="dc-bar" style="--h:62%"></div>
@@ -140,6 +142,7 @@
                   <div class="dc-bar" style="--h:58%"></div>
                   <div class="dc-bar" style="--h:70%"></div>
                 </div>
+                <div class="dc-trend-line"></div>
               </div>
               <div class="dash-events">
                 <div class="de-head">Recent events</div>
@@ -228,43 +231,246 @@
         </div>
       </section>
 
-      <!-- ── OUTCOME PROOF ──────────────────────────────────────── -->
-      <section class="section outcome-section">
+      <!-- ── STATUS QUO ────────────────────────────────────────── -->
+      <section class="section status-quo-section">
         <div class="section-heading centered">
-          <p class="eyebrow">Real results</p>
-          <h2>Bangladesh stores see results<br>within the first month.</h2>
-          <p class="section-sub">These are averages across stores on Tagioo. Your results depend on current ad spend, blocked traffic, and setup quality — but the direction is always up.</p>
+          <p class="eyebrow">The problem</p>
+          <h2>Your ad budget is wasted<br>on broken tracking data.</h2>
+          <p class="section-sub">Most Bangladesh ecommerce stores lose 40–60% of conversion signals before they reach Meta and Google. Your campaigns optimize on half the data — and you pay full price.</p>
         </div>
-        <div class="outcome-grid">
-          <article class="outcome-card">
-            <div class="outcome-num" style="--oc:var(--orange)">+31%</div>
-            <h3>Average ROAS lift</h3>
-            <p>Stores report higher ROAS within 30 days of switching to server-side. Meta optimization works better with complete purchase data.</p>
+        <div class="sq-grid">
+          <article class="sq-card">
+            <div class="sq-card-icon" style="--sqc:#EF4444">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M8 8L16 16M16 8L8 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div class="sq-card-label">Browser pixels</div>
+            <h3>Ad blockers kill 30–40% of signals</h3>
+            <p>Client-side Meta Pixel and GA4 tags get blocked by ad blockers and privacy extensions. Every blocked request is a lost conversion Meta can't optimize for.</p>
+            <div class="sq-card-stat">
+              <span>~35%</span>
+              <span>of Bangladesh users run ad blockers</span>
+            </div>
           </article>
-          <article class="outcome-card">
-            <div class="outcome-num" style="--oc:var(--accent)">+58%</div>
-            <h3>More purchases reported</h3>
-            <p>Ad blockers and ITP were hiding 40–60% of your conversions. Tagioo makes all of them visible to Meta and Google.</p>
+          <article class="sq-card sq-card-active">
+            <div class="sq-card-tag">The fix</div>
+            <div class="sq-card-icon" style="--sqc:#059669">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L20 7V12C20 17 16 21 12 22C8 21 4 17 4 12V7L12 2Z" stroke="currentColor" stroke-width="1.5"/><path d="M8 12L11 15L16 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="sq-card-label">Tagioo sGTM</div>
+            <h3>Server-side: bypasses every restriction</h3>
+            <p>Events route directly from your server to Meta CAPI and Google — bypassing ad blockers, cookie limits, and iOS tracking restrictions. All conversions reach the platforms.</p>
+            <div class="sq-card-stat green">
+              <span>100%</span>
+              <span>event delivery regardless of browser</span>
+            </div>
           </article>
-          <article class="outcome-card">
-            <div class="outcome-num" style="--oc:var(--green)">-43%</div>
-            <h3>Lower cost per acquisition</h3>
-            <p>Better data → better optimization → lower CPA. Meta finds your buyers faster when it sees all the purchase signals.</p>
-          </article>
-          <article class="outcome-card">
-            <div class="outcome-num" style="--oc:var(--accent)">15ms</div>
-            <h3>Sub-20ms response time</h3>
-            <p>BDIX-hosted containers deliver events faster than international servers. Speed matters for real-time Meta CAPI and GA4.</p>
+          <article class="sq-card">
+            <div class="sq-card-icon" style="--sqc:#D97706">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="15" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 10H21" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="15" r="1.5" fill="currentColor"/></svg>
+            </div>
+            <div class="sq-card-label">Cookie restrictions</div>
+            <h3>Safari ITP cuts attribution to 1–7 days</h3>
+            <p>iOS 17 and Safari ITP dramatically shorten cookie lifetimes. Returning buyers look like new visitors — inflating CAC and breaking retargeting audiences.</p>
+            <div class="sq-card-stat">
+              <span>1–7 days</span>
+              <span>max Safari cookie lifetime without server-side</span>
+            </div>
           </article>
         </div>
-        <div class="outcome-disclaimer">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M7 5V7.5M7 9.5V9.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-          Results are averages. Individual results vary based on ad spend, existing tracking setup, and product category.
+      </section>
+
+      <!-- ── PLATFORM OVERVIEW ──────────────────────────────────── -->
+      <section id="platform" class="section platform-section">
+        <div class="section-heading centered">
+          <p class="eyebrow">Full platform</p>
+          <h2>Everything a Bangladesh business owner<br>needs for accurate ad tracking.</h2>
+          <p class="section-sub">Tagioo isn't just a container host. It's a complete tracking operations platform — from launch to daily analytics to offline conversion recovery.</p>
+        </div>
+        <div class="platform-grid">
+          <article class="platform-module">
+            <div class="pm-icon" style="--pm:#5B21B6">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 7H14M6 10H11M6 13H9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+              <strong>Dedicated sGTM Container</strong>
+              <p>Isolated Docker container per client. Full GTM server preview mode. Not shared infrastructure.</p>
+            </div>
+          </article>
+          <article class="platform-module">
+            <div class="pm-icon" style="--pm:#059669">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14L7 9L10 11L13 7L17 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14H17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+              <strong>Real-time Event Analytics</strong>
+              <p>Live feed of every tracking event — PageView, AddToCart, Purchase — with hourly trends and revenue overlays.</p>
+            </div>
+          </article>
+          <article class="platform-module">
+            <div class="pm-icon" style="--pm:#F97316">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M7 10L9.5 12.5L13 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <strong>Purchase Intelligence</strong>
+              <p>Search every purchase by transaction ID, order value, or URL. Verify each sale reached Meta and GA4.</p>
+            </div>
+          </article>
+          <article class="platform-module">
+            <div class="pm-icon" style="--pm:#EF4444">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L11.8 7.2L16.5 7.6L13.1 10.6L14.2 15.2L10 12.7L5.8 15.2L6.9 10.6L3.5 7.6L8.2 7.2L10 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <strong>Smart Purchase Gap Alert</strong>
+              <p>Automatic alert when today's purchases drop &gt;50% below your 7-day average. Catch tracking breaks the same day.</p>
+            </div>
+          </article>
+          <article class="platform-module">
+            <div class="pm-icon" style="--pm:#D97706">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 8H16M4 12H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
+            </div>
+            <div>
+              <strong>Revenue &amp; Conv. Rate Tracking</strong>
+              <p>Daily breakdown table with revenue, purchases, conversion rate — 30 days of history that survives restarts.</p>
+            </div>
+          </article>
+          <article class="platform-module">
+            <div class="pm-icon" style="--pm:#7C3AED">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 16L7 11L10 13L13 8.5L16 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="5" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
+            </div>
+            <div>
+              <strong>Funnel Visualization</strong>
+              <p>See deduplicated event progression from PageView → AddToCart → Checkout → Purchase to spot where you lose buyers.</p>
+            </div>
+          </article>
+          <article class="platform-module">
+            <div class="pm-icon" style="--pm:#0891B2">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2V6M10 14V18M2 10H6M14 10H18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/></svg>
+            </div>
+            <div>
+              <strong>GTM Setup Assistant</strong>
+              <p>4-step wizard generates Web + Server GTM import files for GA4, Meta CAPI, Google Ads, and TikTok — ready in minutes.</p>
+            </div>
+          </article>
+          <article class="platform-module">
+            <div class="pm-icon" style="--pm:#BE185D">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 12H8L10 5L12 15L14 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <strong>Offline Conversions to Meta</strong>
+              <p>Upload offline orders to Meta CAPI and extend first-party cookie lifetime — recover conversions from phone orders and repeat buyers.</p>
+            </div>
+          </article>
+          <article class="platform-module">
+            <div class="pm-icon" style="--pm:#059669">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10C4 10 7 6 10 6C13 6 16 10 16 10C16 10 13 14 10 14C7 14 4 10 4 10Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>
+            </div>
+            <div>
+              <strong>Bot Filtering &amp; Power-Ups</strong>
+              <p>Remove crawler traffic from your ad data. Enable deduplication, EMQ enrichment, and attribution power-ups per container.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ── SMART MONITORING SPOTLIGHT ──────────────────────────── -->
+      <section class="section monitoring-section">
+        <div class="monitoring-inner">
+          <div class="monitoring-content">
+            <p class="eyebrow">Smart monitoring</p>
+            <h2>Know the moment your<br>tracking breaks — not days later.</h2>
+            <p class="monitoring-sub">Most store owners find out their tracking is broken when ROAS mysteriously drops. Tagioo catches it the same day.</p>
+            <ul class="monitoring-list">
+              <li>
+                <div class="ml-icon" style="--mli:#EF4444">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L9.5 6.2L14 6.6L10.8 9.4L11.9 14L8 11.7L4.1 14L5.2 9.4L2 6.6L6.5 6.2L8 2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                </div>
+                <div>
+                  <strong>Purchase gap alert</strong>
+                  <span>Banner fires when purchases today run &gt;50% below your 7-day baseline — scaled for time of day so no false positives at 9am.</span>
+                </div>
+              </li>
+              <li>
+                <div class="ml-icon" style="--mli:#059669">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 11L5 7L8 9L11 5L14 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div>
+                  <strong>Revenue trend overlay</strong>
+                  <span>Revenue trend line sits on top of your events-per-day chart so you can correlate traffic spikes with actual sales instantly.</span>
+                </div>
+              </li>
+              <li>
+                <div class="ml-icon" style="--mli:#F97316">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8 5V8.5M8 10.5V10.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                </div>
+                <div>
+                  <strong>Error drill-down by day</strong>
+                  <span>Click any day in your 30-day table to see which requests errored — 4xx / 5xx broken down so you fix the right thing.</span>
+                </div>
+              </li>
+              <li>
+                <div class="ml-icon" style="--mli:#5B21B6">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 7H11M5 9H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                </div>
+                <div>
+                  <strong>30-day conversion rate history</strong>
+                  <span>Daily table shows purchases, revenue, conversion rate, add-to-carts, errors — all persisted through server restarts.</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <div class="monitoring-visual">
+            <div class="mv-card">
+              <div class="mv-alert">
+                <div class="mv-alert-icon">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L13 11H1L7 1Z" stroke="#D97706" stroke-width="1.3" stroke-linejoin="round"/><path d="M7 5.5V7.5M7 9.5V9.6" stroke="#D97706" stroke-width="1.3" stroke-linecap="round"/></svg>
+                </div>
+                <div>
+                  <strong>Purchase gap detected</strong>
+                  <span>Today: 3 purchases · 7-day avg: 28 · Gap: −89%</span>
+                </div>
+                <span class="mv-alert-badge">Alert</span>
+              </div>
+              <div class="mv-table-preview">
+                <div class="mvt-head">
+                  <span>Date</span><span>Purchases</span><span>Revenue</span><span>Conv.%</span><span>Errors</span>
+                </div>
+                <div class="mvt-row mvt-alert-row">
+                  <span>Today</span><span class="red">3</span><span>৳5,400</span><span class="red">0.2%</span><span class="red">↑12</span>
+                </div>
+                <div class="mvt-row">
+                  <span>Yesterday</span><span class="green">34</span><span>৳61,200</span><span class="green">2.8%</span><span>2</span>
+                </div>
+                <div class="mvt-row">
+                  <span>Mon</span><span class="green">29</span><span>৳52,200</span><span class="green">2.4%</span><span>1</span>
+                </div>
+                <div class="mvt-row">
+                  <span>Sun</span><span class="green">41</span><span>৳73,800</span><span class="green">3.1%</span><span>0</span>
+                </div>
+                <div class="mvt-row">
+                  <span>Sat</span><span class="green">37</span><span>৳66,600</span><span class="green">3.0%</span><span>1</span>
+                </div>
+              </div>
+              <div class="mv-inspector">
+                <div class="mv-inspector-head">Purchase Inspector — search by order ID, value, URL</div>
+                <div class="mv-inspector-row">
+                  <span class="de-badge purchase">Purchase</span>
+                  <span class="mv-order">ORD-8841</span>
+                  <span class="mv-amount">৳2,450</span>
+                  <span class="mv-dest">meta · ga4</span>
+                </div>
+                <div class="mv-inspector-row">
+                  <span class="de-badge purchase">Purchase</span>
+                  <span class="mv-order">ORD-8840</span>
+                  <span class="mv-amount">৳1,800</span>
+                  <span class="mv-dest">meta · ga4</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       <!-- ── PROBLEM ────────────────────────────────────────────── -->
-      <section class="section problem-section">
+      <section id="why" class="section problem-section">
         <div class="section-heading centered">
           <p class="eyebrow">Why server-side?</p>
           <h2>Your tracking is broken.<br>You're losing ROAS.</h2>
@@ -315,7 +521,7 @@
             </div>
             <div class="step-body">
               <h3>Create your container</h3>
-              <p>Sign up, enter your website domain and GTM server container config. Tagioo handles the rest.</p>
+              <p>Sign up, enter your website domain and GTM server container config. Tagioo handles Docker, Nginx, SSL, and launch automatically.</p>
             </div>
           </article>
           <article class="step-card">
@@ -325,7 +531,7 @@
             </div>
             <div class="step-body">
               <h3>Point your DNS</h3>
-              <p>Add one CNAME record: <code>server.yourstore.com → bd.tagioo.com</code>. Your domain, your data.</p>
+              <p>Add one CNAME record: <code>server.yourstore.com → bd.tagioo.com</code>. Your domain, your first-party data.</p>
             </div>
           </article>
           <article class="step-card last">
@@ -333,8 +539,8 @@
               <span class="step-number">03</span>
             </div>
             <div class="step-body">
-              <h3>Start tracking</h3>
-              <p>Tagioo provisions Docker, Nginx, and SSL automatically. Events start flowing within minutes.</p>
+              <h3>Import GTM templates &amp; go live</h3>
+              <p>Use the Setup Assistant to generate your Web + Server GTM files. Import, publish, and events start flowing to Meta, GA4, Google Ads, and TikTok.</p>
             </div>
           </article>
         </div>
@@ -348,7 +554,8 @@
       <section id="features" class="section feature-band">
         <div class="section-heading centered">
           <p class="eyebrow">Built for ecommerce</p>
-          <h2>Everything you need.<br>Nothing you don't.</h2>
+          <h2>Every feature business owners<br>actually need.</h2>
+          <p class="section-sub">Not a generic hosting service. Tagioo is built specifically for Bangladesh ecommerce — with tools to track, monitor, and recover conversions from every channel.</p>
         </div>
         <div class="feature-grid">
           <article class="feature-card">
@@ -362,37 +569,91 @@
             <div class="feature-icon-wrap" style="--fi-bg:rgba(249,115,22,0.08);--fi-border:rgba(249,115,22,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#F97316" stroke-width="1.5"/><path d="M10 3C10 3 13 7 13 10C13 13 10 17 10 17" stroke="#F97316" stroke-width="1.5"/><path d="M10 3C10 3 7 7 7 10C7 13 10 17 10 17" stroke="#F97316" stroke-width="1.5"/><path d="M3 10H17" stroke="#F97316" stroke-width="1.5"/></svg>
             </div>
-            <h3>First-party domain</h3>
-            <p>Use your own subdomain (e.g. <code>server.mystore.com</code>) with automatic SSL via Let's Encrypt.</p>
+            <h3>First-party domain + auto SSL</h3>
+            <p>Use your own subdomain (e.g. <code>server.mystore.com</code>) with automatic SSL via Let's Encrypt. Renewed silently.</p>
           </article>
           <article class="feature-card">
             <div class="feature-icon-wrap" style="--fi-bg:rgba(5,150,105,0.08);--fi-border:rgba(5,150,105,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14L7 9L10 11L13 7L17 14" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14H17" stroke="#059669" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
             <h3>Real-time event analytics</h3>
-            <p>Monitor PageView, AddToCart, Checkout, and Purchase events with hourly trends and conversion metrics.</p>
+            <p>Monitor PageView, AddToCart, Checkout, and Purchase events with hourly trends, revenue overlays, and conversion metrics.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon-wrap" style="--fi-bg:rgba(239,68,68,0.07);--fi-border:rgba(239,68,68,0.16);">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L11.8 7.2L16.5 7.6L13.1 10.6L14.2 15.2L10 12.7L5.8 15.2L6.9 10.6L3.5 7.6L8.2 7.2L10 3Z" stroke="#EF4444" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <h3>Smart purchase gap alert</h3>
+            <p>Auto-detects when today's purchases drop &gt;50% below your 7-day average — scaled by time of day, so you don't get 9am false alarms.</p>
           </article>
           <article class="feature-card">
             <div class="feature-icon-wrap" style="--fi-bg:rgba(91,33,182,0.08);--fi-border:rgba(91,33,182,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10C4 10 7 6 10 6C13 6 16 10 16 10C16 10 13 14 10 14C7 14 4 10 4 10Z" stroke="#5B21B6" stroke-width="1.5"/><circle cx="10" cy="10" r="2" fill="#5B21B6"/></svg>
             </div>
             <h3>Purchase deduplication</h3>
-            <p>Automatically detects and removes duplicate purchase events so your revenue data stays accurate.</p>
-          </article>
-          <article class="feature-card">
-            <div class="feature-icon-wrap" style="--fi-bg:rgba(239,68,68,0.07);--fi-border:rgba(239,68,68,0.16);">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L11.8 7.2L16.5 7.6L13.1 10.6L14.2 15.2L10 12.7L5.8 15.2L6.9 10.6L3.5 7.6L8.2 7.2L10 3Z" stroke="#EF4444" stroke-width="1.5" stroke-linejoin="round"/></svg>
-            </div>
-            <h3>Bot filtering</h3>
-            <p>Filters crawlers, scrapers, and fake traffic before it reaches your ad platforms — cleaner data, better ROAS.</p>
+            <p>Automatically detects and removes duplicate purchase events so your revenue data stays accurate across browser + server.</p>
           </article>
           <article class="feature-card">
             <div class="feature-icon-wrap" style="--fi-bg:rgba(249,115,22,0.08);--fi-border:rgba(249,115,22,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2V6M10 14V18M2 10H6M14 10H18" stroke="#F97316" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" stroke="#F97316" stroke-width="1.5"/></svg>
             </div>
             <h3>GTM template generator</h3>
-            <p>Download pre-built Web GTM + Server GTM templates for GA4, Meta CAPI, Google Ads, and TikTok in one click.</p>
+            <p>4-step Setup Assistant downloads pre-built Web + Server GTM import files for GA4, Meta CAPI, Google Ads, and TikTok.</p>
           </article>
+          <article class="feature-card">
+            <div class="feature-icon-wrap" style="--fi-bg:rgba(190,24,93,0.07);--fi-border:rgba(190,24,93,0.16);">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 12H8L10 5L12 15L14 10H16" stroke="#BE185D" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <h3>Offline conversions to Meta</h3>
+            <p>Upload phone orders and COD sales directly to Meta CAPI. Extend first-party cookie lifetime to recover repeat buyers.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon-wrap" style="--fi-bg:rgba(8,145,178,0.07);--fi-border:rgba(8,145,178,0.16);">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="12" rx="1.5" stroke="#0891B2" stroke-width="1.5"/><path d="M8 4V16M3 8H8M3 12H8" stroke="#0891B2" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <h3>WooCommerce integration</h3>
+            <p>Native webhook order sync — no plugin, no code. 10-minute setup connects your WooCommerce store server-to-server.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon-wrap" style="--fi-bg:rgba(5,150,105,0.08);--fi-border:rgba(5,150,105,0.18);">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 16L7 11L10 13L13 8.5L16 12M4 16H16" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <h3>Bot filtering</h3>
+            <p>Filters crawlers, scrapers, and fake traffic before it reaches your ad platforms — cleaner data, better ROAS.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ── INTEGRATIONS ──────────────────────────────────────── -->
+      <section class="integrations-section">
+        <div class="int-inner">
+          <span class="int-label">Sends data to</span>
+          <div class="int-badges">
+            <span class="int-badge">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#4F46E5" stroke-width="1.2"/><path d="M5 8.5L7 10.5L11 6" stroke="#4F46E5" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Meta CAPI
+            </span>
+            <span class="int-badge">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#EA4335" stroke-width="1.2"/><path d="M5 8L11 8M8 5V11" stroke="#EA4335" stroke-width="1.2" stroke-linecap="round"/></svg>
+              Google Analytics 4
+            </span>
+            <span class="int-badge">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 12L6 8L9 10L12 5.5L14 8" stroke="#34A853" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Google Ads
+            </span>
+            <span class="int-badge">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M8 3L13 8L8 13" stroke="#010101" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              TikTok Events API
+            </span>
+            <span class="int-badge">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="4" width="10" height="8" rx="1" stroke="#7F54B3" stroke-width="1.2"/><path d="M6 4V3M10 4V3" stroke="#7F54B3" stroke-width="1.2" stroke-linecap="round"/></svg>
+              WooCommerce
+            </span>
+            <span class="int-badge">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#96BF48" stroke-width="1.2"/><path d="M5 8L7.5 10.5L11 6" stroke="#96BF48" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Shopify
+            </span>
+          </div>
         </div>
       </section>
 
@@ -428,11 +689,32 @@
                 <td><span class="tbl-neutral">Manual</span></td>
               </tr>
               <tr>
-                <td>Full sGTM server control</td>
+                <td>Smart purchase gap alerts</td>
                 <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
                 <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-no">✗</span></td>
+              </tr>
+              <tr>
+                <td>Purchase inspector + revenue tracking</td>
+                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-yes-muted">Basic</span></td>
+                <td><span class="tbl-no">✗</span></td>
+              </tr>
+              <tr>
+                <td>Offline conversions to Meta</td>
+                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-neutral">Manual</span></td>
+              </tr>
+              <tr>
+                <td>GTM template generator</td>
+                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-no">✗</span></td>
               </tr>
               <tr>
                 <td>BDIX-hosted (Bangladesh fast)</td>
@@ -440,13 +722,6 @@
                 <td><span class="tbl-yes-muted">✓</span></td>
                 <td><span class="tbl-yes-muted">✓</span></td>
                 <td><span class="tbl-neutral">Depends</span></td>
-              </tr>
-              <tr>
-                <td>Free tier available</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> 15K/mo</span></td>
-                <td><span class="tbl-yes-muted">✓ 15K/mo</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-no">✗ server cost</span></td>
               </tr>
               <tr>
                 <td>bKash / Nagad payment</td>
@@ -457,13 +732,6 @@
               </tr>
               <tr>
                 <td>Zero server management</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-no">✗</span></td>
-              </tr>
-              <tr>
-                <td>Real-time event dashboard</td>
                 <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
                 <td><span class="tbl-yes-muted">✓</span></td>
                 <td><span class="tbl-yes-muted">✓</span></td>
@@ -481,12 +749,85 @@
         </div>
       </section>
 
+      <!-- ── OUTCOME PROOF ──────────────────────────────────────── -->
+      <section class="section outcome-section">
+        <div class="section-heading centered">
+          <p class="eyebrow">Real results</p>
+          <h2>Bangladesh stores see results<br>within the first month.</h2>
+          <p class="section-sub">These are averages across stores on Tagioo. Your results depend on current ad spend, blocked traffic, and setup quality — but the direction is always up.</p>
+        </div>
+        <div class="outcome-grid">
+          <article class="outcome-card">
+            <div class="outcome-num" style="--oc:var(--orange)">+31%</div>
+            <h3>Average ROAS lift</h3>
+            <p>Stores report higher ROAS within 30 days of switching to server-side. Meta optimization works better with complete purchase data.</p>
+          </article>
+          <article class="outcome-card">
+            <div class="outcome-num" style="--oc:var(--accent)">+58%</div>
+            <h3>More purchases reported</h3>
+            <p>Ad blockers and ITP were hiding 40–60% of your conversions. Tagioo makes all of them visible to Meta and Google.</p>
+          </article>
+          <article class="outcome-card">
+            <div class="outcome-num" style="--oc:var(--green)">-43%</div>
+            <h3>Lower cost per acquisition</h3>
+            <p>Better data → better optimization → lower CPA. Meta finds your buyers faster when it sees all the purchase signals.</p>
+          </article>
+          <article class="outcome-card">
+            <div class="outcome-num" style="--oc:var(--accent)">15ms</div>
+            <h3>Sub-20ms response time</h3>
+            <p>BDIX-hosted containers deliver events faster than international servers. Speed matters for real-time Meta CAPI and GA4.</p>
+          </article>
+        </div>
+        <div class="outcome-disclaimer">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M7 5V7.5M7 9.5V9.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          Results are averages. Individual results vary based on ad spend, existing tracking setup, and product category.
+        </div>
+      </section>
+
+      <!-- ── TESTIMONIAL ──────────────────────────────────────── -->
+      <section class="section testimonial-section">
+        <div class="testimonial-inner">
+          <div class="testi-card">
+            <div class="testi-stars">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="#F97316"><path d="M9 1L10.5 6.5H16.5L11.5 10L13.5 16L9 12.5L4.5 16L6.5 10L1.5 6.5H7.5L9 1Z"/></svg>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="#F97316"><path d="M9 1L10.5 6.5H16.5L11.5 10L13.5 16L9 12.5L4.5 16L6.5 10L1.5 6.5H7.5L9 1Z"/></svg>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="#F97316"><path d="M9 1L10.5 6.5H16.5L11.5 10L13.5 16L9 12.5L4.5 16L6.5 10L1.5 6.5H7.5L9 1Z"/></svg>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="#F97316"><path d="M9 1L10.5 6.5H16.5L11.5 10L13.5 16L9 12.5L4.5 16L6.5 10L1.5 6.5H7.5L9 1Z"/></svg>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="#F97316"><path d="M9 1L10.5 6.5H16.5L11.5 10L13.5 16L9 12.5L4.5 16L6.5 10L1.5 6.5H7.5L9 1Z"/></svg>
+            </div>
+            <blockquote>"Before Tagioo, our Meta campaigns were optimizing on maybe 40% of actual purchases. After switching, we could finally see all our sales — ROAS jumped from 2.1x to 3.4x in the first month. The purchase gap alert has saved us twice already when tracking broke overnight."</blockquote>
+            <div class="testi-author">
+              <div class="testi-avatar">R</div>
+              <div>
+                <strong>Rafiqul Islam</strong>
+                <span>Owner, Fashion ecommerce store · Dhaka</span>
+              </div>
+              <div class="testi-result-pill">ROAS: 2.1x → 3.4x</div>
+            </div>
+          </div>
+          <div class="testi-aside">
+            <div class="testi-stat-card">
+              <span class="tsa-num">+62%</span>
+              <span>More conversions tracked vs. browser pixel alone</span>
+            </div>
+            <div class="testi-stat-card">
+              <span class="tsa-num">৳0</span>
+              <span>Setup cost — free plan available, WhatsApp help included</span>
+            </div>
+            <div class="testi-stat-card">
+              <span class="tsa-num">10 min</span>
+              <span>WooCommerce setup with native webhook — no plugin required</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ── PRICING ────────────────────────────────────────────── -->
       <section id="pricing" class="section pricing-section">
         <div class="section-heading centered">
           <p class="eyebrow">Simple pricing</p>
           <h2>Plans for every store size.</h2>
-          <p class="section-sub">All plans include: dedicated sGTM container, first-party domain, SSL, real-time analytics, bot filtering, and GTM templates.</p>
+          <p class="section-sub">All plans include: dedicated sGTM container, first-party domain, SSL, real-time analytics, purchase gap alerts, bot filtering, and GTM templates.</p>
         </div>
         <div class="pricing-grid">
 
@@ -517,7 +858,7 @@
               <li><span class="pf-check">✓</span> 300,000 events/month</li>
               <li><span class="pf-check">✓</span> 1 sGTM container</li>
               <li><span class="pf-check">✓</span> First-party domain + SSL</li>
-              <li><span class="pf-check">✓</span> Real-time analytics</li>
+              <li><span class="pf-check">✓</span> Real-time analytics + alerts</li>
               <li><span class="pf-check">✓</span> Purchase deduplication</li>
               <li><span class="pf-check">✓</span> Email support</li>
             </ul>
@@ -535,9 +876,9 @@
               <li><span class="pf-check">✓</span> 1,500,000 events/month</li>
               <li><span class="pf-check">✓</span> 2 sGTM containers</li>
               <li><span class="pf-check">✓</span> Everything in Starter</li>
+              <li><span class="pf-check">✓</span> Offline conversions to Meta</li>
               <li><span class="pf-check">✓</span> Bot filtering + diagnostics</li>
               <li><span class="pf-check">✓</span> Priority WhatsApp support</li>
-              <li><span class="pf-check">✓</span> Dedicated resources</li>
             </ul>
             <a class="button button-primary full-width" href="/signup">Start Growth</a>
           </article>
@@ -579,15 +920,23 @@
           </details>
           <details class="faq-item">
             <summary>How is Tagioo different from PixelFly or BonicBD?</summary>
-            <p>PixelFly uses a shared proxy architecture — your events share infrastructure with other customers. Tagioo gives every customer a fully isolated Docker container with dedicated CPU and memory, just like a private server. You get full GTM server preview mode and complete data isolation.</p>
+            <p>PixelFly uses a shared proxy architecture — your events share infrastructure with other customers. Tagioo gives every customer a fully isolated Docker container with dedicated CPU and memory. Plus, Tagioo adds features no other Bangladesh platform has: purchase gap alerts, revenue tracking, offline conversions to Meta, and a GTM template generator.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What is the purchase gap alert?</summary>
+            <p>Tagioo tracks your daily purchase count and compares it to your 7-day rolling average. If today's purchases fall more than 50% below that average — adjusted for time of day so it's not triggered at 9am — a red banner appears in your dashboard. This catches tracking breaks the same day they happen, not days later when you notice bad ROAS.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What are offline conversions and who should use them?</summary>
+            <p>If your store takes phone orders, cash on delivery, or has customers who buy in-person, those sales never reach Meta through normal tracking. Offline conversions lets you upload those orders directly to Meta CAPI — improving your campaign optimization with all your real sales. The feature also extends your first-party cookie lifetime to recover more repeat buyers.</p>
           </details>
           <details class="faq-item">
             <summary>Do I need to manage any servers?</summary>
-            <p>No. Tagioo handles everything: Docker provisioning, Nginx configuration, SSL certificate (Let's Encrypt), health monitoring, and container restarts. You just point your DNS and install the web GTM container — we do the rest.</p>
+            <p>No. Tagioo handles everything: Docker provisioning, Nginx configuration, SSL certificate (Let's Encrypt), health monitoring, and automatic container restarts. You just point your DNS and install the web GTM container — we do the rest.</p>
           </details>
           <details class="faq-item">
-            <summary>What happens after I sign up?</summary>
-            <p>You get a trial dashboard immediately. Add your website details and GTM server container ID, then point your subdomain DNS to our BDIX server. Container launches automatically once DNS resolves. Payment activates your full plan limit.</p>
+            <summary>How does the WooCommerce integration work?</summary>
+            <p>Add one webhook in WooCommerce admin — no plugin installation, no code — and all orders sync to Tagioo automatically. Combined with the GTM4WP plugin and our ready-made GTM templates, your WooCommerce store gets full server-side tracking for Meta CAPI, GA4, Google Ads, and TikTok in about 10 minutes.</p>
           </details>
           <details class="faq-item">
             <summary>How do I pay?</summary>
@@ -652,7 +1001,8 @@
         <div class="footer-links">
           <div class="footer-col">
             <strong>Product</strong>
-            <a href="/features">Features</a>
+            <a href="#platform">Platform</a>
+            <a href="#features">Features</a>
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
             <a href="/signup">Sign up</a>
