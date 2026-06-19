@@ -3014,6 +3014,19 @@ function normalizeOrderPayload(body) {
     tenantId,
     orderType,
     source: String(body.source || "webhook"),
+    // Customer identifiers for purchase-recovery match quality. Captured so the
+    // server-side forward can pass the real customer IP (and, later, hashed
+    // email/phone) to Meta instead of the panel server's own IP.
+    email: String(firstValue(body, ["email", "customer_email", "billing_email"]) || "").trim(),
+    phone: String(firstValue(body, ["phone", "customer_phone", "billing_phone"]) || "").trim(),
+    firstName: String(firstValue(body, ["first_name", "firstName", "billing_first_name"]) || "").trim(),
+    lastName: String(firstValue(body, ["last_name", "lastName", "billing_last_name"]) || "").trim(),
+    city: String(firstValue(body, ["city", "billing_city"]) || "").trim(),
+    region: String(firstValue(body, ["region", "state", "billing_state"]) || "").trim(),
+    postalCode: String(firstValue(body, ["postal_code", "postcode", "billing_postcode"]) || "").trim(),
+    country: String(firstValue(body, ["country", "billing_country"]) || "").trim(),
+    customerIp: String(firstValue(body, ["customer_ip", "customer_ip_address", "ip"]) || "").trim(),
+    pageLocation: String(firstValue(body, ["page_location", "order_url", "url"]) || "").trim(),
     raw: body
   };
 }
@@ -3042,6 +3055,7 @@ function wooGmtDate(value) {
 }
 
 function normalizeWooOrderPayload(body, tenantId) {
+  const billing = body.billing || {};
   return {
     order_id: String(body.id ?? body.order_id ?? "").trim(),
     total: body.total,
@@ -3050,7 +3064,18 @@ function normalizeWooOrderPayload(body, tenantId) {
     tenant_id: tenantId || config.tenantId,
     order_type: sanitizeId(body.created_via || "") || "store",
     status: body.status,
-    source: "woocommerce"
+    source: "woocommerce",
+    // Flatten billing + client IP so normalizeOrderPayload picks them up for
+    // purchase-recovery match quality.
+    email: billing.email || "",
+    phone: billing.phone || "",
+    first_name: billing.first_name || "",
+    last_name: billing.last_name || "",
+    city: billing.city || "",
+    state: billing.state || "",
+    postcode: billing.postcode || "",
+    country: billing.country || "",
+    customer_ip: body.customer_ip_address || ""
   };
 }
 
@@ -3076,6 +3101,10 @@ async function addOrderWebhook(body) {
   const tenant = (data.tenants || []).find((item) => item.id === order.tenantId);
   const tracking = tenant?.tracking || null;
   const alreadyForwarded = index !== -1 && data.orders[index].forwardedToSgtmAt;
+  // Recovery forwards via the gtag /g/collect path, which needs no api_secret —
+  // only the measurement id + sGTM domain. (apiSecret was required here when the
+  // forward used Measurement Protocol; keeping it gated on apiSecret silently
+  // disabled recovery for any tenant that never set one.)
   const shouldForward =
     index === -1 &&
     !alreadyForwarded &&
@@ -3083,7 +3112,6 @@ async function addOrderWebhook(body) {
     isPaidOrderStatus(order) &&
     tracking &&
     tracking.measurementId &&
-    tracking.apiSecret &&
     tracking.domain;
   if (shouldForward) {
     const stored = data.orders.find((item) => item.id === order.id);
@@ -3131,11 +3159,19 @@ async function forwardOrderToSgtm(order, tracking) {
     "ep.transaction_id": String(order.id),
     "epn.value": String(order.amount)
   });
+  // event_source_url for Meta attribution, if the order carried one.
+  if (order.pageLocation) params.set("dl", order.pageLocation);
   const endpoint = `${tracking.domain}/g/collect?${params.toString()}`;
+  // Match quality: this fetch originates from the panel server, so without this
+  // header Meta CAPI would record the panel's IP as the buyer's. Forward the real
+  // customer IP via X-Forwarded-For — the Meta CAPI template reads it for
+  // client_ip_address. Best-effort: if the tenant's nginx overwrites it, no harm.
+  const headers = { "content-type": "text/plain;charset=UTF-8" };
+  if (order.customerIp) headers["X-Forwarded-For"] = order.customerIp;
   try {
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "content-type": "text/plain;charset=UTF-8" }
+      headers
     });
     if (!response.ok) {
       console.warn(`[orders] sGTM purchase forward for ${order.id} returned ${response.status}`);
