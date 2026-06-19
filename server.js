@@ -3115,26 +3115,27 @@ function mpClientId(seed) {
 }
 
 async function forwardOrderToSgtm(order, tracking) {
-  const endpoint = `${tracking.domain}/mp/collect?measurement_id=${encodeURIComponent(tracking.measurementId)}&api_secret=${encodeURIComponent(tracking.apiSecret)}`;
-  const payload = {
-    client_id: mpClientId(order.id),
-    non_personalized_ads: false,
-    events: [{
-      name: "purchase",
-      params: {
-        transaction_id: order.id,
-        event_id: order.id,
-        currency: order.currency || "BDT",
-        value: order.amount,
-        engagement_time_msec: 1
-      }
-    }]
-  };
+  // sGTM's GA4 client only claims the gtag collection paths (/g/collect); it has
+  // no client that claims Measurement Protocol (/mp/collect), so MP posts return
+  // 400 "unclaimed". Mirror a browser gtag purchase hit instead — the GA4 client
+  // parses it and fires both the GA4 tag and the Meta CAPI tag. Both dedupe on
+  // transaction_id (Meta event_id falls back to transaction_id), so this never
+  // double-counts purchases the browser already caught.
+  const params = new URLSearchParams({
+    v: "2",
+    tid: tracking.measurementId,
+    cid: mpClientId(order.id),
+    en: "purchase",
+    _et: "1",
+    cu: order.currency || "BDT",
+    "ep.transaction_id": String(order.id),
+    "epn.value": String(order.amount)
+  });
+  const endpoint = `${tracking.domain}/g/collect?${params.toString()}`;
   try {
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload)
+      headers: { "content-type": "text/plain;charset=UTF-8" }
     });
     if (!response.ok) {
       console.warn(`[orders] sGTM purchase forward for ${order.id} returned ${response.status}`);
