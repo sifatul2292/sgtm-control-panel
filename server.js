@@ -3120,7 +3120,14 @@ async function addOrderWebhook(body) {
 
   await writeDatabase(data);
 
-  if (shouldForward) forwardOrderToSgtm(order, tracking).catch(() => {});
+  if (shouldForward) {
+    // gtag /g/collect → GA4 purchase + the in-container Meta tag (IP/UA match only).
+    forwardOrderToSgtm(order, tracking).catch(() => {});
+    // Direct Meta CAPI with hashed email/phone/name/geo for high match quality.
+    // Same event_id (order id) as the gtag path and the browser pixel, so Meta
+    // dedupes to a single Purchase and merges the richer user data.
+    sendOrderToMetaCapi(tenant, order).catch(() => {});
+  }
   return { ok: true, order, created: index === -1 };
 }
 
@@ -3178,6 +3185,53 @@ async function forwardOrderToSgtm(order, tracking) {
     }
   } catch (error) {
     console.warn(`[orders] sGTM purchase forward for ${order.id} failed: ${error.message}`);
+  }
+}
+
+// Direct Meta Conversions API send for a recovered order, reusing the offline
+// hashing (sha256Hex) and sender (sendMetaOfflineConversions). Runs alongside the
+// gtag forward: the gtag path covers GA4 and triggers the in-container Meta tag
+// (IP/UA match only), while this adds hashed email/phone/name/geo for high match
+// quality. Both carry event_id = order.id, so Meta dedupes to a single Purchase
+// and merges the richer user data — no double counting. Fire-and-forget.
+async function sendOrderToMetaCapi(tenant, order) {
+  const meta = (tenant && tenant.tracking && tenant.tracking.meta) || {};
+  if (!meta.pixelId || !meta.capiToken) return;
+
+  const userData = {};
+  const em = sha256Hex(order.email); if (em) userData.em = [em];
+  const ph = sha256Hex(order.phone, { digitsOnly: true }); if (ph) userData.ph = [ph];
+  const fn = sha256Hex(order.firstName); if (fn) userData.fn = [fn];
+  const ln = sha256Hex(order.lastName); if (ln) userData.ln = [ln];
+  const ct = sha256Hex(order.city); if (ct) userData.ct = [ct];
+  const st = sha256Hex(order.region); if (st) userData.st = [st];
+  const zp = sha256Hex(order.postalCode); if (zp) userData.zp = [zp];
+  const country = sha256Hex(order.country); if (country) userData.country = [country];
+  if (order.customerIp) userData.client_ip_address = order.customerIp;
+  // Meta needs at least one user-data key to match the event to a person.
+  if (!Object.keys(userData).length) return;
+
+  const customData = { currency: order.currency || "BDT", order_id: String(order.id) };
+  const value = Number(order.amount);
+  if (Number.isFinite(value)) customData.value = value;
+
+  const event = {
+    event_name: "Purchase",
+    event_time: offlineEventTime(order.createdAt),
+    action_source: "website",
+    event_id: String(order.id),
+    user_data: userData,
+    custom_data: customData
+  };
+  if (order.pageLocation) event.event_source_url = order.pageLocation;
+
+  try {
+    const result = await sendMetaOfflineConversions(tenant, [event], { useTestCode: false });
+    if (!result.ok) {
+      console.warn(`[orders] Meta CAPI recovery for ${order.id}: ${(result.fbErrors || [result.reason]).join("; ")}`);
+    }
+  } catch (error) {
+    console.warn(`[orders] Meta CAPI recovery for ${order.id} failed: ${error.message}`);
   }
 }
 
@@ -3378,7 +3432,7 @@ function buildOfflineMetaEvents(rows) {
 }
 
 // Send offline events to Meta's Conversions API, batched ≤1000 per request.
-async function sendMetaOfflineConversions(tenant, events) {
+async function sendMetaOfflineConversions(tenant, events, { useTestCode = true } = {}) {
   const meta = (tenant && tenant.tracking && tenant.tracking.meta) || {};
   const pixelId = meta.pixelId;
   const token = meta.capiToken;
@@ -3389,7 +3443,9 @@ async function sendMetaOfflineConversions(tenant, events) {
   for (let i = 0; i < events.length; i += 1000) {
     const batch = events.slice(i, i + 1000);
     const body = { data: batch, partner_agent: "tagioo-sgtm-1.0" };
-    if (meta.testEventCode) body.test_event_code = meta.testEventCode;
+    // Live purchase recovery passes useTestCode:false so real orders are never
+    // diverted to Test Events when a tenant leaves a stale test_event_code set.
+    if (useTestCode && meta.testEventCode) body.test_event_code = meta.testEventCode;
     try {
       const response = await fetch(url, {
         method: "POST",
