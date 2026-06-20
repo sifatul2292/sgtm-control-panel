@@ -1340,7 +1340,19 @@ function metricsForRange(data, range = "24h") {
         currency: todayPurchases.currency || ""
       };
     }
-    // No order feed: count the exact same deduped purchase rows the Purchase
+    // Server-computed todayEvents.purchases.uniqueCount is deduped by transaction_id
+    // on the server and matches what Event Logs and Top Events show. Trust it when
+    // available rather than recomputing from cleanPurchaseRows (which uses firstDate
+    // date-filter and can miss purchases where date parsing yielded ts=0).
+    if (data.nginx?.todayEvents?.available) {
+      return {
+        events: todayEvents,
+        purchaseCount: Number(todayPurchases.uniqueCount || 0),
+        revenue: Number(todayPurchases.uniqueRevenue || 0),
+        currency: todayPurchases.currency || ""
+      };
+    }
+    // No server summary: count the exact same deduped purchase rows the Purchase
     // Inspector lists for today, so the two views never disagree.
     const start = dhakaDayStartMs();
     const todayPurchaseRows = cleanPurchaseRows(data).filter((row) => {
