@@ -1628,17 +1628,38 @@ h2 {
   background: var(--color-surface-2);
 }
 
-.care-panel-body {
+.container-url-block {
   display: grid;
-  justify-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-lg);
-  text-align: center;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border-top: var(--rule-thin) solid var(--color-line);
 }
 
-.care-panel-body p {
-  max-width: 520px;
+.container-url-block span {
   color: var(--color-muted);
+  font-weight: 900;
+}
+
+.container-url-block a {
+  color: var(--color-accent);
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.container-url-block small {
+  color: var(--color-muted);
+  font-weight: 750;
+}
+
+.container-url-pending strong {
+  color: var(--color-warn);
+}
+
+.domain-panel-footer {
+  padding: var(--space-md);
+  border-top: var(--rule-thin) solid var(--color-line);
+  display: flex;
+  justify-content: flex-end;
 }
 
 .quick-link-list {

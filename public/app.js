@@ -2269,10 +2269,10 @@ function customerContainerDetail(request, data, dnsTarget) {
   const monthRequests = Number(usage.requestsMonth || 0);
   const requestCount = customerContainerRequestCount(request, data);
   const usagePercent = requestLimit ? Math.min(100, Math.round((monthRequests / requestLimit) * 1000) / 10) : 0;
-  const limits = request.resourceLimits || {};
-  const serverUrl = request.trackingDomain ? `https://${request.trackingDomain}` : "Tracking domain pending";
+  const serverUrl = request.trackingDomain ? `https://${request.trackingDomain}` : null;
   const platformUrl = request.platformDomain || serverUrl;
   const canDelete = !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase());
+  const isLive = meta.className === "healthy";
   return `<section class="container-detail-view">
     <article class="panel container-detail-hero">
       <div>
@@ -2284,7 +2284,7 @@ function customerContainerDetail(request, data, dnsTarget) {
         <p>${escapeHtml(request.websiteUrl || "Website not set")}</p>
         <div class="container-detail-progress">
           <strong>${Number(monthRequests).toLocaleString()}</strong>
-          <span>of ${Number(requestLimit).toLocaleString()} requests in this billing period</span>
+          <span>of ${Number(requestLimit).toLocaleString()} requests this billing period</span>
           <em>${usagePercent}% used</em>
         </div>
       </div>
@@ -2306,49 +2306,46 @@ function customerContainerDetail(request, data, dnsTarget) {
         <div class="panel-header">
           <div>
             <h2>Container Settings</h2>
-            <p>Core GTM configuration and isolated runtime identity.</p>
+            <p>GTM configuration and tracking URLs for this container.</p>
           </div>
-          <span class="badge">Settings</span>
+          <span class="badge ${isLive ? "ok" : "warn"}">${escapeHtml(meta.badge)}</span>
         </div>
         <div class="detail-setting-list">
           ${detailSetting("Name", containerDisplayName(request))}
-          ${detailSetting("Type", request.containerType || "sGTM (Server-Side GTM)")}
+          ${detailSetting("Type", request.containerType || "sGTM")}
+          ${detailSetting("sGTM Container ID", request.sgtmContainerId || "Unavailable")}
           ${detailSetting("Container Config", request.containerConfig ? "Configured" : "Missing")}
-          ${detailSetting("sGTM Container ID", request.sgtmContainerId || "GTM server ID unavailable")}
-          ${detailSetting("Preview Environment", request.previewEnvironment || "Production")}
           ${detailSetting("Recent Requests", Number(requestCount || 0).toLocaleString())}
-          ${detailSetting("API Key", request.apiKey || "Auto-managed by Tagioo")}
+          ${detailSetting("Location", request.serverLocation || "Bangladesh BDIX")}
         </div>
-      </article>
-
-      <article class="panel container-detail-panel">
-        <div class="panel-header">
-          <div>
-            <h2>sGTM Cloud</h2>
-            <p>Use these URLs in Google Tag Manager and your first-party setup.</p>
-          </div>
-          <span class="badge ${meta.className === "healthy" ? "ok" : "warn"}">${escapeHtml(meta.badge)}</span>
-        </div>
-        <div class="cloud-url-list">
-          ${cloudUrlRow("Server Container URL", platformUrl, "Default Tagioo hosted endpoint for this container.")}
-          ${cloudUrlRow("First-Party Domain", serverUrl, "Use this as the Server Container URL in your GTM Web Container tags.")}
-          ${cloudUrlRow("Location", request.serverLocation || "Bangladesh BDIX", "Closest available worker region for your traffic.")}
-          ${cloudUrlRow("Resource Limit", limits.memoryMb ? `${limits.memoryMb} MB memory, ${limits.cpuLimit || "CPU default"}` : "Plan default", "Keeps each customer container isolated.")}
-        </div>
+        ${platformUrl ? `<div class="container-url-block">
+          <span>Server Container URL</span>
+          <a href="${escapeHtml(platformUrl)}" target="_blank" rel="noopener">${escapeHtml(platformUrl)}</a>
+          <small>Use in Google Tag Manager → Admin → Server Container URL</small>
+        </div>` : ""}
+        ${serverUrl && serverUrl !== platformUrl ? `<div class="container-url-block">
+          <span>First-Party Domain</span>
+          <a href="${escapeHtml(serverUrl)}" target="_blank" rel="noopener">${escapeHtml(serverUrl)}</a>
+          <small>Use as Server Container URL in your GTM Web Container tags</small>
+        </div>` : ""}
+        ${!serverUrl ? `<div class="container-url-block container-url-pending">
+          <span>Tracking URL</span>
+          <strong>Pending — DNS not yet configured</strong>
+        </div>` : ""}
       </article>
 
       <article class="panel container-detail-panel domain-detail-panel">
         <div class="panel-header">
           <div>
-            <h2>Domains</h2>
-            <p>Your tagging server URLs and the DNS record needed for first-party tracking.</p>
+            <h2>Domain & DNS</h2>
+            <p>Point your tracking subdomain here to enable first-party tracking.</p>
           </div>
-          <span class="badge">1/1</span>
+          <span class="badge ${isLive ? "ok" : "warn"}">${isLive ? "Active" : "Waiting"}</span>
         </div>
-        <div class="domain-live-card">
+        ${serverUrl ? `<div class="domain-live-card">
           <strong>${escapeHtml(serverUrl)}</strong>
-          <span>Domain: ${escapeHtml(meta.className === "healthy" ? "Active" : "Waiting")} · SSL: ${escapeHtml(meta.className === "healthy" ? "Active" : "Provisioning")}</span>
-        </div>
+          <span>Domain: ${isLive ? "Active" : "Waiting"} · SSL: ${isLive ? "Active" : "Provisioning"}</span>
+        </div>` : ""}
         <div class="dns-instruction-card">
           <div>
             <span>Type</span>
@@ -2363,35 +2360,9 @@ function customerContainerDetail(request, data, dnsTarget) {
             <strong>${escapeHtml(dnsTarget)}</strong>
           </div>
         </div>
-      </article>
-
-      <article class="panel container-detail-panel support-detail-panel">
-        <div class="panel-header">
-          <div>
-            <h2>Tagioo Care</h2>
-            <p>Get help reviewing tags, DNS, purchase value, and event deduplication.</p>
-          </div>
-        </div>
-        <div class="care-panel-body">
-          <strong>Personal setup help</strong>
-          <p>We can audit your GTM web tags, server tags, and Meta event match quality before launch.</p>
-          <button class="button" type="button">Get a quote</button>
-        </div>
-      </article>
-
-      <article class="panel container-detail-panel quick-links-panel">
-        <div class="panel-header">
-          <div>
-            <h2>Quick Links</h2>
-            <p>Jump to the pages most customers need after launch.</p>
-          </div>
-        </div>
-        <div class="quick-link-list">
-          <button type="button" data-view-shortcut="logs">View Logs</button>
-          <button type="button" data-view-shortcut="powerUps">Power-Ups</button>
-          <button type="button" data-view-shortcut="billing">My Subscription</button>
-          ${canDelete ? `<button class="danger-link" type="button" data-container-delete="${escapeHtml(request.id)}">Delete Container</button>` : ""}
-        </div>
+        ${canDelete ? `<div class="domain-panel-footer">
+          <button class="danger-link" type="button" data-container-delete="${escapeHtml(request.id)}">Delete Container</button>
+        </div>` : ""}
       </article>
     </div>
   </section>`;
