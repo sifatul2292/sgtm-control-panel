@@ -3235,6 +3235,85 @@ async function sendOrderToMetaCapi(tenant, order) {
   }
 }
 
+// Live tracking self-test for the Setup Assistant. Confirms the two things a
+// customer can silently get wrong: (1) the sGTM container is published and its
+// GA4 client claims the gtag path, (2) the Meta pixel id + CAPI token are valid.
+// A green wizard otherwise proves neither — traffic can exist while Meta is dead.
+async function verifyTenantTracking(tenant) {
+  const tracking = (tenant && tenant.tracking) || {};
+  const checks = {};
+
+  // 1. Container + GA4 client. A non-commerce event name keeps purchase metrics
+  // clean; an unpublished container has no client to claim it and returns 4xx.
+  if (tracking.domain && tracking.measurementId) {
+    const params = new URLSearchParams({
+      v: "2",
+      tid: tracking.measurementId,
+      cid: mpClientId(`verify-${tenant.id}`),
+      en: "tagioo_verify",
+      _et: "1"
+    });
+    try {
+      const r = await fetch(`${tracking.domain}/g/collect?${params.toString()}`, {
+        method: "POST",
+        headers: { "content-type": "text/plain;charset=UTF-8" }
+      });
+      checks.container = r.ok
+        ? { ok: true, detail: "sGTM reachable and the GA4 client is live (container published)." }
+        : { ok: false, detail: `sGTM returned ${r.status}. Import server.json into Server GTM and click Publish.` };
+    } catch (error) {
+      checks.container = { ok: false, detail: `Could not reach ${tracking.domain}: ${error.message}. Check DNS/SSL.` };
+    }
+  } else {
+    checks.container = { ok: false, detail: "Set your GA4 Measurement ID and tracking domain first." };
+  }
+
+  // 2. Meta CAPI creds. test_event_code keeps this out of production reporting;
+  // events_received > 0 with no error means the pixel id + token are valid.
+  const meta = tracking.meta || {};
+  if (meta.pixelId && meta.capiToken) {
+    const verifyTenant = {
+      ...tenant,
+      tracking: { ...tracking, meta: { ...meta, testEventCode: meta.testEventCode || "TAGIOO_VERIFY" } }
+    };
+    const event = {
+      event_name: "Purchase",
+      event_time: Math.floor(Date.now() / 1000),
+      action_source: "website",
+      event_id: `tagioo-verify-${Date.now()}`,
+      user_data: { external_id: [sha256Hex(`tagioo-verify-${tenant.id}`)] },
+      custom_data: { currency: "BDT", value: 0 }
+    };
+    const result = await sendMetaOfflineConversions(verifyTenant, [event], { useTestCode: true });
+    checks.meta = result.ok && result.sent > 0
+      ? { ok: true, detail: "Meta pixel + CAPI token valid. Test event delivered — see Events Manager → Test Events." }
+      : { ok: false, detail: `Meta rejected the test: ${(result.fbErrors || [result.reason || "unknown error"]).join("; ")}. Check pixel id + CAPI token.` };
+  } else {
+    checks.meta = { ok: false, detail: "Add your Meta Pixel ID and Conversions API token first." };
+  }
+
+  return { ok: Boolean(checks.container?.ok && checks.meta?.ok), checks, at: new Date().toISOString() };
+}
+
+// Persist the latest verification result so the Setup Assistant can show it on load.
+async function recordTenantVerify(tenantId, result) {
+  if (!tenantId) return;
+  try {
+    const loaded = await readDatabase();
+    if (!loaded.available) return;
+    const data = loaded.data;
+    data.tenants ||= [];
+    const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
+    if (index === -1) return;
+    const tracking = { ...(data.tenants[index].tracking || {}) };
+    tracking.lastVerify = result;
+    data.tenants[index] = { ...data.tenants[index], tracking };
+    await writeDatabase(data);
+  } catch {
+    // Recording the result must never fail the verification response.
+  }
+}
+
 async function saveTenantTrackingConfig(tenantId, input) {
   if (!tenantId) return;
   try {
@@ -3306,6 +3385,7 @@ function publicTenantTracking(tenant) {
       days: clampCookieDays(cookieExtension.days)
     },
     offlineUploads: Array.isArray(tracking.offlineUploads) ? tracking.offlineUploads.slice(0, 20) : [],
+    lastVerify: tracking.lastVerify || null,
     updatedAt: tracking.updatedAt || ""
   };
 }
@@ -7248,6 +7328,23 @@ const server = createServer(async (req, res) => {
       const result = await handleOfflineConversionUpload(session, csvText, { validateOnly });
       const { ok, status, ...rest } = result;
       jsonResponse(res, status || (ok ? 200 : 400), rest);
+      return;
+    }
+
+    if (pathname === "/api/customer/verify-tracking" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const tenant = await tenantForSession(session);
+      if (!tenant) {
+        jsonResponse(res, 404, { error: "Tenant not found." });
+        return;
+      }
+      const result = await verifyTenantTracking(tenant);
+      await recordTenantVerify(tenant.id, result);
+      jsonResponse(res, 200, result);
       return;
     }
 

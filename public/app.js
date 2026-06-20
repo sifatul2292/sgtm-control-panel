@@ -73,6 +73,8 @@ const els = {
   assistantNext: document.querySelector("#assistantNext"),
   downloadWebTemplate: document.querySelector("#downloadWebTemplate"),
   downloadServerTemplate: document.querySelector("#downloadServerTemplate"),
+  verifyTrackingBtn: document.querySelector("#verifyTrackingBtn"),
+  verifyTrackingResult: document.querySelector("#verifyTrackingResult"),
   reconciliationBadge: document.querySelector("#reconciliationBadge"),
   reconciliationGrid: document.querySelector("#reconciliationGrid"),
   logModeBadge: document.querySelector("#logModeBadge"),
@@ -2813,6 +2815,7 @@ function renderSetupAssistant(data) {
     wooDomainEl.textContent = domain;
   }
   setWooWebhookSecret(data.webhookSecret || "");
+  if (data.tracking?.lastVerify) renderVerifyResult(data.tracking.lastVerify);
   updateSetupAssistantStep();
 }
 
@@ -2870,6 +2873,48 @@ async function generateSetupAssistantTemplates() {
     }
   } catch (error) {
     if (els.setupAssistantResult) els.setupAssistantResult.textContent = error.message;
+  }
+}
+
+function renderVerifyResult(result) {
+  const box = els.verifyTrackingResult;
+  if (!box) return;
+  if (!result || !result.checks) { box.hidden = true; box.innerHTML = ""; return; }
+  const row = (label, check) => {
+    const ok = check && check.ok;
+    return `<div class="verify-row ${ok ? "is-ok" : "is-fail"}">
+      <span class="verify-icon">${ok ? "✓" : "✗"}</span>
+      <span class="verify-label">${label}</span>
+      <span class="verify-detail">${escapeHtml(check ? check.detail : "Not checked.")}</span>
+    </div>`;
+  };
+  const when = result.at ? new Date(result.at).toLocaleString() : "";
+  box.hidden = false;
+  box.innerHTML = `
+    ${row("GA4 / sGTM container", result.checks.container)}
+    ${row("Meta Conversions API", result.checks.meta)}
+    <p class="verify-stamp">${result.ok ? "All checks passed." : "Some checks failed — fix the items above and re-run."}${when ? ` · ${when}` : ""}</p>`;
+}
+
+async function verifyTracking() {
+  const btn = els.verifyTrackingBtn;
+  if (btn) { btn.disabled = true; btn.textContent = "Testing…"; }
+  if (els.verifyTrackingResult) {
+    els.verifyTrackingResult.hidden = false;
+    els.verifyTrackingResult.innerHTML = `<p class="verify-stamp">Sending test events to GA4 and Meta…</p>`;
+  }
+  try {
+    const response = await fetch("/api/customer/verify-tracking", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Verification failed.");
+    renderVerifyResult(result);
+  } catch (error) {
+    if (els.verifyTrackingResult) {
+      els.verifyTrackingResult.hidden = false;
+      els.verifyTrackingResult.innerHTML = `<p class="verify-stamp is-fail">${escapeHtml(error.message)}</p>`;
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Run tracking test"; }
   }
 }
 
@@ -4831,6 +4876,7 @@ els.assistantNext?.addEventListener("click", async () => {
 });
 els.downloadWebTemplate?.addEventListener("click", () => downloadGeneratedTemplate("web"));
 els.downloadServerTemplate?.addEventListener("click", () => downloadGeneratedTemplate("server"));
+els.verifyTrackingBtn?.addEventListener("click", verifyTracking);
 
 document.querySelector("#generateWooSecret")?.addEventListener("click", async (event) => {
   const button = event.currentTarget;
