@@ -872,9 +872,14 @@ function serverEventRows(data) {
 
 // Purchase rows for the inspector. Prefer the dedicated multi-day purchaseEvents
 // feed (covers Week/Month) and fall back to the generic today/retained rows.
+// Always supplement with today's live recentEvents so SQLite-lag can't cause
+// the inspector to show fewer purchases than the dashboard's uniqueCount.
 function inspectorPurchaseRows(data) {
   const purchaseEvents = data.nginx?.retainedEvents?.purchaseEvents;
-  if (Array.isArray(purchaseEvents) && purchaseEvents.length) return purchaseEvents.map(mapServerEventRow);
+  const todayLive = (data.nginx?.todayEvents?.recentEvents || []).filter((e) => e.eventName === "Purchase");
+  if (Array.isArray(purchaseEvents) && purchaseEvents.length) {
+    return [...purchaseEvents, ...todayLive].map(mapServerEventRow);
+  }
   return purchaseRows(data);
 }
 
