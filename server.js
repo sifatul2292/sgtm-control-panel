@@ -6787,6 +6787,7 @@ function filterRequestSummaryForTenant(summary, tenant) {
     currency: ""
   };
   const purchaseKeys = new Set();
+  const purchaseOrders = new Map();
   const purchaseCurrencies = new Set();
   let errors = 0;
 
@@ -6826,18 +6827,30 @@ function filterRequestSummaryForTenant(summary, tenant) {
 
     if (event.eventName === "Purchase") {
       purchases.rawCount += 1;
-      purchases.uniqueCount += 1;
       const amount = parseMoney(event.value);
-      if (amount !== null) {
-        purchases.rawRevenue += amount;
-        purchases.uniqueRevenue += amount;
+      if (amount !== null) purchases.rawRevenue += amount;
+      // Dedupe by transaction_id (or event_id) so the browser hit and the
+      // server-side recovery hit for the same order — both logged to /g/collect —
+      // count as one purchase. Keyless rows fall back to a per-row token so they
+      // still count individually. uniqueRevenue is summed once per unique order.
+      const key = event.transactionId || event.eventId;
+      if (key) {
+        if (!purchaseOrders.has(key)) {
+          purchaseOrders.set(key, true);
+          purchases.uniqueCount += 1;
+          if (amount !== null) purchases.uniqueRevenue += amount;
+        }
+        purchaseKeys.add(key);
+      } else {
+        purchases.uniqueCount += 1;
+        if (amount !== null) purchases.uniqueRevenue += amount;
       }
-      if (event.transactionId || event.eventId) purchaseKeys.add(event.transactionId || event.eventId);
       if (event.currency) purchaseCurrencies.add(String(event.currency).toUpperCase());
     }
   }
 
   purchases.keyedCount = purchaseKeys.size;
+  purchases.duplicateCount = Math.max(0, purchases.rawCount - purchases.uniqueCount);
   purchases.averageOrderValue = purchases.uniqueCount ? purchases.uniqueRevenue / purchases.uniqueCount : 0;
   purchases.currency = purchaseCurrencies.size === 1 ? [...purchaseCurrencies][0] : "";
 

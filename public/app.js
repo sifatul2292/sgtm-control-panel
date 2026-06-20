@@ -1293,22 +1293,11 @@ function eventRawCount(stat) {
 }
 
 function purchaseSummary(data) {
-  const orderToday = data.orders?.today;
-  if (orderToday?.count) {
-    return {
-      rawCount: Number(orderToday.count) || 0,
-      uniqueCount: Number(orderToday.count) || 0,
-      duplicateCount: 0,
-      keyedCount: Number(orderToday.count) || 0,
-      estimatedKeyCount: 0,
-      uniqueRevenue: Number(orderToday.revenue) || 0,
-      rawRevenue: Number(orderToday.revenue) || 0,
-      averageOrderValue: Number(orderToday.averageOrderValue) || 0,
-      currency: orderToday.currency || "",
-      source: "orders"
-    };
-  }
-
+  // Show today's TRACKED purchases (deduped by transaction_id) so the dashboard
+  // matches the Event Logs count. The store-order webhook is still used for the
+  // separate reconciliation view; it no longer overrides this headline number,
+  // which previously made "Purchases" disagree with Event Logs when the webhook
+  // delivered fewer orders than tracking saw.
   const summary = data.nginx?.todayEvents?.purchases || {};
   const stat = reliableEventStats(data).get("Purchase");
   // Use `||` (not `??`) so a deduped count of 0 falls through to the raw event count.
@@ -1807,7 +1796,6 @@ function renderCustomerSetup(data) {
 
 function renderCustomerPerformance(data, range = customerKpiRange) {
   const summary = data.nginx?.todayEvents || {};
-  const retainedSummary = data.nginx?.retainedEvents?.available ? data.nginx.retainedEvents : summary;
   const m = metricsForRange(data, range);
   const periodEvents = Number(data.usage?.requestsMonth ?? Number(summary.count || 0));
   // Conversion is now window-aligned: purchases and events both come from `range`.
@@ -1822,7 +1810,9 @@ function renderCustomerPerformance(data, range = customerKpiRange) {
     { label: "Conversion", value: `${conversion}%`, detail: `${m.purchaseCount.toLocaleString()} / ${m.events.toLocaleString()}` },
     { label: "Purchases", value: m.purchaseCount.toLocaleString(), detail: rangeLabel }
   ]);
-  renderCustomerAnalytics(summary, data.history?.daily || [], customerChartRange, retainedSummary);
+  // Top Events + Event Distribution read today's deduped events (4th arg), not the
+  // 30-day retained window — so they match "today" everywhere else in the panel.
+  renderCustomerAnalytics(summary, data.history?.daily || [], customerChartRange, summary);
 }
 
 function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", eventSummary = summary) {
@@ -4826,8 +4816,7 @@ document.addEventListener("click", (e) => {
   document.querySelectorAll("[data-chart-range]").forEach((b) => b.classList.toggle("is-active", b === btn));
   if (latestData) {
     const summary = latestData.nginx?.todayEvents || {};
-    const retainedSummary = latestData.nginx?.retainedEvents?.available ? latestData.nginx.retainedEvents : summary;
-    renderCustomerAnalytics(summary, latestData.history?.daily || [], customerChartRange, retainedSummary);
+    renderCustomerAnalytics(summary, latestData.history?.daily || [], customerChartRange, summary);
   }
 });
 
