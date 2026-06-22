@@ -490,39 +490,57 @@ add_action('woocommerce_payment_complete', function (int $order_id) {
     $ua  = $order->get_meta(TAGIOO_META_UA);
     $ip  = $order->get_customer_ip_address();
 
-    // Build GA4 Measurement Protocol v2 payload
-    $payload = [
-        'client_id' => 'tagioo_server.' . $order_num,
-        'user_data' => $user_data,
-        'events'    => [[
-            'name'   => 'purchase',
-            'params' => array_filter([
-                'transaction_id' => $order_num,
-                'value'          => tagioo_price((string) $order->get_total()),
-                'currency'       => tagioo_currency(),
-                'tax'            => tagioo_price((string) $order->get_total_tax()),
-                'shipping'       => tagioo_price((string) $order->get_shipping_total()),
-                'coupon'         => implode(',', $order->get_coupon_codes()),
-                'items'          => tagioo_items_from_order($order),
-                'event_id'       => $event_id,
-                // Pass fbp/fbc as params — Tagioo CAPI template reads eventData.fbp / eventData.fbc
-                'fbp'            => $fbp ?: null,
-                'fbc'            => $fbc ?: null,
-            ]),
-        ]],
+    // sGTM's GA4 client only claims the gtag wire format on /g/collect — a
+    // Measurement Protocol JSON body returns HTTP 400 and the hit is lost. Build
+    // a gtag query string so the GA4 client claims it, forwards to GA4, and fires
+    // Meta CAPI. event_id matches the browser hit → Meta + GA4 (by transaction_id)
+    // dedup to one conversion.
+    $params = [
+        'v'                => '2',
+        'tid'              => $mid,
+        'cid'              => 'tagioo_server.' . $order_num,
+        'en'               => 'purchase',
+        '_et'              => '100',                 // engagement, so GA4 records it
+        'sid'              => (string) time(),
+        '_p'               => (string) wp_rand(1, 2147483647),
+        'cu'               => tagioo_currency(),
+        'epn.value'        => tagioo_price((string) $order->get_total()),
+        'epn.tax'          => tagioo_price((string) $order->get_total_tax()),
+        'epn.shipping'     => tagioo_price((string) $order->get_shipping_total()),
+        'ep.transaction_id'=> $order_num,
+        'ep.coupon'        => implode(',', $order->get_coupon_codes()),
+        'ep.event_id'      => $event_id,
+        // page_location → Meta event_source_url + GA4 page path (not the homepage).
+        'dl'               => $order->get_checkout_order_received_url(),
+        // Tagioo CAPI template reads eventData.fbp / eventData.fbc.
+        'ep.fbp'           => $fbp ?: '',
+        'ep.fbc'           => $fbc ?: '',
     ];
+    // Flat user_data params — the Tagioo CAPI template reads these off eventData
+    // when no nested user_data object is present (server recovery path).
+    foreach ($user_data as $k => $v) {
+        if ($v !== '' && $v !== null) $params['ep.' . $k] = $v;
+    }
+    // Items as gtag product params: prN=id..~nm..~pr..~qt..~ca.. (~ is the delimiter).
+    $i = 1;
+    foreach (tagioo_items_from_order($order) as $it) {
+        $pr  = 'id' . str_replace('~', '-', (string) ($it['item_id'] ?? ''));
+        $pr .= '~nm' . str_replace('~', '-', (string) ($it['item_name'] ?? ''));
+        $pr .= '~pr' . (string) ($it['price'] ?? 0);
+        $pr .= '~qt' . (string) ($it['quantity'] ?? 1);
+        if (!empty($it['item_category'])) $pr .= '~ca' . str_replace('~', '-', (string) $it['item_category']);
+        $params['pr' . $i] = $pr;
+        $i++;
+    }
 
-    $url = $sgtm . '/g/collect?measurement_id=' . urlencode($mid) . '&api_secret=' . urlencode($secret);
+    $url = $sgtm . '/g/collect?' . http_build_query($params);
 
-    // Forward customer IP and UA so sGTM CAPI has them for EMQ
-    $headers = [
-        'Content-Type' => 'application/json',
-    ];
+    // Forward customer IP and UA so sGTM CAPI has them for EMQ.
+    $headers = [];
     if ($ip) $headers['X-Forwarded-For'] = $ip;
-    if ($ua) $headers['User-Agent']       = $ua;
+    if ($ua) $headers['User-Agent']      = $ua;
 
     wp_remote_post($url, [
-        'body'      => wp_json_encode($payload),
         'headers'   => $headers,
         'timeout'   => 10,
         'blocking'  => false, // fire-and-forget, don't block order processing

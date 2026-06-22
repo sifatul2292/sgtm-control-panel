@@ -762,11 +762,11 @@ const event = {
   custom_data: {}
 };
 
-addHashed(event.user_data, 'em', firstValue(userData.email_address, userData.email));
-addHashed(event.user_data, 'ph', userData.phone_number);
-addHashed(event.user_data, 'fn', userData.first_name);
-addHashed(event.user_data, 'ln', userData.last_name);
-addRaw(event.user_data, 'external_id', userData.external_id);
+addHashed(event.user_data, 'em', firstValue(userData.email_address, userData.email, eventData.email_address, eventData.email));
+addHashed(event.user_data, 'ph', firstValue(userData.phone_number, eventData.phone_number));
+addHashed(event.user_data, 'fn', firstValue(userData.first_name, eventData.first_name));
+addHashed(event.user_data, 'ln', firstValue(userData.last_name, eventData.last_name));
+addRaw(event.user_data, 'external_id', firstValue(userData.external_id, eventData.external_id));
 addHashed(event.user_data, 'ct', firstValue(userData.city, eventData.city));
 addHashed(event.user_data, 'st', firstValue(userData.region, eventData.region));
 addHashed(event.user_data, 'zp', firstValue(userData.postal_code, eventData.postal_code));
