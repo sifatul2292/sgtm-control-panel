@@ -2870,7 +2870,8 @@ function renderVerifyResult(result) {
   const when = result.at ? new Date(result.at).toLocaleString() : "";
   box.hidden = false;
   box.innerHTML = `
-    ${row("GA4 / sGTM container", result.checks.container)}
+    ${row("sGTM container (live)", result.checks.container)}
+    ${row("GA4 forwarding (ID + secret)", result.checks.ga4)}
     ${row("Meta Conversions API", result.checks.meta)}
     <p class="verify-stamp">${result.ok ? "All checks passed." : "Some checks failed — fix the items above and re-run."}${when ? ` · ${when}` : ""}</p>`;
 }

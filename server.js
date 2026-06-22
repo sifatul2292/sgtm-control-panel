@@ -3308,7 +3308,36 @@ async function verifyTenantTracking(tenant) {
     checks.container = { ok: false, detail: "Set your GA4 Measurement ID and tracking domain first." };
   }
 
-  // 2. Meta CAPI creds. test_event_code keeps this out of production reporting;
+  // 2. GA4 forward creds. The container check proves sGTM claims the hit, but the
+  // server-side GA4 tag forwards to Google with measurementId + apiSecret — an
+  // invalid/blank secret breaks GA4 silently while the container check stays green.
+  // The MP debug endpoint validates the pair without recording data.
+  if (tracking.measurementId && tracking.apiSecret) {
+    try {
+      const r = await fetch(
+        `https://www.google-analytics.com/debug/mp/collect?measurement_id=${encodeURIComponent(tracking.measurementId)}&api_secret=${encodeURIComponent(tracking.apiSecret)}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            client_id: mpClientId(`verify-${tenant.id}`),
+            events: [{ name: "tagioo_verify", params: { engagement_time_msec: 1 } }]
+          })
+        }
+      );
+      const body = await r.json().catch(() => ({}));
+      const messages = Array.isArray(body.validationMessages) ? body.validationMessages : [];
+      checks.ga4 = r.ok && messages.length === 0
+        ? { ok: true, detail: "GA4 Measurement ID + API secret valid. sGTM can forward events to GA4." }
+        : { ok: false, detail: `GA4 rejected the pair: ${messages.map((m) => m.description || m.code).join("; ") || `HTTP ${r.status}`}. Check Measurement ID + API secret.` };
+    } catch (error) {
+      checks.ga4 = { ok: false, detail: `Could not validate GA4 creds: ${error.message}.` };
+    }
+  } else {
+    checks.ga4 = { ok: false, detail: "Add your GA4 Measurement ID and API secret to verify forwarding to GA4." };
+  }
+
+  // 3. Meta CAPI creds. test_event_code keeps this out of production reporting;
   // events_received > 0 with no error means the pixel id + token are valid.
   const meta = tracking.meta || {};
   if (meta.pixelId && meta.capiToken) {
@@ -3332,7 +3361,7 @@ async function verifyTenantTracking(tenant) {
     checks.meta = { ok: false, detail: "Add your Meta Pixel ID and Conversions API token first." };
   }
 
-  return { ok: Boolean(checks.container?.ok && checks.meta?.ok), checks, at: new Date().toISOString() };
+  return { ok: Boolean(checks.container?.ok && checks.ga4?.ok && checks.meta?.ok), checks, at: new Date().toISOString() };
 }
 
 // Persist the latest verification result so the Setup Assistant can show it on load.
