@@ -1056,6 +1056,16 @@ function buildWebGtmTemplate(input) {
         { parameter: "server_container_url", parameterValue: "{{Tagioo - server_container_url}}" }
       ])],
       fingerprint: String(Date.now()), parentFolderId: "3"
+    },
+    // Explicit page context so every event (incl. AJAX add_to_cart) carries the
+    // real URL + title. Without these, sGTM's GA4 client defaults page_location
+    // to the request origin (homepage), corrupting GA4 page reports and the Meta
+    // event_source_url forwarded downstream.
+    {
+      accountId: "0", containerId: "0", variableId: "31",
+      name: "Tagioo - page_title", type: "jsm",
+      parameter: [gtmTemplateParam("javascript", "function(){return document.title;}")],
+      fingerprint: String(Date.now()), parentFolderId: "2"
     }
   ];
   const triggers = [
@@ -1084,6 +1094,8 @@ function buildWebGtmTemplate(input) {
     ];
     for (const [eventName, triggerId] of eventMap) {
       const eventSettingsRows = [
+        { parameter: "page_location", parameterValue: "{{Page URL}}" },
+        { parameter: "page_title", parameterValue: "{{Tagioo - page_title}}" },
         { parameter: "event_id", parameterValue: "{{dlv - event_id}}" },
         { parameter: "user_data.email_address", parameterValue: "{{dlv - user_data.email_address}}" },
         { parameter: "user_data.phone_number", parameterValue: "{{dlv - user_data.phone_number}}" },
@@ -1176,7 +1188,10 @@ function buildWebGtmTemplate(input) {
     trigger: triggers,
     variable: variables,
     folder: folders,
-    builtInVariable: [{ accountId: "0", containerId: "0", type: "EVENT", name: "Event" }]
+    builtInVariable: [
+      { accountId: "0", containerId: "0", type: "EVENT", name: "Event" },
+      { accountId: "0", containerId: "0", type: "PAGE_URL", name: "Page URL" }
+    ]
   });
 }
 
