@@ -73,6 +73,7 @@ const els = {
   assistantNext: document.querySelector("#assistantNext"),
   downloadWebTemplate: document.querySelector("#downloadWebTemplate"),
   downloadServerTemplate: document.querySelector("#downloadServerTemplate"),
+  downloadPlugin: document.querySelector("#downloadPlugin"),
   verifyTrackingBtn: document.querySelector("#verifyTrackingBtn"),
   verifyTrackingResult: document.querySelector("#verifyTrackingResult"),
   reconciliationBadge: document.querySelector("#reconciliationBadge"),
@@ -4853,6 +4854,28 @@ els.assistantNext?.addEventListener("click", async () => {
 });
 els.downloadWebTemplate?.addEventListener("click", () => downloadGeneratedTemplate("web"));
 els.downloadServerTemplate?.addEventListener("click", () => downloadGeneratedTemplate("server"));
+els.downloadPlugin?.addEventListener("click", async () => {
+  const btn = els.downloadPlugin;
+  const prev = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Downloading…";
+  try {
+    const res = await fetch("/api/customer/setup-assistant/plugin");
+    if (!res.ok) throw new Error(await res.text());
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "tagioo-woocommerce.zip";
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert("Plugin download failed: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prev;
+  }
+});
 els.verifyTrackingBtn?.addEventListener("click", verifyTracking);
 
 document.querySelector("#generateWooSecret")?.addEventListener("click", async (event) => {

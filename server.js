@@ -4,10 +4,50 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { gzip } from "node:zlib";
+import { deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
 
 const gzipAsync = promisify(gzip);
+
+// Minimal ZIP builder (no extra deps). Creates a valid ZIP with one entry.
+function crc32(buf) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) {
+    crc ^= buf[i];
+    for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function buildSingleFileZip(filename, content) {
+  const nameBuf = Buffer.from(filename);
+  const data    = Buffer.isBuffer(content) ? content : Buffer.from(content);
+  const crc     = crc32(data);
+  const deflated = deflateRawSync(data, { level: 9 });
+  const now = new Date();
+  const dosDate = (((now.getFullYear() - 1980) & 0x7F) << 9) | (((now.getMonth() + 1) & 0xF) << 5) | (now.getDate() & 0x1F);
+  const dosTime = ((now.getHours() & 0x1F) << 11) | ((now.getMinutes() & 0x3F) << 5) | (Math.floor(now.getSeconds() / 2) & 0x1F);
+  // Local file header (30 bytes + name)
+  const lh = Buffer.alloc(30 + nameBuf.length);
+  lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6);
+  lh.writeUInt16LE(8, 8); lh.writeUInt16LE(dosTime, 10); lh.writeUInt16LE(dosDate, 12);
+  lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(deflated.length, 18); lh.writeUInt32LE(data.length, 22);
+  lh.writeUInt16LE(nameBuf.length, 26); lh.writeUInt16LE(0, 28); nameBuf.copy(lh, 30);
+  // Central directory (46 bytes + name)
+  const cdOffset = lh.length + deflated.length;
+  const cd = Buffer.alloc(46 + nameBuf.length);
+  cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(0, 8);
+  cd.writeUInt16LE(8, 10); cd.writeUInt16LE(dosTime, 12); cd.writeUInt16LE(dosDate, 14);
+  cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(deflated.length, 20); cd.writeUInt32LE(data.length, 24);
+  cd.writeUInt16LE(nameBuf.length, 28); cd.writeUInt16LE(0, 30); cd.writeUInt16LE(0, 32);
+  cd.writeUInt16LE(0, 34); cd.writeUInt16LE(0, 36); cd.writeUInt32LE(0, 38); cd.writeUInt32LE(0, 42);
+  nameBuf.copy(cd, 46);
+  // End of central directory
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(0, 4); eocd.writeUInt16LE(0, 6);
+  eocd.writeUInt16LE(1, 8); eocd.writeUInt16LE(1, 10); eocd.writeUInt32LE(cd.length, 12);
+  eocd.writeUInt32LE(cdOffset, 16); eocd.writeUInt16LE(0, 20);
+  return Buffer.concat([lh, deflated, cd, eocd]);
+}
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(rootDir, "public");
@@ -7326,6 +7366,28 @@ const server = createServer(async (req, res) => {
       // server-side purchase recovery events to this tenant's sGTM.
       await saveTenantTrackingConfig(session.tenantId, body);
       jsonResponse(res, 200, templates);
+      return;
+    }
+
+    if (pathname === "/api/customer/setup-assistant/plugin" && req.method === "GET") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      try {
+        const phpContent = await readFile(join(rootDir, "tagioo-woocommerce.php"));
+        const zip = buildSingleFileZip("tagioo-woocommerce/tagioo-woocommerce.php", phpContent);
+        res.writeHead(200, {
+          "Content-Type": "application/zip",
+          "Content-Disposition": "attachment; filename=\"tagioo-woocommerce.zip\"",
+          "Content-Length": String(zip.length),
+          "Cache-Control": "no-store",
+        });
+        res.end(zip);
+      } catch {
+        jsonResponse(res, 500, { error: "Plugin file not found on server." });
+      }
       return;
     }
 
