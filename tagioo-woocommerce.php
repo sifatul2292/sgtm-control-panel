@@ -123,7 +123,7 @@ function tagioo_settings_page(): void {
                         <input name="<?= TAGIOO_OPTION ?>[sgtm_domain]" id="t_sgtm" type="url"
                                value="<?= esc_attr($s['sgtm_domain']) ?>" class="regular-text"
                                placeholder="https://sgtm.yourdomain.com" />
-                        <p class="description">Used for server-side purchase hit + GTM loader src (leave empty to use google.com).</p>
+                        <p class="description">Used for the server-side purchase hit and first-party data collection. gtm.js always loads from google.com.</p>
                     </td>
                 </tr>
                 <tr>
@@ -185,9 +185,11 @@ function tagioo_settings_page(): void {
 add_action('wp_head', function () {
     $id = tagioo_opt('gtm_id');
     if (!$id || tagioo_opt('inject_gtm') !== '1') return;
-    $sgtm   = tagioo_opt('sgtm_domain');
-    $loader = $sgtm ? esc_url($sgtm) . '/gtm.js?id=' . esc_js($id)
-                    : 'https://www.googletagmanager.com/gtm.js?id=' . esc_js($id);
+    // Always load gtm.js from Google. First-party data collection is handled by the
+    // web container's GA4 config (server_container_url → sGTM), not the loader script.
+    // Serving gtm.js first-party would require a Web Container client in the server
+    // container, which Google does not expose for JSON import.
+    $loader = 'https://www.googletagmanager.com/gtm.js?id=' . esc_js($id);
     $id_e   = esc_js($id);
     echo "\n<!-- Tagioo GTM -->\n";
     echo "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='{$loader}'+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','{$id_e}');</script>\n";
