@@ -510,6 +510,13 @@ function selectedDestinations(input) {
   return selected.length ? selected : ["ga4", "meta", "googleAds", "tiktok"];
 }
 
+function generateTagServingPath() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let path = "";
+  for (let i = 0; i < 18; i++) path += chars[Math.floor(Math.random() * chars.length)];
+  return "/" + path;
+}
+
 function gtmTemplateParam(key, value) {
   return { type: "TEMPLATE", key, value: String(value ?? "") };
 }
@@ -1268,6 +1275,24 @@ function buildServerGtmTemplate(input) {
       ga4Params.push(gtmTemplateParam("apiSecret", "{{Tagioo - ga4_api_secret}}"));
     }
     tags.push(gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", ga4Params, ["1"], "3"));
+  }
+  const webGtmId = String(input.gtmWebContainerId || "").trim().toUpperCase();
+  if (webGtmId) {
+    clients.push({
+      accountId: "0",
+      containerId: "0",
+      clientId: "2",
+      name: "Tagioo - Web Container",
+      type: "google_tag_serving",
+      parameter: [
+        gtmListParam("allowedContainerIds", [
+          { containerId: webGtmId, tagServingPath: generateTagServingPath() }
+        ]),
+        gtmBooleanParam("compressHttpResponse", true),
+        gtmBooleanParam("enableRegionSpecificSettings", false)
+      ],
+      fingerprint: String(Date.now())
+    });
   }
   if (destinations.includes("meta")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo Meta CAPI - All Events", "cvt_0_101", [
