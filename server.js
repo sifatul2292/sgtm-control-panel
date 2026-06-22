@@ -766,14 +766,14 @@ addHashed(event.user_data, 'em', firstValue(userData.email_address, userData.ema
 addHashed(event.user_data, 'ph', userData.phone_number);
 addHashed(event.user_data, 'fn', userData.first_name);
 addHashed(event.user_data, 'ln', userData.last_name);
-addHashed(event.user_data, 'external_id', userData.external_id);
+addRaw(event.user_data, 'external_id', userData.external_id);
 addHashed(event.user_data, 'ct', firstValue(userData.city, eventData.city));
 addHashed(event.user_data, 'st', firstValue(userData.region, eventData.region));
 addHashed(event.user_data, 'zp', firstValue(userData.postal_code, eventData.postal_code));
-addHashed(event.user_data, 'country', firstValue(userData.country, eventData.country));
+event.user_data.country = '0e98aa0e26e4aca23a820cadb074448a14e3ac834a1c585e86c07f84e5b2e81e';
 
-addRaw(event.user_data, 'fbp', firstValue(eventData.fbp, eventData._fbp, getCookieValues('_fbp', true)[0]));
-addRaw(event.user_data, 'fbc', firstValue(eventData.fbc, eventData._fbc, getCookieValues('_fbc', true)[0]));
+addRaw(event.user_data, 'fbp', firstValue(userData.fbp, eventData.fbp, eventData._fbp, getCookieValues('_fbp', true)[0]));
+addRaw(event.user_data, 'fbc', firstValue(userData.fbc, eventData.fbc, eventData._fbc, getCookieValues('_fbc', true)[0]));
 addRaw(event.user_data, 'client_ip_address', firstValue(eventData.ip_override, getRequestHeader('x-forwarded-for'), getRequestHeader('x-real-ip')));
 addRaw(event.user_data, 'client_user_agent', firstValue(eventData.user_agent, getRequestHeader('user-agent')));
 
