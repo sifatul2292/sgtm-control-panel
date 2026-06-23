@@ -3,7 +3,7 @@
  * Plugin Name: Tagioo for WooCommerce
  * Plugin URI:  https://tagioo.com
  * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.3.0
+ * Version:     2.4.0
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author:      Tagioo
@@ -14,7 +14,7 @@
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.3.0');
+define('TAGIOO_VERSION', '2.4.0');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
@@ -302,6 +302,13 @@ function tagioo_user_data_from_order(\WC_Order $order): array {
     ]);
 }
 
+// Unique event_id for a dataLayer push. The browser Meta/TikTok pixel and the
+// server-side CAPI (via the GA4 event_id param) both read this same value, so
+// the two hits for one action deduplicate instead of double-counting.
+function tagioo_event_id(string $prefix): string {
+    return 'tagioo-' . $prefix . '-' . str_replace('.', '', uniqid('', true));
+}
+
 function tagioo_push_script(array $data, bool $echo = true): string {
     $out = '';
     // GTM v2 merges nested objects — always clear stale ecommerce before each event.
@@ -450,7 +457,7 @@ add_action('wp_footer', function () {
     $product = wc_get_product(get_the_ID());
     if (!$product) return;
     $item = tagioo_item_from_product($product);
-    $push = ['event' => 'view_item', 'ecommerce' => [
+    $push = ['event' => 'view_item', 'event_id' => tagioo_event_id('vi'), 'ecommerce' => [
         'currency' => tagioo_currency(),
         'value'    => $item['price'],
         'items'    => [$item],
@@ -468,7 +475,7 @@ add_action('woocommerce_add_to_cart', function (string $key, int $product_id, in
     $product = wc_get_product($variation_id ?: $product_id);
     if (!$product) return;
     $item = tagioo_item_from_product($product, $qty);
-    $push = ['event' => 'add_to_cart', 'ecommerce' => [
+    $push = ['event' => 'add_to_cart', 'event_id' => tagioo_event_id('atc'), 'ecommerce' => [
         'currency' => tagioo_currency(),
         'value'    => tagioo_price((string) ($product->get_price() * $qty)),
         'items'    => [$item],
@@ -503,7 +510,7 @@ add_action('woocommerce_before_checkout_form', function () {
         $items[] = $item;
         $value  += ($product->get_price() * $qty);
     }
-    $push = ['event' => 'begin_checkout', 'ecommerce' => [
+    $push = ['event' => 'begin_checkout', 'event_id' => tagioo_event_id('bc'), 'ecommerce' => [
         'currency' => tagioo_currency(),
         'value'    => round($value, 2),
         'items'    => $items,
