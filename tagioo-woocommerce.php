@@ -3,7 +3,7 @@
  * Plugin Name: Tagioo for WooCommerce
  * Plugin URI:  https://tagioo.com
  * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.1.0
+ * Version:     2.2.0
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author:      Tagioo
@@ -14,7 +14,7 @@
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.1.0');
+define('TAGIOO_VERSION', '2.2.0');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
@@ -346,44 +346,82 @@ function tagioo_client_ip(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Capture _fbp, _fbc, User-Agent at checkout — store in order meta
-// Gives server-side hit the cookies it needs for 10/10 EMQ
+// Meta identifier persistence (_fbp / _fbc) — beat Safari ITP + capture fbclid
+// on the LANDING hit (not at checkout, where the param is long gone), so the
+// server-side purchase hit always has them for 10/10 EMQ.
 // ---------------------------------------------------------------------------
 
-// 1. Inject JS that reads cookies + UA and stores in hidden checkout fields.
-add_action('woocommerce_before_checkout_form', function () {
-    ?>
-    <input type="hidden" id="tagioo_fbp" name="tagioo_fbp" value="" />
-    <input type="hidden" id="tagioo_fbc" name="tagioo_fbc" value="" />
-    <input type="hidden" id="tagioo_ua"  name="tagioo_ua"  value="" />
-    <script>
-    (function(){
-        function getCookie(n){var m=document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)');return m?decodeURIComponent(m[2]):''}
-        var fbp=getCookie('_fbp'), fbc=getCookie('_fbc');
-        // _fbc can also come from fbclid URL param
-        if(!fbc){var u=new URLSearchParams(window.location.search);if(u.get('fbclid'))fbc='fb.1.'+Date.now()+'.'+u.get('fbclid');}
-        document.getElementById('tagioo_fbp').value=fbp;
-        document.getElementById('tagioo_fbc').value=fbc;
-        document.getElementById('tagioo_ua').value=navigator.userAgent;
-    })();
-    </script>
-    <?php
+// Meta-format _fbp value, generated when the Pixel hasn't set one yet.
+function tagioo_new_fbp(): string {
+    return 'fb.1.' . (string) round(microtime(true) * 1000) . '.' . (string) wp_rand(1000000000, 9999999999);
+}
+
+// On every front-end request: capture fbclid → _fbc, ensure _fbp exists, then
+// re-emit both as first-party cookies with a 90-day expiry. Server-set
+// Set-Cookie headers survive Safari ITP's 7-day cap on JS-set cookies, so
+// returning visitors keep a stable match. Same value re-emitted each request →
+// never clobbers the value the Pixel itself wrote.
+add_action('init', function () {
+    if (is_admin()) return;
+    if (defined('DOING_CRON') && DOING_CRON) return;
+    if (defined('REST_REQUEST') && REST_REQUEST) return;
+    if (defined('DOING_AJAX') && DOING_AJAX) return;
+    if (headers_sent()) return;
+
+    $fbp = isset($_COOKIE['_fbp']) ? sanitize_text_field(wp_unslash($_COOKIE['_fbp'])) : '';
+    $fbc = isset($_COOKIE['_fbc']) ? sanitize_text_field(wp_unslash($_COOKIE['_fbc'])) : '';
+
+    // fbclid in the landing URL → build _fbc now. Only when no _fbc cookie set.
+    if (!$fbc && !empty($_GET['fbclid'])) {
+        $fbclid = sanitize_text_field(wp_unslash($_GET['fbclid']));
+        $fbc = 'fb.1.' . (string) round(microtime(true) * 1000) . '.' . $fbclid;
+    }
+
+    // No _fbp yet (first hit, before the Pixel runs) → generate a stable one.
+    if (!$fbp) $fbp = tagioo_new_fbp();
+
+    $opts = [
+        'expires'  => time() + 90 * DAY_IN_SECONDS,
+        'path'     => (defined('COOKIEPATH') && COOKIEPATH) ? COOKIEPATH : '/',
+        'domain'   => defined('COOKIE_DOMAIN') ? COOKIE_DOMAIN : '',
+        'secure'   => is_ssl(),
+        'httponly' => false,            // Meta Pixel reads these via document.cookie
+        'samesite' => 'Lax',
+    ];
+    setcookie('_fbp', $fbp, $opts);
+    $_COOKIE['_fbp'] = $fbp;           // visible to the same request
+    if ($fbc) {
+        setcookie('_fbc', $fbc, $opts);
+        $_COOKIE['_fbc'] = $fbc;
+    }
 }, 1);
 
-// 2. Save to order meta on order creation.
-add_action('woocommerce_checkout_create_order', function (\WC_Order $order, array $data) {
-    $fbp = sanitize_text_field(wp_unslash($_POST['tagioo_fbp'] ?? ''));
-    $fbc = sanitize_text_field(wp_unslash($_POST['tagioo_fbc'] ?? ''));
-    $ua  = sanitize_text_field(wp_unslash($_POST['tagioo_ua']  ?? ''));
-    if ($fbp) $order->update_meta_data(TAGIOO_META_FBP, $fbp);
-    if ($fbc) $order->update_meta_data(TAGIOO_META_FBC, $fbc);
-    if ($ua)  $order->update_meta_data(TAGIOO_META_UA,  $ua);
-    // Real client IP (prefer IPv6) captured during the browser request, so the
-    // server-side hit forwards the same IP family Meta saw via the pixel — even
-    // when payment_complete later fires from a server context (COD, webhook).
+// Attach Meta identifiers + real client IP/UA to the order. Reads cookies and
+// server vars directly → works on BOTH classic and block (Store API) checkout,
+// with no hidden form fields to depend on.
+function tagioo_attach_meta_identifiers(\WC_Order $order): void {
+    $fbp = isset($_COOKIE['_fbp']) ? sanitize_text_field(wp_unslash($_COOKIE['_fbp'])) : '';
+    $fbc = isset($_COOKIE['_fbc']) ? sanitize_text_field(wp_unslash($_COOKIE['_fbc'])) : '';
+    $ua  = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '';
+    if ($fbp && !$order->get_meta(TAGIOO_META_FBP)) $order->update_meta_data(TAGIOO_META_FBP, $fbp);
+    if ($fbc && !$order->get_meta(TAGIOO_META_FBC)) $order->update_meta_data(TAGIOO_META_FBC, $fbc);
+    if ($ua  && !$order->get_meta(TAGIOO_META_UA))  $order->update_meta_data(TAGIOO_META_UA,  $ua);
+    // Real client IP (prefer IPv6) so the server-side hit forwards the same IP
+    // family Meta saw via the pixel — even when payment_complete later fires
+    // from a server context (COD, webhook).
     $ip = tagioo_client_ip();
-    if ($ip) $order->update_meta_data(TAGIOO_META_IP, $ip);
+    if ($ip && !$order->get_meta(TAGIOO_META_IP)) $order->update_meta_data(TAGIOO_META_IP, $ip);
+}
+
+// Classic (shortcode) checkout.
+add_action('woocommerce_checkout_create_order', function (\WC_Order $order, array $data) {
+    tagioo_attach_meta_identifiers($order);
 }, 10, 2);
+
+// Block (Store API) checkout — fires while the browser request cookies are live.
+add_action('woocommerce_store_api_checkout_update_order_from_request', function (\WC_Order $order) {
+    tagioo_attach_meta_identifiers($order);
+}, 10, 1);
 
 // ---------------------------------------------------------------------------
 // view_item
