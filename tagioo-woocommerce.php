@@ -19,6 +19,7 @@ define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
 define('TAGIOO_META_UA',    '_tagioo_ua');
+define('TAGIOO_META_IP',    '_tagioo_ip');
 define('TAGIOO_META_FIRED', '_tagioo_purchase_fired');
 define('TAGIOO_META_SS_FIRED', '_tagioo_ss_purchase_fired');
 
@@ -319,6 +320,32 @@ function tagioo_current_user_data(): array {
 }
 
 // ---------------------------------------------------------------------------
+// Real client IP, preferring IPv6.
+// Meta sees the user's IPv6 via the browser pixel; WooCommerce's
+// get_customer_ip_address() often returns the proxy/edge IPv4 (REMOTE_ADDR),
+// which mismatches and lowers match quality. Read the true-client headers and
+// pick an IPv6 address when one is present.
+// ---------------------------------------------------------------------------
+function tagioo_client_ip(): string {
+    // Header priority: Cloudflare / CDN true-client headers first, then proxy
+    // chain, then the raw connection. X-Forwarded-For may be a comma list with
+    // the client first.
+    $candidates = [];
+    foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_TRUE_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR'] as $h) {
+        if (empty($_SERVER[$h])) continue;
+        foreach (explode(',', (string) wp_unslash($_SERVER[$h])) as $part) {
+            $ip = trim($part);
+            if ($ip !== '' && filter_var($ip, FILTER_VALIDATE_IP)) $candidates[] = $ip;
+        }
+    }
+    // Prefer the first valid IPv6, else first valid IP.
+    foreach ($candidates as $ip) {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) return $ip;
+    }
+    return $candidates[0] ?? '';
+}
+
+// ---------------------------------------------------------------------------
 // Capture _fbp, _fbc, User-Agent at checkout — store in order meta
 // Gives server-side hit the cookies it needs for 10/10 EMQ
 // ---------------------------------------------------------------------------
@@ -351,6 +378,11 @@ add_action('woocommerce_checkout_create_order', function (\WC_Order $order, arra
     if ($fbp) $order->update_meta_data(TAGIOO_META_FBP, $fbp);
     if ($fbc) $order->update_meta_data(TAGIOO_META_FBC, $fbc);
     if ($ua)  $order->update_meta_data(TAGIOO_META_UA,  $ua);
+    // Real client IP (prefer IPv6) captured during the browser request, so the
+    // server-side hit forwards the same IP family Meta saw via the pixel — even
+    // when payment_complete later fires from a server context (COD, webhook).
+    $ip = tagioo_client_ip();
+    if ($ip) $order->update_meta_data(TAGIOO_META_IP, $ip);
 }, 10, 2);
 
 // ---------------------------------------------------------------------------
@@ -488,7 +520,9 @@ add_action('woocommerce_payment_complete', function (int $order_id) {
     $fbp = $order->get_meta(TAGIOO_META_FBP);
     $fbc = $order->get_meta(TAGIOO_META_FBC);
     $ua  = $order->get_meta(TAGIOO_META_UA);
-    $ip  = $order->get_customer_ip_address();
+    // Prefer the IPv6 captured from the browser request; fall back to whatever
+    // WooCommerce stored (usually proxy/edge IPv4).
+    $ip  = $order->get_meta(TAGIOO_META_IP) ?: $order->get_customer_ip_address();
 
     // sGTM's GA4 client only claims the gtag wire format on /g/collect — a
     // Measurement Protocol JSON body returns HTTP 400 and the hit is lost. Build
@@ -516,6 +550,10 @@ add_action('woocommerce_payment_complete', function (int $order_id) {
         'ep.fbp'           => $fbp ?: '',
         'ep.fbc'           => $fbc ?: '',
     ];
+    // Explicit ip_override so the Tagioo CAPI template uses this exact IP (prefer
+    // IPv6) for client_ip_address — avoids depending on nginx's X-Forwarded-For
+    // chain (which appends the WP server IP).
+    if ($ip) $params['ep.ip_override'] = $ip;
     // Flat user_data params — the Tagioo CAPI template reads these off eventData
     // when no nested user_data object is present (server recovery path).
     foreach ($user_data as $k => $v) {
