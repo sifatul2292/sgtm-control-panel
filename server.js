@@ -805,12 +805,20 @@ if (eventData.value !== undefined && eventData.value !== null && eventData.value
 }
 addRaw(event.custom_data, 'order_id', firstValue(eventData.transaction_id, eventData.order_id));
 if (getType(eventData.items) === 'array') {
-  event.custom_data.contents = eventData.items.map((item) => ({
-    id: firstValue(item.item_id, item.id, item.item_name),
-    quantity: item.quantity,
-    item_price: item.price
-  }));
+  let numItems = 0;
+  const contentIds = [];
+  event.custom_data.contents = eventData.items.map((item) => {
+    const id = firstValue(item.item_id, item.id, item.item_name);
+    if (id) contentIds.push(makeString(id));
+    const qty = makeNumber(item.quantity) || 1;
+    numItems = numItems + qty;
+    return { id: id, quantity: item.quantity, item_price: item.price };
+  });
+  // content_ids + num_items drive Meta DPA / Advantage+ catalog retargeting and
+  // match the browser Pixel's payload so the deduped event carries both.
+  if (contentIds.length) event.custom_data.content_ids = contentIds;
   event.custom_data.content_type = 'product';
+  if (numItems > 0) event.custom_data.num_items = numItems;
 }
 
 const body = { data: [event], partner_agent: 'tagioo-sgtm-1.0' };
