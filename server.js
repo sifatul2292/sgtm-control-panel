@@ -697,6 +697,7 @@ const JSON = require('JSON');
 const logToConsole = require('logToConsole');
 const Math = require('Math');
 const makeString = require('makeString');
+const makeNumber = require('makeNumber');
 const sendHttpRequest = require('sendHttpRequest');
 const sha256Sync = require('sha256Sync');
 
@@ -752,11 +753,23 @@ if (!mappedEventName) {
 }
 
 const userData = eventData.user_data || {};
+
+// Meta rejects events whose event_time is older than 7 days. Honor the
+// upstream event_time (so COD orders attribute to the real purchase moment),
+// but clamp anything stale back to now so a late order still lands instead of
+// being dropped.
+const nowSec = Math.round(getTimestampMillis() / 1000);
+let eventTime = nowSec;
+if (eventData.event_time) {
+  eventTime = makeNumber(eventData.event_time);
+  if (!eventTime || eventTime < nowSec - 604800) eventTime = nowSec;
+}
+
 const event = {
   event_name: mappedEventName,
-  event_time: eventData.event_time || Math.round(getTimestampMillis() / 1000),
+  event_time: eventTime,
   action_source: eventData.action_source || data.actionSource || 'website',
-  event_source_url: eventData.page_location,
+  event_source_url: firstValue(eventData.page_location, getRequestHeader('referer')),
   event_id: firstValue(eventData.event_id, eventData.transaction_id),
   user_data: {},
   custom_data: {}
@@ -766,14 +779,23 @@ addHashed(event.user_data, 'em', firstValue(userData.email_address, userData.ema
 addHashed(event.user_data, 'ph', firstValue(userData.phone_number, eventData.phone_number));
 addHashed(event.user_data, 'fn', firstValue(userData.first_name, eventData.first_name));
 addHashed(event.user_data, 'ln', firstValue(userData.last_name, eventData.last_name));
-addRaw(event.user_data, 'external_id', firstValue(userData.external_id, eventData.external_id));
+addHashed(event.user_data, 'external_id', firstValue(userData.external_id, eventData.external_id));
 addHashed(event.user_data, 'ct', firstValue(userData.city, eventData.city));
 addHashed(event.user_data, 'st', firstValue(userData.region, eventData.region));
 addHashed(event.user_data, 'zp', firstValue(userData.postal_code, eventData.postal_code));
-event.user_data.country = '0e98aa0e26e4aca23a820cadb074448a14e3ac834a1c585e86c07f84e5b2e81e';
+// Country must reflect the actual buyer, not a fixed value. Hash the incoming
+// 2-letter code; fall back to the store default (bd) when none is sent.
+addHashed(event.user_data, 'country', firstValue(userData.country, eventData.country, 'bd'));
 
 addRaw(event.user_data, 'fbp', firstValue(userData.fbp, eventData.fbp, eventData._fbp, getCookieValues('_fbp', true)[0]));
-addRaw(event.user_data, 'fbc', firstValue(userData.fbc, eventData.fbc, eventData._fbc, getCookieValues('_fbc', true)[0]));
+// _fbc: prefer the cookie/event value; else reconstruct from the raw fbclid
+// nginx stashed in tagioo_fbclid (covers entry-via-fbclid with no _fbc yet).
+let fbcValue = firstValue(userData.fbc, eventData.fbc, eventData._fbc, getCookieValues('_fbc', true)[0]);
+if (!fbcValue) {
+  const fbclidCookie = getCookieValues('tagioo_fbclid', true)[0];
+  if (fbclidCookie) fbcValue = 'fb.1.' + getTimestampMillis() + '.' + fbclidCookie;
+}
+addRaw(event.user_data, 'fbc', fbcValue);
 addRaw(event.user_data, 'client_ip_address', firstValue(eventData.ip_override, getRequestHeader('x-forwarded-for'), getRequestHeader('x-real-ip')));
 addRaw(event.user_data, 'client_user_agent', firstValue(eventData.user_agent, getRequestHeader('user-agent')));
 
@@ -835,7 +857,7 @@ ___SERVER_PERMISSIONS___
       "key": { "publicId": "get_cookies", "versionId": "1" },
       "param": [
         { "key": "cookieAccess", "value": { "type": 1, "string": "specific" } },
-        { "key": "cookieNames", "value": { "type": 2, "listItem": [{ "type": 1, "string": "_fbp" }, { "type": 1, "string": "_fbc" }] } }
+        { "key": "cookieNames", "value": { "type": 2, "listItem": [{ "type": 1, "string": "_fbp" }, { "type": 1, "string": "_fbc" }, { "type": 1, "string": "tagioo_fbclid" }] } }
       ]
     },
     "isRequired": true

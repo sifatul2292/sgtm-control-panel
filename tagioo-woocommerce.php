@@ -3,7 +3,7 @@
  * Plugin Name: Tagioo for WooCommerce
  * Plugin URI:  https://tagioo.com
  * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.2.0
+ * Version:     2.3.0
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author:      Tagioo
@@ -14,7 +14,7 @@
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.2.0');
+define('TAGIOO_VERSION', '2.3.0');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
@@ -250,15 +250,36 @@ function tagioo_items_from_order(\WC_Order $order): array {
     return $items;
 }
 
+// E.164 dial code per country, used to normalize phone numbers for Meta hashing.
+// Unknown country falls back to the store's Bangladesh default (+88).
+function tagioo_dial_code(string $cc): string {
+    $map = [
+        'BD'=>'88','US'=>'1','CA'=>'1','GB'=>'44','IN'=>'91','PK'=>'92','AU'=>'61',
+        'AE'=>'971','SA'=>'966','MY'=>'60','SG'=>'65','DE'=>'49','FR'=>'33','IT'=>'39',
+        'ES'=>'34','NL'=>'31','SE'=>'46','NO'=>'47','DK'=>'45','BR'=>'55','MX'=>'52',
+        'ID'=>'62','PH'=>'63','TH'=>'66','VN'=>'84','JP'=>'81','CN'=>'86','KR'=>'82',
+        'TR'=>'90','EG'=>'20','ZA'=>'27','NG'=>'234','KE'=>'254','NP'=>'977','LK'=>'94',
+    ];
+    return $map[strtoupper($cc)] ?? '88';
+}
+
+// Normalize a raw phone to E.164 (+<cc><number>) so the Meta hash matches.
+// Honors an already-international number (+ or 00 prefix); else prepends the
+// dial code for the order's billing country.
+function tagioo_normalize_phone(string $raw, string $country = ''): string {
+    $phone = preg_replace('/[^0-9+]/', '', $raw);
+    if (!$phone) return '';
+    if (str_starts_with($phone, '+'))  return $phone;
+    if (str_starts_with($phone, '00')) return '+' . substr($phone, 2);
+    return '+' . tagioo_dial_code($country) . ltrim($phone, '0');
+}
+
 /**
  * Build user_data using exact field names the Tagioo sGTM CAPI template reads.
  * Passes plain text — sGTM hashes server-side (SHA-256).
  */
 function tagioo_user_data_from_order(\WC_Order $order): array {
-    $phone = preg_replace('/[^0-9+]/', '', $order->get_billing_phone());
-    if ($phone && !str_starts_with($phone, '+')) {
-        $phone = '+88' . ltrim($phone, '0');
-    }
+    $phone = tagioo_normalize_phone($order->get_billing_phone(), $order->get_billing_country());
 
     $external_id = '';
     if ($order->get_customer_id()) {
@@ -301,11 +322,9 @@ function tagioo_push_script(array $data, bool $echo = true): string {
 function tagioo_current_user_data(): array {
     $user_id = get_current_user_id();
     if (!$user_id) return [];
-    $user  = get_userdata($user_id);
-    $phone = preg_replace('/[^0-9+]/', '', (string) get_user_meta($user_id, 'billing_phone', true));
-    if ($phone && !str_starts_with($phone, '+')) {
-        $phone = '+88' . ltrim($phone, '0');
-    }
+    $user    = get_userdata($user_id);
+    $country = (string) get_user_meta($user_id, 'billing_country', true);
+    $phone   = tagioo_normalize_phone((string) get_user_meta($user_id, 'billing_phone', true), $country);
     return array_filter([
         'email_address' => strtolower(trim($user->user_email ?? '')),
         'phone_number'  => $phone,
@@ -529,51 +548,66 @@ add_action('woocommerce_thankyou', function (int $order_id) {
 
 // ---------------------------------------------------------------------------
 // Server-side purchase hit → sGTM /g/collect  (replaces WooCommerce webhook)
-// Fires on payment complete — works even if browser is closed / pixel blocked.
-// event_id matches browser hit → Meta deduplicates both to 1 conversion.
+// Runs on a scheduled job, NOT inline: a slow/down sGTM never blocks checkout,
+// and a transient sGTM outage (container restart) is retried with backoff
+// instead of silently dropping the conversion. event_id matches browser hit →
+// Meta deduplicates both to 1; GA4 dedups by transaction_id.
 // ---------------------------------------------------------------------------
-add_action('woocommerce_payment_complete', function (int $order_id) {
+define('TAGIOO_SS_MAX_RETRY', 5);
+
+// Enqueue the send out-of-band. Idempotent: skips if already sent or queued.
+function tagioo_enqueue_server_purchase(int $order_id): void {
+    if (tagioo_opt('server_hit') !== '1') return;
+    $order = wc_get_order($order_id);
+    if (!$order) return;
+    if ($order->get_meta(TAGIOO_META_SS_FIRED)) return;
+    if (wp_next_scheduled('tagioo_server_purchase', [$order_id, 1])) return;
+    wp_schedule_single_event(time(), 'tagioo_server_purchase', [$order_id, 1]);
+}
+add_action('woocommerce_payment_complete', 'tagioo_enqueue_server_purchase', 10);
+// COD / BACS reach "processing" without payment_complete.
+add_action('woocommerce_order_status_processing', 'tagioo_enqueue_server_purchase', 10);
+
+// Worker: build + send the gtag hit, blocking so the HTTP status is readable;
+// mark SS_FIRED only on 2xx; retry with linear backoff up to the cap; log fails.
+add_action('tagioo_server_purchase', function (int $order_id, int $attempt = 1) {
     if (tagioo_opt('server_hit') !== '1') return;
 
-    $sgtm       = tagioo_opt('sgtm_domain');
-    $mid        = tagioo_opt('measurement_id');
-    $secret     = tagioo_opt('api_secret');
-
+    $sgtm   = tagioo_opt('sgtm_domain');
+    $mid    = tagioo_opt('measurement_id');
+    $secret = tagioo_opt('api_secret');
     if (!$sgtm || !$mid || !$secret) return;
 
     $order = wc_get_order($order_id);
     if (!$order) return;
+    if ($order->get_meta(TAGIOO_META_SS_FIRED)) return;   // already sent
 
-    // Dedup: fire server hit once per order.
-    if ($order->get_meta(TAGIOO_META_SS_FIRED)) return;
-    $order->update_meta_data(TAGIOO_META_SS_FIRED, '1');
-    $order->save();
+    $order_num = (string) $order->get_order_number();
+    $event_id  = 'tagioo-purchase-' . $order_num;          // same as browser hit
+    $user_data = tagioo_user_data_from_order($order);
 
-    $order_num  = (string) $order->get_order_number();
-    $event_id   = 'tagioo-purchase-' . $order_num; // same as browser hit
-
-    $user_data  = tagioo_user_data_from_order($order);
-
-    // Add stored fbp/fbc captured from browser at checkout
+    // fbp/fbc/UA captured from the browser at checkout; IP prefers the IPv6 the
+    // browser sent (falls back to whatever WooCommerce stored).
     $fbp = $order->get_meta(TAGIOO_META_FBP);
     $fbc = $order->get_meta(TAGIOO_META_FBC);
     $ua  = $order->get_meta(TAGIOO_META_UA);
-    // Prefer the IPv6 captured from the browser request; fall back to whatever
-    // WooCommerce stored (usually proxy/edge IPv4).
     $ip  = $order->get_meta(TAGIOO_META_IP) ?: $order->get_customer_ip_address();
 
-    // sGTM's GA4 client only claims the gtag wire format on /g/collect — a
-    // Measurement Protocol JSON body returns HTTP 400 and the hit is lost. Build
-    // a gtag query string so the GA4 client claims it, forwards to GA4, and fires
-    // Meta CAPI. event_id matches the browser hit → Meta + GA4 (by transaction_id)
-    // dedup to one conversion.
+    // event_time = order placed time (not send time) so COD orders sent days
+    // later still attribute to the real conversion moment.
+    $created = $order->get_date_created();
+    $ts      = $created ? $created->getTimestamp() : time();
+
+    // sGTM's GA4 client only claims the gtag wire format on /g/collect — an MP
+    // JSON body returns HTTP 400. Build a gtag query string so the GA4 client
+    // claims it, forwards to GA4, and fires Meta CAPI.
     $params = [
         'v'                => '2',
         'tid'              => $mid,
         'cid'              => 'tagioo_server.' . $order_num,
         'en'               => 'purchase',
         '_et'              => '100',                 // engagement, so GA4 records it
-        'sid'              => (string) time(),
+        'sid'              => (string) $ts,
         '_p'               => (string) wp_rand(1, 2147483647),
         'cu'               => tagioo_currency(),
         'epn.value'        => tagioo_price((string) $order->get_total()),
@@ -582,6 +616,7 @@ add_action('woocommerce_payment_complete', function (int $order_id) {
         'ep.transaction_id'=> $order_num,
         'ep.coupon'        => implode(',', $order->get_coupon_codes()),
         'ep.event_id'      => $event_id,
+        'ep.event_time'    => (string) $ts,         // Meta CAPI event_time
         // page_location → Meta event_source_url + GA4 page path (not the homepage).
         'dl'               => $order->get_checkout_order_received_url(),
         // Tagioo CAPI template reads eventData.fbp / eventData.fbc.
@@ -616,14 +651,23 @@ add_action('woocommerce_payment_complete', function (int $order_id) {
     if ($ip) $headers['X-Forwarded-For'] = $ip;
     if ($ua) $headers['User-Agent']      = $ua;
 
-    wp_remote_post($url, [
-        'headers'   => $headers,
-        'timeout'   => 10,
-        'blocking'  => false, // fire-and-forget, don't block order processing
-    ]);
-}, 10);
+    // Blocking: we're in a scheduled job, not the checkout request, so we can
+    // wait for the status and decide whether to retry.
+    $res  = wp_remote_post($url, ['headers' => $headers, 'timeout' => 15, 'blocking' => true]);
+    $code = is_wp_error($res) ? 0 : (int) wp_remote_retrieve_response_code($res);
 
-// Also fire on status change to processing (cash on delivery, BACS, etc.)
-add_action('woocommerce_order_status_processing', function (int $order_id) {
-    do_action('woocommerce_payment_complete', $order_id);
-}, 10);
+    if ($code >= 200 && $code < 300) {
+        $order->update_meta_data(TAGIOO_META_SS_FIRED, '1');
+        $order->save();
+        return;
+    }
+
+    // Failure → log + retry with linear backoff (60s, 120s, ...), capped.
+    $err = is_wp_error($res) ? $res->get_error_message() : ('HTTP ' . $code);
+    error_log("[tagioo] server purchase #{$order_num} attempt {$attempt} failed: {$err}");
+    if ($attempt < TAGIOO_SS_MAX_RETRY) {
+        wp_schedule_single_event(time() + 60 * $attempt, 'tagioo_server_purchase', [$order_id, $attempt + 1]);
+    } else {
+        error_log("[tagioo] server purchase #{$order_num} gave up after {$attempt} attempts");
+    }
+}, 10, 2);
