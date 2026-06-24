@@ -1904,6 +1904,93 @@ async function dockerComposeCommand(args, options = {}) {
   };
 }
 
+// Only containers matching this pattern can be controlled from the panel, so a
+// crafted request can never act on a non-sGTM container (e.g. the host's own db).
+const SGTM_CONTAINER_RE = /^sgtm-[a-z0-9][a-z0-9-]*$/;
+
+async function dockerContainerExists(containerName) {
+  const exists = await systemCommand("docker", ["inspect", "--format", "{{.Name}}", containerName], { timeout: 8000, maxBuffer: 200000 });
+  return exists.ok;
+}
+
+// Restart / stop / start an sGTM container. Owner-gated at the route; this layer
+// re-validates the name and existence so it is safe regardless of caller.
+async function controlContainerLifecycle(containerName, action) {
+  if (!SGTM_CONTAINER_RE.test(containerName)) {
+    return { ok: false, status: 400, error: "Only sgtm-* containers can be controlled." };
+  }
+  if (!["restart", "stop", "start"].includes(action)) {
+    return { ok: false, status: 400, error: "Unsupported action." };
+  }
+  if (!(await dockerContainerExists(containerName))) {
+    return { ok: false, status: 404, error: `Container ${containerName} not found.` };
+  }
+  const result = await systemCommand("docker", [action, containerName], { timeout: 30000, maxBuffer: 1024 * 1024 });
+  if (!result.ok) {
+    return { ok: false, status: 500, error: result.stderr || result.error || `docker ${action} failed.` };
+  }
+  return { ok: true, action, container: containerName };
+}
+
+async function findProvisioningRecordByContainer(containerName) {
+  const db = await readDatabase();
+  if (!db.available) return { db: null, request: null };
+  const request = (db.data.provisioning?.requests || []).find((item) => item.containerName === containerName);
+  return { db, request };
+}
+
+// Resize an sGTM container's memory/CPU caps. Applies live via `docker update`
+// (no downtime) and persists into the compose file + provisioning record so a
+// later recreate keeps the new limits.
+async function resizeContainer(containerName, { memoryMb, cpuLimit } = {}) {
+  if (!SGTM_CONTAINER_RE.test(containerName)) {
+    return { ok: false, status: 400, error: "Only sgtm-* containers can be resized." };
+  }
+  const mb = Math.round(Number(memoryMb));
+  const cpu = Number(cpuLimit);
+  if (!Number.isFinite(mb) || mb < 256 || mb > 8192) {
+    return { ok: false, status: 400, error: "memoryMb must be between 256 and 8192." };
+  }
+  if (!Number.isFinite(cpu) || cpu < 0.25 || cpu > 8) {
+    return { ok: false, status: 400, error: "cpuLimit must be between 0.25 and 8." };
+  }
+  if (!(await dockerContainerExists(containerName))) {
+    return { ok: false, status: 404, error: `Container ${containerName} not found.` };
+  }
+
+  // 1. Live update — immediate, no restart.
+  const update = await systemCommand("docker", [
+    "update",
+    "--memory", `${mb}m`,
+    "--memory-swap", `${mb}m`,
+    "--cpus", cpu.toFixed(2),
+    containerName
+  ], { timeout: 20000, maxBuffer: 1024 * 1024 });
+  if (!update.ok) {
+    return { ok: false, status: 500, error: update.stderr || update.error || "docker update failed." };
+  }
+
+  // 2. Persist into compose + record (best effort; live cap already applied).
+  let persisted = false;
+  const { db, request } = await findProvisioningRecordByContainer(containerName);
+  if (db && request?.plan?.composePath) {
+    try {
+      let yml = await readFile(request.plan.composePath, "utf8");
+      yml = yml
+        .replace(/mem_limit:\s*\S+/g, `mem_limit: ${mb}m`)
+        .replace(/cpus:\s*"[^"]*"/g, `cpus: "${cpu.toFixed(2)}"`);
+      await writeFile(request.plan.composePath, yml, "utf8");
+      request.plan.dockerCompose = yml;
+      request.resourceLimits = { ...(request.resourceLimits || {}), memoryMb: mb, cpuLimit: cpu.toFixed(2) };
+      await writeDatabase(db.data);
+      persisted = true;
+    } catch {
+      // compose file missing/unwritable — live update stands, persistence skipped
+    }
+  }
+  return { ok: true, container: containerName, memoryMb: mb, cpuLimit: cpu.toFixed(2), persisted };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Power-Ups: Cookie Keeper, Click ID Restorer, Custom Loader
 // ─────────────────────────────────────────────────────────────────────────────
@@ -7726,6 +7813,22 @@ const server = createServer(async (req, res) => {
       }
       const enriched = await getEnrichedProvisioningSummary();
       jsonResponse(res, 200, enriched);
+      return;
+    }
+
+    // Owner container controls: restart / stop / start / resize an sgtm-* container.
+    const containerActionMatch = pathname.match(/^\/api\/admin\/containers\/([^/]+)\/(restart|stop|start|resize)$/);
+    if (containerActionMatch && req.method === "POST") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const containerName = decodeURIComponent(containerActionMatch[1]);
+      const action = containerActionMatch[2];
+      const result = action === "resize"
+        ? await resizeContainer(containerName, await readJson(req))
+        : await controlContainerLifecycle(containerName, action);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { error: result.error });
       return;
     }
 

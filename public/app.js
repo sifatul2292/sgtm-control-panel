@@ -1213,6 +1213,16 @@ function renderContainers(docker) {
       const ownerLine = owner
         ? `<p class="container-meta">${escapeHtml(text(owner.customerName, "—"))} · <strong>${escapeHtml(text(owner.plan, "—"))}</strong> · ${Number(owner.requestsMonth || 0).toLocaleString()} req/mo · ${Number(owner.requestsToday || 0).toLocaleString()} today${owner.requestLimit ? ` · ${Number(owner.usagePercent || 0)}% of ${Number(owner.requestLimit || 0).toLocaleString()}` : ""}</p>`
         : "";
+      // Owner-only lifecycle controls — only for managed sgtm-* containers.
+      const controllable = currentSession.role === "owner" && /^sgtm-[a-z0-9-]+$/.test(container.name || "");
+      const running = container.state === "running";
+      const actions = controllable
+        ? `<div class="container-actions">
+            <button class="btn-mini" data-container-action="restart" data-container="${escapeHtml(container.name)}">Restart</button>
+            <button class="btn-mini" data-container-action="${running ? "stop" : "start"}" data-container="${escapeHtml(container.name)}">${running ? "Stop" : "Start"}</button>
+            <button class="btn-mini" data-container-action="resize" data-container="${escapeHtml(container.name)}">Resize</button>
+          </div>`
+        : "";
       card.innerHTML = `
         <div>
           <div class="container-title">
@@ -1229,11 +1239,63 @@ function renderContainers(docker) {
           <span class="state">MEM ${mem}</span>
           <span class="state">exit ${escapeHtml(text(container.exitCode, "n/a"))}</span>
           <span class="state">restarts ${escapeHtml(text(container.restartCount, "0"))}</span>
+          ${actions}
         </div>
       `;
       return card;
     })
   );
+
+  // Delegate lifecycle button clicks once; cards are re-rendered each refresh.
+  if (!els.containerCards.dataset.actionsWired) {
+    els.containerCards.dataset.actionsWired = "1";
+    els.containerCards.addEventListener("click", handleContainerAction);
+  }
+}
+
+async function handleContainerAction(event) {
+  const button = event.target.closest("[data-container-action]");
+  if (!button) return;
+  const name = button.getAttribute("data-container");
+  const action = button.getAttribute("data-container-action");
+  if (!name || !action) return;
+
+  let body = null;
+  if (action === "resize") {
+    const memInput = window.prompt(`New memory cap for ${name} (MB):`, "1024");
+    if (memInput === null) return;
+    const cpuInput = window.prompt(`New CPU cap for ${name} (cores, e.g. 1.0):`, "1.0");
+    if (cpuInput === null) return;
+    body = { memoryMb: Number(memInput), cpuLimit: Number(cpuInput) };
+  } else if (!window.confirm(`${action[0].toUpperCase()}${action.slice(1)} container ${name}?`)) {
+    return;
+  }
+
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = "…";
+  try {
+    const res = await fetch(`/api/admin/containers/${encodeURIComponent(name)}/${action}`, {
+      method: "POST",
+      headers: body ? { "content-type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      window.alert(`Failed: ${data.error || res.status}`);
+      button.disabled = false;
+      button.textContent = original;
+      return;
+    }
+    if (action === "resize" && data.persisted === false) {
+      window.alert("Resized live, but compose file not found — change will revert if the container is recreated.");
+    }
+    await loadDashboard();
+  } catch (error) {
+    window.alert(`Request failed: ${error.message}`);
+    button.disabled = false;
+    button.textContent = original;
+  }
 }
 
 function renderSummaryList(el, items) {
