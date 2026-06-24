@@ -1203,6 +1203,16 @@ function renderContainers(docker) {
     ...docker.containers.map((container) => {
       const card = document.createElement("article");
       card.className = "container-card";
+      const owner = container.owner || null;
+      const cpu = container.cpuPercent === null || container.cpuPercent === undefined
+        ? "—"
+        : `${container.cpuPercent.toFixed(1)}%`;
+      const mem = container.memUsage
+        ? `${escapeHtml(container.memUsage)}${container.memLimit ? ` / ${escapeHtml(container.memLimit)}` : ""}${container.memPercent !== null && container.memPercent !== undefined ? ` (${container.memPercent.toFixed(0)}%)` : ""}`
+        : "—";
+      const ownerLine = owner
+        ? `<p class="container-meta">${escapeHtml(text(owner.customerName, "—"))} · <strong>${escapeHtml(text(owner.plan, "—"))}</strong> · ${Number(owner.requestsMonth || 0).toLocaleString()} req/mo · ${Number(owner.requestsToday || 0).toLocaleString()} today${owner.requestLimit ? ` · ${Number(owner.usagePercent || 0)}% of ${Number(owner.requestLimit || 0).toLocaleString()}` : ""}</p>`
+        : "";
       card.innerHTML = `
         <div>
           <div class="container-title">
@@ -1212,8 +1222,11 @@ function renderContainers(docker) {
           </div>
           <p class="container-meta">${escapeHtml(container.image)}</p>
           <p class="container-meta">${escapeHtml(text(container.ports, "No exposed ports"))}</p>
+          ${ownerLine}
         </div>
         <div class="container-stats">
+          <span class="state">CPU ${escapeHtml(cpu)}</span>
+          <span class="state">MEM ${mem}</span>
           <span class="state">exit ${escapeHtml(text(container.exitCode, "n/a"))}</span>
           <span class="state">restarts ${escapeHtml(text(container.restartCount, "0"))}</span>
         </div>

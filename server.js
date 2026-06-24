@@ -2301,7 +2301,7 @@ async function getDockerSummary() {
     })
     .filter(Boolean);
 
-  const inspectedContainers = await addDockerInspectState(containers);
+  const inspectedContainers = await addDockerStats(await addDockerInspectState(containers));
 
   return {
     available: true,
@@ -2351,6 +2351,53 @@ async function addDockerInspectState(containers) {
       finishedAt: state.FinishedAt || "",
       restartCount: state.RestartCount ?? null,
       exitCode: state.ExitCode ?? null
+    };
+  });
+}
+
+// Live per-container CPU/memory from `docker stats`. Read-only snapshot
+// (--no-stream). Merged onto containers by name; missing stats (e.g. stopped
+// container) leave the fields null so the UI can show "—".
+async function addDockerStats(containers) {
+  if (!containers.length) return containers;
+
+  const stats = await command("docker", [
+    "stats",
+    "--no-stream",
+    "--format",
+    "{{json .}}"
+  ], { timeout: DOCKER_INSPECT_TIMEOUT_MS });
+
+  if (!stats.ok) return containers;
+
+  const byName = new Map();
+  for (const line of stats.stdout.split("\n").filter(Boolean)) {
+    try {
+      const row = JSON.parse(line);
+      if (row.Name) byName.set(row.Name, row);
+    } catch {
+      // ignore malformed stats line
+    }
+  }
+
+  const parsePercent = (value) => {
+    const num = parseFloat(String(value || "").replace("%", ""));
+    return Number.isFinite(num) ? num : null;
+  };
+
+  return containers.map((container) => {
+    const row = byName.get(container.name);
+    if (!row) {
+      return { ...container, cpuPercent: null, memUsage: null, memLimit: null, memPercent: null };
+    }
+    // MemUsage looks like "123.4MiB / 512MiB"; split into usage / limit text.
+    const [memUsage, memLimit] = String(row.MemUsage || "").split("/").map((part) => part.trim());
+    return {
+      ...container,
+      cpuPercent: parsePercent(row.CPUPerc),
+      memUsage: memUsage || null,
+      memLimit: memLimit || null,
+      memPercent: parsePercent(row.MemPerc)
     };
   });
 }
@@ -4620,6 +4667,39 @@ function customerContainerHealth(customer, docker) {
   };
 }
 
+// Join each Docker container to its owning customer so the admin panel can show
+// per-container plan + request usage next to the live CPU/mem stats. Uses the
+// same name-matching as customerContainerHealth. Mutates the container objects.
+function attachContainerOwnership(docker, ownerCustomers = []) {
+  if (!docker?.available || !Array.isArray(docker.containers)) return docker;
+
+  const customerTerms = ownerCustomers.map((customer) => ({
+    customer,
+    terms: [customer.id, customer.name, customer.domain, normalizeHost(customer.domain).split(".")[0]]
+      .map((item) => sanitizeId(item))
+      .filter(Boolean)
+  }));
+  const envCustomer = ownerCustomers.find((customer) => customer.source === "environment") || null;
+
+  for (const container of docker.containers) {
+    const haystack = sanitizeId(`${container.name || ""}-${container.image || ""}`);
+    const match = customerTerms.find(({ terms }) => terms.some((term) => term && haystack.includes(term)));
+    const owner = match?.customer || envCustomer;
+    container.owner = owner
+      ? {
+          customerId: owner.id,
+          customerName: owner.name,
+          plan: owner.plan,
+          requestsMonth: Number(owner.requestsMonth || 0),
+          requestsToday: Number(owner.requestsToday || 0),
+          requestLimit: Number(owner.requestLimit || 0),
+          usagePercent: Number(owner.usagePercent || 0)
+        }
+      : null;
+  }
+  return docker;
+}
+
 function isPastDate(value) {
   if (!value) return false;
   const date = new Date(value);
@@ -6385,6 +6465,7 @@ async function getDashboardData() {
   const integrations = getIntegrationSummary({ orders, requestSummary });
   const setupWizard = getSetupWizard({ customers, provisioning, integrations, ssl, requestSummary });
   const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers, tenantUsage });
+  attachContainerOwnership(docker, owner.customers || []);
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
   const retainedEvents = retainedSummaryFromSnapshots((history.daily || []).slice(0, 30), requestSummary);
