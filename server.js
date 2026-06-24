@@ -118,7 +118,7 @@ const config = {
   paymentStatus: process.env.PAYMENT_STATUS || "paid",
   renewalDate: process.env.RENEWAL_DATE || "",
   monthlyAmount: Number(process.env.MONTHLY_AMOUNT || 0),
-  monthlyRequestLimit: Number(process.env.MONTHLY_REQUEST_LIMIT || 100000),
+  monthlyRequestLimit: Number(process.env.MONTHLY_REQUEST_LIMIT || 500000),
   monthlyContainerLimit: Number(process.env.MONTHLY_CONTAINER_LIMIT || 1),
   customerSupportEmail: process.env.CUSTOMER_SUPPORT_EMAIL || "",
   resendApiKey: process.env.RESEND_API_KEY || "",
@@ -4568,21 +4568,21 @@ function orderBreakdown(orders, key) {
 
 const planMonthlyAmounts = {
   Free: 0,
-  Starter: 900,
+  Starter: 1200,
   Growth: 2500,
-  Pro: 2500,
-  Enterprise: 15000,
+  Pro: 2900,
+  Enterprise: 5900,
   Agency: 7500
 };
 
 const planResourceProfiles = {
   Free:       { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 15000,    containerLimit: 1  },
-  Starter:    { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 300000,   containerLimit: 1  },
+  Starter:    { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 500000,   containerLimit: 1  },
   Growth:     { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2  },
-  Pro:        { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2  },
+  Pro:        { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 2000000,  containerLimit: 2  },
   Agency:     { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 8000000,  containerLimit: 10 },
-  Enterprise: { memoryMb: 2048, cpuLimit: "2.00", monthlyRequestLimit: 20000000, containerLimit: 50 },
-  Customer:   { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 300000,   containerLimit: 1  }
+  Enterprise: { memoryMb: 2048, cpuLimit: "2.00", monthlyRequestLimit: 5000000,  containerLimit: 50 },
+  Customer:   { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 500000,   containerLimit: 1  }
 };
 
 function monthlyAmountForPlan(planName) {
@@ -4800,7 +4800,11 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
   const enrichedCustomers = (customers.tenants || []).map((customer) => {
     const customerContainers = getTenantContainers(customer.id, customer, customerSetup?.requests || [], provisioning?.requests || []);
     const plan = customer.plan || config.billingPlan;
-    const requestLimit = Number(customer.requestLimit || config.monthlyRequestLimit || 0);
+    // Derive the limit from the current plan profile so existing customers
+    // reflect pricing changes instead of a stale value stored at provision time.
+    const requestLimit = Number(
+      resourceProfileForPlan(plan).monthlyRequestLimit || customer.requestLimit || config.monthlyRequestLimit || 0
+    );
     const requestsToday = customerRequestCount(customer, requestSummary, { soleCustomer });
     const periodUsage = tenantUsage[customer.id] || null;
     const requestsMonth = Number(
@@ -4865,7 +4869,13 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
     counts[key] = (counts[key] || 0) + 1;
     return counts;
   }, {});
-  const payingCustomers = enrichedCustomers.filter((customer) => ["active", "trial"].includes(customer.subscriptionStatus) && !customer.unpaid);
+  // Count active + trial subscriptions toward MRR, but exclude the environment
+  // (Default) account — that's the owner's own tenant, not a paying customer.
+  const payingCustomers = enrichedCustomers.filter((customer) =>
+    customer.source !== "environment" &&
+    ["active", "trial"].includes(customer.subscriptionStatus) &&
+    !customer.unpaid
+  );
   const mrr = payingCustomers.reduce((total, customer) => total + Number(customer.monthlyAmount || 0), 0);
   const unpaidCustomers = enrichedCustomers.filter((customer) => customer.unpaid);
   const noTrackingCustomers = enrichedCustomers.filter((customer) => customer.noTrackingToday);
