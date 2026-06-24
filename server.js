@@ -4530,12 +4530,12 @@ const planMonthlyAmounts = {
 
 const planResourceProfiles = {
   Free:       { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 15000,    containerLimit: 1  },
-  Starter:    { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 300000,   containerLimit: 1  },
-  Growth:     { memoryMb: 768,  cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2  },
-  Pro:        { memoryMb: 768,  cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2  },
+  Starter:    { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 300000,   containerLimit: 1  },
+  Growth:     { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2  },
+  Pro:        { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2  },
   Agency:     { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 8000000,  containerLimit: 10 },
   Enterprise: { memoryMb: 2048, cpuLimit: "2.00", monthlyRequestLimit: 20000000, containerLimit: 50 },
-  Customer:   { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 300000,   containerLimit: 1  }
+  Customer:   { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 300000,   containerLimit: 1  }
 };
 
 function monthlyAmountForPlan(planName) {
