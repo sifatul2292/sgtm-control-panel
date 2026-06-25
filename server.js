@@ -779,7 +779,11 @@ addHashed(event.user_data, 'em', firstValue(userData.email_address, userData.ema
 addHashed(event.user_data, 'ph', firstValue(userData.phone_number, eventData.phone_number));
 addHashed(event.user_data, 'fn', firstValue(userData.first_name, eventData.first_name));
 addHashed(event.user_data, 'ln', firstValue(userData.last_name, eventData.last_name));
-addHashed(event.user_data, 'external_id', firstValue(userData.external_id, eventData.external_id));
+// external_id: prefer the storefront-supplied id; else fall back to the stable
+// first-party FPID cookie the GA4 client sets on every visitor. This puts an
+// external_id on every event (incl. PageView/ViewContent) without any storefront
+// change, lifting Meta event match quality.
+addHashed(event.user_data, 'external_id', firstValue(userData.external_id, eventData.external_id, getCookieValues('FPID', true)[0]));
 addHashed(event.user_data, 'ct', firstValue(userData.city, eventData.city));
 addHashed(event.user_data, 'st', firstValue(userData.region, eventData.region));
 addHashed(event.user_data, 'zp', firstValue(userData.postal_code, eventData.postal_code));
@@ -865,7 +869,7 @@ ___SERVER_PERMISSIONS___
       "key": { "publicId": "get_cookies", "versionId": "1" },
       "param": [
         { "key": "cookieAccess", "value": { "type": 1, "string": "specific" } },
-        { "key": "cookieNames", "value": { "type": 2, "listItem": [{ "type": 1, "string": "_fbp" }, { "type": 1, "string": "_fbc" }, { "type": 1, "string": "tagioo_fbclid" }] } }
+        { "key": "cookieNames", "value": { "type": 2, "listItem": [{ "type": 1, "string": "_fbp" }, { "type": 1, "string": "_fbc" }, { "type": 1, "string": "tagioo_fbclid" }, { "type": 1, "string": "FPID" }] } }
       ]
     },
     "isRequired": true
@@ -1989,6 +1993,43 @@ async function resizeContainer(containerName, { memoryMb, cpuLimit } = {}) {
     }
   }
   return { ok: true, container: containerName, memoryMb: mb, cpuLimit: cpu.toFixed(2), persisted };
+}
+
+// Owner changes a customer's plan: updates billing limits on the stored tenant
+// and auto-resizes that tenant's container to the new plan's mem/cpu profile.
+async function changeTenantPlan(tenantId, planName) {
+  if (!tenantId) return { ok: false, status: 400, error: "tenantId is required." };
+  if (!planResourceProfiles[planName] || planName === "Customer") {
+    return { ok: false, status: 400, error: "Unknown plan." };
+  }
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 503, error: "Database unavailable." };
+  const data = loaded.data;
+  data.tenants ||= [];
+  const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
+  if (index === -1) {
+    return { ok: false, status: 404, error: "Customer not found (the Default account cannot be changed here)." };
+  }
+
+  const profile = resourceProfileForPlan(planName);
+  data.tenants[index] = {
+    ...data.tenants[index],
+    plan: planName,
+    requestLimit: profile.monthlyRequestLimit,
+    containerLimit: profile.containerLimit,
+    monthlyAmount: monthlyAmountForPlan(planName),
+    resourceLimits: { ...(data.tenants[index].resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
+    planUpdatedAt: new Date().toISOString()
+  };
+  await writeDatabase(data);
+
+  // Auto-resize the tenant's container to match the new plan, if one exists.
+  let resize = null;
+  const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenantId && item.containerName);
+  if (request?.containerName) {
+    resize = await resizeContainer(request.containerName, { memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit });
+  }
+  return { ok: true, tenantId, plan: planName, requestLimit: profile.monthlyRequestLimit, resize };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -7828,6 +7869,19 @@ const server = createServer(async (req, res) => {
       const result = action === "resize"
         ? await resizeContainer(containerName, await readJson(req))
         : await controlContainerLifecycle(containerName, action);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { error: result.error });
+      return;
+    }
+
+    // Owner changes a customer's plan → updates billing limits + auto-resizes container.
+    const planChangeMatch = pathname.match(/^\/api\/admin\/customers\/([^/]+)\/plan$/);
+    if (planChangeMatch && req.method === "POST") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await changeTenantPlan(decodeURIComponent(planChangeMatch[1]), String(body.plan || "").trim());
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { error: result.error });
       return;
     }
