@@ -41,6 +41,7 @@ function tagioo_settings(): array {
         $cache = wp_parse_args((array) get_option(TAGIOO_OPTION, []), [
             'gtm_id'          => '',
             'inject_gtm'      => '1',
+            'custom_loader'   => '0',
             'sgtm_domain'     => '',
             'measurement_id'  => '',
             'api_secret'      => '',
@@ -73,6 +74,7 @@ function tagioo_sanitize_settings(array $in): array {
     return [
         'gtm_id'          => sanitize_text_field($in['gtm_id'] ?? ''),
         'inject_gtm'      => isset($in['inject_gtm'])      ? '1' : '0',
+        'custom_loader'   => isset($in['custom_loader'])   ? '1' : '0',
         'sgtm_domain'     => esc_url_raw(rtrim($in['sgtm_domain'] ?? '', '/')),
         'measurement_id'  => sanitize_text_field($in['measurement_id'] ?? ''),
         'api_secret'      => sanitize_text_field($in['api_secret'] ?? ''),
@@ -114,6 +116,15 @@ function tagioo_settings_page(): void {
                         <p class="description">Disable only if you already inject GTM manually.</p>
                     </td>
                 </tr>
+                <tr>
+                    <th>Custom Loader</th>
+                    <td>
+                        <label><input type="checkbox" name="<?= TAGIOO_OPTION ?>[custom_loader]" value="1"
+                               <?= checked('1', $s['custom_loader'], false) ?> />
+                        Load gtm.js first-party through the sGTM domain</label>
+                        <p class="description">Serves gtm.js via <code>&lt;sGTM domain&gt;/tagioo-loader/gtm.js</code> instead of googletagmanager.com, to bypass domain-based blockers (Brave, uBlock). Requires the sGTM domain below and the Custom Loader power-up enabled on the server.</p>
+                    </td>
+                </tr>
             </table>
 
             <h2 class="title">Server-Side GTM (sGTM)</h2>
@@ -124,7 +135,7 @@ function tagioo_settings_page(): void {
                         <input name="<?= TAGIOO_OPTION ?>[sgtm_domain]" id="t_sgtm" type="url"
                                value="<?= esc_attr($s['sgtm_domain']) ?>" class="regular-text"
                                placeholder="https://sgtm.yourdomain.com" />
-                        <p class="description">Used for the server-side purchase hit and first-party data collection. gtm.js always loads from google.com.</p>
+                        <p class="description">Used for the server-side purchase hit and first-party data collection. Also the host for Custom Loader (gtm.js served via /tagioo-loader/).</p>
                     </td>
                 </tr>
                 <tr>
@@ -186,11 +197,16 @@ function tagioo_settings_page(): void {
 add_action('wp_head', function () {
     $id = tagioo_opt('gtm_id');
     if (!$id || tagioo_opt('inject_gtm') !== '1') return;
-    // Always load gtm.js from Google. First-party data collection is handled by the
-    // web container's GA4 config (server_container_url → sGTM), not the loader script.
-    // Serving gtm.js first-party would require a Web Container client in the server
-    // container, which Google does not expose for JSON import.
-    $loader = 'https://www.googletagmanager.com/gtm.js?id=' . esc_js($id);
+    // Loader source. Default: Google. Custom Loader on (+ sGTM domain set): serve
+    // gtm.js first-party via <sGTM>/tagioo-loader/gtm.js, which nginx proxies to
+    // googletagmanager.com. First-party path dodges domain-based blockers (Brave,
+    // uBlock) that block the googletagmanager.com host outright.
+    $sgtm = tagioo_opt('sgtm_domain');
+    if (tagioo_opt('custom_loader') === '1' && $sgtm) {
+        $loader = rtrim($sgtm, '/') . '/tagioo-loader/gtm.js?id=' . esc_js($id);
+    } else {
+        $loader = 'https://www.googletagmanager.com/gtm.js?id=' . esc_js($id);
+    }
     $id_e   = esc_js($id);
     echo "\n<!-- Tagioo GTM -->\n";
     echo "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='{$loader}'+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','{$id_e}');</script>\n";
@@ -201,8 +217,12 @@ add_action('wp_body_open', function () {
     $id = tagioo_opt('gtm_id');
     if (!$id || tagioo_opt('inject_gtm') !== '1') return;
     $id_e = esc_attr($id);
+    $sgtm = tagioo_opt('sgtm_domain');
+    $ns   = (tagioo_opt('custom_loader') === '1' && $sgtm)
+        ? rtrim($sgtm, '/') . '/tagioo-loader/ns.html?id=' . $id_e
+        : 'https://www.googletagmanager.com/ns.html?id=' . $id_e;
     echo "\n<!-- Tagioo GTM noscript -->\n";
-    echo "<noscript><iframe src=\"https://www.googletagmanager.com/ns.html?id={$id_e}\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript>\n";
+    echo "<noscript><iframe src=\"{$ns}\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript>\n";
     echo "<!-- End Tagioo GTM noscript -->\n";
 }, 1);
 
