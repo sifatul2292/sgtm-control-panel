@@ -2219,6 +2219,19 @@ function buildNginxConfig({ domain, port, accessLogLine, errorLog }) {
         proxy_set_header Accept-Encoding "";
         proxy_set_header Referer "";
         proxy_hide_header Set-Cookie;
+        # Rewrite the googletagmanager.com host *inside* the proxied gtm.js so the
+        # browser also fetches gtag/js (and other Google scripts) first-party.
+        # gtm.js stores the host ("www.googletagmanager.com") and the path ("/gtag/js")
+        # as separate literals and concatenates them at runtime, so matching the full
+        # URL fails — we rewrite the bare host instead. Result: https + the rewritten
+        # host + "/gtag/js" = https://<domain>/tagioo-loader/gtag/js, which this same
+        # location proxies back to Google. Without this, the proxied script keeps
+        # googletagmanager.com → Brave/uBlock block gtag/js → GA4 never inits → no
+        # /g/collect, no CAPI. GA4 event data is unaffected: it transports to the
+        # GA4 server_container_url (this domain), not googletagmanager.com.
+        sub_filter_once off;
+        sub_filter_types application/javascript text/javascript;
+        sub_filter 'www.googletagmanager.com' '${domain}/tagioo-loader';
         add_header Cache-Control "public, max-age=1800";
         add_header X-Tagioo-Loader "1" always;
     }` : "";
