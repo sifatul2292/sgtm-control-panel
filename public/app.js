@@ -4100,6 +4100,8 @@ function renderAdmin(data) {
   renderOwnerDashboard(data);
   renderCustomerAccounts(data);
   renderWorkerNodes(data);
+  loadOwnerPayments();
+  loadPaymentSettings();
   const customers = data.owner?.customers || data.customers?.tenants || [];
   els.adminBadge.textContent = customers.length ? `${customers.length} tenant${customers.length === 1 ? "" : "s"}` : "No tenants";
   els.customersBadge.className = `badge ${customers.length ? "ok" : "warn"}`;
@@ -4286,6 +4288,7 @@ function renderBilling(data) {
   document.querySelectorAll("[data-plan-action]").forEach((button) => {
     button.onclick = () => selectSubscriptionPlan(button.dataset.planAction);
   });
+  loadBillingPayment();
 }
 
 async function selectSubscriptionPlan(planName) {
@@ -4299,8 +4302,189 @@ async function selectSubscriptionPlan(planName) {
     if (!response.ok) throw new Error((result.errors || [result.error || "Plan update failed."]).join(" "));
     await loadDashboard();
     setView("billing");
+    if (result.payment) document.getElementById("paymentPanel")?.scrollIntoView({ behavior: "smooth" });
   } catch (error) {
     if (els.billingBadge) els.billingBadge.textContent = error.message;
+  }
+}
+
+// Fetch the customer's billing/payment state and render the manual-payment panel.
+async function loadBillingPayment() {
+  const panel = document.getElementById("paymentPanel");
+  if (!panel) return;
+  try {
+    const response = await fetch("/api/customer/billing");
+    if (!response.ok) { panel.hidden = true; return; }
+    const { billing } = await response.json();
+    renderPaymentPanel(billing || {});
+  } catch {
+    panel.hidden = true;
+  }
+}
+
+function renderPaymentPanel(billing) {
+  const panel = document.getElementById("paymentPanel");
+  if (!panel) return;
+  const pending = billing.subscriptionStatus === "pending_payment" && billing.payment;
+  const claims = Array.isArray(billing.claims) ? billing.claims : [];
+
+  // Show the panel when an upgrade is awaiting payment, or there is recent claim history.
+  if (!pending && !claims.length) { panel.hidden = true; return; }
+  panel.hidden = false;
+
+  const badge = document.getElementById("paymentStatusBadge");
+  const form = document.getElementById("paymentClaimForm");
+  const instr = document.getElementById("paymentInstructions");
+  const hasOpenClaim = claims.some((c) => c.status === "pending");
+
+  if (pending) {
+    const p = billing.payment;
+    const numbers = [
+      p.bkashNumber ? `<div class="pay-num"><span>bKash</span><strong>${escapeHtml(p.bkashNumber)}</strong></div>` : "",
+      p.nagadNumber ? `<div class="pay-num"><span>Nagad</span><strong>${escapeHtml(p.nagadNumber)}</strong></div>` : ""
+    ].join("");
+    instr.innerHTML = `
+      <div class="pay-summary">
+        <div><span>Plan</span><strong>${escapeHtml(p.plan)}</strong></div>
+        <div><span>Amount</span><strong>৳${Number(p.amount).toLocaleString()}</strong></div>
+        <div><span>Invoice</span><strong>${escapeHtml(p.invoiceNo)}</strong></div>
+      </div>
+      <div class="pay-numbers">${numbers || "<em>Payment numbers not set yet — contact support.</em>"}</div>
+      <p class="pay-instructions">${escapeHtml(p.instructions || "")}</p>`;
+    if (badge) { badge.textContent = hasOpenClaim ? "Verifying payment" : "Awaiting payment"; }
+    if (form) { form.hidden = hasOpenClaim; form.onsubmit = submitPaymentClaimForm; }
+  } else {
+    instr.innerHTML = "";
+    if (form) form.hidden = true;
+    if (badge) badge.textContent = billing.subscriptionStatus === "active" ? "Active" : "No payment due";
+  }
+
+  const history = document.getElementById("paymentClaimHistory");
+  if (history) {
+    history.innerHTML = claims.length
+      ? `<div class="subscription-feature-heading">Payment history</div>` + claims.map((c) => `
+          <div class="claim-row claim-${escapeHtml(c.status)}">
+            <span>${escapeHtml(c.invoiceNo)} · ${escapeHtml(c.plan)} · ৳${Number(c.amount).toLocaleString()}</span>
+            <span>${escapeHtml(c.method)} · ${escapeHtml(c.txnId)}</span>
+            <span class="claim-status">${escapeHtml(c.status)}</span>
+          </div>`).join("")
+      : "";
+  }
+}
+
+async function submitPaymentClaimForm(event) {
+  event.preventDefault();
+  const form = event.target;
+  const msg = document.getElementById("paymentClaimMessage");
+  const body = {
+    method: form.method.value,
+    txnId: form.txnId.value.trim(),
+    senderNumber: form.senderNumber.value.trim()
+  };
+  if (msg) msg.textContent = "Submitting…";
+  try {
+    const response = await fetch("/api/customer/payment-claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Submit failed."]).join(" "));
+    if (msg) msg.textContent = "Submitted. We'll verify and activate your plan shortly.";
+    form.reset();
+    await loadBillingPayment();
+  } catch (error) {
+    if (msg) msg.textContent = error.message;
+  }
+}
+
+// ── Owner: payment claims queue ────────────────────────────────────────────
+async function loadOwnerPayments() {
+  const list = document.getElementById("ownerPaymentsList");
+  const badge = document.getElementById("ownerPaymentsBadge");
+  if (!list) return;
+  try {
+    const response = await fetch("/api/admin/payments");
+    if (!response.ok) return;
+    const { payments } = await response.json();
+    const all = Array.isArray(payments) ? payments : [];
+    const pending = all.filter((p) => p.status === "pending");
+    if (badge) badge.textContent = `${pending.length} pending`;
+    const show = pending.length ? pending : all.slice(0, 8);
+    list.innerHTML = show.length
+      ? show.map((p) => `
+          <div class="summary-item claim-${escapeHtml(p.status)}">
+            <div class="summary-item-main">
+              <strong>${escapeHtml(p.tenantId)} · ${escapeHtml(p.plan)} · ৳${Number(p.amount).toLocaleString()}</strong>
+              <span>${escapeHtml(p.method)} · TxnID <code>${escapeHtml(p.txnId)}</code> · from ${escapeHtml(p.senderNumber)}</span>
+              <span>Invoice ${escapeHtml(p.invoiceNo)} · ${escapeHtml(p.status)}</span>
+            </div>
+            ${p.status === "pending" ? `<div class="summary-item-actions">
+              <button class="button button-primary" type="button" data-pay-confirm="${escapeHtml(p.id)}">Confirm</button>
+              <button class="button" type="button" data-pay-reject="${escapeHtml(p.id)}">Reject</button>
+            </div>` : ""}
+          </div>`).join("")
+      : `<div class="summary-item"><div class="summary-item-main"><strong>No payments yet</strong><span>Manual bKash/Nagad claims will appear here.</span></div></div>`;
+    list.querySelectorAll("[data-pay-confirm]").forEach((b) => { b.onclick = () => actOnPayment(b.dataset.payConfirm, "confirm"); });
+    list.querySelectorAll("[data-pay-reject]").forEach((b) => { b.onclick = () => actOnPayment(b.dataset.payReject, "reject"); });
+  } catch { /* leave list as-is */ }
+}
+
+async function actOnPayment(id, action) {
+  let reason = "";
+  if (action === "reject") {
+    reason = window.prompt("Reason for rejecting this payment (optional):") || "";
+  } else if (!window.confirm("Confirm this payment? This activates the customer's plan for 30 days.")) {
+    return;
+  }
+  try {
+    const response = await fetch(`/api/admin/payments/${encodeURIComponent(id)}/${action}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reason })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Action failed."]).join(" "));
+    await loadOwnerPayments();
+  } catch (error) {
+    window.alert(error.message);
+  }
+}
+
+async function loadPaymentSettings() {
+  const form = document.getElementById("paymentSettingsForm");
+  if (!form) return;
+  form.onsubmit = savePaymentSettings;
+  try {
+    const response = await fetch("/api/admin/settings/payment");
+    if (!response.ok) return;
+    const { settings } = await response.json();
+    for (const key of ["bkashNumber", "nagadNumber", "ownerNotifyEmail", "ownerWhatsApp", "instructions"]) {
+      if (form[key]) form[key].value = settings[key] || "";
+    }
+  } catch { /* ignore */ }
+}
+
+async function savePaymentSettings(event) {
+  event.preventDefault();
+  const form = event.target;
+  const msg = document.getElementById("paymentSettingsMessage");
+  const body = {};
+  for (const key of ["bkashNumber", "nagadNumber", "ownerNotifyEmail", "ownerWhatsApp", "instructions"]) {
+    body[key] = form[key] ? form[key].value.trim() : "";
+  }
+  if (msg) msg.textContent = "Saving…";
+  try {
+    const response = await fetch("/api/admin/settings/payment", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Save failed."]).join(" "));
+    if (msg) msg.textContent = "Saved.";
+  } catch (error) {
+    if (msg) msg.textContent = error.message;
   }
 }
 

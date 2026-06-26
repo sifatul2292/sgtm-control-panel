@@ -345,38 +345,99 @@ async function findCustomerAccountByEmail(email) {
   ) || null;
 }
 
-async function sendPasswordResetEmail(toEmail, resetUrl) {
+// Generic transactional email sender (Resend). Wraps `bodyHtml` in the standard
+// Tagioo email shell so every message looks consistent. Returns {ok}.
+async function sendEmail({ to, subject, bodyHtml }) {
   if (!config.resendApiKey) {
-    console.error("[reset] RESEND_API_KEY not set — cannot send reset email");
+    console.error(`[email] RESEND_API_KEY not set — cannot send "${subject}" to ${to}`);
+    return { ok: false };
+  }
+  if (!to) {
+    console.error(`[email] no recipient for "${subject}"`);
     return { ok: false };
   }
   try {
     const fromAddr = config.customerSupportEmail || "noreply@tagioo.com";
+    const html = [
+      `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px">`,
+      bodyHtml,
+      `<hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0">`,
+      `<p style="color:#C4CCDB;font-size:12px;margin:0">Tagioo · Server-side tracking for Bangladesh ecommerce</p>`,
+      `</div>`
+    ].join("");
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${config.resendApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: `Tagioo <${fromAddr}>`,
-        to: [toEmail],
-        subject: "Reset your Tagioo password",
-        html: [
-          `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px">`,
-          `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Reset your password</p>`,
-          `<p style="color:#5B6B8A;margin:0 0 28px;line-height:1.6">Click the button below to set a new password for your Tagioo account. This link expires in <strong>1 hour</strong>.</p>`,
-          `<a href="${resetUrl}" style="display:inline-block;background:#5B21B6;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Reset password →</a>`,
-          `<p style="color:#9BA8C0;font-size:13px;margin:32px 0 0">If you didn't request a password reset, you can safely ignore this email — your password won't change.</p>`,
-          `<hr style="border:none;border-top:1px solid #E5E7EB;margin:24px 0">`,
-          `<p style="color:#C4CCDB;font-size:12px;margin:0">Tagioo · Server-side tracking for Bangladesh ecommerce</p>`,
-          `</div>`
-        ].join("")
-      })
+      body: JSON.stringify({ from: `Tagioo <${fromAddr}>`, to: [to], subject, html })
     });
-    if (!r.ok) console.error("[reset] Resend API error:", r.status);
+    if (!r.ok) console.error(`[email] Resend API error for "${subject}":`, r.status);
     return { ok: r.ok };
   } catch (e) {
-    console.error("[reset] email send error:", e.message);
+    console.error(`[email] send error for "${subject}":`, e.message);
     return { ok: false };
   }
+}
+
+async function sendPasswordResetEmail(toEmail, resetUrl) {
+  return sendEmail({
+    to: toEmail,
+    subject: "Reset your Tagioo password",
+    bodyHtml: [
+      `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Reset your password</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 28px;line-height:1.6">Click the button below to set a new password for your Tagioo account. This link expires in <strong>1 hour</strong>.</p>`,
+      `<a href="${resetUrl}" style="display:inline-block;background:#5B21B6;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Reset password →</a>`,
+      `<p style="color:#9BA8C0;font-size:13px;margin:32px 0 0">If you didn't request a password reset, you can safely ignore this email — your password won't change.</p>`
+    ].join("")
+  });
+}
+
+// Notify the owner that a customer submitted a manual payment claim to verify.
+async function notifyOwnerPaymentClaim(payment, ownerEmail) {
+  const to = ownerEmail || config.customerSupportEmail;
+  return sendEmail({
+    to,
+    subject: `💰 Payment claim: ${payment.amount} BDT — ${payment.tenantId}`,
+    bodyHtml: [
+      `<p style="font-size:20px;font-weight:900;margin:0 0 8px;color:#0F0A1E">New payment to verify</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 20px;line-height:1.6">A customer submitted a manual payment. Verify the transaction ID in your ${escapeHtml(payment.method)} app, then confirm it in Admin → Payments.</p>`,
+      `<table style="width:100%;border-collapse:collapse;font-size:14px;color:#0F0A1E">`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Invoice</td><td style="padding:6px 0;font-weight:700">${escapeHtml(payment.invoiceNo)}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Customer</td><td style="padding:6px 0;font-weight:700">${escapeHtml(payment.tenantId)}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Plan</td><td style="padding:6px 0;font-weight:700">${escapeHtml(payment.plan)}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Amount</td><td style="padding:6px 0;font-weight:700">৳${escapeHtml(String(payment.amount))}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Method</td><td style="padding:6px 0;font-weight:700">${escapeHtml(payment.method)}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Transaction ID</td><td style="padding:6px 0;font-weight:700">${escapeHtml(payment.txnId)}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Sender</td><td style="padding:6px 0;font-weight:700">${escapeHtml(payment.senderNumber)}</td></tr>`,
+      `</table>`
+    ].join("")
+  });
+}
+
+// Tell the customer their plan is active after the owner confirms payment.
+async function emailCustomerActivated(toEmail, payment, renewalDate) {
+  const renew = renewalDate ? new Date(renewalDate).toISOString().slice(0, 10) : "";
+  return sendEmail({
+    to: toEmail,
+    subject: `✅ Your Tagioo ${payment.plan} plan is active`,
+    bodyHtml: [
+      `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Payment confirmed 🎉</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 20px;line-height:1.6">We verified your payment for invoice <strong>${escapeHtml(payment.invoiceNo)}</strong>. Your <strong>${escapeHtml(payment.plan)}</strong> plan is now active${renew ? ` until <strong>${renew}</strong>` : ""}. Tracking is running.</p>`,
+      `<a href="https://tagioo.com/#dashboard" style="display:inline-block;background:#059669;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Open dashboard →</a>`
+    ].join("")
+  });
+}
+
+// Tell the customer their payment claim was rejected (wrong / duplicate TxnID).
+async function emailCustomerPaymentRejected(toEmail, payment, reason) {
+  return sendEmail({
+    to: toEmail,
+    subject: `⚠️ We couldn't verify your Tagioo payment`,
+    bodyHtml: [
+      `<p style="font-size:20px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Payment not verified</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 16px;line-height:1.6">We couldn't match the transaction for invoice <strong>${escapeHtml(payment.invoiceNo)}</strong>${reason ? `: ${escapeHtml(reason)}` : "."}. Please double-check the transaction ID and submit it again from your dashboard.</p>`,
+      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:#5B21B6;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Resubmit payment →</a>`
+    ].join("")
+  });
 }
 
 function getSession(req) {
@@ -3055,6 +3116,7 @@ async function readDatabase() {
     tenants: [],
     customerAccounts: [],
     customerSetupRequests: [],
+    payments: [],
     alerts: [],
     integrations: []
   };
@@ -3077,6 +3139,7 @@ async function readDatabase() {
         tenants: parsed.tenants || [],
         customerAccounts: parsed.customerAccounts || [],
         customerSetupRequests: parsed.customerSetupRequests || [],
+        payments: parsed.payments || [],
         alerts: parsed.alerts || [],
         integrations: parsed.integrations || []
       }
@@ -4234,16 +4297,53 @@ async function addCustomerSignup(input) {
     phone,
     country: input.country || "BD",
     referral: input.referral || "",
-    plan: "Starter",
+    plan: "Free",
     source: "self_signup",
-    subscriptionStatus: "trial",
-    paymentStatus: "pending",
+    subscriptionStatus: "free",
+    paymentStatus: "free",
     status: "active"
   }, { allowUpdate: false });
 
   return result;
 }
 
+// Read the owner's manual-payment settings (bKash/Nagad numbers, notify email),
+// with safe fallbacks. Never throws.
+function paymentSettings(data) {
+  const p = (data?.settings?.payment) || {};
+  return {
+    bkashNumber: String(p.bkashNumber || "").trim(),
+    nagadNumber: String(p.nagadNumber || "").trim(),
+    ownerNotifyEmail: String(p.ownerNotifyEmail || config.customerSupportEmail || "").trim(),
+    ownerWhatsApp: String(p.ownerWhatsApp || "").trim(),
+    instructions: String(p.instructions || "Use “Send Money” to the number above, then enter the Transaction ID below.").trim()
+  };
+}
+
+// Sequential invoice number per tenant, e.g. "test-user-INV001".
+function nextInvoiceNo(data, tenantId) {
+  const count = (data.payments || []).filter((p) => p.tenantId === tenantId).length;
+  return `${tenantId}-INV${String(count + 1).padStart(3, "0")}`;
+}
+
+// Customer instructions returned to the billing UI for a pending upgrade.
+function paymentInstructionsFor(tenant, data) {
+  const settings = paymentSettings(data);
+  return {
+    invoiceNo: tenant.pendingInvoiceNo || "",
+    plan: tenant.pendingPlan || "",
+    amount: Number(tenant.pendingAmount || 0),
+    bkashNumber: settings.bkashNumber,
+    nagadNumber: settings.nagadNumber,
+    ownerWhatsApp: settings.ownerWhatsApp,
+    instructions: settings.instructions
+  };
+}
+
+// Customer chooses a plan. Free applies immediately; a PAID plan does NOT activate
+// service — it moves the tenant to `pending_payment` and issues an invoice. Only an
+// owner-confirmed payment (confirmPayment) flips the tenant to `active` with paid
+// limits. This is the gate that closes the "active before payment" revenue leak.
 async function selectCustomerPlan(input, session) {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   const planName = String(input.plan || input.planName || "").trim();
@@ -4261,23 +4361,241 @@ async function selectCustomerPlan(input, session) {
   const tenantIndex = data.tenants.findIndex((tenant) => tenant.id === session.tenantId);
   if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
 
-  const profile = resourceProfileForPlan(planName);
   const now = new Date();
-  const renewalDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+  const current = data.tenants[tenantIndex];
+
+  // Free plan: apply right away, no payment needed.
+  if (planName === "Free") {
+    const profile = resourceProfileForPlan("Free");
+    data.tenants[tenantIndex] = {
+      ...current,
+      plan: "Free",
+      requestLimit: profile.monthlyRequestLimit,
+      containerLimit: profile.containerLimit,
+      monthlyAmount: 0,
+      subscriptionStatus: "free",
+      paymentStatus: "free",
+      pendingPlan: "",
+      pendingAmount: 0,
+      pendingInvoiceNo: "",
+      updatedAt: now.toISOString()
+    };
+    await writeDatabase(data);
+    return { ok: true, tenant: data.tenants[tenantIndex] };
+  }
+
+  // Paid plan: stage an upgrade awaiting manual payment. Keep effective limits where
+  // they are (typically Free) until the owner confirms payment.
+  const amount = monthlyAmountForPlan(planName);
+  const invoiceNo = current.pendingInvoiceNo || nextInvoiceNo(data, current.id);
   data.tenants[tenantIndex] = {
-    ...data.tenants[tenantIndex],
-    plan: planName,
-    requestLimit: profile.monthlyRequestLimit,
-    containerLimit: profile.containerLimit,
-    monthlyAmount: monthlyAmountForPlan(planName),
-    subscriptionStatus: planName === "Free" ? "trial" : "active",
-    paymentStatus: planName === "Free" ? "free" : "pending",
-    renewalDate,
+    ...current,
+    subscriptionStatus: "pending_payment",
+    paymentStatus: "pending",
+    pendingPlan: planName,
+    pendingAmount: amount,
+    pendingInvoiceNo: invoiceNo,
     updatedAt: now.toISOString()
   };
 
   await writeDatabase(data);
-  return { ok: true, tenant: data.tenants[tenantIndex] };
+  return {
+    ok: true,
+    tenant: data.tenants[tenantIndex],
+    payment: paymentInstructionsFor(data.tenants[tenantIndex], data)
+  };
+}
+
+// Customer reports they paid: records a pending payment claim with the transaction
+// ID and emails the owner to verify. Does NOT activate anything on its own.
+async function submitPaymentClaim(input, session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  const method = String(input.method || "").trim().toLowerCase();
+  const txnId = String(input.txnId || input.transactionId || "").trim().slice(0, 64);
+  const senderNumber = String(input.senderNumber || input.sender || "").trim().slice(0, 32);
+  const errors = [];
+  if (!["bkash", "nagad"].includes(method)) errors.push("Choose bKash or Nagad.");
+  if (!txnId) errors.push("Transaction ID is required.");
+  if (!senderNumber) errors.push("Sender number is required.");
+  if (errors.length) return { ok: false, status: 400, errors };
+
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const data = loaded.data;
+  data.payments ||= [];
+  const tenant = (data.tenants || []).find((t) => t.id === session.tenantId);
+  if (!tenant) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+  if (!tenant.pendingPlan) return { ok: false, status: 400, errors: ["Choose a plan to upgrade before submitting a payment."] };
+
+  // Block duplicate transaction IDs across all payments.
+  if (data.payments.some((p) => p.txnId && p.txnId.toLowerCase() === txnId.toLowerCase())) {
+    return { ok: false, status: 409, errors: ["This transaction ID was already submitted."] };
+  }
+
+  const now = new Date().toISOString();
+  const payment = {
+    id: `pay_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
+    invoiceNo: tenant.pendingInvoiceNo || nextInvoiceNo(data, tenant.id),
+    tenantId: tenant.id,
+    plan: tenant.pendingPlan,
+    amount: Number(tenant.pendingAmount || monthlyAmountForPlan(tenant.pendingPlan)),
+    method,
+    txnId,
+    senderNumber,
+    status: "pending",
+    claimedAt: now,
+    confirmedBy: "",
+    confirmedAt: "",
+    note: ""
+  };
+  data.payments.push(payment);
+  await writeDatabase(data);
+
+  // Best-effort owner notification (does not block the response).
+  notifyOwnerPaymentClaim(payment, paymentSettings(data).ownerNotifyEmail).catch(() => {});
+  return { ok: true, payment };
+}
+
+// Owner confirms a pending payment: applies the paid plan, sets a 30-day window,
+// starts the tenant's container if one exists, and emails the customer.
+async function confirmPayment(paymentId, session) {
+  if (session?.role !== "owner") return { ok: false, status: 403, errors: ["Owner access required."] };
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const data = loaded.data;
+  data.payments ||= [];
+  const payment = data.payments.find((p) => p.id === paymentId);
+  if (!payment) return { ok: false, status: 404, errors: ["Payment not found."] };
+  if (payment.status === "confirmed") return { ok: false, status: 409, errors: ["Payment already confirmed."] };
+
+  const tenantIndex = (data.tenants || []).findIndex((t) => t.id === payment.tenantId);
+  if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+
+  const now = new Date();
+  const renewalDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const profile = resourceProfileForPlan(payment.plan);
+  const tenant = data.tenants[tenantIndex];
+  data.tenants[tenantIndex] = {
+    ...tenant,
+    plan: payment.plan,
+    requestLimit: profile.monthlyRequestLimit,
+    containerLimit: profile.containerLimit,
+    monthlyAmount: monthlyAmountForPlan(payment.plan),
+    resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
+    subscriptionStatus: "active",
+    paymentStatus: "paid",
+    paidAt: now.toISOString(),
+    renewalDate,
+    pendingPlan: "",
+    pendingAmount: 0,
+    pendingInvoiceNo: "",
+    updatedAt: now.toISOString()
+  };
+
+  payment.status = "confirmed";
+  payment.confirmedBy = session.username || "owner";
+  payment.confirmedAt = now.toISOString();
+  await writeDatabase(data);
+
+  // Start/resume the tenant's container if one is provisioned, and resize to plan.
+  let container = null;
+  const request = (data.provisioning?.requests || []).find((item) => item.tenantId === payment.tenantId && item.containerName);
+  if (request?.containerName) {
+    await controlContainerLifecycle(request.containerName, "start").catch(() => {});
+    container = await resizeContainer(request.containerName, { memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit }).catch(() => null);
+  }
+
+  const account = (data.customerAccounts || []).find((a) => a.tenantId === payment.tenantId);
+  emailCustomerActivated(account?.email || account?.username, payment, renewalDate).catch(() => {});
+  return { ok: true, payment, tenant: data.tenants[tenantIndex], container };
+}
+
+// Owner rejects a pending payment (wrong / duplicate / unverifiable transaction).
+async function rejectPayment(paymentId, reason, session) {
+  if (session?.role !== "owner") return { ok: false, status: 403, errors: ["Owner access required."] };
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const data = loaded.data;
+  data.payments ||= [];
+  const payment = data.payments.find((p) => p.id === paymentId);
+  if (!payment) return { ok: false, status: 404, errors: ["Payment not found."] };
+  if (payment.status === "confirmed") return { ok: false, status: 409, errors: ["Cannot reject a confirmed payment."] };
+
+  payment.status = "rejected";
+  payment.note = String(reason || "").slice(0, 240);
+  payment.confirmedBy = session.username || "owner";
+  payment.confirmedAt = new Date().toISOString();
+  await writeDatabase(data);
+
+  const account = (data.customerAccounts || []).find((a) => a.tenantId === payment.tenantId);
+  emailCustomerPaymentRejected(account?.email || account?.username, payment, payment.note).catch(() => {});
+  return { ok: true, payment };
+}
+
+// Customer-facing billing snapshot for the dashboard billing view.
+async function getCustomerBilling(session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const data = loaded.data;
+  const tenant = (data.tenants || []).find((t) => t.id === session.tenantId);
+  if (!tenant) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+  const claims = (data.payments || [])
+    .filter((p) => p.tenantId === tenant.id)
+    .sort((a, b) => String(b.claimedAt).localeCompare(String(a.claimedAt)));
+  const latestPending = claims.find((p) => p.status === "pending") || null;
+  return {
+    ok: true,
+    billing: {
+      plan: tenant.plan || "Free",
+      subscriptionStatus: tenant.subscriptionStatus || "free",
+      paymentStatus: tenant.paymentStatus || "free",
+      monthlyAmount: Number(tenant.monthlyAmount || 0),
+      renewalDate: tenant.renewalDate || "",
+      requestLimit: Number(tenant.requestLimit || 0),
+      pendingPlan: tenant.pendingPlan || "",
+      pendingAmount: Number(tenant.pendingAmount || 0),
+      pendingInvoiceNo: tenant.pendingInvoiceNo || "",
+      payment: tenant.pendingPlan ? paymentInstructionsFor(tenant, data) : null,
+      latestPending,
+      claims: claims.slice(0, 10)
+    }
+  };
+}
+
+// Owner: list payment claims (newest first), optionally filtered by status.
+async function listPayments(statusFilter) {
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  let payments = (loaded.data.payments || []).slice();
+  if (statusFilter) payments = payments.filter((p) => p.status === statusFilter);
+  payments.sort((a, b) => String(b.claimedAt).localeCompare(String(a.claimedAt)));
+  return { ok: true, payments };
+}
+
+// Owner: read manual-payment settings.
+async function getPaymentSettings() {
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  return { ok: true, settings: paymentSettings(loaded.data) };
+}
+
+// Owner: update manual-payment settings (bKash/Nagad numbers, notify email, etc.).
+async function updatePaymentSettings(input) {
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const data = loaded.data;
+  data.settings ||= {};
+  const current = paymentSettings(data);
+  data.settings.payment = {
+    bkashNumber: String(input.bkashNumber ?? current.bkashNumber).trim().slice(0, 32),
+    nagadNumber: String(input.nagadNumber ?? current.nagadNumber).trim().slice(0, 32),
+    ownerNotifyEmail: String(input.ownerNotifyEmail ?? current.ownerNotifyEmail).trim().slice(0, 160),
+    ownerWhatsApp: String(input.ownerWhatsApp ?? current.ownerWhatsApp).trim().slice(0, 32),
+    instructions: String(input.instructions ?? current.instructions).trim().slice(0, 500)
+  };
+  await writeDatabase(data);
+  return { ok: true, settings: paymentSettings(data) };
 }
 
 async function rotateCustomerWebhookSecret(session) {
@@ -4720,9 +5038,9 @@ const planResourceProfiles = {
   Free:       { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 15000,    containerLimit: 1  },
   Starter:    { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 500000,   containerLimit: 1  },
   Growth:     { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2  },
-  Pro:        { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 2000000,  containerLimit: 2  },
+  Pro:        { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 2000000,  containerLimit: 3  },
   Agency:     { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 8000000,  containerLimit: 10 },
-  Enterprise: { memoryMb: 2048, cpuLimit: "2.00", monthlyRequestLimit: 5000000,  containerLimit: 50 },
+  Enterprise: { memoryMb: 2048, cpuLimit: "2.00", monthlyRequestLimit: 5000000,  containerLimit: 10 },
   Customer:   { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 500000,   containerLimit: 1  }
 };
 
@@ -7766,7 +8084,30 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await selectCustomerPlan(body, session);
-      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { tenant: result.tenant } : { errors: result.errors });
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { tenant: result.tenant, payment: result.payment || null } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/billing" && req.method === "GET") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const result = await getCustomerBilling(session);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { billing: result.billing } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/payment-claim" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await submitPaymentClaim(body, session);
+      jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok ? { payment: result.payment } : { errors: result.errors });
       return;
     }
 
@@ -7867,6 +8208,46 @@ const server = createServer(async (req, res) => {
       }
       const enriched = await getEnrichedProvisioningSummary();
       jsonResponse(res, 200, enriched);
+      return;
+    }
+
+    // Owner: manual-payment settings (bKash/Nagad numbers, notify email).
+    if (pathname === "/api/admin/settings/payment" && (req.method === "GET" || req.method === "PUT")) {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const result = req.method === "GET"
+        ? await getPaymentSettings()
+        : await updatePaymentSettings(await readJson(req));
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { settings: result.settings } : { errors: result.errors });
+      return;
+    }
+
+    // Owner: list manual-payment claims (?status=pending|confirmed|rejected).
+    if (pathname === "/api/admin/payments" && req.method === "GET") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const result = await listPayments(String(reqUrl.searchParams.get("status") || "").trim() || null);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { payments: result.payments } : { errors: result.errors });
+      return;
+    }
+
+    // Owner: confirm / reject a payment claim.
+    const paymentActionMatch = pathname.match(/^\/api\/admin\/payments\/([^/]+)\/(confirm|reject)$/);
+    if (paymentActionMatch && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "owner") {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const paymentId = decodeURIComponent(paymentActionMatch[1]);
+      const result = paymentActionMatch[2] === "confirm"
+        ? await confirmPayment(paymentId, session)
+        : await rejectPayment(paymentId, (await readJson(req)).reason, session);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { errors: result.errors });
       return;
     }
 

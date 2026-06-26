@@ -4230,3 +4230,26 @@ a.button.button-primary {
 .verify-detail { color: var(--color-text, inherit); }
 .verify-stamp { margin: 4px 0 0; font-size: 0.82rem; color: var(--color-text-muted, #667085); }
 .verify-stamp.is-fail { color: var(--color-danger); }
+
+/* ── Manual payment (Phase 1) ─────────────────────────────────────────── */
+.payment-instructions { display: grid; gap: 14px; margin-bottom: 18px; }
+.pay-summary { display: flex; flex-wrap: wrap; gap: 18px; }
+.pay-summary > div { display: flex; flex-direction: column; }
+.pay-summary span { font-size: 0.78rem; color: var(--color-text-muted, #667085); }
+.pay-summary strong { font-size: 1.05rem; }
+.pay-numbers { display: flex; flex-wrap: wrap; gap: 12px; }
+.pay-num { display: flex; flex-direction: column; padding: 10px 16px; border: 1px solid var(--color-border, #E5E7EB); border-radius: 10px; }
+.pay-num span { font-size: 0.74rem; color: var(--color-text-muted, #667085); }
+.pay-num strong { font-size: 1.1rem; letter-spacing: 0.5px; }
+.pay-instructions { color: var(--color-text-muted, #667085); margin: 0; }
+.payment-claim-form { display: grid; gap: 12px; }
+.payment-claim-form .form-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.payment-claim-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; flex: 1 1 160px; }
+.payment-claim-history { margin-top: 16px; }
+.claim-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--color-border, #E5E7EB); font-size: 0.85rem; }
+.claim-status { text-transform: capitalize; font-weight: 700; }
+.claim-pending .claim-status { color: #B45309; }
+.claim-confirmed .claim-status { color: #059669; }
+.claim-rejected .claim-status { color: var(--color-danger, #DC2626); }
+.summary-item.claim-pending { border-left: 3px solid #F59E0B; }
+.summary-item-actions { display: flex; gap: 8px; align-items: center; }

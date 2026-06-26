@@ -11,7 +11,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=17" />
+    <link rel="stylesheet" href="/styles.css?v=18" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -1801,10 +1801,10 @@ window.dataLayer.push({
                 <label>
                   Plan
                   <select name="planName">
-                    <option>Starter</option>
-                    <option>Growth</option>
+                    <option>Free</option>
+                    <option selected>Starter</option>
                     <option>Pro</option>
-                    <option>Agency</option>
+                    <option>Enterprise</option>
                   </select>
                 </label>
                 <label>
@@ -1879,6 +1879,48 @@ window.dataLayer.push({
               <p>Manage customer logins, server workers, and monitor active subscriptions.</p>
             </div>
             <span id="adminBadge" class="status-dot">Checking</span>
+          </section>
+
+          <section class="split-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Payments to verify</h2>
+                  <p>Manual bKash/Nagad claims. Verify the transaction ID, then confirm to activate the plan.</p>
+                </div>
+                <span id="ownerPaymentsBadge" class="badge">0 pending</span>
+              </div>
+              <div id="ownerPaymentsList" class="summary-list"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Payment settings</h2>
+                  <p>Numbers shown to customers, and where claim alerts are emailed.</p>
+                </div>
+                <span class="badge">Owner only</span>
+              </div>
+              <form id="paymentSettingsForm" class="provisioning-form">
+                <label>bKash number
+                  <input name="bkashNumber" placeholder="01XXXXXXXXX" />
+                </label>
+                <label>Nagad number
+                  <input name="nagadNumber" placeholder="01XXXXXXXXX" />
+                </label>
+                <label>Owner notify email
+                  <input name="ownerNotifyEmail" type="email" placeholder="you@tagioo.com" />
+                </label>
+                <label>Owner WhatsApp
+                  <input name="ownerWhatsApp" placeholder="+8801XXXXXXXXX" />
+                </label>
+                <label>Payment instructions
+                  <input name="instructions" placeholder="Use Send Money, then enter the Transaction ID." />
+                </label>
+                <button class="button button-primary" type="submit">Save payment settings</button>
+                <span id="paymentSettingsMessage" class="field-help"></span>
+              </form>
+            </article>
           </section>
 
           <!-- Hidden refs kept for renderAdmin() JS compatibility -->
@@ -2002,10 +2044,10 @@ window.dataLayer.push({
                 <label>
                   Plan
                   <select name="plan">
-                    <option>Starter</option>
-                    <option>Growth</option>
+                    <option>Free</option>
+                    <option selected>Starter</option>
                     <option>Pro</option>
-                    <option>Agency</option>
+                    <option>Enterprise</option>
                   </select>
                 </label>
                 <label>
@@ -2185,6 +2227,36 @@ window.dataLayer.push({
             <div id="billingGrid" class="subscription-current"></div>
           </section>
 
+          <section id="paymentPanel" class="panel subscription-panel" hidden>
+            <div class="panel-header">
+              <div>
+                <h2>Complete your payment</h2>
+                <p>Send the amount via bKash or Nagad, then enter the Transaction ID to activate your plan.</p>
+              </div>
+              <span id="paymentStatusBadge" class="badge">Awaiting payment</span>
+            </div>
+            <div id="paymentInstructions" class="payment-instructions"></div>
+            <form id="paymentClaimForm" class="payment-claim-form">
+              <div class="form-row">
+                <label>Paid with
+                  <select name="method" required>
+                    <option value="bkash">bKash</option>
+                    <option value="nagad">Nagad</option>
+                  </select>
+                </label>
+                <label>Transaction ID
+                  <input name="txnId" type="text" placeholder="e.g. 8N7A1B2C3D" required />
+                </label>
+                <label>Your sending number
+                  <input name="senderNumber" type="text" placeholder="01XXXXXXXXX" required />
+                </label>
+              </div>
+              <button class="button button-primary" type="submit">I've paid — submit transaction</button>
+              <span id="paymentClaimMessage" class="field-help"></span>
+            </form>
+            <div id="paymentClaimHistory" class="payment-claim-history"></div>
+          </section>
+
           <section class="panel subscription-panel">
             <div class="panel-header">
               <div>
@@ -2229,6 +2301,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=29" type="module"></script>
+    <script src="/app.js?v=30" type="module"></script>
   </body>
 </html>
