@@ -440,6 +440,55 @@ async function emailCustomerPaymentRejected(toEmail, payment, reason) {
   });
 }
 
+// ── Phase 2: Free-tier usage nudges ────────────────────────────────────────
+// One escalating block per threshold. Tone ramps from informational (10K) to
+// urgent (14K). `purchases`/`revenue` show the customer what's at stake.
+const FREE_NUDGE_TIERS = {
+  10000: { color: "#5B21B6", emoji: "📈", heading: "You're halfway through your free events",
+    tone: "You've used 10,000 of your 15,000 free monthly events. Plenty of room left — but if you run ads, it's worth knowing the cap is coming." },
+  12000: { color: "#B45309", emoji: "⚠️", heading: "80% of your free events used",
+    tone: "You've used 12,000 of 15,000 free events this cycle. At 15,000 your tracking pauses until your cycle resets — Meta and GA4 stop receiving conversions." },
+  13000: { color: "#EA580C", emoji: "🔶", heading: "Only ~2,000 free events left",
+    tone: "You've used 13,000 of 15,000 free events. You're close to the cap. Upgrade now so your tracking never stops mid-campaign." },
+  14000: { color: "#DC2626", emoji: "🚨", heading: "URGENT — your tracking is about to stop",
+    tone: "You've used 14,000 of 15,000 free events. At 15,000, tracking pauses and new sales stop reaching Meta and Google Ads — your campaigns lose their optimization signal. Upgrade now to keep selling." }
+};
+
+function purchaseStatHtml({ purchases, revenue, currency }) {
+  if (!purchases) return "";
+  const rev = revenue ? ` worth ${currency ? escapeHtml(currency) + " " : "৳"}${Math.round(revenue).toLocaleString()}` : "";
+  return `<p style="background:#F8FAFC;border:1px solid #E5E7EB;border-radius:10px;padding:14px 16px;color:#0F0A1E;margin:0 0 20px;line-height:1.6">Tagioo has already tracked <strong>${purchases.toLocaleString()} purchase${purchases === 1 ? "" : "s"}${rev}</strong> for you this cycle. If your tracking pauses, sales like these stop reaching your ad platforms.</p>`;
+}
+
+async function emailFreeTierNudge(toEmail, tenant, threshold, used, limit, purchaseData) {
+  const tier = FREE_NUDGE_TIERS[threshold] || FREE_NUDGE_TIERS[10000];
+  const remaining = Math.max(0, limit - used);
+  return sendEmail({
+    to: toEmail,
+    subject: `${tier.emoji} ${tier.heading} — Tagioo`,
+    bodyHtml: [
+      `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:${tier.color}">${tier.emoji} ${escapeHtml(tier.heading)}</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">${escapeHtml(tier.tone)}</p>`,
+      `<div style="background:#F8FAFC;border-radius:10px;padding:14px 16px;margin:0 0 18px"><div style="height:8px;background:#E5E7EB;border-radius:99px;overflow:hidden"><div style="height:8px;width:${Math.min(100, Math.round((used / limit) * 100))}%;background:${tier.color}"></div></div><p style="margin:8px 0 0;font-size:13px;color:#5B6B8A"><strong style="color:${tier.color}">${used.toLocaleString()}</strong> / ${limit.toLocaleString()} events used · ${remaining.toLocaleString()} left this cycle</p></div>`,
+      purchaseStatHtml(purchaseData || {}),
+      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:${tier.color};color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Upgrade now →</a>`
+    ].join("")
+  });
+}
+
+async function emailFreeTierCapped(toEmail, tenant, purchaseData) {
+  return sendEmail({
+    to: toEmail,
+    subject: `🛑 Tracking paused — you hit your free limit`,
+    bodyHtml: [
+      `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#DC2626">🛑 Your tracking is paused</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">You've used all 15,000 free events this cycle, so your sGTM container is paused. New conversions are <strong>not</strong> reaching Meta, GA4, or Google Ads right now. Upgrade to a paid plan to resume tracking immediately.</p>`,
+      purchaseStatHtml(purchaseData || {}),
+      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:#DC2626;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Upgrade & resume tracking →</a>`
+    ].join("")
+  });
+}
+
 function getSession(req) {
   if (!config.authEnabled) {
     return {
@@ -6168,6 +6217,109 @@ async function enrichProvisioningRequest(request) {
   return { ...request, plan: { ...plan, checks } };
 }
 
+// ── Phase 2: Free-tier rolling-cycle usage enforcement ─────────────────────
+const FREE_NUDGE_THRESHOLDS = [10000, 12000, 13000, 14000];
+const FREE_HARD_CAP = 15000;
+const FREE_CYCLE_DAYS = 30;
+
+// Sum of all of a tenant's stored daily request counts. Used with a per-cycle
+// baseline (snapshotted at cycle start) so cycle usage = currentSum - baseline.
+// This resets cleanly on rollover even when the old and new cycle share a day.
+function tenantUsageSum(data, tenantId) {
+  const days = data.tenantDailyRequests?.[tenantId] || {};
+  let total = 0;
+  for (const count of Object.values(days)) total += Number(count || 0);
+  return total;
+}
+
+// Sum a tenant's tracked purchases + revenue within the current cycle window.
+function cyclePurchaseStats(data, tenantId, startKey, endKey) {
+  const hist = data.tenantEventHistory?.[tenantId] || {};
+  let purchases = 0, revenue = 0, currency = "";
+  for (const [dateKey, snap] of Object.entries(hist)) {
+    if (dateKey < startKey || dateKey > endKey) continue;
+    const ps = snap.purchaseSummary || {};
+    purchases += Number(ps.uniqueCount || 0);
+    revenue += Number(ps.uniqueRevenue || 0);
+    if (!currency && ps.currency) currency = ps.currency;
+  }
+  return { purchases, revenue, currency };
+}
+
+// Resolve a tenant's running sGTM container name from provisioning records.
+function tenantContainerName(data, tenantId) {
+  const req = (data.provisioning?.requests || []).find((item) => item.tenantId === tenantId && item.containerName);
+  return req?.containerName || "";
+}
+
+// Evaluate every Free-tier tenant against its rolling 30-day cycle: roll the
+// window when it expires (resuming a capped container), send escalating upgrade
+// nudges at 10K/12K/13K/14K (once each per cycle), and hard-cap (stop the
+// container) at 15K. Mutates `data`; the caller persists it. Side-effects
+// (emails, docker start/stop) are best-effort and never throw.
+async function enforceFreeTierUsage(data) {
+  const now = new Date();
+  const todayKey = localDateKey(now);
+  const cycleMs = FREE_CYCLE_DAYS * 24 * 60 * 60 * 1000;
+
+  for (const tenant of (data.tenants || [])) {
+    if (!tenant?.id) continue;
+    const status = tenant.subscriptionStatus;
+    const isFreeTier = tenant.plan === "Free" || status === "free" || status === "free_capped";
+    if (!isFreeTier) continue;
+
+    // Initialise the cycle window for tenants that don't have one yet.
+    if (!tenant.cycleStart || !tenant.cycleEnd) {
+      tenant.cycleStart = now.toISOString();
+      tenant.cycleEnd = new Date(now.getTime() + cycleMs).toISOString();
+      tenant.cycleNudge = 0;
+      tenant.cycleBaseline = tenantUsageSum(data, tenant.id);
+    }
+
+    // Cycle rollover: reset usage baseline + nudge state, resume if capped.
+    if (now >= new Date(tenant.cycleEnd)) {
+      tenant.cycleStart = now.toISOString();
+      tenant.cycleEnd = new Date(now.getTime() + cycleMs).toISOString();
+      tenant.cycleNudge = 0;
+      tenant.cycleBaseline = tenantUsageSum(data, tenant.id);
+      if (status === "free_capped") {
+        tenant.subscriptionStatus = "free";
+        tenant.cappedAt = "";
+        const name = tenantContainerName(data, tenant.id);
+        if (name) await controlContainerLifecycle(name, "start").catch(() => {});
+      }
+      continue;
+    }
+
+    const startKey = localDateKey(new Date(tenant.cycleStart));
+    const used = Math.max(0, tenantUsageSum(data, tenant.id) - Number(tenant.cycleBaseline || 0));
+    const account = (data.customerAccounts || []).find((a) => a.tenantId === tenant.id);
+    const toEmail = account?.email || account?.username || "";
+
+    // Hard cap: stop the container once, on the transition to capped.
+    if (used >= FREE_HARD_CAP) {
+      if (status !== "free_capped") {
+        tenant.subscriptionStatus = "free_capped";
+        tenant.cappedAt = now.toISOString();
+        const name = tenantContainerName(data, tenant.id);
+        if (name) await controlContainerLifecycle(name, "stop").catch(() => {});
+        emailFreeTierCapped(toEmail, tenant, cyclePurchaseStats(data, tenant.id, startKey, todayKey)).catch(() => {});
+      }
+      continue;
+    }
+
+    // Escalating nudges: send the highest crossed threshold not yet sent this cycle.
+    let toSend = 0;
+    for (const threshold of FREE_NUDGE_THRESHOLDS) {
+      if (used >= threshold && threshold > Number(tenant.cycleNudge || 0)) toSend = threshold;
+    }
+    if (toSend) {
+      tenant.cycleNudge = toSend;
+      emailFreeTierNudge(toEmail, tenant, toSend, used, FREE_HARD_CAP, cyclePurchaseStats(data, tenant.id, startKey, todayKey)).catch(() => {});
+    }
+  }
+}
+
 async function persistDailySummary(summary) {
   const loaded = await readDatabase();
   // Only a DB read failure blocks persistence. An unavailable shared-log summary must
@@ -6267,6 +6419,9 @@ async function persistDailySummary(summary) {
     }
   }
   pruneTenantEventHistory(data.tenantEventHistory, 30);
+
+  // Phase 2: evaluate Free-tier usage cycles (nudges + hard cap) before persisting.
+  await enforceFreeTierUsage(data).catch((e) => console.error("[free-tier] enforcement error:", e.message));
 
   try {
     await writeDatabase(data);
