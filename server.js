@@ -489,6 +489,59 @@ async function emailFreeTierCapped(toEmail, tenant, purchaseData) {
   });
 }
 
+// ── Phase 4: paid-plan renewal + dunning ───────────────────────────────────
+// Block showing the customer how to pay their renewal (numbers + invoice).
+function renewalPayHtml(tenant, data) {
+  const s = paymentSettings(data);
+  const numbers = [
+    s.bkashNumber ? `bKash <strong>${escapeHtml(s.bkashNumber)}</strong>` : "",
+    s.nagadNumber ? `Nagad <strong>${escapeHtml(s.nagadNumber)}</strong>` : ""
+  ].filter(Boolean).join(" · ");
+  return `<p style="background:#F8FAFC;border:1px solid #E5E7EB;border-radius:10px;padding:14px 16px;color:#0F0A1E;margin:0 0 18px;line-height:1.7">Plan <strong>${escapeHtml(tenant.plan)}</strong> · Amount <strong>৳${Number(tenant.monthlyAmount || 0).toLocaleString()}</strong>${numbers ? `<br>Send to: ${numbers}` : ""}</p>`;
+}
+
+async function emailRenewalReminder(toEmail, tenant, daysLeft, data) {
+  const urgent = daysLeft <= 1;
+  const color = urgent ? "#DC2626" : daysLeft <= 3 ? "#EA580C" : "#5B21B6";
+  const when = daysLeft <= 0 ? "today" : daysLeft === 1 ? "tomorrow" : `in ${daysLeft} days`;
+  return sendEmail({
+    to: toEmail,
+    subject: `${urgent ? "🚨 " : "🔔 "}Your Tagioo ${tenant.plan} plan renews ${when}`,
+    bodyHtml: [
+      `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:${color}">${urgent ? "🚨 " : "🔔 "}Renewal due ${escapeHtml(when)}</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Your <strong>${escapeHtml(tenant.plan)}</strong> plan expires on <strong>${escapeHtml(String(tenant.renewalDate || "").slice(0, 10))}</strong>. Pay now to keep your server-side tracking running without interruption.</p>`,
+      renewalPayHtml(tenant, data),
+      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:${color};color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Renew now →</a>`
+    ].join("")
+  });
+}
+
+async function emailOverdue(toEmail, tenant, data, graceDays) {
+  return sendEmail({
+    to: toEmail,
+    subject: `⚠️ Your Tagioo payment is overdue`,
+    bodyHtml: [
+      `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#EA580C">⚠️ Payment overdue</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Your <strong>${escapeHtml(tenant.plan)}</strong> plan renewal hasn't been received. Your tracking is still running, but it will <strong>pause in ${Number(graceDays || 7)} days</strong> if payment isn't confirmed. Renew now to avoid losing conversion data.</p>`,
+      renewalPayHtml(tenant, data),
+      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:#EA580C;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Pay now →</a>`
+    ].join("")
+  });
+}
+
+async function emailExpiredSuspended(toEmail, tenant, data) {
+  return sendEmail({
+    to: toEmail,
+    subject: `🛑 Tracking paused — renew to resume`,
+    bodyHtml: [
+      `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#DC2626">🛑 Your service is paused</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Your <strong>${escapeHtml(tenant.plan)}</strong> plan expired and the renewal grace period has ended, so your sGTM container is paused. New conversions are <strong>not</strong> reaching Meta, GA4, or Google Ads. Renew now to resume immediately.</p>`,
+      renewalPayHtml(tenant, data),
+      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:#DC2626;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Renew & resume →</a>`
+    ].join("")
+  });
+}
+
 function getSession(req) {
   if (!config.authEnabled) {
     return {
@@ -4535,6 +4588,9 @@ async function confirmPayment(paymentId, session) {
     paymentStatus: "paid",
     paidAt: now.toISOString(),
     renewalDate,
+    renewalReminder: 99,
+    overdueAt: "",
+    expiredAt: "",
     pendingPlan: "",
     pendingAmount: 0,
     pendingInvoiceNo: "",
@@ -6320,6 +6376,57 @@ async function enforceFreeTierUsage(data) {
   }
 }
 
+const RENEWAL_REMINDER_DAYS = [7, 3, 1];
+const RENEWAL_GRACE_DAYS = 7;
+
+// Evaluate paid plans against their 30-day window: send T-7/T-3/T-1 renewal
+// reminders (once each), flip to `overdue` once the renewal date passes (grace
+// period — container keeps running), then to `expired` + stop the container once
+// the grace period ends. Mutates `data`; side-effects are best-effort.
+async function enforcePaidRenewals(data) {
+  const now = new Date();
+  for (const tenant of (data.tenants || [])) {
+    if (!tenant?.id) continue;
+    const status = tenant.subscriptionStatus;
+    if (!["active", "overdue"].includes(status)) continue;
+    if (tenant.plan === "Free" || !tenant.renewalDate) continue;
+
+    const renewal = new Date(tenant.renewalDate);
+    if (Number.isNaN(renewal.getTime())) continue;
+    const account = (data.customerAccounts || []).find((a) => a.tenantId === tenant.id);
+    const toEmail = account?.email || account?.username || "";
+
+    // Pre-expiry reminders.
+    if (now < renewal) {
+      const daysLeft = Math.ceil((renewal.getTime() - now.getTime()) / 86400000);
+      let toSend = null;
+      for (const mark of RENEWAL_REMINDER_DAYS) {
+        if (daysLeft <= mark && mark < Number(tenant.renewalReminder ?? 99)) toSend = mark;
+      }
+      if (toSend != null) {
+        tenant.renewalReminder = toSend;
+        emailRenewalReminder(toEmail, tenant, daysLeft, data).catch(() => {});
+      }
+      continue;
+    }
+
+    // Past the renewal date.
+    const daysOver = Math.floor((now.getTime() - renewal.getTime()) / 86400000);
+    if (status !== "overdue") {
+      tenant.subscriptionStatus = "overdue";
+      tenant.overdueAt = now.toISOString();
+      emailOverdue(toEmail, tenant, data, RENEWAL_GRACE_DAYS).catch(() => {});
+    }
+    if (daysOver >= RENEWAL_GRACE_DAYS) {
+      tenant.subscriptionStatus = "expired";
+      tenant.expiredAt = now.toISOString();
+      const name = tenantContainerName(data, tenant.id);
+      if (name) await controlContainerLifecycle(name, "stop").catch(() => {});
+      emailExpiredSuspended(toEmail, tenant, data).catch(() => {});
+    }
+  }
+}
+
 async function persistDailySummary(summary) {
   const loaded = await readDatabase();
   // Only a DB read failure blocks persistence. An unavailable shared-log summary must
@@ -6422,6 +6529,7 @@ async function persistDailySummary(summary) {
 
   // Phase 2: evaluate Free-tier usage cycles (nudges + hard cap) before persisting.
   await enforceFreeTierUsage(data).catch((e) => console.error("[free-tier] enforcement error:", e.message));
+  await enforcePaidRenewals(data).catch((e) => console.error("[renewal] enforcement error:", e.message));
 
   try {
     await writeDatabase(data);
