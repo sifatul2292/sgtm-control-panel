@@ -378,6 +378,25 @@ async function sendEmail({ to, subject, bodyHtml }) {
   }
 }
 
+async function emailWelcome(toEmail, fullName) {
+  const name = String(fullName || "").trim().split(" ")[0] || "there";
+  return sendEmail({
+    to: toEmail,
+    subject: "👋 Welcome to Tagioo — let's recover your lost sales",
+    bodyHtml: [
+      `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Welcome, ${escapeHtml(name)}!</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Your Tagioo account is ready. You're on the <strong>Free</strong> plan — 15,000 tracked events per month, no card needed. Here's how to go live:</p>`,
+      `<ol style="color:#0F0A1E;margin:0 0 20px;padding-left:20px;line-height:1.9">`,
+      `<li>Open <strong>Setup</strong> in your dashboard and enter your domain + GTM config.</li>`,
+      `<li>Install the first-party loader so Brave &amp; ad-blockers can't strip your tracking.</li>`,
+      `<li>Run the tracking test to confirm Meta &amp; GA4 are receiving events.</li>`,
+      `</ol>`,
+      `<a href="https://tagioo.com/#setupAssistant" style="display:inline-block;background:#5B21B6;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Start setup →</a>`,
+      `<p style="color:#9BA8C0;font-size:13px;margin:24px 0 0">Need a hand? Reply to this email and we'll help you get live.</p>`
+    ].join("")
+  });
+}
+
 async function sendPasswordResetEmail(toEmail, resetUrl) {
   return sendEmail({
     to: toEmail,
@@ -4406,6 +4425,7 @@ async function addCustomerSignup(input) {
     status: "active"
   }, { allowUpdate: false });
 
+  if (result.ok) emailWelcome(email, fullName).catch(() => {});
   return result;
 }
 
