@@ -11,7 +11,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=19" />
+    <link rel="stylesheet" href="/styles.css?v=20" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -2225,6 +2225,10 @@ window.dataLayer.push({
         </section>
 
         <section id="billingView" class="view" data-view="billing">
+          <!-- Status-aware payment banner: appears at the top whenever there's a
+               pending/verifying payment or an expired plan. -->
+          <section id="paymentPanel" class="payment-status-card" hidden></section>
+
           <section class="panel subscription-panel">
             <div class="panel-header">
               <div>
@@ -2232,43 +2236,12 @@ window.dataLayer.push({
                 <p>Your active Tagioo plan, renewal date, and included features.</p>
               </div>
               <div class="subscription-actions">
-                <button class="button" type="button" data-plan-action="Free">Extend Free Plan</button>
                 <button class="button button-primary" type="button" data-plan-action="Pro">Upgrade Plan</button>
                 <span id="billingBadge" class="status-dot">Checking</span>
                 <span id="planBadge" class="badge">Plan</span>
               </div>
             </div>
             <div id="billingGrid" class="subscription-current"></div>
-          </section>
-
-          <section id="paymentPanel" class="panel subscription-panel" hidden>
-            <div class="panel-header">
-              <div>
-                <h2>Complete your payment</h2>
-                <p>Send the amount via bKash or Nagad, then enter the Transaction ID to activate your plan.</p>
-              </div>
-              <span id="paymentStatusBadge" class="badge">Awaiting payment</span>
-            </div>
-            <div id="paymentInstructions" class="payment-instructions"></div>
-            <form id="paymentClaimForm" class="payment-claim-form">
-              <div class="form-row">
-                <label>Paid with
-                  <select name="method" required>
-                    <option value="bkash">bKash</option>
-                    <option value="nagad">Nagad</option>
-                  </select>
-                </label>
-                <label>Transaction ID
-                  <input name="txnId" type="text" placeholder="e.g. 8N7A1B2C3D" required />
-                </label>
-                <label>Your sending number
-                  <input name="senderNumber" type="text" placeholder="01XXXXXXXXX" required />
-                </label>
-              </div>
-              <button class="button button-primary" type="submit">I've paid — submit transaction</button>
-              <span id="paymentClaimMessage" class="field-help"></span>
-            </form>
-            <div id="paymentClaimHistory" class="payment-claim-history"></div>
           </section>
 
           <section class="panel subscription-panel">
@@ -2291,6 +2264,14 @@ window.dataLayer.push({
             <div id="subscriptionPlans" class="subscription-plan-grid"></div>
           </section>
         </section>
+
+        <!-- Payment modal: opens on plan select / "Complete payment". -->
+        <div id="paymentModalOverlay" class="payment-modal-overlay" hidden>
+          <div class="payment-modal" role="dialog" aria-modal="true" aria-labelledby="paymentModalTitle">
+            <button class="payment-modal-close" type="button" aria-label="Close" data-payment-modal-close>✕</button>
+            <div id="paymentModalBody"></div>
+          </div>
+        </div>
 
         <section id="docsView" class="view" data-view="docs">
           <section class="hero-panel">
@@ -2315,6 +2296,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=31" type="module"></script>
+    <script src="/app.js?v=33" type="module"></script>
   </body>
 </html>

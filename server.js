@@ -432,6 +432,23 @@ async function notifyOwnerPaymentClaim(payment, ownerEmail) {
   });
 }
 
+// Acknowledge to the customer that we received their payment claim (verifying).
+async function emailCustomerClaimReceived(toEmail, payment) {
+  return sendEmail({
+    to: toEmail,
+    subject: `⏳ We received your payment — verifying now`,
+    bodyHtml: [
+      `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Payment received — verifying</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 16px;line-height:1.6">Thanks! We got your payment details for invoice <strong>${escapeHtml(payment.invoiceNo)}</strong> (<strong>${escapeHtml(payment.plan)}</strong> · ৳${escapeHtml(String(payment.amount))}). We're verifying the transaction now and will activate your plan shortly — usually within a few hours.</p>`,
+      `<table style="width:100%;border-collapse:collapse;font-size:14px;color:#0F0A1E">`,
+      `<tr><td style="padding:5px 0;color:#5B6B8A">Transaction ID</td><td style="padding:5px 0;font-weight:700">${escapeHtml(payment.txnId)}</td></tr>`,
+      `<tr><td style="padding:5px 0;color:#5B6B8A">Method</td><td style="padding:5px 0;font-weight:700">${escapeHtml(payment.method)}</td></tr>`,
+      `</table>`,
+      `<p style="color:#9BA8C0;font-size:13px;margin:20px 0 0">You'll get another email the moment your plan goes live.</p>`
+    ].join("")
+  });
+}
+
 // Tell the customer their plan is active after the owner confirms payment.
 async function emailCustomerActivated(toEmail, payment, renewalDate) {
   const renew = renewalDate ? new Date(renewalDate).toISOString().slice(0, 10) : "";
@@ -4573,8 +4590,10 @@ async function submitPaymentClaim(input, session) {
   data.payments.push(payment);
   await writeDatabase(data);
 
-  // Best-effort owner notification (does not block the response).
+  // Best-effort notifications (do not block the response).
   notifyOwnerPaymentClaim(payment, paymentSettings(data).ownerNotifyEmail).catch(() => {});
+  const account = (data.customerAccounts || []).find((a) => a.tenantId === tenant.id);
+  emailCustomerClaimReceived(account?.email || account?.username, payment).catch(() => {});
   return { ok: true, payment };
 }
 
@@ -8368,6 +8387,15 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await selectCustomerPlan(body, session);
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { tenant: result.tenant, payment: result.payment || null } : { errors: result.errors });
+      return;
+    }
+
+    // Cheap session probe so the UI can resolve owner/customer role + apply nav
+    // access without waiting on (or depending on) the heavy /api/dashboard build.
+    if (pathname === "/api/session" && req.method === "GET") {
+      const session = getSession(req);
+      if (!session) { jsonResponse(res, 401, { error: "Authentication required." }); return; }
+      jsonResponse(res, 200, { session: { role: session.role, username: session.username, tenantId: session.tenantId } });
       return;
     }
 

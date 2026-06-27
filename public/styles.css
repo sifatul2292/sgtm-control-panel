@@ -4272,3 +4272,44 @@ a.button.button-primary {
 .onboarding-step-body strong { font-size: 0.95rem; }
 .onboarding-step-body span { font-size: 0.82rem; color: var(--color-text-muted, #667085); }
 .onboarding-step-cta { white-space: nowrap; }
+
+/* ── Payment status card (top of subscription) ────────────────────────── */
+.payment-status-card { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; padding: 18px 20px; border-radius: 14px; border: 1px solid var(--color-border, #E5E7EB); margin-bottom: 18px; background: #fff; }
+.payment-status-card .psc-main { display: flex; gap: 14px; align-items: flex-start; flex: 1; min-width: 260px; }
+.payment-status-card .psc-icon { font-size: 1.6rem; line-height: 1; }
+.payment-status-card .psc-text strong { display: block; font-size: 1.05rem; margin-bottom: 2px; }
+.payment-status-card .psc-text p { margin: 0; color: var(--color-text-muted, #667085); font-size: 0.9rem; line-height: 1.5; }
+.payment-status-card .psc-invoice { display: inline-block; margin-top: 6px; font-size: 0.78rem; color: var(--color-text-muted, #667085); }
+.payment-status-card.is-pending { border-left: 4px solid #F59E0B; background: #FFFBEB; }
+.payment-status-card.is-verifying { border-left: 4px solid #6366F1; background: #EEF2FF; }
+.payment-status-card.is-active { border-left: 4px solid #059669; background: #ECFDF5; }
+.payment-status-card.is-warning { border-left: 4px solid #EA580C; background: #FFF7ED; }
+.payment-status-card.is-danger { border-left: 4px solid #DC2626; background: #FEF2F2; }
+
+/* ── Payment modal ────────────────────────────────────────────────────── */
+body.modal-open { overflow: hidden; }
+.payment-modal-overlay { position: fixed; inset: 0; background: rgba(15,10,30,.55); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1000; padding: 20px; }
+.payment-modal { position: relative; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 18px; padding: 28px; box-shadow: 0 24px 60px rgba(15,10,30,.3); }
+.payment-modal-close { position: absolute; top: 16px; right: 16px; border: none; background: #F3F4F6; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.9rem; color: #475467; }
+.pm-header { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; }
+.pm-eyebrow { font-size: 0.8rem; font-weight: 700; color: var(--color-primary, #5B21B6); text-transform: uppercase; letter-spacing: .04em; }
+.pm-amount { font-size: 2rem; font-weight: 900; color: #0F0A1E; }
+.pm-amount small { font-size: 0.9rem; font-weight: 600; color: var(--color-text-muted, #667085); }
+.pm-steps { margin: 0 0 18px; padding-left: 20px; color: #0F0A1E; line-height: 1.8; font-size: 0.9rem; }
+.pm-numbers { display: grid; gap: 10px; margin-bottom: 14px; }
+.pm-number { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border: 1px solid var(--color-border, #E5E7EB); border-radius: 12px; background: #F9FAFB; }
+.pm-number span { display: block; font-size: 0.72rem; color: var(--color-text-muted, #667085); }
+.pm-number strong { font-size: 1.15rem; letter-spacing: .5px; }
+.pm-copy { border: 1px solid var(--color-border, #E5E7EB); background: #fff; border-radius: 8px; padding: 6px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; color: var(--color-primary, #5B21B6); }
+.pm-warn { color: #B45309; background: #FFFBEB; border: 1px solid #FDE68A; padding: 12px; border-radius: 10px; margin: 0; font-size: 0.85rem; }
+.pm-ref { font-size: 0.82rem; color: var(--color-text-muted, #667085); margin: 0 0 18px; }
+.pm-form { display: grid; gap: 12px; }
+.pm-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; font-weight: 600; }
+.pm-form input, .pm-form select { padding: 10px 12px; border: 1px solid var(--color-border, #E5E7EB); border-radius: 10px; font-size: 0.95rem; }
+.pm-submit { margin-top: 4px; }
+.pm-message { font-size: 0.82rem; color: var(--color-text-muted, #667085); }
+.pm-message.is-error { color: var(--color-danger, #DC2626); }
+.pm-success { text-align: center; padding: 16px 4px; }
+.pm-success-icon { font-size: 2.5rem; }
+.pm-success h3 { margin: 10px 0 8px; font-size: 1.3rem; }
+.pm-success p { color: var(--color-text-muted, #667085); line-height: 1.6; margin: 0 0 20px; font-size: 0.9rem; }

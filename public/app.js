@@ -445,10 +445,31 @@ function setView(name, options = {}) {
   els.pageTitle.textContent = currentSession.role === "customer" && next === "dashboard" ? "Tracking Overview" : viewTitles[next][1];
   window.location.hash = next;
   if (!options.skipRender && latestData) renderCurrentView(latestData);
+  // Payment panels load independently of the (sometimes-failing) dashboard fetch.
+  if (next === "admin") { loadOwnerPayments(); loadPaymentSettings(); }
+  if (next === "billing") loadBillingPayment();
+  if (next === "customerContainers") loadOnboarding();
 }
 
 function applySessionAccess(data) {
-  currentSession = data.session || { role: "owner" };
+  applySession(data.session);
+}
+
+// Resolve role from the cheap /api/session endpoint so owner/customer access works
+// even when the heavy /api/dashboard build fails. Runs at boot before loadDashboard.
+async function initSession() {
+  try {
+    const r = await fetch("/api/session", { cache: "no-store" });
+    if (!r.ok) return;
+    const { session } = await r.json();
+    if (session) applySession(session);
+  } catch {
+    // Fall back to whatever loadDashboard resolves.
+  }
+}
+
+function applySession(session) {
+  currentSession = session || { role: "owner" };
   const customerMode = currentSession.role === "customer";
   try {
     window.localStorage.setItem("tagioo_session_role", customerMode ? "customer" : "owner");
@@ -4356,6 +4377,10 @@ function renderOnboarding(tracking) {
   }
 }
 
+// Cache of the latest billing snapshot so the modal can render without refetching.
+let latestBilling = null;
+
+// Customer picks a plan -> create the pending invoice, then open the payment modal.
 async function selectSubscriptionPlan(planName) {
   try {
     const response = await fetch("/api/customer/subscription", {
@@ -4365,15 +4390,15 @@ async function selectSubscriptionPlan(planName) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Plan update failed."]).join(" "));
-    await loadDashboard();
     setView("billing");
-    if (result.payment) document.getElementById("paymentPanel")?.scrollIntoView({ behavior: "smooth" });
+    await loadBillingPayment();
+    if (result.payment) openPaymentModal(result.payment);
   } catch (error) {
-    if (els.billingBadge) els.billingBadge.textContent = error.message;
+    window.alert(error.message);
   }
 }
 
-// Fetch the customer's billing/payment state and render the manual-payment panel.
+// Fetch billing state and render the top status card.
 async function loadBillingPayment() {
   const panel = document.getElementById("paymentPanel");
   if (!panel) return;
@@ -4381,72 +4406,145 @@ async function loadBillingPayment() {
     const response = await fetch("/api/customer/billing");
     if (!response.ok) { panel.hidden = true; return; }
     const { billing } = await response.json();
-    renderPaymentPanel(billing || {});
+    latestBilling = billing || {};
+    renderPaymentStatusCard(latestBilling);
   } catch {
     panel.hidden = true;
   }
 }
 
-function renderPaymentPanel(billing) {
+// Status-aware banner at the top of the subscription page.
+function renderPaymentStatusCard(billing) {
   const panel = document.getElementById("paymentPanel");
   if (!panel) return;
-  const pending = billing.subscriptionStatus === "pending_payment" && billing.payment;
+  const status = billing.subscriptionStatus;
   const claims = Array.isArray(billing.claims) ? billing.claims : [];
+  const openClaim = claims.find((c) => c.status === "pending");
+  const lastConfirmed = claims.find((c) => c.status === "confirmed");
+  const renew = billing.renewalDate ? new Date(billing.renewalDate).toLocaleDateString() : "";
+  const money = (n) => `৳${Number(n || 0).toLocaleString()}`;
 
-  // Show the panel when an upgrade is awaiting payment, or there is recent claim history.
-  if (!pending && !claims.length) { panel.hidden = true; return; }
-  panel.hidden = false;
+  let tone = "", icon = "", title = "", sub = "", action = "", invoiceRow = "";
 
-  const badge = document.getElementById("paymentStatusBadge");
-  const form = document.getElementById("paymentClaimForm");
-  const instr = document.getElementById("paymentInstructions");
-  const hasOpenClaim = claims.some((c) => c.status === "pending");
-
-  if (pending) {
-    const p = billing.payment;
-    const numbers = [
-      p.bkashNumber ? `<div class="pay-num"><span>bKash</span><strong>${escapeHtml(p.bkashNumber)}</strong></div>` : "",
-      p.nagadNumber ? `<div class="pay-num"><span>Nagad</span><strong>${escapeHtml(p.nagadNumber)}</strong></div>` : ""
-    ].join("");
-    instr.innerHTML = `
-      <div class="pay-summary">
-        <div><span>Plan</span><strong>${escapeHtml(p.plan)}</strong></div>
-        <div><span>Amount</span><strong>৳${Number(p.amount).toLocaleString()}</strong></div>
-        <div><span>Invoice</span><strong>${escapeHtml(p.invoiceNo)}</strong></div>
-      </div>
-      <div class="pay-numbers">${numbers || "<em>Payment numbers not set yet — contact support.</em>"}</div>
-      <p class="pay-instructions">${escapeHtml(p.instructions || "")}</p>`;
-    if (badge) { badge.textContent = hasOpenClaim ? "Verifying payment" : "Awaiting payment"; }
-    if (form) { form.hidden = hasOpenClaim; form.onsubmit = submitPaymentClaimForm; }
+  if (openClaim) {
+    tone = "is-verifying"; icon = "⏳";
+    title = "We're verifying your payment";
+    sub = `Transaction <strong>${escapeHtml(openClaim.txnId)}</strong> for ${escapeHtml(openClaim.plan)} (${money(openClaim.amount)}) is under review. Your plan activates as soon as we confirm it — usually within a few hours.`;
+  } else if (status === "pending_payment" && billing.payment) {
+    tone = "is-pending"; icon = "💳";
+    title = `Finish upgrading to ${escapeHtml(billing.payment.plan)}`;
+    sub = `Send <strong>${money(billing.payment.amount)}</strong> via bKash or Nagad, then submit your Transaction ID to activate.`;
+    invoiceRow = `<span class="psc-invoice">Invoice ${escapeHtml(billing.payment.invoiceNo)}</span>`;
+    action = `<button class="button button-primary" type="button" data-open-payment>Complete payment</button>`;
+  } else if (status === "expired") {
+    tone = "is-danger"; icon = "🛑";
+    title = "Your plan has expired";
+    sub = "Tracking is paused. Renew now to resume sending conversions to Meta and Google.";
+    action = `<button class="button button-primary" type="button" data-renew-plan="${escapeHtml(billing.plan)}">Renew now</button>`;
+  } else if (status === "overdue") {
+    tone = "is-warning"; icon = "⚠️";
+    title = "Payment overdue";
+    sub = `Your ${escapeHtml(billing.plan)} plan renewal is due${renew ? ` (was ${escapeHtml(renew)})` : ""}. Renew now to avoid your tracking being paused.`;
+    action = `<button class="button button-primary" type="button" data-renew-plan="${escapeHtml(billing.plan)}">Renew now</button>`;
+  } else if (status === "active" && lastConfirmed && billing.paymentStatus === "paid") {
+    tone = "is-active"; icon = "✅";
+    title = `${escapeHtml(billing.plan)} plan is active`;
+    sub = renew ? `Verified and running. Renews on <strong>${escapeHtml(renew)}</strong>.` : "Payment verified — your plan is active.";
   } else {
-    instr.innerHTML = "";
-    if (form) form.hidden = true;
-    if (badge) badge.textContent = billing.subscriptionStatus === "active" ? "Active" : "No payment due";
+    panel.hidden = true;
+    return;
   }
 
-  const history = document.getElementById("paymentClaimHistory");
-  if (history) {
-    history.innerHTML = claims.length
-      ? `<div class="subscription-feature-heading">Payment history</div>` + claims.map((c) => `
-          <div class="claim-row claim-${escapeHtml(c.status)}">
-            <span>${escapeHtml(c.invoiceNo)} · ${escapeHtml(c.plan)} · ৳${Number(c.amount).toLocaleString()}</span>
-            <span>${escapeHtml(c.method)} · ${escapeHtml(c.txnId)}</span>
-            <span class="claim-status">${escapeHtml(c.status)}</span>
-          </div>`).join("")
-      : "";
-  }
+  panel.hidden = false;
+  panel.className = `payment-status-card ${tone}`;
+  panel.innerHTML = `
+    <div class="psc-main">
+      <span class="psc-icon">${icon}</span>
+      <div class="psc-text">
+        <strong>${title}</strong>
+        <p>${sub}</p>
+        ${invoiceRow}
+      </div>
+    </div>
+    ${action ? `<div class="psc-action">${action}</div>` : ""}`;
+
+  const open = panel.querySelector("[data-open-payment]");
+  if (open) open.onclick = () => openPaymentModal(billing.payment);
+  const renewBtn = panel.querySelector("[data-renew-plan]");
+  if (renewBtn) renewBtn.onclick = () => selectSubscriptionPlan(renewBtn.dataset.renewPlan);
+}
+
+// ── Payment modal ──────────────────────────────────────────────────────────
+function openPaymentModal(payment) {
+  const overlay = document.getElementById("paymentModalOverlay");
+  const body = document.getElementById("paymentModalBody");
+  if (!overlay || !body || !payment) return;
+  const money = (n) => `৳${Number(n || 0).toLocaleString()}`;
+  const numberRow = (label, num) => num
+    ? `<div class="pm-number"><div><span>${label}</span><strong>${escapeHtml(num)}</strong></div><button class="pm-copy" type="button" data-copy="${escapeHtml(num)}">Copy</button></div>`
+    : "";
+  const numbers = [numberRow("bKash", payment.bkashNumber), numberRow("Nagad", payment.nagadNumber)].join("");
+
+  body.innerHTML = `
+    <div class="pm-header">
+      <span class="pm-eyebrow">Upgrade to ${escapeHtml(payment.plan)}</span>
+      <span class="pm-amount">${money(payment.amount)}<small>/month</small></span>
+    </div>
+    <ol class="pm-steps">
+      <li><strong>Open bKash or Nagad</strong> and choose <strong>Send Money</strong>.</li>
+      <li>Send <strong>${money(payment.amount)}</strong> to the number below.</li>
+      <li>Enter the <strong>Transaction ID</strong> you receive, then submit.</li>
+    </ol>
+    <div class="pm-numbers">${numbers || `<p class="pm-warn">⚠️ Payment numbers aren't configured yet. Please contact support before paying.</p>`}</div>
+    <p class="pm-ref">Reference / Invoice: <strong>${escapeHtml(payment.invoiceNo)}</strong></p>
+    <form id="paymentClaimForm" class="pm-form">
+      <label>Paid with
+        <select name="method" required>
+          <option value="bkash">bKash</option>
+          <option value="nagad">Nagad</option>
+        </select>
+      </label>
+      <label>Transaction ID
+        <input name="txnId" type="text" placeholder="e.g. 8N7A1B2C3D" required />
+      </label>
+      <label>Your sending number
+        <input name="senderNumber" type="text" inputmode="numeric" placeholder="01XXXXXXXXX" required />
+      </label>
+      <button class="button button-primary pm-submit" type="submit">I've paid — submit Transaction ID</button>
+      <span id="paymentClaimMessage" class="pm-message"></span>
+    </form>`;
+
+  body.querySelectorAll(".pm-copy").forEach((b) => {
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copied ✓"; setTimeout(() => (b.textContent = "Copy"), 1500); } catch { /* ignore */ }
+    };
+  });
+  const form = body.querySelector("#paymentClaimForm");
+  if (form) form.onsubmit = submitPaymentClaimForm;
+
+  overlay.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closePaymentModal() {
+  const overlay = document.getElementById("paymentModalOverlay");
+  if (overlay) overlay.hidden = true;
+  document.body.classList.remove("modal-open");
+  loadBillingPayment();
 }
 
 async function submitPaymentClaimForm(event) {
   event.preventDefault();
   const form = event.target;
   const msg = document.getElementById("paymentClaimMessage");
+  const btn = form.querySelector(".pm-submit");
   const body = {
     method: form.method.value,
     txnId: form.txnId.value.trim(),
     senderNumber: form.senderNumber.value.trim()
   };
-  if (msg) msg.textContent = "Submitting…";
+  if (msg) { msg.textContent = "Submitting…"; msg.className = "pm-message"; }
+  if (btn) btn.disabled = true;
   try {
     const response = await fetch("/api/customer/payment-claim", {
       method: "POST",
@@ -4455,11 +4553,18 @@ async function submitPaymentClaimForm(event) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Submit failed."]).join(" "));
-    if (msg) msg.textContent = "Submitted. We'll verify and activate your plan shortly.";
-    form.reset();
-    await loadBillingPayment();
+    // Success state inside the modal.
+    const modalBody = document.getElementById("paymentModalBody");
+    if (modalBody) modalBody.innerHTML = `
+      <div class="pm-success">
+        <span class="pm-success-icon">⏳</span>
+        <h3>Payment submitted!</h3>
+        <p>We've received Transaction ID <strong>${escapeHtml(body.txnId)}</strong> and emailed you a confirmation. We'll verify it and activate your plan shortly — you'll get another email the moment it's live.</p>
+        <button class="button button-primary" type="button" data-payment-modal-close>Done</button>
+      </div>`;
   } catch (error) {
-    if (msg) msg.textContent = error.message;
+    if (msg) { msg.textContent = error.message; msg.className = "pm-message is-error"; }
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -5151,6 +5256,19 @@ document.addEventListener("click", (e) => {
 });
 
 els.refreshButton.addEventListener("click", loadDashboard);
+
+// Payment modal: close on backdrop click, ✕, or "Done"; Esc key closes too.
+document.addEventListener("click", (event) => {
+  if (event.target.closest("[data-payment-modal-close]")) { closePaymentModal(); return; }
+  const overlay = document.getElementById("paymentModalOverlay");
+  if (overlay && !overlay.hidden && event.target === overlay) closePaymentModal();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    const overlay = document.getElementById("paymentModalOverlay");
+    if (overlay && !overlay.hidden) closePaymentModal();
+  }
+});
 els.dailyEventLogBody?.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-drill='errors']");
   if (!btn || !els.eventStatusFilter) return;
@@ -5438,5 +5556,8 @@ els.customerSetupForm.addEventListener("submit", async (event) => {
 });
 window.addEventListener("hashchange", () => setView(window.location.hash.replace("#", "") || "dashboard"));
 
-setView(window.location.hash.replace("#", "") || "dashboard");
-loadDashboard();
+(async () => {
+  await initSession();                                   // resolve role first (cheap)
+  setView(window.location.hash.replace("#", "") || "dashboard");
+  loadDashboard();                                       // heavy data; may fail without breaking access
+})();
