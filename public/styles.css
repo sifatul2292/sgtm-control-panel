@@ -4253,3 +4253,22 @@ a.button.button-primary {
 .claim-rejected .claim-status { color: var(--color-danger, #DC2626); }
 .summary-item.claim-pending { border-left: 3px solid #F59E0B; }
 .summary-item-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ── Onboarding checklist (new-customer handoff) ──────────────────────── */
+.onboarding-card { border: 1px solid var(--color-border, #E5E7EB); }
+.onboarding-head { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.onboarding-progress { min-width: 160px; }
+.onboarding-progress > span { font-size: 0.8rem; color: var(--color-text-muted, #667085); font-weight: 700; }
+.onboarding-bar { height: 8px; background: #E5E7EB; border-radius: 99px; overflow: hidden; margin-top: 6px; }
+.onboarding-bar > span { display: block; height: 8px; background: var(--color-primary, #5B21B6); transition: width .3s; }
+.onboarding-steps { display: grid; gap: 10px; }
+.onboarding-step { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--color-border, #E5E7EB); border-radius: 12px; }
+.onboarding-step.is-active { border-color: var(--color-primary, #5B21B6); background: rgba(91,33,182,.04); }
+.onboarding-step.is-done { opacity: .65; }
+.onboarding-step-mark { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 0.9rem; background: #E5E7EB; color: #475467; }
+.onboarding-step.is-done .onboarding-step-mark { background: #059669; color: #fff; }
+.onboarding-step.is-active .onboarding-step-mark { background: var(--color-primary, #5B21B6); color: #fff; }
+.onboarding-step-body { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.onboarding-step-body strong { font-size: 0.95rem; }
+.onboarding-step-body span { font-size: 0.82rem; color: var(--color-text-muted, #667085); }
+.onboarding-step-cta { white-space: nowrap; }

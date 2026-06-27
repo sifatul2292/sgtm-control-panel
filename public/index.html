@@ -11,7 +11,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=18" />
+    <link rel="stylesheet" href="/styles.css?v=19" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -665,6 +665,20 @@
               <p>Manage your server-side GTM containers, tracking domains, logs, and setup details from one place.</p>
             </div>
             <button class="button button-primary" type="button" data-scroll-target="customerContainerCreate">New Container</button>
+          </section>
+
+          <section id="onboardingCard" class="panel onboarding-card" hidden>
+            <div class="onboarding-head">
+              <div>
+                <h2>Get your tracking live in 3 steps</h2>
+                <p>No code needed — our setup assistant walks you through each one.</p>
+              </div>
+              <div class="onboarding-progress">
+                <span id="onboardingProgressText">0 / 3 done</span>
+                <div class="onboarding-bar"><span id="onboardingBar" style="width:0%"></span></div>
+              </div>
+            </div>
+            <div id="onboardingSteps" class="onboarding-steps"></div>
           </section>
 
           <section class="panel container-list-panel">
@@ -2301,6 +2315,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=30" type="module"></script>
+    <script src="/app.js?v=31" type="module"></script>
   </body>
 </html>

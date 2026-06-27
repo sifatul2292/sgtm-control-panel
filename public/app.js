@@ -2220,6 +2220,7 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
 }
 
 function renderCustomerContainers(data) {
+  loadOnboarding();
   const requests = (data.customerSetup?.requests || []).filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()));
   const dnsTarget = data.config?.provisionDnsTarget || data.config?.publicBaseUrl || window.location.host || "the SGTM server";
   if (els.customerDnsTarget) els.customerDnsTarget.textContent = dnsTarget;
@@ -4289,6 +4290,70 @@ function renderBilling(data) {
     button.onclick = () => selectSubscriptionPlan(button.dataset.planAction);
   });
   loadBillingPayment();
+}
+
+// New-customer onboarding checklist: 3 plug-and-play steps to go live.
+// Driven by the tenant's tracking state; hides itself once all steps pass.
+async function loadOnboarding() {
+  const card = document.getElementById("onboardingCard");
+  if (!card) return;
+  try {
+    const response = await fetch("/api/customer/me");
+    if (!response.ok) { card.hidden = true; return; }
+    const { tracking } = await response.json();
+    renderOnboarding(tracking || {});
+  } catch {
+    card.hidden = true;
+  }
+}
+
+function renderOnboarding(tracking) {
+  const card = document.getElementById("onboardingCard");
+  if (!card) return;
+  const steps = [
+    {
+      done: Boolean(tracking.domain && tracking.measurementId),
+      title: "Add your website & GA4",
+      desc: "Enter your store domain and Google Analytics ID in the setup assistant."
+    },
+    {
+      done: Boolean(tracking.meta?.pixelId && tracking.meta?.hasToken),
+      title: "Connect Meta (Pixel + CAPI)",
+      desc: "Paste your Meta Pixel ID and Conversions API token to recover lost sales."
+    },
+    {
+      done: Boolean(tracking.lastVerify?.ok),
+      title: "Go live & confirm tracking",
+      desc: "Run the one-click tracking test — we check GA4 and Meta are receiving events."
+    }
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+
+  // Hide the whole card once everything is set up.
+  if (doneCount === steps.length) { card.hidden = true; return; }
+  card.hidden = false;
+
+  const text = document.getElementById("onboardingProgressText");
+  const bar = document.getElementById("onboardingBar");
+  if (text) text.textContent = `${doneCount} / ${steps.length} done`;
+  if (bar) bar.style.width = `${Math.round((doneCount / steps.length) * 100)}%`;
+
+  // First not-yet-done step is the active call-to-action.
+  const activeIndex = steps.findIndex((s) => !s.done);
+  const list = document.getElementById("onboardingSteps");
+  if (list) {
+    list.innerHTML = steps.map((s, i) => `
+      <div class="onboarding-step ${s.done ? "is-done" : i === activeIndex ? "is-active" : ""}">
+        <span class="onboarding-step-mark">${s.done ? "✓" : i + 1}</span>
+        <div class="onboarding-step-body">
+          <strong>${escapeHtml(s.title)}</strong>
+          <span>${escapeHtml(s.desc)}</span>
+        </div>
+        ${!s.done && i === activeIndex ? `<button class="button button-primary onboarding-step-cta" type="button">Start →</button>` : ""}
+      </div>`).join("");
+    const cta = list.querySelector(".onboarding-step-cta");
+    if (cta) cta.onclick = () => setView("setupAssistant");
+  }
 }
 
 async function selectSubscriptionPlan(planName) {
