@@ -1413,47 +1413,34 @@ window.dataLayer.push({
               </div><!-- /shopify tab -->
 
               <!-- ── WooCommerce ── -->
-              <div class="instructions-tab-panel is-active" data-tab-panel="woo">
+              <div class=”instructions-tab-panel is-active” data-tab-panel=”woo”>
 
-                <div class="setup-quickstart">
-                  <div class="setup-quickstart-head">
-                    <span class="badge ok">10-minute setup</span>
-                    <h3>WooCommerce → Tagioo in 4 steps</h3>
-                    <p>Follow these in order. Each step takes ~2 minutes. By the end your store sends clean, server-side, deduplicated events to GA4, Meta and TikTok — and recovers purchases even when the browser pixel is blocked.</p>
+                <div class=”setup-quickstart”>
+                  <div class=”setup-quickstart-head”>
+                    <span class=”badge ok”>10-minute setup</span>
+                    <h3>WooCommerce → Tagioo in 3 steps</h3>
+                    <p>Follow these in order. By the end your store sends clean, server-side, deduplicated events to GA4, Meta and TikTok — even when the browser pixel is blocked.</p>
                   </div>
-                  <ol class="setup-stepper">
-                    <li><span class="setup-step-no">1</span><div><strong>Order sync webhook</strong><span>Native WooCommerce webhook → Tagioo. No plugin. ~2 min.</span><a href="#wooStep1" data-scroll-target="wooStep1">Jump to step 1 ↓</a></div></li>
-                    <li><span class="setup-step-no">2</span><div><strong>Install Tagioo plugin</strong><span>Download from Setup Assistant. Pushes full ecommerce dataLayer automatically. ~2 min.</span><a href="#wooStep2" data-scroll-target="wooStep2">Jump to step 2 ↓</a></div></li>
-                    <li><span class="setup-step-no">3</span><div><strong>Import GTM containers</strong><span>Import the two ready-made JSON files (web + server). ~3 min.</span><a href="#wooStep3" data-scroll-target="wooStep3">Jump to step 3 ↓</a></div></li>
-                    <li><span class="setup-step-no">4</span><div><strong>Test &amp; go live</strong><span>Fire a test purchase and confirm it lands everywhere. ~2 min.</span><a href="#wooStep4" data-scroll-target="wooStep4">Jump to step 4 ↓</a></div></li>
+                  <ol class=”setup-stepper”>
+                    <li><span class=”setup-step-no”>1</span><div><strong>Generate JSON files</strong><span>Use the Setup Assistant above to download web.json + server.json pre-configured for your store.</span><a href=”#wooStep1” data-scroll-target=”wooStep1”>Jump to step 1 ↓</a></div></li>
+                    <li><span class=”setup-step-no”>2</span><div><strong>Install Tagioo plugin</strong><span>Download and install the WordPress plugin. Pushes full ecommerce dataLayer automatically.</span><a href=”#wooStep2” data-scroll-target=”wooStep2”>Jump to step 2 ↓</a></div></li>
+                    <li><span class=”setup-step-no”>3</span><div><strong>Test &amp; go live</strong><span>Import the JSON files into GTM, fire a test purchase, and verify in Meta Test Events.</span><a href=”#wooStep3” data-scroll-target=”wooStep3”>Jump to step 3 ↓</a></div></li>
                   </ol>
                 </div>
 
-                <div class="event-group" id="wooStep1">
-                  <div class="event-group-header">
-                    <span class="event-label">Step 1 — order sync (no plugin)</span>
-                    <span class="event-trigger">WooCommerce native webhook — built into every WordPress store, nothing to install</span>
+                <div class=”event-group” id=”wooStep1”>
+                  <div class=”event-group-header”>
+                    <span class=”event-label”>Step 1 — generate JSON files</span>
+                    <span class=”event-trigger”>Use the Setup Assistant wizard above — fills your credentials and generates import-ready GTM files</span>
                   </div>
-                  <ol class="woo-webhook-steps">
-                    <li>In your WordPress admin, go to <strong>WooCommerce → Settings → Advanced → Webhooks</strong> and click <strong>Add webhook</strong>.</li>
-                    <li>Fill the form exactly like this:</li>
+                  <ol class=”woo-webhook-steps”>
+                    <li>Scroll up to the <strong>Setup Assistant</strong> panel on this page.</li>
+                    <li><strong>Step 1:</strong> Select <em>Ecommerce</em> as business type, <em>WooCommerce</em> as platform, set your currency and tracking domain.</li>
+                    <li><strong>Step 2:</strong> Choose your destinations — GA4, Meta CAPI, Google Ads, TikTok.</li>
+                    <li><strong>Step 3:</strong> Enter your pixel IDs, measurement IDs, and access tokens. Leave any blank — Tagioo adds placeholders you can fill inside GTM later.</li>
+                    <li><strong>Step 4:</strong> Click <em>Generate templates</em>. Two buttons activate: <strong>⇣ web.json</strong> and <strong>⇣ server.json</strong>. Download both.</li>
                   </ol>
-<pre class="instructions-code"><code>Name:          Tagioo order sync
-Status:        Active
-Topic:         Order created
-Delivery URL:  <span data-woo-webhook-url>https://your-panel-domain/api/orders/woocommerce</span>
-Secret:        <span data-woo-webhook-secret>click “Generate secret” below</span>
-API Version:   WP REST API Integration v3</code></pre>
-                  <div class="woo-webhook-actions">
-                    <button id="generateWooSecret" class="button" type="button">Generate secret</button>
-                    <button id="copyWooSecret" class="button" type="button" hidden>Copy secret</button>
-                    <span id="wooSecretMessage" class="form-message"></span>
-                  </div>
-                  <ol class="woo-webhook-steps" start="3">
-                    <li>Click <strong>Save webhook</strong>. WooCommerce sends a test ping — the status should stay <strong>Active</strong>.</li>
-                    <li>Place a test order. It appears in your Tagioo dashboard within seconds and is matched against tracked purchases automatically.</li>
-                  </ol>
-                  <p class="woo-webhook-note">Generating a new secret replaces the old one, so update the WooCommerce webhook if you regenerate. Tagioo verifies every delivery with the <code>x-wc-webhook-signature</code> header, so no plugin, code snippet, or API key is needed on your site. Order ID, total, currency, and date are mapped automatically.</p>
+                  <p class=”woo-webhook-note”>Keep these files — you’ll import them in step 3. The JSON files contain all GA4, Meta CAPI, and TikTok tags pre-wired to the Tagioo plugin’s dataLayer format, including <code>transaction_id</code> for deduplication.</p>
                 </div>
 
                 <div class=”event-group” id=”wooStep2”>
@@ -1463,55 +1450,43 @@ API Version:   WP REST API Integration v3</code></pre>
                   </div>
                   <div class=”woo-plugin-download-card”>
                     <button id=”downloadPlugin” class=”button button-primary” type=”button”>⇣ Download Tagioo Plugin (.zip)</button>
-                    <span class=”woo-plugin-note”>Generated with your tracking config</span>
+                    <span class=”woo-plugin-note”>WordPress plugin — install directly from your WP admin</span>
                   </div>
                   <ol class=”woo-webhook-steps”>
-                    <li>Download the plugin using the button above.</li>
-                    <li>In WordPress admin go to <strong>Plugins → Add New → Upload Plugin</strong>, choose the <code>tagioo-woocommerce.zip</code> file, then click <strong>Install Now</strong> and <strong>Activate</strong>.</li>
-                    <li>That’s it. The Tagioo plugin automatically pushes <code>page_view</code>, <code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code>, <code>purchase</code>, and <code>user_data</code> (email, phone, name) into the dataLayer — no configuration needed.</li>
+                    <li>Click the <strong>Download button above</strong> to get <code>tagioo-woocommerce.zip</code>.</li>
+                    <li>In WordPress admin go to <strong>Plugins → Add New → Upload Plugin</strong>, choose the zip file, click <strong>Install Now</strong>, then <strong>Activate</strong>.</li>
+                    <li>No configuration needed. The plugin automatically pushes <code>page_view</code>, <code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code>, <code>purchase</code>, and <code>user_data</code> (email, phone, name) into the dataLayer on every event.</li>
                   </ol>
-                  <p class=”woo-webhook-note”>The plugin replaces GTM4WP entirely. It uses the GA4 ecommerce data structure (<code>items[]</code>) and includes <code>event_id</code> on every event for browser↔server deduplication. You can skip the manual PHP snippets at the bottom of this page.</p>
+                  <p class=”woo-webhook-note”>The plugin uses the GA4 ecommerce data structure (<code>items[]</code>) and includes <code>event_id</code> on every event for browser↔server deduplication. No GTM4WP needed.</p>
                 </div>
 
-                <div class="event-group" id="wooStep3">
-                  <div class="event-group-header">
-                    <span class="event-label">Step 3 — import GTM containers</span>
-                    <span class="event-trigger">Two ready-made JSON files: one web container, one server container</span>
+                <div class=”event-group” id=”wooStep3”>
+                  <div class=”event-group-header”>
+                    <span class=”event-label”>Step 3 — import GTM containers &amp; test</span>
+                    <span class=”event-trigger”>Import web.json + server.json into GTM, publish, fire a test purchase, verify in Meta</span>
                   </div>
-                  <ol class="woo-webhook-steps">
-                    <li>Download the two container files generated for your store using the buttons in the <strong>“Container templates”</strong> panel above (Web container JSON + Server container JSON).</li>
-                    <li><strong>Web container:</strong> open <a href="https://tagmanager.google.com" target="_blank" rel="noopener">tagmanager.google.com</a> → your <em>web</em> container → <strong>Admin → Import Container</strong>. Choose the web JSON, pick <strong>Existing</strong> workspace, and select <strong>Merge → Overwrite conflicting tags</strong>. Click <strong>Confirm</strong>.</li>
-                    <li><strong>Server container:</strong> switch to your <em>server</em> container → <strong>Admin → Import Container</strong>, choose the server JSON, <strong>Merge → Overwrite</strong>, <strong>Confirm</strong>.</li>
-                    <li>In the server container open <strong>Clients</strong> and confirm the <em>GA4</em> client and the <em>Data tag</em> point to <code><span data-woo-tracking-domain>your tracking domain</span></code>.</li>
+                  <ol class=”woo-webhook-steps”>
+                    <li><strong>Web container:</strong> open <a href=”https://tagmanager.google.com” target=”_blank” rel=”noopener”>tagmanager.google.com</a> → your <em>web</em> container → <strong>Admin → Import Container</strong>. Choose <strong>web.json</strong>, pick <strong>Existing</strong> workspace, select <strong>Merge → Overwrite conflicting tags</strong>. Click <strong>Confirm</strong>.</li>
+                    <li><strong>Server container:</strong> switch to your <em>server</em> container → <strong>Admin → Import Container</strong>, choose <strong>server.json</strong>, <strong>Merge → Overwrite</strong>, <strong>Confirm</strong>.</li>
+                    <li>In the server container open <strong>Clients</strong> and confirm the GA4 client and the Data tag point to <code><span data-woo-tracking-domain>your tracking domain</span></code>.</li>
                     <li>Click <strong>Submit → Publish</strong> on <em>both</em> containers.</li>
-                  </ol>
-                  <p class="woo-webhook-note">The JSON files already contain the GA4, Meta CAPI and TikTok tags, all triggers, and the variables that read the Tagioo plugin’s dataLayer — including <code>transaction_id</code> for deduplication. You only fill in your own pixel/measurement IDs, which are pre-populated from the form above.</p>
-                </div>
-
-                <div class="event-group" id="wooStep4">
-                  <div class="event-group-header">
-                    <span class="event-label">Step 4 — test &amp; go live</span>
-                    <span class="event-trigger">Confirm one real purchase reaches every destination, then you’re done</span>
-                  </div>
-                  <ol class="woo-webhook-steps">
                     <li>In each GTM container click <strong>Preview</strong> and enter your store URL to open Tag Assistant.</li>
-                    <li>On your store: view a product, add to cart, begin checkout, and place a <strong>test order</strong> (a 1-unit cheap product or 100% coupon).</li>
-                    <li>In Tag Assistant confirm <code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code> and <code>purchase</code> fire, and that the GA4 / Meta / TikTok tags fired on <code>purchase</code>.</li>
-                    <li>Verify the event landed everywhere:
+                    <li>On your store: view a product, add to cart, begin checkout, and place a <strong>test order</strong> (cheap product or 100% coupon).</li>
+                    <li>Verify the purchase landed everywhere:
                       <ul>
-                        <li><strong>Tagioo → Event Logs:</strong> the request appears within seconds; the <strong>Purchase Inspector</strong> shows the order with its <code>transaction_id</code>.</li>
-                        <li><strong>GA4:</strong> Reports → Realtime shows the purchase with revenue.</li>
-                        <li><strong>Meta:</strong> Events Manager → Test Events shows <code>Purchase</code> (server) — and no duplicate vs the browser pixel, because both share <code>transaction_id</code>.</li>
+                        <li><strong>Tagioo → Event Logs:</strong> purchase appears within seconds with <code>transaction_id</code>.</li>
+                        <li><strong>GA4 Realtime:</strong> purchase shows with revenue.</li>
+                        <li><strong>Meta → Events Manager → Test Events:</strong> <code>Purchase</code> appears server-side with no browser duplicate.</li>
                       </ul>
                     </li>
-                    <li>Refund/cancel the test order. Done — your store is now tracking server-side. 🎉</li>
+                    <li>Refund/cancel the test order. Your store is now live with server-side tracking. 🎉</li>
                   </ol>
-                  <p class="woo-webhook-note">Seeing duplicate purchases in Meta? Make sure the browser pixel and the CAPI/server tag both send the same <code>event_id</code>/<code>transaction_id</code> (the order ID). Tagioo and the supplied containers already do this — duplicates almost always mean a second, older pixel is still hard-coded in your theme.</p>
+                  <p class=”woo-webhook-note”>Seeing duplicate purchases in Meta? Both the browser pixel and the CAPI/server tag send the same <code>event_id</code>/<code>transaction_id</code> — Meta deduplicates automatically. Duplicates almost always mean an old pixel is hard-coded in your theme.</p>
                 </div>
 
-                <details class="woo-advanced">
+                <details class=”woo-advanced”>
                   <summary>Advanced — manual dataLayer snippets (skip if you installed the Tagioo plugin)</summary>
-                  <p class="woo-webhook-note">Only use these if you are <em>not</em> using the Tagioo plugin and want to push the dataLayer yourself from your theme’s <code>functions.php</code>.</p>
+                  <p class=”woo-webhook-note”>Only use these if you are <em>not</em> using the Tagioo plugin and want to push the dataLayer yourself from your theme’s <code>functions.php</code>.</p>
 
                 <div class="event-group">
                   <div class="event-group-header">
