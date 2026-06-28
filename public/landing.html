@@ -511,34 +511,80 @@
           <h2>Live in under 30 minutes.</h2>
           <p class="section-sub">No developers. No server knowledge. No DevOps. If you can update DNS, you can launch Tagioo.</p>
         </div>
-        <div class="step-grid">
-          <article class="step-card">
+        <div class="step-timeline">
+          <article class="step-card step-reveal">
             <div class="step-num-wrap">
               <span class="step-number">01</span>
-              <div class="step-line"></div>
+              <div class="step-connector"></div>
             </div>
             <div class="step-body">
-              <h3>Create your container</h3>
-              <p>Sign up, enter your website domain and GTM server container config. Tagioo handles Docker, Nginx, SSL, and launch automatically.</p>
+              <h3>Create account in Tagioo</h3>
+              <p>Sign up at tagioo.com — takes 30 seconds. Your dashboard is ready instantly.</p>
             </div>
           </article>
-          <article class="step-card">
+          <article class="step-card step-reveal">
             <div class="step-num-wrap">
               <span class="step-number">02</span>
-              <div class="step-line"></div>
+              <div class="step-connector"></div>
             </div>
             <div class="step-body">
-              <h3>Point your DNS</h3>
-              <p>Add one CNAME record: <code>server.yourstore.com → bd.tagioo.com</code>. Your domain, your first-party data.</p>
+              <h3>Create GTM Server Container</h3>
+              <p>In Google Tag Manager, create a Server container. Copy the <strong>Container Config</strong> string — you'll paste it into Tagioo next.</p>
+              <div class="step-sub-action">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7H12M8 3L12 7L8 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Point your first-party domain <code>track.yoursite.com</code> → <code>bd.tagioo.com</code> (one CNAME record)
+              </div>
             </div>
           </article>
-          <article class="step-card last">
+          <article class="step-card step-reveal">
             <div class="step-num-wrap">
               <span class="step-number">03</span>
+              <div class="step-connector"></div>
             </div>
             <div class="step-body">
-              <h3>Import GTM templates &amp; go live</h3>
-              <p>Use the Setup Assistant to generate your Web + Server GTM files. Import, publish, and events start flowing to Meta, GA4, Google Ads, and TikTok.</p>
+              <h3>Create a container in Tagioo</h3>
+              <p>Paste the config, enter your domain. Tagioo handles Docker, Nginx, SSL, and launch automatically.</p>
+            </div>
+          </article>
+          <article class="step-card step-reveal">
+            <div class="step-num-wrap">
+              <span class="step-number">04</span>
+              <div class="step-connector"></div>
+            </div>
+            <div class="step-body">
+              <h3>Use Setup Assistant to download JSON files</h3>
+              <p>Our 4-step wizard generates ready-made Web + Server GTM import files for GA4, Meta CAPI, Google Ads, and TikTok — pre-configured with your credentials.</p>
+            </div>
+          </article>
+          <article class="step-card step-reveal">
+            <div class="step-num-wrap">
+              <span class="step-number">05</span>
+              <div class="step-connector"></div>
+            </div>
+            <div class="step-body">
+              <h3>Import into Web &amp; Server GTM</h3>
+              <p>Upload <strong>web.json</strong> to your Web GTM container and <strong>server.json</strong> to your Server GTM container. Choose Merge, then Publish both.</p>
+            </div>
+          </article>
+          <article class="step-card step-reveal">
+            <div class="step-num-wrap">
+              <span class="step-number">06</span>
+              <div class="step-connector"></div>
+            </div>
+            <div class="step-body">
+              <h3>Download plugin &amp; connect website</h3>
+              <p>Download the Tagioo WordPress plugin from Setup Assistant, install it on your WooCommerce store, and activate — it handles the full ecommerce dataLayer automatically.</p>
+            </div>
+          </article>
+          <article class="step-card step-reveal step-card--final">
+            <div class="step-num-wrap">
+              <span class="step-number step-number--done">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4 9L7.5 12.5L14 5.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </div>
+            <div class="step-body">
+              <h3>Test events in Meta</h3>
+              <p>Open Meta Events Manager → Test Events. Fire a purchase on your store and watch it appear server-side. You're live.</p>
             </div>
           </article>
         </div>
@@ -610,7 +656,7 @@
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="12" rx="1.5" stroke="#0891B2" stroke-width="1.5"/><path d="M8 4V16M3 8H8M3 12H8" stroke="#0891B2" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
             <h3>WooCommerce integration</h3>
-            <p>Native webhook order sync — no plugin, no code. 10-minute setup connects your WooCommerce store server-to-server.</p>
+            <p>Install the Tagioo WordPress plugin — it pushes the full ecommerce dataLayer (view_item, add_to_cart, purchase, user_data) automatically. No manual code, no GTM4WP needed.</p>
           </article>
           <article class="feature-card">
             <div class="feature-icon-wrap" style="--fi-bg:rgba(5,150,105,0.08);--fi-border:rgba(5,150,105,0.18);">
@@ -943,7 +989,7 @@
           </details>
           <details class="faq-item">
             <summary>How does the WooCommerce integration work?</summary>
-            <p>Add one webhook in WooCommerce admin — no plugin installation, no code — and all orders sync to Tagioo automatically. Combined with the GTM4WP plugin and our ready-made GTM templates, your WooCommerce store gets full server-side tracking for Meta CAPI, GA4, Google Ads, and TikTok in about 10 minutes.</p>
+            <p>Download and install the Tagioo WordPress plugin from Setup Assistant. It automatically pushes the full ecommerce dataLayer — page_view, view_item, add_to_cart, begin_checkout, purchase, and user_data fields — so you don't need GTM4WP or any manual code. Combined with our ready-made GTM templates, your WooCommerce store gets full server-side tracking for Meta CAPI, GA4, Google Ads, and TikTok in about 10 minutes.</p>
           </details>
           <details class="faq-item">
             <summary>How do I pay?</summary>
@@ -1060,6 +1106,14 @@
       window.addEventListener("scroll", () => {
         header.classList.toggle("scrolled", window.scrollY > 40);
       }, { passive: true });
+
+      const stepObs = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("is-visible"); stepObs.unobserve(e.target); } });
+      }, { threshold: 0.15 });
+      document.querySelectorAll(".step-reveal").forEach((el, i) => {
+        el.style.animationDelay = `${i * 0.1}s`;
+        stepObs.observe(el);
+      });
 
       document.querySelectorAll(".faq-item").forEach(item => {
         item.addEventListener("toggle", () => {
