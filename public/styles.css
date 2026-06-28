@@ -2187,7 +2187,10 @@ h2 {
 
 .subscription-panel {
   background: var(--color-surface);
+  animation: planCardIn 400ms cubic-bezier(.22,1,.36,1) both;
 }
+.subscription-panel:nth-child(2) { animation-delay: 60ms; }
+.subscription-panel:nth-child(3) { animation-delay: 120ms; }
 
 .subscription-actions {
   display: flex;
@@ -2304,7 +2307,9 @@ h2 {
   height: 100%;
   border-radius: inherit;
   background: var(--color-accent);
+  animation: usageBarFill 800ms cubic-bezier(.22,1,.36,1) both;
 }
+@keyframes usageBarFill { from { width: 0 !important; } }
 
 .usage-progress-row small,
 .usage-progress-row span,
@@ -2332,7 +2337,14 @@ h2 {
   border: var(--rule-thin) solid var(--color-line);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  animation: planCardIn 420ms cubic-bezier(.22,1,.36,1) both;
+  transition: transform 180ms ease, box-shadow 180ms ease;
 }
+.subscription-plan-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+}
+@keyframes planCardIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 
 .subscription-plan-card.is-popular {
   border-color: var(--color-focus);
@@ -4274,7 +4286,7 @@ a.button.button-primary {
 .onboarding-step-cta { white-space: nowrap; }
 
 /* ── Payment status card (top of subscription) ────────────────────────── */
-.payment-status-card { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; padding: 18px 20px; border-radius: 14px; border: 1px solid var(--color-border, #E5E7EB); margin-bottom: 18px; background: #fff; }
+.payment-status-card { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; padding: 18px 20px; border-radius: 14px; border: 1px solid var(--color-border, #E5E7EB); margin-bottom: 18px; background: #fff; animation: planCardIn 400ms cubic-bezier(.22,1,.36,1) both; }
 .payment-status-card .psc-main { display: flex; gap: 14px; align-items: flex-start; flex: 1; min-width: 260px; }
 .payment-status-card .psc-icon { font-size: 1.6rem; line-height: 1; }
 .payment-status-card .psc-text strong { display: block; font-size: 1.05rem; margin-bottom: 2px; }
@@ -4288,8 +4300,10 @@ a.button.button-primary {
 
 /* ── Payment modal ────────────────────────────────────────────────────── */
 body.modal-open { overflow: hidden; }
-.payment-modal-overlay { position: fixed; inset: 0; background: rgba(15,10,30,.55); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1000; padding: 20px; }
-.payment-modal { position: relative; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 18px; padding: 28px; box-shadow: 0 24px 60px rgba(15,10,30,.3); }
+.payment-modal-overlay { position: fixed; inset: 0; background: rgba(15,10,30,.55); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1000; padding: 20px; animation: modalOverlayIn 200ms ease both; }
+.payment-modal { position: relative; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 18px; padding: 28px; box-shadow: 0 24px 60px rgba(15,10,30,.3); animation: modalSlideUp 320ms cubic-bezier(.22,1,.36,1) both; }
+@keyframes modalOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalSlideUp { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .payment-modal-close { position: absolute; top: 16px; right: 16px; border: none; background: #F3F4F6; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 0.9rem; color: #475467; }
 .pm-header { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; }
 .pm-eyebrow { font-size: 0.8rem; font-weight: 700; color: var(--color-primary, #5B21B6); text-transform: uppercase; letter-spacing: .04em; }

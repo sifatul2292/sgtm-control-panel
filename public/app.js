@@ -4290,23 +4290,31 @@ function renderBilling(data) {
   `;
 
   if (els.subscriptionPlans) {
+    const activeRank = planRank[activePlanName] ?? 0;
     els.subscriptionPlans.innerHTML = subscriptionPlans
       .filter((plan) => plan.name !== "Free")
-      .map((plan) => `
-        <article class="subscription-plan-card ${plan.popular ? "is-popular" : ""}">
+      .map((plan, i) => {
+        const isCurrent = plan.name === activePlanName;
+        const cardRank = planRank[plan.name] ?? 0;
+        const btnLabel = isCurrent ? "Current Plan" : cardRank > activeRank ? "Upgrade" : "Downgrade";
+        const btnClass = isCurrent ? "button" : "button button-primary";
+        return `
+        <article class="subscription-plan-card ${plan.popular ? "is-popular" : ""}" style="animation-delay:${i * 60}ms">
           ${plan.popular ? `<span class="popular-label">Most Popular</span>` : ""}
           <h3>${escapeHtml(plan.name)}</h3>
           <div class="plan-price">${formatPlanPrice(plan)}</div>
           ${planFeatureList([`${plan.requests.toLocaleString()} events/month`, `${plan.containers} containers`, `${plan.domains} domain${plan.domains === 1 ? "" : "s"}`, `${plan.receivers} receivers/container`, plan.retention, ...plan.features])}
-          <button class="button ${plan.name === activePlanName ? "" : "button-primary"}" type="button" data-plan-select="${escapeHtml(plan.name)}">
-            ${plan.name === activePlanName ? "Current Plan" : "Select Plan"}
+          <button class="${btnClass}" type="button" data-plan-select="${escapeHtml(plan.name)}" ${isCurrent ? "disabled" : ""}>
+            ${btnLabel}
           </button>
-        </article>
-      `).join("");
+        </article>`;
+      }).join("");
     els.subscriptionPlans.querySelectorAll("[data-plan-select]").forEach((button) => {
       button.addEventListener("click", () => selectSubscriptionPlan(button.dataset.planSelect));
     });
   }
+  const sectionTitle = document.getElementById("planSectionTitle");
+  if (sectionTitle) sectionTitle.textContent = activePlanName === "Free" ? "Choose a Plan" : "Change Plan";
   document.querySelectorAll("[data-plan-action]").forEach((button) => {
     button.onclick = () => selectSubscriptionPlan(button.dataset.planAction);
   });
@@ -4382,6 +4390,8 @@ let latestBilling = null;
 
 // Customer picks a plan -> create the pending invoice, then open the payment modal.
 async function selectSubscriptionPlan(planName) {
+  const plan = subscriptionPlans.find((p) => p.name === planName);
+  openPaymentModal({ plan: planName, amount: plan ? plan.price.replace(/[^\d]/g, "") : "0", invoiceNo: "…", bkashNumber: null, nagadNumber: null, _loading: true });
   try {
     const response = await fetch("/api/customer/subscription", {
       method: "POST",
@@ -4393,7 +4403,9 @@ async function selectSubscriptionPlan(planName) {
     setView("billing");
     await loadBillingPayment();
     if (result.payment) openPaymentModal(result.payment);
+    else closePaymentModal();
   } catch (error) {
+    closePaymentModal();
     window.alert(error.message);
   }
 }

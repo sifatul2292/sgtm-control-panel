@@ -11,7 +11,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=20" />
+    <link rel="stylesheet" href="/styles.css?v=21" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -92,9 +92,7 @@
           <a class="side-link" href="#docker">Docker Logs</a>
         </div>
 
-        <div class="sidebar-footer">
-          <span id="readOnlyBadge" class="status-pill">Read only</span>
-        </div>
+        <div class="sidebar-footer"></div>
       </aside>
 
       <main class="main-shell">
@@ -2236,7 +2234,6 @@ window.dataLayer.push({
                 <p>Your active Tagioo plan, renewal date, and included features.</p>
               </div>
               <div class="subscription-actions">
-                <button class="button button-primary" type="button" data-plan-action="Pro">Upgrade Plan</button>
                 <span id="billingBadge" class="status-dot">Checking</span>
                 <span id="planBadge" class="badge">Plan</span>
               </div>
@@ -2257,7 +2254,7 @@ window.dataLayer.push({
           <section class="panel subscription-panel">
             <div class="panel-header">
               <div>
-                <h2>Upgrade Your Plan</h2>
+                <h2 id="planSectionTitle">Available Plans</h2>
                 <p>Choose the package that fits your monthly traffic and number of containers.</p>
               </div>
             </div>
@@ -2296,6 +2293,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=33" type="module"></script>
+    <script src="/app.js?v=34" type="module"></script>
   </body>
 </html>
