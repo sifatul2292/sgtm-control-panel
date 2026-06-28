@@ -5377,14 +5377,21 @@ els.assistantNext?.addEventListener("click", async () => {
 });
 els.downloadWebTemplate?.addEventListener("click", () => downloadGeneratedTemplate("web"));
 els.downloadServerTemplate?.addEventListener("click", () => downloadGeneratedTemplate("server"));
-els.downloadPlugin?.addEventListener("click", async () => {
-  const btn = els.downloadPlugin;
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".download-plugin-btn");
+  if (!btn) return;
+  const errEl = document.querySelector("#pluginDownloadError");
+  if (errEl) errEl.hidden = true;
   const prev = btn.textContent;
   btn.disabled = true;
   btn.textContent = "Downloading…";
   try {
     const res = await fetch("/api/customer/setup-assistant/plugin");
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) {
+      let msg;
+      try { const j = await res.json(); msg = j.error || JSON.stringify(j); } catch { msg = await res.text(); }
+      throw new Error(msg);
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -5393,7 +5400,8 @@ els.downloadPlugin?.addEventListener("click", async () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (e) {
-    alert("Plugin download failed: " + e.message);
+    if (errEl) { errEl.textContent = "Download failed: " + e.message; errEl.hidden = false; }
+    else alert("Plugin download failed: " + e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = prev;
