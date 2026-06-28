@@ -4232,7 +4232,7 @@ function planFeatureList(features) {
 }
 
 function formatPlanPrice(plan) {
-  return plan.price === "Free" ? "Free" : `${plan.price}<small>/month</small>`;
+  return plan.price === "Free" ? "Free" : plan.price;
 }
 
 function renewalText(value) {
@@ -4252,24 +4252,25 @@ function renderBilling(data) {
   const usagePercent = requestLimit ? Math.min(100, Math.round((requestsMonth / requestLimit) * 1000) / 10) : 0;
   const containersUsed = (data.customerSetup?.requests || []).filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase())).length;
   const statusClass = usage.status === "healthy" ? "ok" : usage.status === "unmetered" ? "ok" : "warn";
-  els.billingBadge.textContent = usage.status === "over_limit" ? "Over limit" : usage.status === "warning" ? "Watch usage" : "Healthy";
-  els.planBadge.className = `badge ${statusClass}`;
-  els.planBadge.textContent = activePlanName;
+  if (els.billingBadge) els.billingBadge.textContent = usage.status === "over_limit" ? "Over limit" : usage.status === "warning" ? "Watch usage" : "Healthy";
+  if (els.planBadge) { els.planBadge.className = `badge ${statusClass}`; els.planBadge.textContent = activePlanName; }
 
-  els.billingGrid.innerHTML = `
-    <div class="subscription-plan-name">
-      <span>Current Plan</span>
-      <strong>${escapeHtml(activePlanName)}</strong>
-      <small>${escapeHtml(String(usage.subscriptionStatus || "Monthly billing"))}</small>
-      <p>${escapeHtml(renewalText(usage.renewalDate))}</p>
-      <div class="subscription-feature-heading">Plan Features</div>
-      ${planFeatureList([`${activePlan.requests.toLocaleString()} / month requests`, `${activePlan.containers} containers`, `${activePlan.domains} domain${activePlan.domains === 1 ? "" : "s"}`, `${activePlan.receivers} receivers / container`, activePlan.retention, ...activePlan.features])}
-    </div>
-    <div class="subscription-price-block">
-      <strong>${formatPlanPrice(activePlan)}</strong>
-      <span>${activePlan.price === "Free" ? "per month" : "BDT per month"}</span>
-    </div>
-  `;
+  const heroCard = document.getElementById("billingHeroCard");
+  if (heroCard) {
+    const planGradient = { Free: "hero-free", Starter: "hero-starter", Pro: "hero-pro", Enterprise: "hero-enterprise" };
+    heroCard.className = `billing-hero-card ${planGradient[activePlanName] || "hero-starter"}`;
+    heroCard.innerHTML = `
+      <div class="bhc-left">
+        <span class="bhc-badge">${escapeHtml(activePlanName)}</span>
+        <strong class="bhc-price">${formatPlanPrice(activePlan)}<small>/month</small></strong>
+        <span class="bhc-metric">${activePlan.requests.toLocaleString()} events/month</span>
+      </div>
+      <div class="bhc-right">
+        <span class="bhc-status">${escapeHtml(String(usage.subscriptionStatus || "active").replaceAll("_", " "))}</span>
+        <span class="bhc-renewal">${escapeHtml(renewalText(usage.renewalDate))}</span>
+      </div>
+    `;
+  }
 
   els.packageGrid.innerHTML = `
     <div class="usage-progress-row">
@@ -4291,22 +4292,27 @@ function renderBilling(data) {
 
   if (els.subscriptionPlans) {
     const activeRank = planRank[activePlanName] ?? 0;
+    const planGradientClass = { Starter: "card-starter", Pro: "card-pro", Enterprise: "card-enterprise" };
     els.subscriptionPlans.innerHTML = subscriptionPlans
       .filter((plan) => plan.name !== "Free")
       .map((plan, i) => {
         const isCurrent = plan.name === activePlanName;
         const cardRank = planRank[plan.name] ?? 0;
-        const btnLabel = isCurrent ? "Current Plan" : cardRank > activeRank ? "Upgrade" : "Downgrade";
-        const btnClass = isCurrent ? "button" : "button button-primary";
+        const btnLabel = isCurrent ? "Active" : cardRank > activeRank ? "Upgrade" : "Downgrade";
         return `
-        <article class="subscription-plan-card ${plan.popular ? "is-popular" : ""}" style="animation-delay:${i * 60}ms">
-          ${plan.popular ? `<span class="popular-label">Most Popular</span>` : ""}
-          <h3>${escapeHtml(plan.name)}</h3>
-          <div class="plan-price">${formatPlanPrice(plan)}</div>
-          ${planFeatureList([`${plan.requests.toLocaleString()} events/month`, `${plan.containers} containers`, `${plan.domains} domain${plan.domains === 1 ? "" : "s"}`, `${plan.receivers} receivers/container`, plan.retention, ...plan.features])}
-          <button class="${btnClass}" type="button" data-plan-select="${escapeHtml(plan.name)}" ${isCurrent ? "disabled" : ""}>
-            ${btnLabel}
-          </button>
+        <article class="subscription-plan-card ${planGradientClass[plan.name] || ""} ${isCurrent ? "is-active-plan" : ""}" style="animation-delay:${i * 60}ms">
+          <div class="spc-header">
+            <span class="spc-name">${escapeHtml(plan.name)}</span>
+            ${isCurrent ? `<span class="spc-active-badge">ACTIVE</span>` : ""}
+            <strong class="spc-price">${formatPlanPrice(plan)}<small> / month</small></strong>
+            <span class="spc-metric">${plan.requests.toLocaleString()} events/month</span>
+          </div>
+          <div class="spc-body">
+            ${planFeatureList([`${plan.containers} containers`, `${plan.domains} domain${plan.domains === 1 ? "" : "s"}`, `${plan.receivers} receivers/container`, plan.retention, ...plan.features])}
+            <button class="spc-btn ${isCurrent ? "spc-btn-current" : ""}" type="button" data-plan-select="${escapeHtml(plan.name)}" ${isCurrent ? "disabled" : ""}>
+              ${btnLabel}
+            </button>
+          </div>
         </article>`;
       }).join("");
     els.subscriptionPlans.querySelectorAll("[data-plan-select]").forEach((button) => {
@@ -4444,8 +4450,8 @@ function renderPaymentStatusCard(billing) {
     sub = `Transaction <strong>${escapeHtml(openClaim.txnId)}</strong> for ${escapeHtml(openClaim.plan)} (${money(openClaim.amount)}) is under review. Your plan activates as soon as we confirm it — usually within a few hours.`;
   } else if (status === "pending_payment" && billing.payment) {
     tone = "is-pending"; icon = "💳";
-    title = `Finish upgrading to ${escapeHtml(billing.payment.plan)}`;
-    sub = `Send <strong>${money(billing.payment.amount)}</strong> via bKash or Nagad, then submit your Transaction ID to activate.`;
+    title = `${escapeHtml(billing.plan || "Starter")} plan — payment pending`;
+    sub = renew ? `Expires <strong>${escapeHtml(renew)}</strong>. Complete payment for <strong>${escapeHtml(billing.payment.plan)}</strong> (${money(billing.payment.amount)}) to upgrade.` : `Complete payment for <strong>${escapeHtml(billing.payment.plan)}</strong> (${money(billing.payment.amount)}) to upgrade.`;
     invoiceRow = `<span class="psc-invoice">Invoice ${escapeHtml(billing.payment.invoiceNo)}</span>`;
     action = `<button class="button button-primary" type="button" data-open-payment>Complete payment</button>`;
   } else if (status === "expired") {

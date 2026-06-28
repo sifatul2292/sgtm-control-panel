@@ -11,7 +11,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=21" />
+    <link rel="stylesheet" href="/styles.css?v=22" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -2223,29 +2223,18 @@ window.dataLayer.push({
         </section>
 
         <section id="billingView" class="view" data-view="billing">
-          <!-- Status-aware payment banner: appears at the top whenever there's a
-               pending/verifying payment or an expired plan. -->
+          <section id="billingHeroCard" class="billing-hero-card"></section>
           <section id="paymentPanel" class="payment-status-card" hidden></section>
-
-          <section class="panel subscription-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Current Plan</h2>
-                <p>Your active Tagioo plan, renewal date, and included features.</p>
-              </div>
-              <div class="subscription-actions">
-                <span id="billingBadge" class="status-dot">Checking</span>
-                <span id="planBadge" class="badge">Plan</span>
-              </div>
-            </div>
-            <div id="billingGrid" class="subscription-current"></div>
-          </section>
 
           <section class="panel subscription-panel">
             <div class="panel-header">
               <div>
                 <h2>Monthly Usage</h2>
                 <p>Live usage against your current billing period.</p>
+              </div>
+              <div class="subscription-actions">
+                <span id="billingBadge" class="status-dot" hidden>Checking</span>
+                <span id="planBadge" class="badge" hidden>Plan</span>
               </div>
             </div>
             <div id="packageGrid" class="subscription-usage"></div>
@@ -2293,6 +2282,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=34" type="module"></script>
+    <script src="/app.js?v=36" type="module"></script>
   </body>
 </html>
