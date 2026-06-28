@@ -2295,11 +2295,71 @@ h2 {
   gap: var(--space-sm);
 }
 
+.subscription-plan-section {
+  padding: var(--space-lg);
+}
 .subscription-plan-grid {
+  padding: var(--space-lg);
+}
+
+.billing-cycle-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: var(--space-md);
+  border-radius: var(--radius-pill, 100px);
+  background: var(--color-surface-2, #F3F4F6);
+  width: fit-content;
+}
+.bct-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius-pill, 100px);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, transform 100ms ease;
+}
+.bct-btn:hover { color: var(--color-text); }
+.bct-btn.is-active {
+  background: var(--color-accent, #7C3AED);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(124,58,237,.25);
+}
+.bct-save {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill, 100px);
+  background: rgba(5,150,105,.15);
+  color: #059669;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.bct-btn.is-active .bct-save {
+  background: rgba(255,255,255,.25);
+  color: #fff;
+}
+.spc-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-md);
-  padding: var(--space-lg);
+}
+.spc-per-month {
+  font-size: 0.78rem;
+  opacity: .75;
+}
+.spc-saved {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill, 100px);
+  background: rgba(255,255,255,.2);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
 }
 
 .subscription-plan-card {
@@ -3305,6 +3365,7 @@ textarea::placeholder {
   .health-grid,
   .business-grid,
   .subscription-plan-grid,
+  .spc-grid,
   .provisioning-form,
   .analytics-layout,
   .client-analytics {

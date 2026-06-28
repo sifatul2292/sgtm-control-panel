@@ -272,6 +272,14 @@ const subscriptionPlans = [
 
 const planRank = { Free: 0, Starter: 1, Growth: 2, Pro: 3, Enterprise: 4, Agency: 4 };
 
+const billingCycles = [
+  { id: "monthly", label: "Monthly", months: 1, discount: 0 },
+  { id: "quarterly", label: "3-Month", months: 3, discount: 0.05 },
+  { id: "semiannual", label: "6-Month", months: 6, discount: 0.10 },
+  { id: "yearly", label: "Yearly", months: 12, discount: 0.15 }
+];
+let selectedCycle = billingCycles[0];
+
 const powerUps = [
   {
     id: "cookie-keeper",
@@ -4235,6 +4243,21 @@ function formatPlanPrice(plan) {
   return plan.price === "Free" ? "Free" : plan.price;
 }
 
+function cyclePrice(plan, cycle) {
+  if (plan.price === "Free") return { total: 0, monthly: 0, original: 0, saved: 0 };
+  const monthly = Number(String(plan.price).replace(/[^\d]/g, ""));
+  const original = monthly * cycle.months;
+  const total = Math.round(original * (1 - cycle.discount));
+  return { total, monthly: Math.round(total / cycle.months), original, saved: original - total };
+}
+
+function formatCyclePrice(plan, cycle) {
+  if (plan.price === "Free") return "Free";
+  const { total, monthly } = cyclePrice(plan, cycle);
+  if (cycle.months === 1) return `৳${monthly.toLocaleString()}`;
+  return `৳${total.toLocaleString()}`;
+}
+
 function renewalText(value) {
   if (!value) return "Renews monthly";
   const date = new Date(value);
@@ -4291,33 +4314,7 @@ function renderBilling(data) {
   `;
 
   if (els.subscriptionPlans) {
-    const activeRank = planRank[activePlanName] ?? 0;
-    const planGradientClass = { Starter: "card-starter", Pro: "card-pro", Enterprise: "card-enterprise" };
-    els.subscriptionPlans.innerHTML = subscriptionPlans
-      .filter((plan) => plan.name !== "Free")
-      .map((plan, i) => {
-        const isCurrent = plan.name === activePlanName;
-        const cardRank = planRank[plan.name] ?? 0;
-        const btnLabel = isCurrent ? "Active" : cardRank > activeRank ? "Upgrade" : "Downgrade";
-        return `
-        <article class="subscription-plan-card ${planGradientClass[plan.name] || ""} ${isCurrent ? "is-active-plan" : ""}" style="animation-delay:${i * 60}ms">
-          <div class="spc-header">
-            <span class="spc-name">${escapeHtml(plan.name)}</span>
-            ${isCurrent ? `<span class="spc-active-badge">ACTIVE</span>` : ""}
-            <strong class="spc-price">${formatPlanPrice(plan)}<small> / month</small></strong>
-            <span class="spc-metric">${plan.requests.toLocaleString()} events/month</span>
-          </div>
-          <div class="spc-body">
-            ${planFeatureList([`${plan.containers} containers`, `${plan.domains} domain${plan.domains === 1 ? "" : "s"}`, `${plan.receivers} receivers/container`, plan.retention, ...plan.features])}
-            <button class="spc-btn ${isCurrent ? "spc-btn-current" : ""}" type="button" data-plan-select="${escapeHtml(plan.name)}" ${isCurrent ? "disabled" : ""}>
-              ${btnLabel}
-            </button>
-          </div>
-        </article>`;
-      }).join("");
-    els.subscriptionPlans.querySelectorAll("[data-plan-select]").forEach((button) => {
-      button.addEventListener("click", () => selectSubscriptionPlan(button.dataset.planSelect));
-    });
+    renderPlanCards(activePlanName);
   }
   const sectionTitle = document.getElementById("planSectionTitle");
   if (sectionTitle) sectionTitle.textContent = activePlanName === "Free" ? "Choose a Plan" : "Change Plan";
@@ -4325,6 +4322,60 @@ function renderBilling(data) {
     button.onclick = () => selectSubscriptionPlan(button.dataset.planAction);
   });
   loadBillingPayment();
+}
+
+function renderPlanCards(activePlanName) {
+  const container = els.subscriptionPlans;
+  if (!container) return;
+  const activeRank = planRank[activePlanName] ?? 0;
+  const cycle = selectedCycle;
+  const planGradientClass = { Starter: "card-starter", Pro: "card-pro", Enterprise: "card-enterprise" };
+  const cycleLabel = cycle.months === 1 ? "/ month" : `/ ${cycle.months} months`;
+
+  const toggle = `<div class="billing-cycle-toggle">${billingCycles.map((c) => `<button class="bct-btn ${c.id === cycle.id ? "is-active" : ""}" type="button" data-cycle="${c.id}">${escapeHtml(c.label)}${c.discount ? ` <span class="bct-save">-${Math.round(c.discount * 100)}%</span>` : ""}</button>`).join("")}</div>`;
+
+  const cards = subscriptionPlans
+    .filter((plan) => plan.name !== "Free")
+    .map((plan, i) => {
+      const isCurrent = plan.name === activePlanName;
+      const cardRank = planRank[plan.name] ?? 0;
+      const btnLabel = isCurrent ? "Active" : cardRank > activeRank ? "Upgrade" : "Downgrade";
+      const cp = cyclePrice(plan, cycle);
+      const priceDisplay = cycle.months === 1
+        ? `৳${cp.monthly.toLocaleString()}`
+        : `৳${cp.total.toLocaleString()}`;
+      const perMonthNote = cycle.months > 1
+        ? `<span class="spc-per-month">৳${cp.monthly.toLocaleString()}/mo</span>` : "";
+      const savedNote = cp.saved > 0
+        ? `<span class="spc-saved">Save ৳${cp.saved.toLocaleString()}</span>` : "";
+      return `
+      <article class="subscription-plan-card ${planGradientClass[plan.name] || ""} ${isCurrent ? "is-active-plan" : ""}" style="animation-delay:${i * 60}ms">
+        <div class="spc-header">
+          <span class="spc-name">${escapeHtml(plan.name)}</span>
+          ${isCurrent ? `<span class="spc-active-badge">ACTIVE</span>` : ""}
+          <strong class="spc-price">${priceDisplay}<small> ${cycleLabel}</small></strong>
+          ${perMonthNote}${savedNote}
+          <span class="spc-metric">${plan.requests.toLocaleString()} events/month</span>
+        </div>
+        <div class="spc-body">
+          ${planFeatureList([`${plan.containers} containers`, `${plan.domains} domain${plan.domains === 1 ? "" : "s"}`, `${plan.receivers} receivers/container`, plan.retention, ...plan.features])}
+          <button class="spc-btn ${isCurrent ? "spc-btn-current" : ""}" type="button" data-plan-select="${escapeHtml(plan.name)}" ${isCurrent ? "disabled" : ""}>
+            ${btnLabel}
+          </button>
+        </div>
+      </article>`;
+    }).join("");
+
+  container.innerHTML = toggle + `<div class="spc-grid">${cards}</div>`;
+  container.querySelectorAll("[data-plan-select]").forEach((button) => {
+    button.addEventListener("click", () => selectSubscriptionPlan(button.dataset.planSelect));
+  });
+  container.querySelectorAll("[data-cycle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedCycle = billingCycles.find((c) => c.id === button.dataset.cycle) || billingCycles[0];
+      renderPlanCards(activePlanName);
+    });
+  });
 }
 
 // New-customer onboarding checklist: 3 plug-and-play steps to go live.
@@ -4397,12 +4448,14 @@ let latestBilling = null;
 // Customer picks a plan -> create the pending invoice, then open the payment modal.
 async function selectSubscriptionPlan(planName) {
   const plan = subscriptionPlans.find((p) => p.name === planName);
-  openPaymentModal({ plan: planName, amount: plan ? plan.price.replace(/[^\d]/g, "") : "0", invoiceNo: "…", bkashNumber: null, nagadNumber: null, _loading: true });
+  const cp = plan ? cyclePrice(plan, selectedCycle) : { total: 0 };
+  const previewAmount = selectedCycle.months === 1 ? cp.monthly || cp.total : cp.total;
+  openPaymentModal({ plan: planName, amount: previewAmount, billingCycle: selectedCycle.id, invoiceNo: "…", bkashNumber: null, nagadNumber: null, _loading: true });
   try {
     const response = await fetch("/api/customer/subscription", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ planName })
+      body: JSON.stringify({ planName, billingCycle: selectedCycle.id })
     });
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Plan update failed."]).join(" "));
@@ -4503,10 +4556,12 @@ function openPaymentModal(payment) {
     : "";
   const numbers = [numberRow("bKash", payment.bkashNumber), numberRow("Nagad", payment.nagadNumber)].join("");
 
+  const cycleObj = billingCycles.find((c) => c.id === (payment.billingCycle || selectedCycle.id)) || billingCycles[0];
+  const cycleLabel = cycleObj.months === 1 ? "/month" : `/${cycleObj.months} months`;
   body.innerHTML = `
     <div class="pm-header">
-      <span class="pm-eyebrow">Upgrade to ${escapeHtml(payment.plan)}</span>
-      <span class="pm-amount">${money(payment.amount)}<small>/month</small></span>
+      <span class="pm-eyebrow">Upgrade to ${escapeHtml(payment.plan)} — ${escapeHtml(cycleObj.label)}</span>
+      <span class="pm-amount">${money(payment.amount)}<small>${cycleLabel}</small></span>
     </div>
     <ol class="pm-steps">
       <li><strong>Open bKash or Nagad</strong> and choose <strong>Send Money</strong>.</li>

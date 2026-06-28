@@ -4472,6 +4472,7 @@ function paymentInstructionsFor(tenant, data) {
     invoiceNo: tenant.pendingInvoiceNo || "",
     plan: tenant.pendingPlan || "",
     amount: Number(tenant.pendingAmount || 0),
+    billingCycle: tenant.pendingBillingCycle || "monthly",
     bkashNumber: settings.bkashNumber,
     nagadNumber: settings.nagadNumber,
     ownerWhatsApp: settings.ownerWhatsApp,
@@ -4483,9 +4484,23 @@ function paymentInstructionsFor(tenant, data) {
 // service — it moves the tenant to `pending_payment` and issues an invoice. Only an
 // owner-confirmed payment (confirmPayment) flips the tenant to `active` with paid
 // limits. This is the gate that closes the "active before payment" revenue leak.
+const billingCycleConfig = {
+  monthly:    { months: 1,  discount: 0,    label: "Monthly" },
+  quarterly:  { months: 3,  discount: 0.05, label: "3-Month" },
+  semiannual: { months: 6,  discount: 0.10, label: "6-Month" },
+  yearly:     { months: 12, discount: 0.15, label: "Yearly" }
+};
+
+function computeCycleAmount(planName, cycleId) {
+  const monthly = monthlyAmountForPlan(planName);
+  const cycle = billingCycleConfig[cycleId] || billingCycleConfig.monthly;
+  return Math.round(monthly * cycle.months * (1 - cycle.discount));
+}
+
 async function selectCustomerPlan(input, session) {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   const planName = String(input.plan || input.planName || "").trim();
+  const cycleId = billingCycleConfig[String(input.billingCycle || "").trim()] ? String(input.billingCycle).trim() : "monthly";
   if (!planResourceProfiles[planName] || planName === "Customer") {
     return { ok: false, status: 400, errors: ["Choose a valid plan."] };
   }
@@ -4525,7 +4540,8 @@ async function selectCustomerPlan(input, session) {
 
   // Paid plan: stage an upgrade awaiting manual payment. Keep effective limits where
   // they are (typically Free) until the owner confirms payment.
-  const amount = monthlyAmountForPlan(planName);
+  const amount = computeCycleAmount(planName, cycleId);
+  const cycle = billingCycleConfig[cycleId] || billingCycleConfig.monthly;
   const invoiceNo = current.pendingInvoiceNo || nextInvoiceNo(data, current.id);
   data.tenants[tenantIndex] = {
     ...current,
@@ -4533,6 +4549,7 @@ async function selectCustomerPlan(input, session) {
     paymentStatus: "pending",
     pendingPlan: planName,
     pendingAmount: amount,
+    pendingBillingCycle: cycleId,
     pendingInvoiceNo: invoiceNo,
     updatedAt: now.toISOString()
   };
@@ -4613,12 +4630,15 @@ async function confirmPayment(paymentId, session) {
   if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
 
   const now = new Date();
-  const renewalDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  const profile = resourceProfileForPlan(payment.plan);
   const tenant = data.tenants[tenantIndex];
+  const cycleId = tenant.pendingBillingCycle || "monthly";
+  const cycleDays = (billingCycleConfig[cycleId] || billingCycleConfig.monthly).months * 30;
+  const renewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000).toISOString();
+  const profile = resourceProfileForPlan(payment.plan);
   data.tenants[tenantIndex] = {
     ...tenant,
     plan: payment.plan,
+    billingCycle: cycleId,
     requestLimit: profile.monthlyRequestLimit,
     containerLimit: profile.containerLimit,
     monthlyAmount: monthlyAmountForPlan(payment.plan),
@@ -4632,6 +4652,7 @@ async function confirmPayment(paymentId, session) {
     expiredAt: "",
     pendingPlan: "",
     pendingAmount: 0,
+    pendingBillingCycle: "",
     pendingInvoiceNo: "",
     updatedAt: now.toISOString()
   };
