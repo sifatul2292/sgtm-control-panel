@@ -2914,20 +2914,27 @@ function setWooWebhookSecret(secret) {
   if (generateButton) generateButton.textContent = secret ? "Regenerate secret" : "Generate secret";
 }
 
+let prevAssistantStep = 1;
 function updateSetupAssistantStep() {
+  const direction = setupAssistantStep > prevAssistantStep ? "forward" : "back";
   document.querySelectorAll("[data-assistant-step-label]").forEach((item) => {
     const step = Number(item.dataset.assistantStepLabel);
     item.classList.toggle("is-active", step === setupAssistantStep);
     item.classList.toggle("is-complete", step < setupAssistantStep);
   });
   document.querySelectorAll("[data-assistant-step]").forEach((panel) => {
-    panel.classList.toggle("is-active", Number(panel.dataset.assistantStep) === setupAssistantStep);
+    const isActive = Number(panel.dataset.assistantStep) === setupAssistantStep;
+    panel.classList.remove("is-active", "slide-forward", "slide-back");
+    if (isActive) {
+      panel.classList.add("is-active", direction === "forward" ? "slide-forward" : "slide-back");
+    }
   });
   if (els.assistantBack) els.assistantBack.disabled = setupAssistantStep === 1;
   if (els.assistantNext) els.assistantNext.textContent = setupAssistantStep === 4 ? "Generate templates" : "Next";
   if (els.setupAssistantBadge) {
     els.setupAssistantBadge.textContent = `Step ${setupAssistantStep} of 4`;
   }
+  prevAssistantStep = setupAssistantStep;
 }
 
 function setupAssistantPayload() {

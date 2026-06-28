@@ -890,28 +890,81 @@ h2 {
 
 /* ── Step animations ──────────────────────────────────────────────── */
 @keyframes assistantFadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes assistantSlideLeft {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes assistantSlideRight {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 @keyframes stepCirclePop {
-  0%   { transform: scale(1); }
-  50%  { transform: scale(1.18); }
-  100% { transform: scale(1); }
+  0%   { transform: scale(0.6); opacity: 0.4; }
+  60%  { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes stepCircleGlow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-ok), transparent 70%); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in oklch, var(--color-ok), transparent 100%); }
 }
 @keyframes downloadPulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-ok), transparent 60%); }
   50%       { box-shadow: 0 0 0 8px color-mix(in oklch, var(--color-ok), transparent 100%); }
 }
+@keyframes stepLineGrow {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+@keyframes stepFormFieldIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 .assistant-step-panel.is-active {
-  animation: assistantFadeInUp 0.28s ease both;
+  animation: assistantFadeInUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.assistant-step-panel.slide-forward {
+  animation: assistantSlideLeft 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.assistant-step-panel.slide-back {
+  animation: assistantSlideRight 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .assistant-step::before {
-  transition: background 0.25s ease, border-color 0.25s ease;
+  transition: background 0.35s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.35s cubic-bezier(0.22, 1, 0.36, 1), transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.assistant-step.is-active::before {
+  animation: stepCircleGlow 1.8s ease-in-out 0.3s 2;
 }
 .assistant-step.is-complete::before {
-  animation: stepCirclePop 0.35s ease;
+  animation: stepCirclePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+.assistant-step::after {
+  transform-origin: top;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.1s;
+}
+.assistant-step.is-complete::after {
+  animation: stepLineGrow 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.assistant-step-panel.is-active .assistant-form-grid label,
+.assistant-step-panel.is-active .assistant-destination-grid label {
+  animation: stepFormFieldIn 0.3s ease both;
+}
+.assistant-step-panel.is-active .assistant-form-grid label:nth-child(1),
+.assistant-step-panel.is-active .assistant-destination-grid label:nth-child(1) { animation-delay: 0.05s; }
+.assistant-step-panel.is-active .assistant-form-grid label:nth-child(2),
+.assistant-step-panel.is-active .assistant-destination-grid label:nth-child(2) { animation-delay: 0.1s; }
+.assistant-step-panel.is-active .assistant-form-grid label:nth-child(3),
+.assistant-step-panel.is-active .assistant-destination-grid label:nth-child(3) { animation-delay: 0.15s; }
+.assistant-step-panel.is-active .assistant-form-grid label:nth-child(4),
+.assistant-step-panel.is-active .assistant-destination-grid label:nth-child(4) { animation-delay: 0.2s; }
+.assistant-step-panel.is-active .assistant-form-grid label:nth-child(n+5) { animation-delay: 0.25s; }
+.assistant-step-panel.is-active .assistant-form-grid label:nth-child(n+7) { animation-delay: 0.3s; }
+.assistant-step-panel.is-active .assistant-form-grid label:nth-child(n+9) { animation-delay: 0.35s; }
+.assistant-step-panel.is-active .assistant-form-grid label:nth-child(n+11) { animation-delay: 0.4s; }
+
 .assistant-download-card {
   animation: downloadPulse 2.4s ease-in-out 0.4s 3;
 }
@@ -930,6 +983,25 @@ h2 {
 #downloadWebTemplate:not([disabled]):hover ~ .assistant-download-icon,
 .assistant-download-card:has(button:not([disabled])) .assistant-download-icon {
   transform: translateY(3px);
+}
+
+/* ── WooCommerce plugin download card ── */
+.woo-plugin-download-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  margin: var(--space-md) 0;
+  background: color-mix(in oklch, var(--color-ok), transparent 92%);
+  border: var(--rule-thin) solid color-mix(in oklch, var(--color-ok), transparent 75%);
+  border-radius: var(--radius-lg);
+}
+.woo-plugin-download-card .button {
+  flex-shrink: 0;
+}
+.woo-plugin-note {
+  font-size: 0.82rem;
+  color: var(--color-muted);
 }
 
 /* ── Mapping grid ─────────────────────────────────────────────────── */

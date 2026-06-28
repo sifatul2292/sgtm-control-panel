@@ -963,7 +963,6 @@
                     <div class="assistant-download-actions">
                       <button id="downloadWebTemplate" class="button" type="button" disabled>⇣ web.json</button>
                       <button id="downloadServerTemplate" class="button" type="button" disabled>⇣ server.json</button>
-                      <button id="downloadPlugin" class="button" type="button">⇣ WordPress Plugin (.zip)</button>
                     </div>
                     <p id="setupAssistantResult" class="form-message"></p>
                   </div>
@@ -1424,7 +1423,7 @@ window.dataLayer.push({
                   </div>
                   <ol class="setup-stepper">
                     <li><span class="setup-step-no">1</span><div><strong>Order sync webhook</strong><span>Native WooCommerce webhook → Tagioo. No plugin. ~2 min.</span><a href="#wooStep1" data-scroll-target="wooStep1">Jump to step 1 ↓</a></div></li>
-                    <li><span class="setup-step-no">2</span><div><strong>Install GTM4WP plugin</strong><span>Free WordPress plugin that pushes the dataLayer e-commerce events. ~3 min.</span><a href="#wooStep2" data-scroll-target="wooStep2">Jump to step 2 ↓</a></div></li>
+                    <li><span class="setup-step-no">2</span><div><strong>Install Tagioo plugin</strong><span>Download from Setup Assistant. Pushes full ecommerce dataLayer automatically. ~2 min.</span><a href="#wooStep2" data-scroll-target="wooStep2">Jump to step 2 ↓</a></div></li>
                     <li><span class="setup-step-no">3</span><div><strong>Import GTM containers</strong><span>Import the two ready-made JSON files (web + server). ~3 min.</span><a href="#wooStep3" data-scroll-target="wooStep3">Jump to step 3 ↓</a></div></li>
                     <li><span class="setup-step-no">4</span><div><strong>Test &amp; go live</strong><span>Fire a test purchase and confirm it lands everywhere. ~2 min.</span><a href="#wooStep4" data-scroll-target="wooStep4">Jump to step 4 ↓</a></div></li>
                   </ol>
@@ -1457,23 +1456,21 @@ API Version:   WP REST API Integration v3</code></pre>
                   <p class="woo-webhook-note">Generating a new secret replaces the old one, so update the WooCommerce webhook if you regenerate. Tagioo verifies every delivery with the <code>x-wc-webhook-signature</code> header, so no plugin, code snippet, or API key is needed on your site. Order ID, total, currency, and date are mapped automatically.</p>
                 </div>
 
-                <div class="event-group" id="wooStep2">
-                  <div class="event-group-header">
-                    <span class="event-label">Step 2 — install GTM4WP</span>
-                    <span class="event-trigger">Free plugin that pushes WooCommerce e-commerce events into the dataLayer — no code</span>
+                <div class=”event-group” id=”wooStep2”>
+                  <div class=”event-group-header”>
+                    <span class=”event-label”>Step 2 — install Tagioo plugin</span>
+                    <span class=”event-trigger”>Our WordPress plugin pushes the full ecommerce dataLayer automatically — no code, no GTM4WP needed</span>
                   </div>
-                  <ol class="woo-webhook-steps">
-                    <li>In WordPress admin go to <strong>Plugins → Add New</strong>, search <strong>“GTM4WP”</strong> (by Thomas Geiger), then <strong>Install</strong> and <strong>Activate</strong>.</li>
-                    <li>Open <strong>Settings → Google Tag Manager</strong> and enter your <strong>web</strong> container ID in <strong>General → Google Tag Manager ID</strong> (format <code>GTM-XXXXXXX</code>). Set <strong>Container code placement</strong> to <em>Codeless / off</em> only if you load GTM yourself; otherwise leave <em>On</em>.</li>
-                    <li>Open the <strong>Integration → WooCommerce</strong> tab and turn ON these settings:</li>
+                  <div class=”woo-plugin-download-card”>
+                    <button id=”downloadPlugin” class=”button button-primary” type=”button”>⇣ Download Tagioo Plugin (.zip)</button>
+                    <span class=”woo-plugin-note”>Generated with your tracking config</span>
+                  </div>
+                  <ol class=”woo-webhook-steps”>
+                    <li>Download the plugin using the button above.</li>
+                    <li>In WordPress admin go to <strong>Plugins → Add New → Upload Plugin</strong>, choose the <code>tagioo-woocommerce.zip</code> file, then click <strong>Install Now</strong> and <strong>Activate</strong>.</li>
+                    <li>That’s it. The Tagioo plugin automatically pushes <code>page_view</code>, <code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code>, <code>purchase</code>, and <code>user_data</code> (email, phone, name) into the dataLayer — no configuration needed.</li>
                   </ol>
-<pre class="instructions-code"><code>✅ Track enhanced e-commerce          (master switch)
-✅ Track classic e-commerce            OFF — use enhanced only
-✅ purchase / view_item / add_to_cart / begin_checkout / view_item_list
-✅ Use new GA4 ecommerce data structure   ← REQUIRED (items[], not products[])
-✅ Include tax in product price        (match your GA4 / Meta value)
-✅ Send user data (email, phone) on order   ← powers Meta CAPI / Google EC matching</code></pre>
-                  <p class="woo-webhook-note">The <strong>“new GA4 ecommerce data structure”</strong> toggle is the one people miss — without it events arrive in the old Universal Analytics shape and Tagioo’s GA4/Meta tags won’t read the items array. Save changes. GTM4WP now pushes <code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code> and <code>purchase</code> automatically — you can skip the manual PHP snippets at the bottom of this page.</p>
+                  <p class=”woo-webhook-note”>The plugin replaces GTM4WP entirely. It uses the GA4 ecommerce data structure (<code>items[]</code>) and includes <code>event_id</code> on every event for browser↔server deduplication. You can skip the manual PHP snippets at the bottom of this page.</p>
                 </div>
 
                 <div class="event-group" id="wooStep3">
@@ -1488,7 +1485,7 @@ API Version:   WP REST API Integration v3</code></pre>
                     <li>In the server container open <strong>Clients</strong> and confirm the <em>GA4</em> client and the <em>Data tag</em> point to <code><span data-woo-tracking-domain>your tracking domain</span></code>.</li>
                     <li>Click <strong>Submit → Publish</strong> on <em>both</em> containers.</li>
                   </ol>
-                  <p class="woo-webhook-note">The JSON files already contain the GA4, Meta CAPI and TikTok tags, all triggers, and the variables that read GTM4WP’s dataLayer — including <code>transaction_id</code> for deduplication. You only fill in your own pixel/measurement IDs, which are pre-populated from the form above.</p>
+                  <p class="woo-webhook-note">The JSON files already contain the GA4, Meta CAPI and TikTok tags, all triggers, and the variables that read the Tagioo plugin’s dataLayer — including <code>transaction_id</code> for deduplication. You only fill in your own pixel/measurement IDs, which are pre-populated from the form above.</p>
                 </div>
 
                 <div class="event-group" id="wooStep4">
@@ -1513,8 +1510,8 @@ API Version:   WP REST API Integration v3</code></pre>
                 </div>
 
                 <details class="woo-advanced">
-                  <summary>Advanced — manual dataLayer snippets (skip if you installed GTM4WP)</summary>
-                  <p class="woo-webhook-note">Only use these if you are <em>not</em> using GTM4WP and want to push the dataLayer yourself from your theme’s <code>functions.php</code>.</p>
+                  <summary>Advanced — manual dataLayer snippets (skip if you installed the Tagioo plugin)</summary>
+                  <p class="woo-webhook-note">Only use these if you are <em>not</em> using the Tagioo plugin and want to push the dataLayer yourself from your theme’s <code>functions.php</code>.</p>
 
                 <div class="event-group">
                   <div class="event-group-header">
