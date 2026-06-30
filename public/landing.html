@@ -60,7 +60,7 @@
           <div class="hero-orb hero-orb-1"></div>
           <div class="hero-orb hero-orb-2"></div>
         </div>
-        <div class="hero-inner">
+        <div class="hero-inner hero-centered">
           <div class="hero-content">
             <div class="hero-tags">
               <div class="hero-badge">
@@ -72,114 +72,106 @@
                 For business owners, by business owners
               </div>
             </div>
-            <h1>Boost ROAS and maximize sales with our <span class="hero-accent">server-side tracking.<svg class="hero-accent-underline" viewBox="0 0 300 12" fill="none" preserveAspectRatio="none" aria-hidden="true"><path d="M2 8.5C52 4 150 2.5 298 6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span></h1>
-            <p class="hero-copy">Business owners use Tagioo's platform to implement server-side tracking in about 30 minutes. Tagioo serves your GTM <em>and</em> gtag first-party from your own domain — so the data gets through and your campaigns optimize on the full picture. <em>Live in 30 minutes, no server skills.</em></p>
+            <h1>Boost ROAS and maximize sales with <span class="hero-accent">server-side tracking.<svg class="hero-accent-underline" viewBox="0 0 300 12" fill="none" preserveAspectRatio="none" aria-hidden="true"><path d="M2 8.5C52 4 150 2.5 298 6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span></h1>
+            <p class="hero-copy">Business owners use Tagioo's platform to implement server-side tracking in about 30 minutes — GTM <em>and</em> gtag served first-party from your own domain, so the data gets through and your campaigns optimize on the full picture. <em>Live in 30 minutes, no server skills.</em></p>
 
-            <div class="hero-result-proof">
-              <div class="hrp-item">
-                <span class="hrp-num">+31%</span>
-                <span class="hrp-label">Avg ROAS lift</span>
-              </div>
-              <div class="hrp-sep"></div>
-              <div class="hrp-item">
-                <span class="hrp-num">+58%</span>
-                <span class="hrp-label">More conversions seen</span>
-              </div>
-              <div class="hrp-sep"></div>
-              <div class="hrp-item">
-                <span class="hrp-num">&lt;30min</span>
-                <span class="hrp-label">To go live</span>
-              </div>
-            </div>
-
-            <div class="hero-actions">
-              <a class="button button-primary" href="/signup">
+            <form class="hero-signup" action="/signup" method="get">
+              <input class="hero-signup-input" type="email" name="email" placeholder="Enter your email" autocomplete="email" required aria-label="Email address" />
+              <button class="button button-primary" type="submit">
                 <span>Start for free</span>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7H12M8 3L12 7L8 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </a>
-              <a class="button button-outline" href="#pricing">See pricing</a>
-            </div>
+              </button>
+            </form>
             <p class="hero-social-proof">
               <strong>Plug-and-play setup.</strong>
-              No developer, no headache — live in 30 minutes.
+              No developer, no headache — or <a href="#pricing">see pricing</a>.
             </p>
           </div>
-          <div class="hero-visual">
-            <div class="dash-card">
-              <div class="dash-card-header">
-                <div class="dash-card-dots">
-                  <span></span><span></span><span></span>
-                </div>
-                <span class="dash-card-title">Tagioo Analytics</span>
-                <span class="dash-live"><span class="live-dot"></span>Live</span>
+        </div>
+      </section>
+
+      <!-- ── DASHBOARD SHOWCASE ─────────────────────────────────── -->
+      <section class="section dash-showcase">
+        <div class="section-heading centered">
+          <p class="eyebrow">Live dashboard</p>
+          <h2>Every event, ROAS, and purchase<br>in one real-time view.</h2>
+          <p class="section-sub">Watch conversions land server-side as they happen — no guessing whether the pixel fired.</p>
+        </div>
+        <div class="dash-showcase-visual">
+          <div class="dash-card">
+            <div class="dash-card-header">
+              <div class="dash-card-dots">
+                <span></span><span></span><span></span>
               </div>
-              <div class="dash-stats-row">
-                <div class="dash-stat-mini">
-                  <span class="dsm-val">24,891</span>
-                  <span class="dsm-label">Events today</span>
-                  <span class="dsm-change up">↑ 18%</span>
-                </div>
-                <div class="dash-stat-mini">
-                  <span class="dsm-val">৳4.2x</span>
-                  <span class="dsm-label">ROAS</span>
-                  <span class="dsm-change up">↑ 31%</span>
-                </div>
-                <div class="dash-stat-mini">
-                  <span class="dsm-val">99.8%</span>
-                  <span class="dsm-label">Uptime</span>
-                  <span class="dsm-change stable">Stable</span>
-                </div>
+              <span class="dash-card-title">Tagioo Analytics</span>
+              <span class="dash-live"><span class="live-dot"></span>Live</span>
+            </div>
+            <div class="dash-stats-row">
+              <div class="dash-stat-mini">
+                <span class="dsm-val">24,891</span>
+                <span class="dsm-label">Events today</span>
+                <span class="dsm-change up">↑ 18%</span>
               </div>
-              <div class="dash-chart">
-                <div class="dc-label">Hourly events &amp; revenue</div>
-                <div class="dc-bars">
-                  <div class="dc-bar" style="--h:45%"></div>
-                  <div class="dc-bar" style="--h:62%"></div>
-                  <div class="dc-bar" style="--h:38%"></div>
-                  <div class="dc-bar" style="--h:75%"></div>
-                  <div class="dc-bar" style="--h:55%"></div>
-                  <div class="dc-bar" style="--h:88%"></div>
-                  <div class="dc-bar hi" style="--h:100%"></div>
-                  <div class="dc-bar" style="--h:72%"></div>
-                  <div class="dc-bar" style="--h:65%"></div>
-                  <div class="dc-bar" style="--h:80%"></div>
-                  <div class="dc-bar" style="--h:58%"></div>
-                  <div class="dc-bar" style="--h:70%"></div>
-                </div>
-                <div class="dc-trend-line"></div>
+              <div class="dash-stat-mini">
+                <span class="dsm-val">৳4.2x</span>
+                <span class="dsm-label">ROAS</span>
+                <span class="dsm-change up">↑ 31%</span>
               </div>
-              <div class="dash-events">
-                <div class="de-head">Recent events</div>
-                <div class="de-row">
-                  <span class="de-badge purchase">Purchase</span>
-                  <span class="de-meta">meta.pixel · ৳2,450</span>
-                  <span class="de-time">2s</span>
-                </div>
-                <div class="de-row">
-                  <span class="de-badge cart">AddToCart</span>
-                  <span class="de-meta">ga4 · product #1234</span>
-                  <span class="de-time">5s</span>
-                </div>
-                <div class="de-row">
-                  <span class="de-badge view">PageView</span>
-                  <span class="de-meta">tiktok · /checkout</span>
-                  <span class="de-time">8s</span>
-                </div>
-                <div class="de-row">
-                  <span class="de-badge purchase">Purchase</span>
-                  <span class="de-meta">meta.pixel · ৳1,800</span>
-                  <span class="de-time">12s</span>
-                </div>
+              <div class="dash-stat-mini">
+                <span class="dsm-val">99.8%</span>
+                <span class="dsm-label">Uptime</span>
+                <span class="dsm-change stable">Stable</span>
               </div>
             </div>
-            <div class="hero-float-tag hero-float-1">
-              <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="#059669"/></svg>
-              Container active · 15ms
+            <div class="dash-chart">
+              <div class="dc-label">Hourly events &amp; revenue</div>
+              <div class="dc-bars">
+                <div class="dc-bar" style="--h:45%"></div>
+                <div class="dc-bar" style="--h:62%"></div>
+                <div class="dc-bar" style="--h:38%"></div>
+                <div class="dc-bar" style="--h:75%"></div>
+                <div class="dc-bar" style="--h:55%"></div>
+                <div class="dc-bar" style="--h:88%"></div>
+                <div class="dc-bar hi" style="--h:100%"></div>
+                <div class="dc-bar" style="--h:72%"></div>
+                <div class="dc-bar" style="--h:65%"></div>
+                <div class="dc-bar" style="--h:80%"></div>
+                <div class="dc-bar" style="--h:58%"></div>
+                <div class="dc-bar" style="--h:70%"></div>
+              </div>
+              <div class="dc-trend-line"></div>
             </div>
-            <div class="hero-float-tag hero-float-2">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 10L5 7L7 9L10 5L12 7" stroke="#F97316" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              ROAS up 31% this week
+            <div class="dash-events">
+              <div class="de-head">Recent events</div>
+              <div class="de-row">
+                <span class="de-badge purchase">Purchase</span>
+                <span class="de-meta">meta.pixel · ৳2,450</span>
+                <span class="de-time">2s</span>
+              </div>
+              <div class="de-row">
+                <span class="de-badge cart">AddToCart</span>
+                <span class="de-meta">ga4 · product #1234</span>
+                <span class="de-time">5s</span>
+              </div>
+              <div class="de-row">
+                <span class="de-badge view">PageView</span>
+                <span class="de-meta">tiktok · /checkout</span>
+                <span class="de-time">8s</span>
+              </div>
+              <div class="de-row">
+                <span class="de-badge purchase">Purchase</span>
+                <span class="de-meta">meta.pixel · ৳1,800</span>
+                <span class="de-time">12s</span>
+              </div>
             </div>
+          </div>
+          <div class="hero-float-tag hero-float-1">
+            <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="#059669"/></svg>
+            Container active · 15ms
+          </div>
+          <div class="hero-float-tag hero-float-2">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 10L5 7L7 9L10 5L12 7" stroke="#F97316" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            ROAS up 31% this week
           </div>
         </div>
       </section>

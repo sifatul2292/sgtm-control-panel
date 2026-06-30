@@ -342,6 +342,70 @@ nav a:hover { color: var(--text); background: var(--surface); }
 
 .hero-content { display: grid; gap: 28px; }
 
+/* Stape-style centered single-column hero */
+.hero-inner.hero-centered {
+  grid-template-columns: 1fr;
+  max-width: 820px;
+  padding-top: 100px;
+  padding-bottom: 72px;
+}
+.hero-centered .hero-content {
+  justify-items: center;
+  text-align: center;
+  gap: 24px;
+}
+.hero-centered .hero-tags { justify-content: center; }
+.hero-centered .hero-social-proof {
+  display: block;
+  text-align: center;
+  margin-top: 0;
+}
+.hero-centered .hero-social-proof strong { color: var(--text-2); }
+.hero-centered h1 {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 1.1;
+}
+.hero-centered .hero-copy {
+  max-width: 620px;
+  font-size: clamp(0.98rem, 1.4vw, 1.08rem);
+  line-height: 1.65;
+}
+
+.hero-signup {
+  display: flex;
+  width: 100%;
+  max-width: 560px;
+  gap: 10px;
+  margin-top: 4px;
+}
+.hero-signup-input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 18px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-lg, 14px);
+  background: rgba(255,255,255,0.9);
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.hero-signup-input::placeholder { color: var(--muted); }
+.hero-signup-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(108,79,248,0.15);
+}
+.hero-signup .button-primary { white-space: nowrap; flex-shrink: 0; }
+
+/* Dashboard showcase (relocated from hero) */
+.dash-showcase { background: var(--bg-2); }
+.dash-showcase-visual {
+  position: relative;
+  max-width: 860px;
+  margin: 48px auto 0;
+}
+
 .anchor-offset {
   display: block;
   position: absolute;
@@ -1739,6 +1803,8 @@ thead .col-tagioo { color: var(--accent) !important; }
   .footer-links { grid-template-columns: 1fr 1fr; }
   .hero-actions { flex-direction: column; }
   .hero-actions .button { width: 100%; }
+  .hero-signup { flex-direction: column; }
+  .hero-signup .button-primary { width: 100%; justify-content: center; }
   .cta-actions { flex-direction: column; width: 100%; }
   .cta-actions .button { width: 100%; }
   .stat-divider { display: none; }
