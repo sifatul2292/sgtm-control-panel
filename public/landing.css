@@ -342,6 +342,36 @@ nav a:hover { color: var(--text); background: var(--surface); }
 
 .hero-content { display: grid; gap: 28px; }
 
+.anchor-offset {
+  display: block;
+  position: absolute;
+  top: -90px;
+  visibility: hidden;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.hero-owner-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--green);
+  background: rgba(5,150,105,0.08);
+  border: 1px solid rgba(5,150,105,0.22);
+  width: fit-content;
+  letter-spacing: 0.02em;
+}
+.hero-owner-tag svg { flex-shrink: 0; }
+
 .hero-badge {
   display: inline-flex;
   align-items: center;
@@ -381,10 +411,29 @@ h1 {
 }
 
 .hero-accent {
+  position: relative;
+  display: inline-block;
   background: linear-gradient(135deg, var(--accent) 0%, #C084FC 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.hero-accent-underline {
+  position: absolute;
+  left: 0;
+  bottom: -0.12em;
+  width: 100%;
+  height: 0.34em;
+  color: #C084FC;
+  overflow: visible;
+  stroke-dasharray: 320;
+  stroke-dashoffset: 320;
+  animation: heroUnderlineDraw 0.9s 0.4s ease-out forwards;
+}
+
+@keyframes heroUnderlineDraw {
+  to { stroke-dashoffset: 0; }
 }
 
 .hero-copy {
@@ -1287,7 +1336,7 @@ thead .col-tagioo { color: var(--accent) !important; }
 .sq-card-stat.green { background: rgba(5,150,105,0.06); border-color: rgba(5,150,105,0.18); }
 
 /* ─── Platform modules ───────────────────────────────────────── */
-.platform-section { background: var(--bg-2); }
+.platform-section { background: var(--bg-2); position: relative; }
 
 .platform-grid {
   display: grid;
