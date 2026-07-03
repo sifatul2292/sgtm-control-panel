@@ -26,11 +26,11 @@
         <span>Tagioo</span>
       </a>
       <nav aria-label="Primary navigation">
-        <a href="#platform">Platform</a>
-        <a href="#features">Features</a>
-        <a href="#how">How it works</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#faq">FAQ</a>
+        <a href="/features">Platform</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/compare">Compare</a>
+        <a href="/docs">Docs</a>
         <a href="/login" class="nav-login">Sign in</a>
         <a class="nav-cta" href="/signup">Get started free</a>
       </nav>
@@ -42,11 +42,11 @@
     <!-- ── MOBILE NAV ─────────────────────────────────────────── -->
     <div class="mobile-nav" id="mobileNav" aria-hidden="true">
       <nav>
-        <a href="#platform" onclick="closeMobileNav()">Platform</a>
-        <a href="#features" onclick="closeMobileNav()">Features</a>
-        <a href="#how" onclick="closeMobileNav()">How it works</a>
-        <a href="#pricing" onclick="closeMobileNav()">Pricing</a>
-        <a href="#faq" onclick="closeMobileNav()">FAQ</a>
+        <a href="/features" onclick="closeMobileNav()">Platform</a>
+        <a href="/how-it-works" onclick="closeMobileNav()">How it works</a>
+        <a href="/pricing" onclick="closeMobileNav()">Pricing</a>
+        <a href="/compare" onclick="closeMobileNav()">Compare</a>
+        <a href="/docs" onclick="closeMobileNav()">Docs</a>
         <a href="/login">Sign in</a>
         <a class="mobile-cta" href="/signup">Get started free →</a>
       </nav>
@@ -92,7 +92,7 @@
 
       <!-- ── DASHBOARD SHOWCASE ─────────────────────────────────── -->
       <section class="section dash-showcase">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Live dashboard</p>
           <h2>Every event, ROAS, and purchase<br>in one real-time view.</h2>
           <p class="section-sub">Watch conversions land server-side as they happen — no guessing whether the pixel fired.</p>
@@ -108,7 +108,7 @@
             </div>
             <div class="dash-stats-row">
               <div class="dash-stat-mini">
-                <span class="dsm-val">24,891</span>
+                <span class="dsm-val" data-count-to="24891">24,891</span>
                 <span class="dsm-label">Events today</span>
                 <span class="dsm-change up">↑ 18%</span>
               </div>
@@ -229,13 +229,13 @@
 
       <!-- ── STATUS QUO ────────────────────────────────────────── -->
       <section class="section status-quo-section">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">The problem</p>
           <h2>Your ad budget is wasted<br>on broken tracking data.</h2>
           <p class="section-sub">Most Bangladesh ecommerce stores lose 40–60% of conversion signals before they reach Meta and Google. Your campaigns optimize on half the data — and you pay full price.</p>
         </div>
         <div class="sq-grid">
-          <article class="sq-card">
+          <article class="sq-card" data-reveal>
             <div class="sq-card-icon" style="--sqc:#EF4444">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M8 8L16 16M16 8L8 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
@@ -247,7 +247,7 @@
               <span>of Bangladesh users run ad blockers</span>
             </div>
           </article>
-          <article class="sq-card sq-card-active">
+          <article class="sq-card sq-card-active" data-reveal>
             <div class="sq-card-tag">The fix</div>
             <div class="sq-card-icon" style="--sqc:#059669">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L20 7V12C20 17 16 21 12 22C8 21 4 17 4 12V7L12 2Z" stroke="currentColor" stroke-width="1.5"/><path d="M8 12L11 15L16 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -260,7 +260,7 @@
               <span>event delivery regardless of browser</span>
             </div>
           </article>
-          <article class="sq-card">
+          <article class="sq-card" data-reveal>
             <div class="sq-card-icon" style="--sqc:#D97706">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="15" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 10H21" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="15" r="1.5" fill="currentColor"/></svg>
             </div>
@@ -278,13 +278,13 @@
       <!-- ── PLATFORM OVERVIEW ──────────────────────────────────── -->
       <section id="platform" class="section platform-section">
         <span id="features" class="anchor-offset" aria-hidden="true"></span>
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Full platform</p>
           <h2>Everything a Bangladesh business owner<br>needs for accurate ad tracking.</h2>
           <p class="section-sub">Tagioo isn't just a container host. It's a complete tracking operations platform — from launch to daily analytics to offline conversion recovery.</p>
         </div>
         <div class="platform-grid">
-          <article class="platform-module">
+          <article class="platform-module" data-reveal>
             <div class="pm-icon" style="--pm:#5B21B6">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 7H14M6 10H11M6 13H9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
@@ -293,7 +293,7 @@
               <p>Isolated Docker container per client. Full GTM server preview mode. Not shared infrastructure.</p>
             </div>
           </article>
-          <article class="platform-module">
+          <article class="platform-module" data-reveal>
             <div class="pm-icon" style="--pm:#059669">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14L7 9L10 11L13 7L17 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14H17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
@@ -302,25 +302,7 @@
               <p>Live feed of every tracking event — PageView, AddToCart, Purchase — with hourly trends and revenue overlays.</p>
             </div>
           </article>
-          <article class="platform-module">
-            <div class="pm-icon" style="--pm:#F97316">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M7 10L9.5 12.5L13 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div>
-              <strong>Purchase Intelligence</strong>
-              <p>Search every purchase by transaction ID, order value, or URL. Verify each sale reached Meta and GA4.</p>
-            </div>
-          </article>
-          <article class="platform-module">
-            <div class="pm-icon" style="--pm:#EF4444">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L11.8 7.2L16.5 7.6L13.1 10.6L14.2 15.2L10 12.7L5.8 15.2L6.9 10.6L3.5 7.6L8.2 7.2L10 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-            </div>
-            <div>
-              <strong>Smart Purchase Gap Alert</strong>
-              <p>Automatic alert when today's purchases drop &gt;50% below your 7-day average. Catch tracking breaks the same day.</p>
-            </div>
-          </article>
-          <article class="platform-module">
+          <article class="platform-module" data-reveal>
             <div class="pm-icon" style="--pm:#D97706">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 8H16M4 12H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
             </div>
@@ -329,16 +311,7 @@
               <p>Daily breakdown table with revenue, purchases, conversion rate — 30 days of history that survives restarts.</p>
             </div>
           </article>
-          <article class="platform-module">
-            <div class="pm-icon" style="--pm:#7C3AED">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 16L7 11L10 13L13 8.5L16 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="5" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
-            </div>
-            <div>
-              <strong>Funnel Visualization</strong>
-              <p>See deduplicated event progression from PageView → AddToCart → Checkout → Purchase to spot where you lose buyers.</p>
-            </div>
-          </article>
-          <article class="platform-module">
+          <article class="platform-module" data-reveal>
             <div class="pm-icon" style="--pm:#0891B2">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2V6M10 14V18M2 10H6M14 10H18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/></svg>
             </div>
@@ -347,7 +320,7 @@
               <p>4-step wizard generates Web + Server GTM import files for GA4, Meta CAPI, Google Ads, and TikTok — ready in minutes.</p>
             </div>
           </article>
-          <article class="platform-module">
+          <article class="platform-module" data-reveal>
             <div class="pm-icon" style="--pm:#BE185D">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 12H8L10 5L12 15L14 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
@@ -356,16 +329,7 @@
               <p>Upload offline orders to Meta CAPI and extend first-party cookie lifetime — recover conversions from phone orders and repeat buyers.</p>
             </div>
           </article>
-          <article class="platform-module">
-            <div class="pm-icon" style="--pm:#059669">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10C4 10 7 6 10 6C13 6 16 10 16 10C16 10 13 14 10 14C7 14 4 10 4 10Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>
-            </div>
-            <div>
-              <strong>Bot Filtering &amp; Power-Ups</strong>
-              <p>Remove crawler traffic from your ad data. Enable deduplication, EMQ enrichment, and attribution power-ups per container.</p>
-            </div>
-          </article>
-          <article class="platform-module">
+          <article class="platform-module" data-reveal>
             <div class="pm-icon" style="--pm:#F97316">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 3C10 3 13 7 13 10C13 13 10 17 10 17" stroke="currentColor" stroke-width="1.5"/><path d="M10 3C10 3 7 7 7 10C7 13 10 17 10 17" stroke="currentColor" stroke-width="1.5"/><path d="M3 10H17" stroke="currentColor" stroke-width="1.5"/></svg>
             </div>
@@ -374,7 +338,7 @@
               <p>Use your own subdomain (e.g. <code>server.mystore.com</code>) with automatic SSL via Let's Encrypt — renewed silently.</p>
             </div>
           </article>
-          <article class="platform-module">
+          <article class="platform-module" data-reveal>
             <div class="pm-icon" style="--pm:#0891B2">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 4V16M3 8H8M3 12H8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
@@ -383,6 +347,9 @@
               <p>Install the Tagioo WordPress plugin — pushes the full ecommerce dataLayer (view_item, add_to_cart, purchase, user_data) automatically. No GTM4WP needed.</p>
             </div>
           </article>
+        </div>
+        <div class="platform-more">
+          <a class="button button-outline" href="/features">See the full platform tour →</a>
         </div>
       </section>
 
@@ -486,12 +453,12 @@
 
       <!-- ── HOW IT WORKS ───────────────────────────────────────── -->
       <section id="how" class="section how-section">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Simple launch flow</p>
           <h2>Live in under 30 minutes.</h2>
           <p class="section-sub">No developers. No server knowledge. No DevOps. If you can update DNS, you can launch Tagioo.</p>
         </div>
-        <div class="step-timeline">
+        <div class="step-timeline step-timeline-teaser">
           <article class="step-card step-reveal">
             <div class="step-num-wrap">
               <span class="step-number">01</span>
@@ -516,46 +483,6 @@
               </div>
             </div>
           </article>
-          <article class="step-card step-reveal">
-            <div class="step-num-wrap">
-              <span class="step-number">03</span>
-              <div class="step-connector"></div>
-            </div>
-            <div class="step-body">
-              <h3>Create a container in Tagioo</h3>
-              <p>Paste the config, enter your domain. Tagioo handles Docker, Nginx, SSL, and launch automatically.</p>
-            </div>
-          </article>
-          <article class="step-card step-reveal">
-            <div class="step-num-wrap">
-              <span class="step-number">04</span>
-              <div class="step-connector"></div>
-            </div>
-            <div class="step-body">
-              <h3>Use Setup Assistant to download JSON files</h3>
-              <p>Our 4-step wizard generates ready-made Web + Server GTM import files for GA4, Meta CAPI, Google Ads, and TikTok — pre-configured with your credentials.</p>
-            </div>
-          </article>
-          <article class="step-card step-reveal">
-            <div class="step-num-wrap">
-              <span class="step-number">05</span>
-              <div class="step-connector"></div>
-            </div>
-            <div class="step-body">
-              <h3>Import into Web &amp; Server GTM</h3>
-              <p>Upload <strong>web.json</strong> to your Web GTM container and <strong>server.json</strong> to your Server GTM container. Choose Merge, then Publish both.</p>
-            </div>
-          </article>
-          <article class="step-card step-reveal">
-            <div class="step-num-wrap">
-              <span class="step-number">06</span>
-              <div class="step-connector"></div>
-            </div>
-            <div class="step-body">
-              <h3>Download plugin &amp; connect website</h3>
-              <p>Download the Tagioo WordPress plugin from Setup Assistant, install it on your WooCommerce store, and activate — it handles the full ecommerce dataLayer automatically.</p>
-            </div>
-          </article>
           <article class="step-card step-reveal step-card--final">
             <div class="step-num-wrap">
               <span class="step-number step-number--done">
@@ -563,10 +490,13 @@
               </span>
             </div>
             <div class="step-body">
-              <h3>Test events in Meta</h3>
-              <p>Open Meta Events Manager → Test Events. Fire a purchase on your store and watch it appear server-side. You're live.</p>
+              <h3>+4 more steps — Setup Assistant, GTM import, plugin, live test</h3>
+              <p>The full guided walkthrough, with screenshots for every step, is on the setup guide.</p>
             </div>
           </article>
+        </div>
+        <div class="how-more">
+          <a class="button button-primary" href="/how-it-works">See the full setup guide →</a>
         </div>
         <div class="how-guarantee">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5V9C16 13 12.5 16.5 9 17C5.5 16.5 2 13 2 9V5L9 1Z" stroke="#059669" stroke-width="1.5"/><path d="M6 9L8 11L12 7" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -609,7 +539,7 @@
 
       <!-- ── COMPARISON ─────────────────────────────────────────── -->
       <section class="section comparison-section">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Why Tagioo</p>
           <h2>The best server-side tracking<br>in Bangladesh.</h2>
           <p class="section-sub">Most platforms run everyone on the same shared server. Tagioo gives every customer an isolated container with dedicated resources — BDIX-hosted for the fastest response times in Bangladesh.</p>
@@ -658,48 +588,6 @@
                 <td><span class="tbl-no">✗</span></td>
               </tr>
               <tr>
-                <td>Purchase inspector + revenue tracking</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-yes-muted">Basic</span></td>
-                <td><span class="tbl-no">✗</span></td>
-              </tr>
-              <tr>
-                <td>Offline conversions to Meta</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-neutral">Manual</span></td>
-              </tr>
-              <tr>
-                <td>GTM template generator</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-no">✗</span></td>
-              </tr>
-              <tr>
-                <td>BDIX-hosted (Bangladesh fast)</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-neutral">Depends</span></td>
-              </tr>
-              <tr>
-                <td>bKash / Nagad payment</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-neutral">N/A</span></td>
-              </tr>
-              <tr>
-                <td>Zero server management</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-no">✗</span></td>
-              </tr>
-              <tr>
                 <td>Starting price</td>
                 <td class="col-tagioo price-cell">৳1,200/mo</td>
                 <td class="price-cell">৳1,200/mo</td>
@@ -709,32 +597,35 @@
             </tbody>
           </table>
         </div>
+        <div class="how-more">
+          <a class="button button-outline" href="/compare">See the full comparison →</a>
+        </div>
       </section>
 
       <!-- ── OUTCOME PROOF ──────────────────────────────────────── -->
       <section class="section outcome-section">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">The money math</p>
           <h2>Every hidden sale is money<br>straight out of your pocket.</h2>
           <p class="section-sub">Meta and Google can only optimize on the sales they actually see. When ad-blockers hide half your purchases, the algorithm spends your budget chasing the wrong people — and you pay for it.</p>
         </div>
         <div class="outcome-grid">
-          <article class="outcome-card">
+          <article class="outcome-card" data-reveal>
             <div class="outcome-num" style="--oc:var(--orange)">40–60%</div>
             <h3>Of your sales go unseen</h3>
             <p>Ad-blockers, Brave, and iOS quietly drop your browser pixel — so Meta never learns who really bought.</p>
           </article>
-          <article class="outcome-card">
+          <article class="outcome-card" data-reveal>
             <div class="outcome-num" style="--oc:var(--accent)">৳50,000</div>
             <h3>Spend, half wasted</h3>
             <p>Spend ৳1,00,000 on ads but Meta sees only half your buyers? It optimizes on bad data and burns the rest.</p>
           </article>
-          <article class="outcome-card">
+          <article class="outcome-card" data-reveal>
             <div class="outcome-num" style="--oc:var(--green)">Same budget,</div>
             <h3>more profit</h3>
             <p>Feed back the hidden sales and the algorithm finds cheaper buyers — more orders from the budget you already spend.</p>
           </article>
-          <article class="outcome-card">
+          <article class="outcome-card" data-reveal>
             <div class="outcome-num" style="--oc:var(--accent)">৳0</div>
             <h3>To start &amp; see it</h3>
             <p>Free plan, plug-and-play setup. Watch your real sales appear in the dashboard before you pay a taka.</p>
@@ -779,14 +670,14 @@
 
       <!-- ── PRICING ────────────────────────────────────────────── -->
       <section id="pricing" class="section pricing-section">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Simple pricing</p>
           <h2>Plans for every store size.</h2>
           <p class="section-sub">Every plan includes the Custom Loader that loads <strong>gtm.js and gtag.js first-party</strong> — so Brave and ad-blockers can't strip your tracking. Plus dedicated sGTM container, first-party domain, SSL, server-side Meta CAPI, and real-time analytics.</p>
         </div>
         <div class="pricing-grid">
 
-          <article class="pricing-card">
+          <article class="pricing-card" data-reveal>
             <div class="plan-tier-badge" style="--tb:#5B21B6">Free</div>
             <div class="plan-header">
               <div class="plan-price"><strong>৳0</strong><span>/month</span></div>
@@ -804,7 +695,7 @@
             <a class="button button-outline full-width" href="/signup">Get started free</a>
           </article>
 
-          <article class="pricing-card">
+          <article class="pricing-card" data-reveal>
             <div class="plan-tier-badge" style="--tb:#059669">Starter</div>
             <div class="plan-header">
               <div class="plan-price"><strong>৳1,200</strong><span>/month</span></div>
@@ -822,7 +713,7 @@
             <a class="button button-outline full-width" href="/signup">Start Starter</a>
           </article>
 
-          <article class="pricing-card featured">
+          <article class="pricing-card featured" data-reveal>
             <div class="plan-popular-tag">Most popular</div>
             <div class="plan-tier-badge" style="--tb:#F97316">Pro</div>
             <div class="plan-header">
@@ -841,7 +732,7 @@
             <a class="button button-primary full-width" href="/signup">Start Pro</a>
           </article>
 
-          <article class="pricing-card">
+          <article class="pricing-card" data-reveal>
             <div class="plan-tier-badge" style="--tb:#D97706">Enterprise</div>
             <div class="plan-header">
               <div class="plan-price"><strong>৳5,900</strong><span>/month</span></div>
@@ -862,13 +753,13 @@
         </div>
         <div class="pricing-footer">
           <p>Pay monthly via <strong>bKash</strong> or <strong>Nagad</strong>. After you pick a plan, send the payment and enter your transaction ID — we verify and activate within hours. Cancel anytime.</p>
-          <p>Need a custom plan? <a href="https://wa.me/+8801XXXXXXXXX" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
+          <p><a href="/pricing">Full plan details &amp; billing FAQ →</a> &nbsp;·&nbsp; Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
         </div>
       </section>
 
       <!-- ── FAQ ────────────────────────────────────────────────── -->
       <section id="faq" class="section faq-section">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Questions</p>
           <h2>Frequently asked.</h2>
         </div>
@@ -916,7 +807,7 @@
           <p class="cta-sub">Join Bangladesh stores tracking accurately with Tagioo. Free plan available. No credit card required. Setup takes under 30 minutes.</p>
           <div class="cta-actions">
             <a class="button button-cta-primary button-lg" href="/signup">Create free account →</a>
-            <a class="button button-cta-ghost button-lg" href="https://wa.me/+8801XXXXXXXXX" target="_blank" rel="noopener">Chat on WhatsApp</a>
+            <a class="button button-cta-ghost button-lg" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Chat on WhatsApp</a>
           </div>
           <div class="cta-trust-row">
             <span>
@@ -960,15 +851,16 @@
         <div class="footer-links">
           <div class="footer-col">
             <strong>Product</strong>
-            <a href="#platform">Platform</a>
-            <a href="#features">Features</a>
-            <a href="#how">How it works</a>
-            <a href="#pricing">Pricing</a>
+            <a href="/features">Platform</a>
+            <a href="/how-it-works">How it works</a>
+            <a href="/pricing">Pricing</a>
+            <a href="/compare">Compare</a>
             <a href="/signup">Sign up</a>
           </div>
           <div class="footer-col">
             <strong>Support</strong>
-            <a href="https://wa.me/+8801XXXXXXXXX" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="/docs">Docs</a>
+            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
             <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
             <a href="#faq">FAQ</a>
           </div>
@@ -986,7 +878,7 @@
     </footer>
 
     <!-- ── WHATSAPP FLOAT ──────────────────────────────────────── -->
-    <a class="whatsapp-float" href="https://wa.me/+8801XXXXXXXXX" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+    <a class="whatsapp-float" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
       </svg>
@@ -1030,6 +922,33 @@
           }
         });
       });
+
+      const revealObs = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("is-visible"); revealObs.unobserve(e.target); } });
+      }, { threshold: 0.15 });
+      document.querySelectorAll("[data-reveal]").forEach((el, i) => {
+        el.style.animationDelay = `${(i % 6) * 0.08}s`;
+        revealObs.observe(el);
+      });
+
+      const countObs = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (!e.isIntersecting) return;
+          const el = e.target;
+          countObs.unobserve(el);
+          const to = parseFloat(el.dataset.countTo);
+          const dur = 900;
+          const start = performance.now();
+          function tick(now) {
+            const p = Math.min((now - start) / dur, 1);
+            const eased = 1 - Math.pow(1 - p, 3);
+            el.textContent = Math.round(to * eased).toLocaleString();
+            if (p < 1) requestAnimationFrame(tick);
+          }
+          requestAnimationFrame(tick);
+        });
+      }, { threshold: 0.4 });
+      document.querySelectorAll("[data-count-to]").forEach(el => countObs.observe(el));
     </script>
   </body>
 </html>

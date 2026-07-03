@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="How to set up Tagioo server-side GTM in under 30 minutes — create your container, point DNS, import GTM templates, install the WordPress plugin, and go live. Step-by-step guide." />
+    <meta property="og:title" content="How it works — Tagioo setup guide" />
+    <meta property="og:description" content="A full step-by-step walkthrough for launching server-side GTM tracking on Tagioo — no developer needed." />
+    <title>How it works — Tagioo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/landing.css" />
+  </head>
+  <body>
+
+    <!-- ── HEADER ─────────────────────────────────────────────── -->
+    <header class="site-header" id="siteHeader">
+      <a class="brand" href="/" aria-label="Tagioo home">
+        <span class="brand-mark">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="currentColor"/>
+            <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="white" opacity="0.9"/>
+          </svg>
+        </span>
+        <span>Tagioo</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/features">Platform</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/compare">Compare</a>
+        <a href="/docs">Docs</a>
+        <a href="/login" class="nav-login">Sign in</a>
+        <a class="nav-cta" href="/signup">Get started free</a>
+      </nav>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </header>
+
+    <!-- ── MOBILE NAV ─────────────────────────────────────────── -->
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true">
+      <nav>
+        <a href="/features" onclick="closeMobileNav()">Platform</a>
+        <a href="/how-it-works" onclick="closeMobileNav()">How it works</a>
+        <a href="/pricing" onclick="closeMobileNav()">Pricing</a>
+        <a href="/compare" onclick="closeMobileNav()">Compare</a>
+        <a href="/docs" onclick="closeMobileNav()">Docs</a>
+        <a href="/login">Sign in</a>
+        <a class="mobile-cta" href="/signup">Get started free →</a>
+      </nav>
+    </div>
+
+    <main>
+
+      <!-- ── HERO ───────────────────────────────────────────────── -->
+      <section class="hero">
+        <div class="hero-bg">
+          <div class="hero-orb hero-orb-1"></div>
+          <div class="hero-orb hero-orb-2"></div>
+        </div>
+        <div class="hero-inner">
+          <div class="hero-content">
+            <div class="hero-copy">
+              <p class="eyebrow">Simple launch flow</p>
+              <h1>Live in under 30 minutes.</h1>
+              <p class="section-sub">No developers. No server knowledge. No DevOps. If you can update DNS, you can launch Tagioo. Here's every step, in order.</p>
+              <div class="hero-actions">
+                <a class="button button-primary" href="/signup">Create free account →</a>
+                <a class="button button-outline" href="/docs">Read the docs</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PREREQUISITES ──────────────────────────────────────── -->
+      <section class="section">
+        <div class="how-guarantee" data-reveal style="max-width:720px;margin-left:auto;margin-right:auto;">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5V9C16 13 12.5 16.5 9 17C5.5 16.5 2 13 2 9V5L9 1Z" stroke="#059669" stroke-width="1.5"/><path d="M6 9L8 11L12 7" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Before you start: you'll need admin access to a Google Tag Manager account, DNS access for your domain (to add one CNAME record), and about 30 minutes.
+        </div>
+      </section>
+
+      <!-- ── FULL STEP TIMELINE ─────────────────────────────────── -->
+      <section id="how" class="section how-section">
+        <div class="step-timeline">
+          <article class="step-card step-reveal">
+            <div class="step-num-wrap">
+              <span class="step-number">01</span>
+              <div class="step-connector"></div>
+            </div>
+            <div class="step-body">
+              <h3>Create account in Tagioo</h3>
+              <p>Sign up at tagioo.com — takes 30 seconds. Your dashboard is ready instantly, on the Free plan (15,000 events/month, no card required).</p>
+            </div>
+          </article>
+          <article class="step-card step-reveal">
+            <div class="step-num-wrap">
+              <span class="step-number">02</span>
+              <div class="step-connector"></div>
+            </div>
+            <div class="step-body">
+              <h3>Create GTM Server Container</h3>
+              <p>In Google Tag Manager, create a Server container. Copy the <strong>Container Config</strong> string — you'll paste it into Tagioo next.</p>
+              <div class="step-sub-action">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7H12M8 3L12 7L8 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Point your first-party domain <code>track.yoursite.com</code> → <code>bd.tagioo.com</code> (one CNAME record)
+              </div>
+            </div>
+          </article>
+          <article class="step-card step-reveal">
+            <div class="step-num-wrap">
+              <span class="step-number">03</span>
+              <div class="step-connector"></div>
+            </div>
+            <div class="step-body">
+              <h3>Create a container in Tagioo</h3>
+              <p>Paste the config, enter your domain. Tagioo handles Docker, Nginx, SSL, and launch automatically — usually live within a minute or two.</p>
+            </div>
+          </article>
+          <article class="step-card step-reveal">
+            <div class="step-num-wrap">
+              <span class="step-number">04</span>
+              <div class="step-connector"></div>
+            </div>
+            <div class="step-body">
+              <h3>Use Setup Assistant to download JSON files</h3>
+              <p>Our 4-step wizard generates ready-made Web + Server GTM import files for GA4, Meta CAPI, Google Ads, and TikTok — pre-configured with your credentials, so you're not manually wiring up tags.</p>
+            </div>
+          </article>
+          <article class="step-card step-reveal">
+            <div class="step-num-wrap">
+              <span class="step-number">05</span>
+              <div class="step-connector"></div>
+            </div>
+            <div class="step-body">
+              <h3>Import into Web &amp; Server GTM</h3>
+              <p>Upload <strong>web.json</strong> to your Web GTM container and <strong>server.json</strong> to your Server GTM container. Choose Merge, then Publish both.</p>
+            </div>
+          </article>
+          <article class="step-card step-reveal">
+            <div class="step-num-wrap">
+              <span class="step-number">06</span>
+              <div class="step-connector"></div>
+            </div>
+            <div class="step-body">
+              <h3>Download plugin &amp; connect website</h3>
+              <p>Download the Tagioo WordPress plugin from Setup Assistant, install it on your WooCommerce store, and activate — it handles the full ecommerce dataLayer automatically. Not on WooCommerce? See the <a href="/docs">docs</a> for manual dataLayer setup.</p>
+            </div>
+          </article>
+          <article class="step-card step-reveal step-card--final">
+            <div class="step-num-wrap">
+              <span class="step-number step-number--done">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4 9L7.5 12.5L14 5.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </div>
+            <div class="step-body">
+              <h3>Test events in Meta</h3>
+              <p>Open Meta Events Manager → Test Events. Fire a purchase on your store and watch it appear server-side. You're live — check your Tagioo dashboard for the real-time event feed.</p>
+            </div>
+          </article>
+        </div>
+        <div class="how-guarantee">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5V9C16 13 12.5 16.5 9 17C5.5 16.5 2 13 2 9V5L9 1Z" stroke="#059669" stroke-width="1.5"/><path d="M6 9L8 11L12 7" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          If you get stuck on any step, our team sets it up for you via WhatsApp — free.
+        </div>
+      </section>
+
+      <!-- ── FINAL CTA ───────────────────────────────────────────── -->
+      <section class="section cta-section">
+        <div class="cta-inner">
+          <p class="eyebrow eyebrow-onpurple">Start today</p>
+          <h2>Your dashboard is<br>waiting for you.</h2>
+          <p class="cta-sub">Free plan available. No credit card required. Setup takes under 30 minutes.</p>
+          <div class="cta-actions">
+            <a class="button button-cta-primary button-lg" href="/signup">Create free account →</a>
+            <a class="button button-cta-ghost button-lg" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Chat on WhatsApp</a>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ── FOOTER ─────────────────────────────────────────────── -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a class="brand brand-light" href="/">
+            <span class="brand-mark brand-mark-light">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
+                <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
+              </svg>
+            </span>
+            <span>Tagioo</span>
+          </a>
+          <p>First-party server-side tracking infrastructure for Bangladesh ecommerce and agencies.</p>
+          <div class="footer-payments">
+            <span class="trust-badge bkash sm">bKash</span>
+            <span class="trust-badge nagad sm">Nagad</span>
+            <span class="trust-badge sm footer-tb">Visa / MC</span>
+          </div>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <strong>Product</strong>
+            <a href="/features">Platform</a>
+            <a href="/how-it-works">How it works</a>
+            <a href="/pricing">Pricing</a>
+            <a href="/compare">Compare</a>
+            <a href="/signup">Sign up</a>
+          </div>
+          <div class="footer-col">
+            <strong>Support</strong>
+            <a href="/docs">Docs</a>
+            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
+          </div>
+          <div class="footer-col">
+            <strong>Legal</strong>
+            <a href="/terms">Terms of Service</a>
+            <a href="/privacy">Privacy Policy</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2025 Tagioo. All rights reserved.</span>
+        <span>Made in Bangladesh 🇧🇩</span>
+      </div>
+    </footer>
+
+    <!-- ── WHATSAPP FLOAT ──────────────────────────────────────── -->
+    <a class="whatsapp-float" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+    </a>
+
+    <script>
+      const menuBtn = document.getElementById("menuBtn");
+      const mobileNav = document.getElementById("mobileNav");
+
+      menuBtn.addEventListener("click", () => {
+        const open = mobileNav.classList.toggle("open");
+        menuBtn.setAttribute("aria-expanded", String(open));
+        mobileNav.setAttribute("aria-hidden", String(!open));
+      });
+
+      function closeMobileNav() {
+        mobileNav.classList.remove("open");
+        menuBtn.setAttribute("aria-expanded", "false");
+        mobileNav.setAttribute("aria-hidden", "true");
+      }
+
+      const header = document.getElementById("siteHeader");
+      window.addEventListener("scroll", () => {
+        header.classList.toggle("scrolled", window.scrollY > 40);
+      }, { passive: true });
+
+      const revealObs = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("is-visible"); revealObs.unobserve(e.target); } });
+      }, { threshold: 0.15 });
+      document.querySelectorAll("[data-reveal]").forEach((el, i) => {
+        el.style.animationDelay = `${(i % 6) * 0.08}s`;
+        revealObs.observe(el);
+      });
+
+      const stepObs = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("is-visible"); stepObs.unobserve(e.target); } });
+      }, { threshold: 0.15 });
+      document.querySelectorAll(".step-reveal").forEach((el, i) => {
+        el.style.animationDelay = `${i * 0.1}s`;
+        stepObs.observe(el);
+      });
+    </script>
+  </body>
+</html>

@@ -26,10 +26,11 @@
         <span>Tagioo</span>
       </a>
       <nav aria-label="Primary navigation">
-        <a href="/features">Features</a>
-        <a href="/#how">How it works</a>
-        <a href="/#pricing">Pricing</a>
-        <a href="/#faq">FAQ</a>
+        <a href="/features">Platform</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/compare">Compare</a>
+        <a href="/docs">Docs</a>
         <a href="/login" class="nav-login">Sign in</a>
         <a class="nav-cta" href="/signup">Get started free</a>
       </nav>
@@ -41,10 +42,11 @@
     <!-- ── MOBILE NAV ─────────────────────────────────────────── -->
     <div class="mobile-nav" id="mobileNav" aria-hidden="true">
       <nav>
-        <a href="/features" onclick="closeMobileNav()">Features</a>
-        <a href="/#how" onclick="closeMobileNav()">How it works</a>
-        <a href="/#pricing" onclick="closeMobileNav()">Pricing</a>
-        <a href="/#faq" onclick="closeMobileNav()">FAQ</a>
+        <a href="/features" onclick="closeMobileNav()">Platform</a>
+        <a href="/how-it-works" onclick="closeMobileNav()">How it works</a>
+        <a href="/pricing" onclick="closeMobileNav()">Pricing</a>
+        <a href="/compare" onclick="closeMobileNav()">Compare</a>
+        <a href="/docs" onclick="closeMobileNav()">Docs</a>
         <a href="/login">Sign in</a>
         <a class="mobile-cta" href="/signup">Get started free →</a>
       </nav>
@@ -66,7 +68,49 @@
               <p class="section-sub">Tagioo gives you a dedicated server-side GTM container with first-party tracking, conversion APIs for every major ad platform, and the tools to recover the conversions adblockers and browser restrictions normally cost you.</p>
               <div class="hero-actions">
                 <a class="button button-primary" href="/signup">Start free →</a>
-                <a class="button button-outline" href="/#pricing">See pricing</a>
+                <a class="button button-outline" href="/pricing">See pricing</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── DASHBOARD PREVIEW ──────────────────────────────────── -->
+      <section class="section dash-showcase">
+        <div class="section-heading centered" data-reveal>
+          <p class="eyebrow">See it in action</p>
+          <h2>Every capability shows up<br>in one real-time dashboard.</h2>
+          <p class="section-sub">No separate tools to log into — analytics, purchase inspection, and alerts all live in your Tagioo dashboard.</p>
+        </div>
+        <div class="dash-showcase-visual" data-reveal>
+          <div class="mv-card">
+            <div class="mv-inspector">
+              <div class="mv-inspector-head">Purchase Inspector — search by order ID, value, URL</div>
+              <div class="mv-inspector-row">
+                <span class="de-badge purchase">Purchase</span>
+                <span class="mv-order">ORD-8841</span>
+                <span class="mv-amount">৳2,450</span>
+                <span class="mv-dest">meta · ga4</span>
+              </div>
+              <div class="mv-inspector-row">
+                <span class="de-badge purchase">Purchase</span>
+                <span class="mv-order">ORD-8840</span>
+                <span class="mv-amount">৳1,800</span>
+                <span class="mv-dest">meta · ga4</span>
+              </div>
+            </div>
+            <div class="mv-table-preview">
+              <div class="mvt-head">
+                <span>Date</span><span>Purchases</span><span>Revenue</span><span>Conv.%</span><span>Errors</span>
+              </div>
+              <div class="mvt-row">
+                <span>Today</span><span class="green">34</span><span>৳61,200</span><span class="green">2.8%</span><span>2</span>
+              </div>
+              <div class="mvt-row">
+                <span>Yesterday</span><span class="green">29</span><span>৳52,200</span><span class="green">2.4%</span><span>1</span>
+              </div>
+              <div class="mvt-row">
+                <span>Mon</span><span class="green">41</span><span>৳73,800</span><span class="green">3.1%</span><span>0</span>
               </div>
             </div>
           </div>
@@ -75,34 +119,34 @@
 
       <!-- ── AD PLATFORM CONNECTIONS ────────────────────────────── -->
       <section class="section feature-band">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Connect to major ad platforms</p>
           <h2>Server-side conversion APIs<br>for every channel.</h2>
           <p class="section-sub">Send events directly from your server to each ad platform's Conversions API. Bypass browser limits, recover blocked events, and improve match quality and attribution.</p>
         </div>
         <div class="feature-grid">
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(24,119,242,0.08);--fi-border:rgba(24,119,242,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.25" stroke="#1877F2" stroke-width="1.5"/><path d="M11.2 10.2H12.4L12.7 8.6H11.2V7.7C11.2 7.2 11.4 6.9 12.1 6.9H12.8V5.5C12.5 5.45 12 5.4 11.5 5.4C10.3 5.4 9.5 6.1 9.5 7.5V8.6H8.2V10.2H9.5V14.5H11.2V10.2Z" fill="#1877F2"/></svg>
             </div>
             <h3>Meta Conversions API</h3>
             <p>Server-side Purchase, AddToCart, and ViewContent events with hashed match keys, <code>fbp</code>/<code>fbc</code> and event-ID deduplication against the browser pixel.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(232,134,5,0.08);--fi-border:rgba(232,134,5,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 14L10 4L15 14" stroke="#E88605" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="13" r="1.3" fill="#E88605"/></svg>
             </div>
             <h3>Google Analytics 4</h3>
             <p>Native server-side GA4 forwarding with the Measurement Protocol API secret — full ecommerce events, FPID, and a clean data stream.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(0,0,0,0.06);--fi-border:rgba(0,0,0,0.14);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M12 4V12.5C12 13.9 10.9 15 9.5 15C8.1 15 7 13.9 7 12.5C7 11.1 8.1 10 9.5 10V8C7 8 5 10 5 12.5C5 15 7 17 9.5 17C12 17 14 15 14 12.5V8C14.7 8.6 15.6 9 16.5 9V7C14.9 7 13.6 5.7 13.6 4H12Z" fill="#111827"/></svg>
             </div>
             <h3>TikTok Events API</h3>
             <p>Server-side TikTok events via the Community Template Gallery integration — field mappings handled, deduped against the web pixel.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(52,168,83,0.08);--fi-border:rgba(52,168,83,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L11.8 7.2L16.5 7.6L13.1 10.6L14.2 15.2L10 12.7L5.8 15.2L6.9 10.6L3.5 7.6L8.2 7.2L10 3Z" stroke="#34A853" stroke-width="1.5" stroke-linejoin="round"/></svg>
             </div>
@@ -114,47 +158,47 @@
 
       <!-- ── CORE INFRASTRUCTURE ────────────────────────────────── -->
       <section class="section feature-band">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">First-party infrastructure</p>
           <h2>Your own server.<br>Your own domain.</h2>
         </div>
         <div class="feature-grid">
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(91,33,182,0.08);--fi-border:rgba(91,33,182,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="#5B21B6" stroke-width="1.5"/><path d="M6 7H14M6 10H11M6 13H9" stroke="#5B21B6" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
             <h3>Managed sGTM hosting</h3>
             <p>A dedicated, isolated Docker container running server-side GTM — full server access, preview mode, and debug tools. Not a shared proxy.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(249,115,22,0.08);--fi-border:rgba(249,115,22,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#F97316" stroke-width="1.5"/><path d="M10 3C10 3 13 7 13 10C13 13 10 17 10 17M10 3C10 3 7 7 7 10C7 13 10 17 10 17M3 10H17" stroke="#F97316" stroke-width="1.5"/></svg>
             </div>
             <h3>Custom first-party domain</h3>
             <p>Serve tracking from your own subdomain (e.g. <code>server.mystore.com</code>) with automatic SSL — first-party context means better cookies and fewer blocked requests.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(5,150,105,0.08);--fi-border:rgba(5,150,105,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3V10L14 12" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="10" r="7" stroke="#059669" stroke-width="1.5"/></svg>
             </div>
             <h3>Custom loader</h3>
             <p>Load your tag library from your own first-party path instead of the third-party CDN — keeps tracking in first-party context for more reliable delivery.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(91,33,182,0.08);--fi-border:rgba(91,33,182,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14L7 9L10 11L13 7L17 14" stroke="#5B21B6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14H17" stroke="#5B21B6" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
             <h3>Real-time event analytics</h3>
             <p>Watch PageView, ViewItem, AddToCart, Checkout, and Purchase events land in real time, with hourly trends and conversion metrics per container.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(91,33,182,0.08);--fi-border:rgba(91,33,182,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10C4 10 7 6 10 6C13 6 16 10 16 10C16 10 13 14 10 14C7 14 4 10 4 10Z" stroke="#5B21B6" stroke-width="1.5"/><circle cx="10" cy="10" r="2" fill="#5B21B6"/></svg>
             </div>
             <h3>Purchase deduplication</h3>
             <p>Detects and removes duplicate purchase events across browser and server via <code>transaction_id</code> so your revenue stays accurate.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(239,68,68,0.07);--fi-border:rgba(239,68,68,0.16);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L11.8 7.2L16.5 7.6L13.1 10.6L14.2 15.2L10 12.7L5.8 15.2L6.9 10.6L3.5 7.6L8.2 7.2L10 3Z" stroke="#EF4444" stroke-width="1.5" stroke-linejoin="round"/></svg>
             </div>
@@ -166,13 +210,13 @@
 
       <!-- ── NEW: RECOVERY FEATURES (highlighted) ───────────────── -->
       <section class="section feature-band">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Conversion recovery</p>
           <h2>Recover the conversions<br>you're losing today.</h2>
           <p class="section-sub">Browser restrictions and offline orders quietly cost you reported conversions. These two features close the gap.</p>
         </div>
         <div class="feature-grid">
-          <article class="feature-card feature-card-highlight">
+          <article class="feature-card feature-card-highlight" data-reveal>
             <span class="feature-badge">New</span>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(24,119,242,0.08);--fi-border:rgba(24,119,242,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 4H16V13H11L8 16V13H4V4Z" stroke="#1877F2" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 8H13M7 10.5H11" stroke="#1877F2" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -180,7 +224,7 @@
             <h3>Offline conversion upload</h3>
             <p>Upload phone, COD, and in-store orders as a CSV and push them straight to Meta as offline conversions — hashed customer match keys, batched, with a validation preview and per-upload history. Close the loop on orders that never touched your website checkout.</p>
           </article>
-          <article class="feature-card feature-card-highlight">
+          <article class="feature-card feature-card-highlight" data-reveal>
             <span class="feature-badge">New</span>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(5,150,105,0.08);--fi-border:rgba(5,150,105,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3V10L14 12" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="10" cy="10" r="7" stroke="#059669" stroke-width="1.5"/></svg>
@@ -193,33 +237,33 @@
 
       <!-- ── PLATFORM / EDGE ────────────────────────────────────── -->
       <section class="section feature-band">
-        <div class="section-heading centered">
+        <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Built to be fast and reliable</p>
           <h2>A platform you don't<br>have to babysit.</h2>
         </div>
         <div class="feature-grid">
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(249,115,22,0.08);--fi-border:rgba(249,115,22,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2V6M10 14V18M2 10H6M14 10H18" stroke="#F97316" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" stroke="#F97316" stroke-width="1.5"/></svg>
             </div>
             <h3>GTM template generator</h3>
             <p>One-click Web GTM + Server GTM templates for GA4, Meta CAPI, Google Ads, and TikTok — import, preview, publish.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(5,150,105,0.08);--fi-border:rgba(5,150,105,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14L7 9L10 11L13 7L17 14" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
             <h3>BDIX-fast edge</h3>
             <p>Hosted close to your customers for the fastest response times in Bangladesh — low latency keeps tags firing before users bounce.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(91,33,182,0.08);--fi-border:rgba(91,33,182,0.18);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2L16 5V10C16 14 13 16.5 10 18C7 16.5 4 14 4 10V5L10 2Z" stroke="#5B21B6" stroke-width="1.5" stroke-linejoin="round"/><path d="M7.5 10L9.2 11.7L12.5 8.4" stroke="#5B21B6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
             <h3>Auto-healing uptime</h3>
             <p>A watchdog keeps your container alive — if it ever exits, it's restarted automatically so events never silently stop.</p>
           </article>
-          <article class="feature-card">
+          <article class="feature-card" data-reveal>
             <div class="feature-icon-wrap" style="--fi-bg:rgba(239,68,68,0.07);--fi-border:rgba(239,68,68,0.16);">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L16 6V10C16 14 10 17 10 17C10 17 4 14 4 10V6L10 3Z" stroke="#EF4444" stroke-width="1.5" stroke-linejoin="round"/></svg>
             </div>
@@ -236,7 +280,7 @@
           <p class="cta-sub">Set up your dedicated server-side GTM container in minutes.</p>
           <div class="cta-actions">
             <a class="button button-cta-primary button-lg" href="/signup">Get started free →</a>
-            <a class="button button-cta-ghost button-lg" href="/#pricing">See pricing</a>
+            <a class="button button-cta-ghost button-lg" href="/pricing">See pricing</a>
           </div>
         </div>
       </section>
@@ -266,14 +310,16 @@
         <div class="footer-links">
           <div class="footer-col">
             <strong>Product</strong>
-            <a href="/features">Features</a>
-            <a href="/#how">How it works</a>
-            <a href="/#pricing">Pricing</a>
+            <a href="/features">Platform</a>
+            <a href="/how-it-works">How it works</a>
+            <a href="/pricing">Pricing</a>
+            <a href="/compare">Compare</a>
             <a href="/signup">Sign up</a>
           </div>
           <div class="footer-col">
             <strong>Support</strong>
-            <a href="https://wa.me/+8801XXXXXXXXX" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="/docs">Docs</a>
+            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
             <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
             <a href="/#faq">FAQ</a>
           </div>
@@ -291,7 +337,7 @@
     </footer>
 
     <!-- ── WHATSAPP FLOAT ──────────────────────────────────────── -->
-    <a class="whatsapp-float" href="https://wa.me/+8801XXXXXXXXX" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+    <a class="whatsapp-float" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
       </svg>
@@ -317,6 +363,14 @@
       window.addEventListener("scroll", () => {
         header.classList.toggle("scrolled", window.scrollY > 40);
       }, { passive: true });
+
+      const revealObs = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("is-visible"); revealObs.unobserve(e.target); } });
+      }, { threshold: 0.15 });
+      document.querySelectorAll("[data-reveal]").forEach((el, i) => {
+        el.style.animationDelay = `${(i % 6) * 0.08}s`;
+        revealObs.observe(el);
+      });
     </script>
   </body>
 </html>

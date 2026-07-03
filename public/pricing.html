@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Tagioo pricing — Free 15,000 events/month forever, Starter ৳1,200/mo, Pro ৳2,900/mo, Enterprise ৳5,900/mo. Pay via bKash or Nagad. No credit card required." />
+    <meta property="og:title" content="Pricing — Tagioo" />
+    <meta property="og:description" content="Simple, transparent pricing for server-side GTM hosting in Bangladesh. Free forever tier, no card required, pay via bKash/Nagad." />
+    <title>Pricing — Tagioo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/landing.css" />
+  </head>
+  <body>
+
+    <!-- ── HEADER ─────────────────────────────────────────────── -->
+    <header class="site-header" id="siteHeader">
+      <a class="brand" href="/" aria-label="Tagioo home">
+        <span class="brand-mark">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="currentColor"/>
+            <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="white" opacity="0.9"/>
+          </svg>
+        </span>
+        <span>Tagioo</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/features">Platform</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/compare">Compare</a>
+        <a href="/docs">Docs</a>
+        <a href="/login" class="nav-login">Sign in</a>
+        <a class="nav-cta" href="/signup">Get started free</a>
+      </nav>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </header>
+
+    <!-- ── MOBILE NAV ─────────────────────────────────────────── -->
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true">
+      <nav>
+        <a href="/features" onclick="closeMobileNav()">Platform</a>
+        <a href="/how-it-works" onclick="closeMobileNav()">How it works</a>
+        <a href="/pricing" onclick="closeMobileNav()">Pricing</a>
+        <a href="/compare" onclick="closeMobileNav()">Compare</a>
+        <a href="/docs" onclick="closeMobileNav()">Docs</a>
+        <a href="/login">Sign in</a>
+        <a class="mobile-cta" href="/signup">Get started free →</a>
+      </nav>
+    </div>
+
+    <main>
+
+      <!-- ── HERO ───────────────────────────────────────────────── -->
+      <section class="hero">
+        <div class="hero-bg">
+          <div class="hero-orb hero-orb-1"></div>
+          <div class="hero-orb hero-orb-2"></div>
+        </div>
+        <div class="hero-inner">
+          <div class="hero-content">
+            <div class="hero-copy">
+              <p class="eyebrow">Simple pricing</p>
+              <h1>No card. No lock-in.<br>Just server-side tracking.</h1>
+              <p class="section-sub">Start free with 15,000 events a month, forever. Upgrade when you need more volume — pay monthly via bKash or Nagad, cancel anytime.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PRICING GRID ───────────────────────────────────────── -->
+      <section class="section pricing-section">
+        <div class="pricing-grid">
+
+          <article class="pricing-card" data-reveal>
+            <div class="plan-tier-badge" style="--tb:#5B21B6">Free</div>
+            <div class="plan-header">
+              <div class="plan-price"><strong>৳0</strong><span>/month</span></div>
+              <p>Test with real events. No credit card required.</p>
+            </div>
+            <ul class="plan-features">
+              <li><span class="pf-check">✓</span> 15,000 events/month</li>
+              <li><span class="pf-check">✓</span> 1 domain · 1 sGTM container</li>
+              <li><span class="pf-check">✓</span> First-party domain + SSL</li>
+              <li><span class="pf-check">✓</span> Custom Loader (Brave bypass)</li>
+              <li><span class="pf-check">✓</span> Consent Mode v2 (GDPR)</li>
+              <li><span class="pf-check">✓</span> Real-time dashboard + event logs</li>
+              <li><span class="pf-check">✓</span> Email support · 3-day log retention</li>
+            </ul>
+            <a class="button button-outline full-width" href="/signup">Get started free</a>
+          </article>
+
+          <article class="pricing-card" data-reveal>
+            <div class="plan-tier-badge" style="--tb:#059669">Starter</div>
+            <div class="plan-header">
+              <div class="plan-price"><strong>৳1,200</strong><span>/month</span></div>
+              <p>For stores starting with server-side tracking.</p>
+            </div>
+            <ul class="plan-features">
+              <li><span class="pf-check">✓</span> 500,000 events/month</li>
+              <li><span class="pf-check">✓</span> 1 domain · 1 sGTM container</li>
+              <li><span class="pf-check">✓</span> Everything in Free</li>
+              <li><span class="pf-check">✓</span> Full-funnel Meta CAPI + dedup</li>
+              <li><span class="pf-check">✓</span> Server-side purchase recovery</li>
+              <li><span class="pf-check">✓</span> Cookie life extension</li>
+              <li><span class="pf-check">✓</span> WhatsApp support · 7-day retention</li>
+            </ul>
+            <a class="button button-outline full-width" href="/signup">Start Starter</a>
+          </article>
+
+          <article class="pricing-card featured" data-reveal>
+            <div class="plan-popular-tag">Most popular</div>
+            <div class="plan-tier-badge" style="--tb:#F97316">Pro</div>
+            <div class="plan-header">
+              <div class="plan-price"><strong>৳2,900</strong><span>/month</span></div>
+              <p>For stores running serious ad campaigns.</p>
+            </div>
+            <ul class="plan-features">
+              <li><span class="pf-check">✓</span> 2,000,000 events/month</li>
+              <li><span class="pf-check">✓</span> 2 domains · 3 sGTM containers</li>
+              <li><span class="pf-check">✓</span> Everything in Starter</li>
+              <li><span class="pf-check">✓</span> Offline conversions to Meta</li>
+              <li><span class="pf-check">✓</span> Bot detection &amp; filtering</li>
+              <li><span class="pf-check">✓</span> Advanced reports + diagnostics</li>
+              <li><span class="pf-check">✓</span> Priority WhatsApp + call · 15-day retention</li>
+            </ul>
+            <a class="button button-primary full-width" href="/signup">Start Pro</a>
+          </article>
+
+          <article class="pricing-card" data-reveal>
+            <div class="plan-tier-badge" style="--tb:#D97706">Enterprise</div>
+            <div class="plan-header">
+              <div class="plan-price"><strong>৳5,900</strong><span>/month</span></div>
+              <p>For agencies and high-volume stores.</p>
+            </div>
+            <ul class="plan-features">
+              <li><span class="pf-check">✓</span> 5,000,000 events/month</li>
+              <li><span class="pf-check">✓</span> 10 domains · 10 sGTM containers</li>
+              <li><span class="pf-check">✓</span> Everything in Pro</li>
+              <li><span class="pf-check">✓</span> Multi-domain management</li>
+              <li><span class="pf-check">✓</span> Dedicated support line + SLA</li>
+              <li><span class="pf-check">✓</span> Free migration + setup</li>
+              <li><span class="pf-check">✓</span> 30-day log retention</li>
+            </ul>
+            <a class="button button-outline full-width" href="/signup">Start Enterprise</a>
+          </article>
+
+        </div>
+        <div class="pricing-footer">
+          <p>Pay monthly via <strong>bKash</strong> or <strong>Nagad</strong>. After you pick a plan, send the payment and enter your transaction ID — we verify and activate within hours. Cancel anytime.</p>
+          <p>Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
+        </div>
+      </section>
+
+      <!-- ── FEATURE MATRIX ─────────────────────────────────────── -->
+      <section class="section comparison-section">
+        <div class="section-heading centered" data-reveal>
+          <p class="eyebrow">Compare plans</p>
+          <h2>Every feature,<br>side by side.</h2>
+          <p class="section-sub">All plans include the Custom Loader that loads gtm.js and gtag.js first-party, so Brave and ad-blockers can't strip your tracking.</p>
+        </div>
+        <div class="plan-matrix-wrap">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th>Free</th>
+                <th>Starter</th>
+                <th class="col-tagioo">Pro</th>
+                <th>Enterprise</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Events / month</td>
+                <td>15,000</td>
+                <td>500,000</td>
+                <td class="col-tagioo">2,000,000</td>
+                <td>5,000,000</td>
+              </tr>
+              <tr>
+                <td>Domains</td>
+                <td>1</td>
+                <td>1</td>
+                <td class="col-tagioo">2</td>
+                <td>10</td>
+              </tr>
+              <tr>
+                <td>sGTM containers</td>
+                <td>1</td>
+                <td>1</td>
+                <td class="col-tagioo">3</td>
+                <td>10</td>
+              </tr>
+              <tr>
+                <td>Custom Loader (Brave bypass)</td>
+                <td><span class="tbl-yes">Yes</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>Consent Mode v2 (GDPR)</td>
+                <td><span class="tbl-yes">Yes</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>Full-funnel Meta CAPI + dedup</td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>Server-side purchase recovery</td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>Cookie life extension</td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>Offline conversions to Meta</td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>Bot detection &amp; filtering</td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>Advanced reports &amp; diagnostics</td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>Multi-domain management</td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td class="col-tagioo"><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-yes">Yes</span></td>
+              </tr>
+              <tr>
+                <td>Support</td>
+                <td><span class="tbl-yes-muted">Email</span></td>
+                <td><span class="tbl-yes-muted">WhatsApp</span></td>
+                <td class="col-tagioo"><span class="tbl-yes-muted">Priority WhatsApp + call</span></td>
+                <td><span class="tbl-yes-muted">Dedicated line + SLA</span></td>
+              </tr>
+              <tr>
+                <td>Log retention</td>
+                <td>3 days</td>
+                <td>7 days</td>
+                <td class="col-tagioo">15 days</td>
+                <td>30 days</td>
+              </tr>
+              <tr>
+                <td>Price</td>
+                <td class="price-cell">৳0/mo</td>
+                <td class="price-cell">৳1,200/mo</td>
+                <td class="col-tagioo price-cell">৳2,900/mo</td>
+                <td class="price-cell">৳5,900/mo</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ── ENTERPRISE CTA ─────────────────────────────────────── -->
+      <section class="section monitoring-section">
+        <div class="monitoring-inner">
+          <div class="monitoring-content">
+            <p class="eyebrow">Need more?</p>
+            <h2>Custom volume or<br>multi-brand agency plan.</h2>
+            <p class="monitoring-sub">Running multiple stores or brands, or need volume above 5M events/month? We'll build a plan around your setup — same isolated-container architecture, no shared infrastructure.</p>
+            <a class="button button-primary" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Talk to us on WhatsApp →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── BILLING FAQ ────────────────────────────────────────── -->
+      <section id="faq" class="section faq-section">
+        <div class="section-heading centered" data-reveal>
+          <p class="eyebrow">Billing questions</p>
+          <h2>How payment &amp; renewal work.</h2>
+        </div>
+        <div class="faq-grid">
+          <details class="faq-item">
+            <summary>How do I pay — is there a card option?</summary>
+            <p>No card, no gateway. Pick a plan, then send the amount via <strong>bKash</strong> or <strong>Nagad</strong> "Send Money" to the number shown in your dashboard, and enter the transaction ID. We verify it against the payment and activate your plan — usually within a few hours, always same day.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What happens right after I submit a transaction ID?</summary>
+            <p>Your account stays on your current limits while we verify. Once confirmed, your plan goes <strong>active</strong> immediately, your container is (re)started if it was stopped, and your 30-day billing window starts from the confirmation date — not from when you submitted.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What happens when my Free plan hits 15,000 events?</summary>
+            <p>We email and WhatsApp you at 80% usage so you're not surprised. At 15,000 events your container pauses until either your 30-day cycle resets (free tracking resumes automatically) or you upgrade to a paid plan. No data is deleted — it just stops collecting new events until the cycle rolls over or you upgrade.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How does renewal work?</summary>
+            <p>Paid plans run 30 days from the date we confirm your payment. We send reminders 7, 3, and 1 day before your renewal date. If it lapses, you get a short grace period with tracking still running, then the container pauses until you renew — same bKash/Nagad flow as your first payment.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can I cancel or downgrade anytime?</summary>
+            <p>Yes. There's no lock-in contract — simply don't renew when your 30-day window ends, or downgrade to Free at any time and keep the 15,000 events/month tier forever.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Do you offer refunds?</summary>
+            <p>Since payment is confirmed manually before activation, message us on WhatsApp if something's wrong with your billing — we handle it case by case, same day.</p>
+          </details>
+        </div>
+      </section>
+
+      <!-- ── FINAL CTA ───────────────────────────────────────────── -->
+      <section class="section cta-section">
+        <div class="cta-inner">
+          <p class="eyebrow eyebrow-onpurple">Start today</p>
+          <h2>Start free.<br>Upgrade when you're ready.</h2>
+          <p class="cta-sub">15,000 events a month, forever, no card required.</p>
+          <div class="cta-actions">
+            <a class="button button-cta-primary button-lg" href="/signup">Create free account →</a>
+            <a class="button button-cta-ghost button-lg" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Chat on WhatsApp</a>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ── FOOTER ─────────────────────────────────────────────── -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a class="brand brand-light" href="/">
+            <span class="brand-mark brand-mark-light">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
+                <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
+              </svg>
+            </span>
+            <span>Tagioo</span>
+          </a>
+          <p>First-party server-side tracking infrastructure for Bangladesh ecommerce and agencies.</p>
+          <div class="footer-payments">
+            <span class="trust-badge bkash sm">bKash</span>
+            <span class="trust-badge nagad sm">Nagad</span>
+            <span class="trust-badge sm footer-tb">Visa / MC</span>
+          </div>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <strong>Product</strong>
+            <a href="/features">Platform</a>
+            <a href="/how-it-works">How it works</a>
+            <a href="/pricing">Pricing</a>
+            <a href="/compare">Compare</a>
+            <a href="/signup">Sign up</a>
+          </div>
+          <div class="footer-col">
+            <strong>Support</strong>
+            <a href="/docs">Docs</a>
+            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
+            <a href="#faq">FAQ</a>
+          </div>
+          <div class="footer-col">
+            <strong>Legal</strong>
+            <a href="/terms">Terms of Service</a>
+            <a href="/privacy">Privacy Policy</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2025 Tagioo. All rights reserved.</span>
+        <span>Made in Bangladesh 🇧🇩</span>
+      </div>
+    </footer>
+
+    <!-- ── WHATSAPP FLOAT ──────────────────────────────────────── -->
+    <a class="whatsapp-float" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+    </a>
+
+    <script>
+      const menuBtn = document.getElementById("menuBtn");
+      const mobileNav = document.getElementById("mobileNav");
+
+      menuBtn.addEventListener("click", () => {
+        const open = mobileNav.classList.toggle("open");
+        menuBtn.setAttribute("aria-expanded", String(open));
+        mobileNav.setAttribute("aria-hidden", String(!open));
+      });
+
+      function closeMobileNav() {
+        mobileNav.classList.remove("open");
+        menuBtn.setAttribute("aria-expanded", "false");
+        mobileNav.setAttribute("aria-hidden", "true");
+      }
+
+      const header = document.getElementById("siteHeader");
+      window.addEventListener("scroll", () => {
+        header.classList.toggle("scrolled", window.scrollY > 40);
+      }, { passive: true });
+
+      document.querySelectorAll(".faq-item").forEach(item => {
+        item.addEventListener("toggle", () => {
+          if (item.open) {
+            document.querySelectorAll(".faq-item[open]").forEach(other => {
+              if (other !== item) other.removeAttribute("open");
+            });
+          }
+        });
+      });
+
+      const revealObs = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("is-visible"); revealObs.unobserve(e.target); } });
+      }, { threshold: 0.15 });
+      document.querySelectorAll("[data-reveal]").forEach((el, i) => {
+        el.style.animationDelay = `${(i % 6) * 0.08}s`;
+        revealObs.observe(el);
+      });
+    </script>
+  </body>
+</html>

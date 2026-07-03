@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Tagioo documentation — WooCommerce plugin setup, GTM Setup Assistant, first-party domain & SSL, offline conversions upload, purchase gap alert thresholds, and troubleshooting." />
+    <meta property="og:title" content="Docs — Tagioo" />
+    <meta property="og:description" content="Reference documentation for the Tagioo server-side GTM platform." />
+    <title>Docs — Tagioo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/landing.css" />
+  </head>
+  <body>
+
+    <!-- ── HEADER ─────────────────────────────────────────────── -->
+    <header class="site-header" id="siteHeader">
+      <a class="brand" href="/" aria-label="Tagioo home">
+        <span class="brand-mark">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="currentColor"/>
+            <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="white" opacity="0.9"/>
+          </svg>
+        </span>
+        <span>Tagioo</span>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/features">Platform</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/compare">Compare</a>
+        <a href="/docs">Docs</a>
+        <a href="/login" class="nav-login">Sign in</a>
+        <a class="nav-cta" href="/signup">Get started free</a>
+      </nav>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </header>
+
+    <!-- ── MOBILE NAV ─────────────────────────────────────────── -->
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true">
+      <nav>
+        <a href="/features" onclick="closeMobileNav()">Platform</a>
+        <a href="/how-it-works" onclick="closeMobileNav()">How it works</a>
+        <a href="/pricing" onclick="closeMobileNav()">Pricing</a>
+        <a href="/compare" onclick="closeMobileNav()">Compare</a>
+        <a href="/docs" onclick="closeMobileNav()">Docs</a>
+        <a href="/login">Sign in</a>
+        <a class="mobile-cta" href="/signup">Get started free →</a>
+      </nav>
+    </div>
+
+    <main>
+      <div class="docs-shell">
+        <nav class="docs-sidebar" aria-label="Documentation sections">
+          <a href="#getting-started">Getting Started</a>
+          <a href="#woocommerce">WooCommerce Plugin</a>
+          <a href="#setup-assistant">GTM Setup Assistant</a>
+          <a href="#domain-ssl">Domain &amp; SSL</a>
+          <a href="#offline-conversions">Offline Conversions</a>
+          <a href="#purchase-gap-alert">Purchase Gap Alert</a>
+          <a href="#troubleshooting">Troubleshooting</a>
+        </nav>
+
+        <div class="docs-main">
+          <p class="eyebrow">Documentation</p>
+          <h1 style="font-size:2.2rem;margin-bottom:8px;">Tagioo reference docs</h1>
+          <p style="color:var(--text-2);margin-bottom:40px;">Technical detail for every part of the platform. New here? Start with the <a href="/how-it-works" style="color:var(--accent);">full setup guide</a> instead — this page is for reference once you're up and running.</p>
+
+          <section id="getting-started" class="docs-section">
+            <h2>Getting Started</h2>
+            <p>Every Tagioo account starts on the Free plan (15,000 events/month, forever). Launch flow, top to bottom:</p>
+            <ul>
+              <li>Create your Tagioo account and a GTM Server container</li>
+              <li>Point a subdomain at Tagioo via one CNAME record</li>
+              <li>Create a container in your Tagioo dashboard</li>
+              <li>Generate and import Web + Server GTM templates via Setup Assistant</li>
+              <li>Connect your store (WooCommerce plugin, or manual dataLayer)</li>
+              <li>Test in Meta Events Manager and confirm events in your dashboard</li>
+            </ul>
+            <p>See the <a href="/how-it-works">full step-by-step walkthrough</a> for screenshots and detail on each step.</p>
+          </section>
+
+          <section id="woocommerce" class="docs-section">
+            <h2>WooCommerce Plugin</h2>
+            <p>Download the Tagioo plugin from your dashboard's Setup Assistant, upload it under <strong>Plugins → Add New → Upload Plugin</strong> in WordPress, activate, and paste your container's tracking ID when prompted. No GTM4WP or manual dataLayer coding needed.</p>
+            <p>Once active, it automatically pushes these events to the dataLayer on every relevant page:</p>
+            <ul>
+              <li><code>page_view</code> — every page load, with page_location and page_title set explicitly</li>
+              <li><code>view_item</code> — product page views</li>
+              <li><code>add_to_cart</code> — cart additions, with product ID, price, quantity</li>
+              <li><code>begin_checkout</code> — checkout page reached</li>
+              <li><code>purchase</code> — completed order, with transaction ID, value, and items</li>
+              <li>Hashed <code>user_data</code> (email, phone) on purchase for Meta CAPI match quality, where available</li>
+            </ul>
+          </section>
+
+          <section id="setup-assistant" class="docs-section">
+            <h2>GTM Setup Assistant</h2>
+            <p>A 4-step wizard in your dashboard that generates two ready-to-import JSON files:</p>
+            <ul>
+              <li><strong>web.json</strong> — imports into your Web GTM container: dataLayer listeners, the Custom Loader tag, and Consent Mode v2 defaults</li>
+              <li><strong>server.json</strong> — imports into your Server GTM container: GA4 client + tags, Meta CAPI tag, Google Ads conversion tags, and TikTok Events API tag, pre-filled with your credentials</li>
+            </ul>
+            <p>In GTM, use <strong>Import Container → Merge → Rename conflicting tags</strong>, review in Preview mode, then Publish both containers.</p>
+          </section>
+
+          <section id="domain-ssl" class="docs-section">
+            <h2>First-party Domain &amp; SSL</h2>
+            <p>Point a subdomain you own at Tagioo with a single CNAME record:</p>
+            <div class="docs-code">track.yoursite.com  CNAME  bd.tagioo.com</div>
+            <p>Once DNS propagates (usually minutes, sometimes up to a few hours), Tagioo automatically provisions an SSL certificate via Let's Encrypt and renews it silently — no action needed from you. This is also the domain the Custom Loader uses to serve <code>gtm.js</code>/<code>gtag.js</code> first-party, which is what lets tracking survive Brave and most ad-blockers.</p>
+          </section>
+
+          <section id="offline-conversions" class="docs-section">
+            <h2>Offline Conversions</h2>
+            <p>Available on Pro and Enterprise. Upload a CSV of phone, COD, or in-store orders from your dashboard's Offline Conversions view. Expected columns:</p>
+            <div class="docs-code">order_id, value, currency, email, phone, event_time</div>
+            <p>Email and phone are hashed client-side before upload. You'll see a validation preview before confirming, and every upload is logged with a per-batch history so you can see exactly what was sent to Meta CAPI and when.</p>
+          </section>
+
+          <section id="purchase-gap-alert" class="docs-section">
+            <h2>Purchase Gap Alert</h2>
+            <p>Tagioo compares today's purchase count against your trailing 7-day average, scaled for time of day so it doesn't false-positive at 9am. If today's count runs more than 50% below that baseline, a red banner appears in your dashboard the same day — instead of you noticing days later via a bad ROAS number.</p>
+            <p>On the Free plan, usage against your 15,000 events/month cycle is tracked the same way: you're notified by email and WhatsApp as you approach the limit (at rising thresholds from 10K events), and your container pauses if you reach 15,000 until the 30-day cycle resets or you upgrade.</p>
+          </section>
+
+          <section id="troubleshooting" class="docs-section">
+            <h2>Troubleshooting</h2>
+            <p><strong>Events not showing up in Meta Test Events?</strong> Confirm your Server GTM container is published (not just saved), check the container status in your Tagioo dashboard is "Running," and verify your domain's SSL certificate is issued (a padlock on <code>https://track.yoursite.com</code>).</p>
+            <p><strong>Purchases missing after a WooCommerce order?</strong> Check the WordPress plugin is active and its container tracking ID matches your dashboard. Use the Purchase Inspector in your dashboard to search by order ID and see exactly which destinations (Meta, GA4) received it.</p>
+            <p><strong>ROAS suddenly dropped?</strong> Check the dashboard's Purchase Gap Alert first — it's built for exactly this. If it's not flagging anything, check your 30-day table for a spike in errors on the affected day.</p>
+            <p>Still stuck? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Message us on WhatsApp</a> — free setup help.</p>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <!-- ── FOOTER ─────────────────────────────────────────────── -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a class="brand brand-light" href="/">
+            <span class="brand-mark brand-mark-light">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
+                <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
+              </svg>
+            </span>
+            <span>Tagioo</span>
+          </a>
+          <p>First-party server-side tracking infrastructure for Bangladesh ecommerce and agencies.</p>
+          <div class="footer-payments">
+            <span class="trust-badge bkash sm">bKash</span>
+            <span class="trust-badge nagad sm">Nagad</span>
+            <span class="trust-badge sm footer-tb">Visa / MC</span>
+          </div>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <strong>Product</strong>
+            <a href="/features">Platform</a>
+            <a href="/how-it-works">How it works</a>
+            <a href="/pricing">Pricing</a>
+            <a href="/compare">Compare</a>
+            <a href="/signup">Sign up</a>
+          </div>
+          <div class="footer-col">
+            <strong>Support</strong>
+            <a href="/docs">Docs</a>
+            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
+          </div>
+          <div class="footer-col">
+            <strong>Legal</strong>
+            <a href="/terms">Terms of Service</a>
+            <a href="/privacy">Privacy Policy</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2025 Tagioo. All rights reserved.</span>
+        <span>Made in Bangladesh 🇧🇩</span>
+      </div>
+    </footer>
+
+    <!-- ── WHATSAPP FLOAT ──────────────────────────────────────── -->
+    <a class="whatsapp-float" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+    </a>
+
+    <script>
+      const menuBtn = document.getElementById("menuBtn");
+      const mobileNav = document.getElementById("mobileNav");
+
+      menuBtn.addEventListener("click", () => {
+        const open = mobileNav.classList.toggle("open");
+        menuBtn.setAttribute("aria-expanded", String(open));
+        mobileNav.setAttribute("aria-hidden", String(!open));
+      });
+
+      function closeMobileNav() {
+        mobileNav.classList.remove("open");
+        menuBtn.setAttribute("aria-expanded", "false");
+        mobileNav.setAttribute("aria-hidden", "true");
+      }
+
+      const header = document.getElementById("siteHeader");
+      window.addEventListener("scroll", () => {
+        header.classList.toggle("scrolled", window.scrollY > 40);
+      }, { passive: true });
+    </script>
+  </body>
+</html>

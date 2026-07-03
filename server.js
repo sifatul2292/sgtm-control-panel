@@ -1679,12 +1679,12 @@ function loginPage(error = "", opts = {}) {
         </div>
         <div class="lb-stats">
           <div class="lb-stat">
-            <span class="lb-stat-num">+31%</span>
-            <small>avg ROAS lift</small>
+            <span class="lb-stat-num">15,000</span>
+            <small>free events / month</small>
           </div>
           <div class="lb-stat">
-            <span class="lb-stat-num">+58%</span>
-            <small>more purchases seen</small>
+            <span class="lb-stat-num">Dedicated</span>
+            <small>container per client</small>
           </div>
           <div class="lb-stat">
             <span class="lb-stat-num">15ms</span>
@@ -1835,8 +1835,8 @@ function resetPasswordPage(token = "", error = "") {
           <p>Server-side GTM built for Bangladesh ecommerce. Recover lost conversions and feed Meta &amp; Google clean data.</p>
         </div>
         <div class="lb-stats">
-          <div class="lb-stat"><span class="lb-stat-num">+31%</span><small>avg ROAS lift</small></div>
-          <div class="lb-stat"><span class="lb-stat-num">+58%</span><small>more purchases seen</small></div>
+          <div class="lb-stat"><span class="lb-stat-num">15,000</span><small>free events / month</small></div>
+          <div class="lb-stat"><span class="lb-stat-num">Dedicated</span><small>container per client</small></div>
           <div class="lb-stat"><span class="lb-stat-num">15ms</span><small>BDIX response</small></div>
         </div>
         <p class="lb-footer">© 2025 Tagioo · Made in Bangladesh 🇧🇩</p>
@@ -8183,6 +8183,26 @@ const server = createServer(async (req, res) => {
 
     if (pathname === "/features") {
       await servePublicPage(res, "features.html");
+      return;
+    }
+
+    if (pathname === "/pricing") {
+      await servePublicPage(res, "pricing.html");
+      return;
+    }
+
+    if (pathname === "/compare") {
+      await servePublicPage(res, "compare.html");
+      return;
+    }
+
+    if (pathname === "/how-it-works") {
+      await servePublicPage(res, "how-it-works.html");
+      return;
+    }
+
+    if (pathname === "/docs") {
+      await servePublicPage(res, "docs.html");
       return;
     }
 
