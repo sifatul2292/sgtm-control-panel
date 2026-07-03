@@ -3,13 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="description" content="Tagioo pricing — Free 15,000 events/month forever, Starter ৳1,200/mo, Pro ৳2,900/mo, Enterprise ৳5,900/mo. Pay via bKash or Nagad. No credit card required." />
     <meta property="og:title" content="Pricing — Tagioo" />
     <meta property="og:description" content="Simple, transparent pricing for server-side GTM hosting in Bangladesh. Free forever tier, no card required, pay via bKash/Nagad." />
     <title>Pricing — Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/landing.css" />
   </head>
   <body>
@@ -55,7 +56,7 @@
     <main>
 
       <!-- ── HERO ───────────────────────────────────────────────── -->
-      <section class="hero">
+      <section class="hero hero-sub">
         <div class="hero-bg">
           <div class="hero-orb hero-orb-1"></div>
           <div class="hero-orb hero-orb-2"></div>
@@ -73,6 +74,13 @@
 
       <!-- ── PRICING GRID ───────────────────────────────────────── -->
       <section class="section pricing-section">
+
+        <div class="billing-toggle" role="tablist" aria-label="Billing cycle">
+          <button class="billing-tab is-active" type="button" data-cycle="1" role="tab" aria-selected="true">Monthly</button>
+          <button class="billing-tab" type="button" data-cycle="3" role="tab" aria-selected="false">3 Months <span class="billing-save">Save 10% + free setup</span></button>
+          <button class="billing-tab" type="button" data-cycle="6" role="tab" aria-selected="false">6 Months <span class="billing-save">Save 20%</span></button>
+        </div>
+
         <div class="pricing-grid">
 
           <article class="pricing-card" data-reveal>
@@ -93,10 +101,11 @@
             <a class="button button-outline full-width" href="/signup">Get started free</a>
           </article>
 
-          <article class="pricing-card" data-reveal>
+          <article class="pricing-card" data-reveal data-monthly="1200">
             <div class="plan-tier-badge" style="--tb:#059669">Starter</div>
             <div class="plan-header">
-              <div class="plan-price"><strong>৳1,200</strong><span>/month</span></div>
+              <div class="plan-price"><strong data-price-display>৳1,200</strong><span data-price-unit>/month</span></div>
+              <p class="plan-cycle-note" data-cycle-note></p>
               <p>For stores starting with server-side tracking.</p>
             </div>
             <ul class="plan-features">
@@ -111,11 +120,12 @@
             <a class="button button-outline full-width" href="/signup">Start Starter</a>
           </article>
 
-          <article class="pricing-card featured" data-reveal>
+          <article class="pricing-card featured" data-reveal data-monthly="2900">
             <div class="plan-popular-tag">Most popular</div>
             <div class="plan-tier-badge" style="--tb:#F97316">Pro</div>
             <div class="plan-header">
-              <div class="plan-price"><strong>৳2,900</strong><span>/month</span></div>
+              <div class="plan-price"><strong data-price-display>৳2,900</strong><span data-price-unit>/month</span></div>
+              <p class="plan-cycle-note" data-cycle-note></p>
               <p>For stores running serious ad campaigns.</p>
             </div>
             <ul class="plan-features">
@@ -130,10 +140,11 @@
             <a class="button button-primary full-width" href="/signup">Start Pro</a>
           </article>
 
-          <article class="pricing-card" data-reveal>
+          <article class="pricing-card" data-reveal data-monthly="5900">
             <div class="plan-tier-badge" style="--tb:#D97706">Enterprise</div>
             <div class="plan-header">
-              <div class="plan-price"><strong>৳5,900</strong><span>/month</span></div>
+              <div class="plan-price"><strong data-price-display>৳5,900</strong><span data-price-unit>/month</span></div>
+              <p class="plan-cycle-note" data-cycle-note></p>
               <p>For agencies and high-volume stores.</p>
             </div>
             <ul class="plan-features">
@@ -150,7 +161,7 @@
 
         </div>
         <div class="pricing-footer">
-          <p>Pay monthly via <strong>bKash</strong> or <strong>Nagad</strong>. After you pick a plan, send the payment and enter your transaction ID — we verify and activate within hours. Cancel anytime.</p>
+          <p>Pay via <strong>bKash</strong> or <strong>Nagad</strong>. After you pick a plan and cycle, send the payment and enter your transaction ID — we verify and activate within hours. Cancel anytime.</p>
           <p>Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
         </div>
       </section>
@@ -317,7 +328,11 @@
           </details>
           <details class="faq-item">
             <summary>How does renewal work?</summary>
-            <p>Paid plans run 30 days from the date we confirm your payment. We send reminders 7, 3, and 1 day before your renewal date. If it lapses, you get a short grace period with tracking still running, then the container pauses until you renew — same bKash/Nagad flow as your first payment.</p>
+            <p>Paid plans run for whichever cycle you pick — 30, 90, or 180 days — from the date we confirm your payment. We send reminders before your renewal date. If it lapses, you get a short grace period with tracking still running, then the container pauses until you renew — same bKash/Nagad flow as your first payment.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How do the 3-month and 6-month discounts work?</summary>
+            <p>Pick a 3-month cycle and pay 10% less than three separate monthly payments, plus we set your GTM containers up for you free (usually a self-serve step). Pick 6 months and save 20%. Same bKash/Nagad flow, one payment covers the whole cycle.</p>
           </details>
           <details class="faq-item">
             <summary>Can I cancel or downgrade anytime?</summary>
@@ -388,9 +403,12 @@
           </div>
         </div>
       </div>
+      <div class="footer-wordmark-wrap" aria-hidden="true">
+        <span class="footer-wordmark">Tagioo</span>
+      </div>
       <div class="footer-bottom">
-        <span>© 2025 Tagioo. All rights reserved.</span>
-        <span>Made in Bangladesh 🇧🇩</span>
+        <span>© 2025 Tagioo. All rights reserved. &nbsp;·&nbsp; Made in Bangladesh 🇧🇩</span>
+        <p class="footer-disclaimer">Figures illustrating potential savings, profit, or ROAS improvement on this site are illustrative examples, not guarantees or audited results. Actual results depend on your ad spend, traffic, and current tracking setup.</p>
       </div>
     </footer>
 
@@ -438,6 +456,36 @@
       document.querySelectorAll("[data-reveal]").forEach((el, i) => {
         el.style.animationDelay = `${(i % 6) * 0.08}s`;
         revealObs.observe(el);
+      });
+
+      const billingTabs = document.querySelectorAll(".billing-tab");
+      const cycleCards = document.querySelectorAll(".pricing-card[data-monthly]");
+      billingTabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+          billingTabs.forEach(t => { t.classList.remove("is-active"); t.setAttribute("aria-selected", "false"); });
+          tab.classList.add("is-active");
+          tab.setAttribute("aria-selected", "true");
+          const cycle = Number(tab.dataset.cycle);
+          cycleCards.forEach(card => {
+            const monthly = Number(card.dataset.monthly);
+            const priceEl = card.querySelector("[data-price-display]");
+            const unitEl = card.querySelector("[data-price-unit]");
+            const noteEl = card.querySelector("[data-cycle-note]");
+            if (cycle === 1) {
+              priceEl.textContent = "৳" + monthly.toLocaleString();
+              unitEl.textContent = "/month";
+              noteEl.textContent = "";
+            } else {
+              const discount = cycle === 3 ? 0.10 : 0.20;
+              const total = Math.round(monthly * cycle * (1 - discount));
+              const perMonth = Math.round(total / cycle);
+              priceEl.textContent = "৳" + perMonth.toLocaleString();
+              unitEl.textContent = "/month";
+              noteEl.textContent = `Billed ৳${total.toLocaleString()} every ${cycle} months`
+                + (cycle === 3 ? " · Free guided setup included" : "");
+            }
+          });
+        });
       });
     </script>
   </body>

@@ -25,13 +25,14 @@
   /* alias used by chart tooltip */
   --color-text-2: oklch(0.565 0.011 60);
 
-  /* accent — brand violet (matches landing + auth pages, #5B21B6 family) */
-  --color-accent:      oklch(0.487 0.222 295);   /* #5B21B6 */
-  --color-accent-deep: oklch(0.430 0.196 295);   /* #4C1D95 */
-  --color-accent-ink:  oklch(0.340 0.150 296);   /* #3B0764 */
-  --color-accent-bright: oklch(0.541 0.247 293); /* #7C3AED — vivid hover/glow */
-  --color-accent-wash: oklch(0.966 0.016 300);   /* #F3EEFF tint */
-  --color-accent-line: oklch(0.905 0.044 300);   /* #E9DFFF */
+  /* accent — brand indigo (matches landing + auth pages, #4F46E5 family) */
+  --color-accent:      #4F46E5;   /* indigo-600 */
+  --color-accent-deep: #4338CA;   /* indigo-700 */
+  --color-accent-ink:  #312E81;   /* indigo-900 */
+  --color-accent-bright: #6366F1; /* indigo-500 — vivid hover/glow */
+  --color-accent-wash: #EEF0FF;   /* pale indigo tint */
+  --color-accent-line: #E0E4FF;   /* pale indigo line */
+  --color-primary:     var(--color-accent); /* alias — some panel views reference this name */
 
   /* secondary brand accent — warm orange (#F97316), pairs with violet */
   --color-brand-orange:      oklch(0.702 0.188 42);   /* #F97316 */
@@ -46,7 +47,7 @@
   --color-warn:    oklch(0.67 0.16 80);
   --color-danger:  oklch(0.59 0.19 28);
   --color-warning: oklch(0.67 0.16 80);
-  --color-focus:   oklch(0.487 0.222 295);
+  --color-focus:   var(--color-accent);
 
   /* chart series */
   --c-pageview:  oklch(0.62 0.105 250);

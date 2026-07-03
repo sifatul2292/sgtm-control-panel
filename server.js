@@ -1653,10 +1653,12 @@ function loginPage(error = "", opts = {}) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="robots" content="noindex, nofollow" />
     <title>Sign in — Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
   </head>
   <body class="login-body">
@@ -1812,10 +1814,12 @@ function resetPasswordPage(token = "", error = "") {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="robots" content="noindex, nofollow" />
     <title>Reset password — Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
   </head>
   <body class="login-body">
@@ -1912,10 +1916,12 @@ function signupPage(error = "", values = {}) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="robots" content="noindex, nofollow" />
     <title>Create account — Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
   </head>
   <body class="login-body">
@@ -8294,7 +8300,8 @@ const server = createServer(async (req, res) => {
         redirect(res, "/");
         return;
       }
-      htmlResponse(res, 200, signupPage());
+      const prefillEmail = reqUrl.searchParams.get("email") || "";
+      htmlResponse(res, 200, signupPage("", { email: prefillEmail }));
       return;
     }
 
@@ -8464,7 +8471,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    if (pathname !== "/login" && pathname !== "/signup" && pathname !== "/tokens.css" && pathname !== "/login.css" && !isAuthenticated(req)) {
+    if (pathname !== "/login" && pathname !== "/signup" && pathname !== "/tokens.css" && pathname !== "/login.css" && pathname !== "/favicon.svg" && pathname !== "/favicon.ico" && !isAuthenticated(req)) {
       if (pathname.startsWith("/api/")) {
         jsonResponse(res, 401, { error: "Authentication required." });
         return;

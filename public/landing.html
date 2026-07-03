@@ -3,13 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="description" content="Tagioo — Managed server-side GTM hosting for Bangladesh. Dedicated sGTM containers, first-party domains, real-time event analytics. Starting ৳1,200/month." />
     <meta property="og:title" content="Tagioo — Boost ROAS with server-side tracking for Bangladesh" />
     <meta property="og:description" content="Bangladesh's best server-side GTM platform. Dedicated containers, first-party domains, BDIX-fast. Recover lost conversions and boost ROAS." />
     <title>Tagioo — Server-side GTM hosting for Bangladesh</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/landing.css" />
   </head>
   <body>
@@ -73,7 +74,7 @@
               </div>
             </div>
             <h1>Boost ROAS and maximize sales with <span class="hero-accent">server-side tracking.<svg class="hero-accent-underline" viewBox="0 0 300 12" fill="none" preserveAspectRatio="none" aria-hidden="true"><path d="M2 8.5C52 4 150 2.5 298 6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span></h1>
-            <p class="hero-copy">Business owners use Tagioo's platform to implement server-side tracking in about 30 minutes — GTM <em>and</em> gtag served first-party from your own domain, so the data gets through and your campaigns optimize on the full picture. <em>Live in 30 minutes, no server skills.</em></p>
+            <p class="hero-copy">Business owners use Tagioo's platform to implement server-side tracking in about 10 minutes — GTM <em>and</em> gtag served first-party from your own domain, so the data gets through and your campaigns optimize on the full picture. <em>Live in 10 minutes, no server skills.</em></p>
 
             <form class="hero-signup" action="/signup" method="get">
               <input class="hero-signup-input" type="email" name="email" placeholder="Enter your email" autocomplete="email" required aria-label="Email address" />
@@ -276,7 +277,7 @@
       </section>
 
       <!-- ── PLATFORM OVERVIEW ──────────────────────────────────── -->
-      <section id="platform" class="section platform-section">
+      <section id="platform" class="section platform-section section-dark">
         <span id="features" class="anchor-offset" aria-hidden="true"></span>
         <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Full platform</p>
@@ -290,7 +291,7 @@
             </div>
             <div>
               <strong>Dedicated sGTM Container</strong>
-              <p>Isolated Docker container per client. Full GTM server preview mode. Not shared infrastructure.</p>
+              <p>Isolated container per client. Full GTM server preview mode. Not shared infrastructure.</p>
             </div>
           </article>
           <article class="platform-module" data-reveal>
@@ -345,6 +346,24 @@
             <div>
               <strong>WooCommerce Integration</strong>
               <p>Install the Tagioo WordPress plugin — pushes the full ecommerce dataLayer (view_item, add_to_cart, purchase, user_data) automatically. No GTM4WP needed.</p>
+            </div>
+          </article>
+          <article class="platform-module" data-reveal>
+            <div class="pm-icon" style="--pm:#EF4444">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L11.8 7.2L16.5 7.6L13.1 10.6L14.2 15.2L10 12.7L5.8 15.2L6.9 10.6L3.5 7.6L8.2 7.2L10 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <strong>Smart Purchase Gap Alert</strong>
+              <p>Automatic alert when today's purchases drop &gt;50% below your 7-day average. Catch tracking breaks the same day.</p>
+            </div>
+          </article>
+          <article class="platform-module" data-reveal>
+            <div class="pm-icon" style="--pm:#059669">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10C4 10 7 6 10 6C13 6 16 10 16 10C16 10 13 14 10 14C7 14 4 10 4 10Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>
+            </div>
+            <div>
+              <strong>Bot Filtering &amp; Power-Ups</strong>
+              <p>Remove crawler traffic from your ad data. Enable deduplication, EMQ enrichment, and attribution power-ups per container.</p>
             </div>
           </article>
         </div>
@@ -455,7 +474,7 @@
       <section id="how" class="section how-section">
         <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Simple launch flow</p>
-          <h2>Live in under 30 minutes.</h2>
+          <h2>Live in under 10 minutes.</h2>
           <p class="section-sub">No developers. No server knowledge. No DevOps. If you can update DNS, you can launch Tagioo.</p>
         </div>
         <div class="step-timeline step-timeline-teaser">
@@ -538,7 +557,7 @@
       </section>
 
       <!-- ── COMPARISON ─────────────────────────────────────────── -->
-      <section class="section comparison-section">
+      <section class="section comparison-section section-dark">
         <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Why Tagioo</p>
           <h2>The best server-side tracking<br>in Bangladesh.</h2>
@@ -550,8 +569,7 @@
               <tr>
                 <th>Feature</th>
                 <th class="col-tagioo">Tagioo</th>
-                <th>PixelFly</th>
-                <th>BonicBD</th>
+                <th>Stape.io</th>
                 <th>DIY VPS</th>
               </tr>
             </thead>
@@ -564,34 +582,43 @@
                     Yes
                   </span>
                 </td>
-                <td><span class="tbl-yes-muted">Partial</span></td>
-                <td><span class="tbl-yes-muted">Partial</span></td>
-                <td><span class="tbl-no">✗</span></td>
-              </tr>
-              <tr>
-                <td>Dedicated container per client</td>
-                <td class="col-tagioo">
-                  <span class="tbl-yes">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    Yes
-                  </span>
-                </td>
-                <td><span class="tbl-no">✗ shared proxy</span></td>
                 <td><span class="tbl-yes-muted">✓</span></td>
                 <td><span class="tbl-neutral">Manual</span></td>
+              </tr>
+              <tr>
+                <td>BDIX-hosted (Bangladesh fast)</td>
+                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-neutral">Depends</span></td>
+              </tr>
+              <tr>
+                <td>bKash / Nagad payment</td>
+                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-neutral">N/A</span></td>
+              </tr>
+              <tr>
+                <td>WhatsApp support in Bengali</td>
+                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
+                <td><span class="tbl-no">✗</span></td>
+                <td><span class="tbl-neutral">N/A</span></td>
               </tr>
               <tr>
                 <td>Smart purchase gap alerts</td>
                 <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
                 <td><span class="tbl-no">✗</span></td>
                 <td><span class="tbl-no">✗</span></td>
+              </tr>
+              <tr>
+                <td>Zero server management</td>
+                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
+                <td><span class="tbl-yes-muted">✓</span></td>
                 <td><span class="tbl-no">✗</span></td>
               </tr>
               <tr>
                 <td>Starting price</td>
                 <td class="col-tagioo price-cell">৳1,200/mo</td>
-                <td class="price-cell">৳1,200/mo</td>
-                <td class="price-cell">৳1,000/mo</td>
+                <td class="price-cell">$15+/mo</td>
                 <td class="price-cell">৳2,000+/mo</td>
               </tr>
             </tbody>
@@ -603,7 +630,7 @@
       </section>
 
       <!-- ── OUTCOME PROOF ──────────────────────────────────────── -->
-      <section class="section outcome-section">
+      <section class="section outcome-section section-dark">
         <div class="section-heading centered" data-reveal>
           <p class="eyebrow">The money math</p>
           <h2>Every hidden sale is money<br>straight out of your pocket.</h2>
@@ -621,14 +648,14 @@
             <p>Spend ৳1,00,000 on ads but Meta sees only half your buyers? It optimizes on bad data and burns the rest.</p>
           </article>
           <article class="outcome-card" data-reveal>
-            <div class="outcome-num" style="--oc:var(--green)">Same budget,</div>
-            <h3>more profit</h3>
-            <p>Feed back the hidden sales and the algorithm finds cheaper buyers — more orders from the budget you already spend.</p>
+            <div class="outcome-num" style="--oc:var(--green)">৳25,000+</div>
+            <h3>Illustrative monthly profit</h3>
+            <p>On a ৳1,00,000 monthly ad spend, recovering hidden sales lets Meta's algorithm find cheaper buyers instead of guessing — a realistic example of profit clawed back from the same budget.</p>
           </article>
           <article class="outcome-card" data-reveal>
-            <div class="outcome-num" style="--oc:var(--accent)">৳0</div>
-            <h3>To start &amp; see it</h3>
-            <p>Free plan, plug-and-play setup. Watch your real sales appear in the dashboard before you pay a taka.</p>
+            <div class="outcome-num" style="--oc:var(--accent)">Higher EMQ</div>
+            <h3>Better Meta purchase match quality</h3>
+            <p>Server-side Purchase events carry hashed email, phone, and external ID — pushing your Meta Event Match Quality score up, for cheaper, more accurate optimization on every sale.</p>
           </article>
         </div>
         <div class="outcome-disclaimer">
@@ -638,7 +665,7 @@
       </section>
 
       <!-- ── TESTIMONIAL ──────────────────────────────────────── -->
-      <section class="section testimonial-section">
+      <section class="section testimonial-section section-dark">
         <div class="testimonial-inner">
           <div class="testi-card">
             <p class="eyebrow">For business owners, by business owners</p>
@@ -753,12 +780,13 @@
         </div>
         <div class="pricing-footer">
           <p>Pay monthly via <strong>bKash</strong> or <strong>Nagad</strong>. After you pick a plan, send the payment and enter your transaction ID — we verify and activate within hours. Cancel anytime.</p>
+          <p>Prices above are monthly — <a href="/pricing">save up to 20% with 3 or 6-month billing →</a></p>
           <p><a href="/pricing">Full plan details &amp; billing FAQ →</a> &nbsp;·&nbsp; Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
         </div>
       </section>
 
       <!-- ── FAQ ────────────────────────────────────────────────── -->
-      <section id="faq" class="section faq-section">
+      <section id="faq" class="section faq-section section-dark">
         <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Questions</p>
           <h2>Frequently asked.</h2>
@@ -769,8 +797,8 @@
             <p>Server-side Google Tag Manager runs on a server you control instead of in the visitor's browser. This means ad blockers can't intercept your tracking events, and your data reaches Meta, GA4, and Google Ads reliably. It's essential for any store spending serious money on ads.</p>
           </details>
           <details class="faq-item">
-            <summary>How is Tagioo different from PixelFly or BonicBD?</summary>
-            <p>PixelFly uses a shared proxy architecture — your events share infrastructure with other customers. Tagioo gives every customer a fully isolated Docker container with dedicated CPU and memory. Plus, Tagioo adds features no other Bangladesh platform has: purchase gap alerts, revenue tracking, offline conversions to Meta, and a GTM template generator.</p>
+            <summary>How is Tagioo different from Stape.io or a DIY VPS?</summary>
+            <p>Stape.io is a solid international sGTM host, but it's priced in USD, has no BDIX peering for Bangladesh traffic, and doesn't take bKash/Nagad. A DIY VPS means you own the container runtime, Nginx, and SSL yourself. Tagioo is BDIX-hosted for Bangladesh speed, billed in taka via bKash/Nagad, and adds purchase gap alerts, revenue tracking, offline conversions to Meta, and a GTM template generator built specifically for GA4, Meta CAPI, Google Ads, and TikTok.</p>
           </details>
           <details class="faq-item">
             <summary>What is the purchase gap alert?</summary>
@@ -782,7 +810,7 @@
           </details>
           <details class="faq-item">
             <summary>Do I need to manage any servers?</summary>
-            <p>No. Tagioo handles everything: Docker provisioning, Nginx configuration, SSL certificate (Let's Encrypt), health monitoring, and automatic container restarts. You just point your DNS and install the web GTM container — we do the rest.</p>
+            <p>No. Tagioo handles everything: container provisioning, Nginx configuration, SSL certificate (Let's Encrypt), health monitoring, and automatic container restarts. You just point your DNS and install the web GTM container — we do the rest.</p>
           </details>
           <details class="faq-item">
             <summary>How does the WooCommerce integration work?</summary>
@@ -804,7 +832,7 @@
         <div class="cta-inner">
           <p class="eyebrow eyebrow-onpurple">Start today</p>
           <h2>Stop losing conversions.<br>Start boosting ROAS.</h2>
-          <p class="cta-sub">Join Bangladesh stores tracking accurately with Tagioo. Free plan available. No credit card required. Setup takes under 30 minutes.</p>
+          <p class="cta-sub">Join Bangladesh stores tracking accurately with Tagioo. Free plan available. No credit card required. Setup takes under 10 minutes.</p>
           <div class="cta-actions">
             <a class="button button-cta-primary button-lg" href="/signup">Create free account →</a>
             <a class="button button-cta-ghost button-lg" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Chat on WhatsApp</a>
@@ -871,9 +899,12 @@
           </div>
         </div>
       </div>
+      <div class="footer-wordmark-wrap" aria-hidden="true">
+        <span class="footer-wordmark">Tagioo</span>
+      </div>
       <div class="footer-bottom">
-        <span>© 2025 Tagioo. All rights reserved.</span>
-        <span>Made in Bangladesh 🇧🇩</span>
+        <span>© 2025 Tagioo. All rights reserved. &nbsp;·&nbsp; Made in Bangladesh 🇧🇩</span>
+        <p class="footer-disclaimer">Figures illustrating potential savings, profit, or ROAS improvement on this site are illustrative examples, not guarantees or audited results. Actual results depend on your ad spend, traffic, and current tracking setup.</p>
       </div>
     </footer>
 
