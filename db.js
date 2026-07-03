@@ -53,6 +53,16 @@ CREATE TABLE IF NOT EXISTS daily_summaries (
   computed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   PRIMARY KEY (tenant_id, date_key)
 );
+
+CREATE TABLE IF NOT EXISTS error_logs (
+  id INTEGER PRIMARY KEY,
+  source TEXT NOT NULL DEFAULT 'server',
+  message TEXT NOT NULL,
+  stack TEXT NOT NULL DEFAULT '',
+  context TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_error_logs_created ON error_logs (created_at);
 `;
 
 export function openEventStore(dataDir) {
@@ -100,6 +110,16 @@ export function openEventStore(dataDir) {
     VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     ON CONFLICT(tenant_id, date_key) DO UPDATE SET payload = excluded.payload, computed_at = excluded.computed_at
   `);
+
+  const insertErrorLogStmt = db.prepare(
+    "INSERT INTO error_logs (source, message, stack, context) VALUES (@source, @message, @stack, @context)"
+  );
+  const listErrorLogsStmt = db.prepare("SELECT * FROM error_logs ORDER BY id DESC LIMIT ?");
+  const countErrorLogsStmt = db.prepare("SELECT COUNT(*) AS n FROM error_logs");
+  const deleteErrorLogsStmt = db.prepare("DELETE FROM error_logs");
+  const capErrorLogsStmt = db.prepare(
+    "DELETE FROM error_logs WHERE id NOT IN (SELECT id FROM error_logs ORDER BY id DESC LIMIT ?)"
+  );
 
   return {
     db,
@@ -181,6 +201,30 @@ export function openEventStore(dataDir) {
 
     setDailySummary(tenantId, dateKey, snapshot) {
       setSummaryStmt.run(tenantId || "", dateKey, JSON.stringify(snapshot));
+    },
+
+    // Owner-facing error log (server exceptions + reported client-side JS errors).
+    // Capped at insert time so a repeating bug can't grow this table unbounded.
+    insertErrorLog({ source, message, stack, context }, keepMax = 500) {
+      insertErrorLogStmt.run({
+        source: String(source || "server").slice(0, 20),
+        message: String(message || "").slice(0, 2000),
+        stack: String(stack || "").slice(0, 8000),
+        context: String(context || "").slice(0, 2000)
+      });
+      capErrorLogsStmt.run(keepMax);
+    },
+
+    listErrorLogs(limit = 200) {
+      return listErrorLogsStmt.all(limit);
+    },
+
+    countErrorLogs() {
+      return countErrorLogsStmt.get().n;
+    },
+
+    clearErrorLogs() {
+      return deleteErrorLogsStmt.run().changes;
     },
 
     prune(retentionDays, batchRetentionDays = 7) {

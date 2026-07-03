@@ -11,7 +11,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=24" />
+    <link rel="stylesheet" href="/styles.css?v=25" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -66,6 +66,11 @@
           <button class="nav-item" type="button" data-view-target="admin" data-owner-only aria-label="Admin" title="Admin">
             <span class="nav-icon" aria-hidden="true">▣</span>
             <span>Admin</span>
+          </button>
+          <button class="nav-item" type="button" data-view-target="errorLogs" data-owner-only aria-label="Error Logs" title="Error Logs">
+            <span class="nav-icon" aria-hidden="true">⚠</span>
+            <span>Error Logs</span>
+            <span id="errorLogsNavBadge" class="nav-badge" hidden>0</span>
           </button>
           <button class="nav-item" type="button" data-view-target="integrations" data-owner-only aria-label="Integrations" title="Integrations">
             <span class="nav-icon" aria-hidden="true">↔</span>
@@ -1967,7 +1972,7 @@ window.dataLayer.push({
             <span id="ownerWatchBadge"></span><div id="ownerIssueList"></div>
             <span id="ownerInfraBadge"></span><div id="ownerInfraList"></div>
             <span id="ownerCustomerBadge"></span>
-            <tbody id="ownerCustomerTable"></tbody>
+            <table><tbody id="ownerCustomerTable"></tbody></table>
             <span id="customersBadge"></span><div id="customersList"></div>
             <div id="adminActions"></div>
           </div>
@@ -2118,6 +2123,49 @@ window.dataLayer.push({
               <span id="wizardBadge" class="badge">0/0</span>
             </div>
             <div id="setupWizard" class="wizard-list"></div>
+          </section>
+
+          <section class="split-grid">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Database Backups</h2>
+                  <p>Snapshots of tenants, payments, and customer logins. Kept on this VPS — last 4 auto-pruned.</p>
+                </div>
+                <span id="backupsBadge" class="badge">0 backups</span>
+              </div>
+              <div class="panel-header" style="padding-top:0">
+                <button id="createBackupBtn" class="button button-primary" type="button">Create backup now</button>
+                <label class="button" style="cursor:pointer">
+                  Import backup
+                  <input id="importBackupInput" type="file" accept=".json" hidden />
+                </label>
+              </div>
+              <p id="backupsMessage" class="field-help"></p>
+              <div id="backupsList" class="summary-list"></div>
+            </article>
+          </section>
+        </section>
+
+        <section id="errorLogsView" class="view" data-view="errorLogs">
+          <section class="customer-page-head">
+            <div>
+              <p class="breadcrumb">Service / Error Logs</p>
+              <h2>Error Logs</h2>
+              <p>Server exceptions and reported browser errors. Emailed at most once per hour per distinct message.</p>
+            </div>
+            <span id="errorLogsBadge" class="status-dot">Checking</span>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <h2>Recent errors</h2>
+                <p>Newest first, last 200 kept.</p>
+              </div>
+              <button id="clearErrorLogsBtn" class="button" type="button">Clear all</button>
+            </div>
+            <div id="errorLogsList" class="summary-list"></div>
           </section>
         </section>
 
@@ -2308,6 +2356,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=38" type="module"></script>
+    <script src="/app.js?v=40" type="module"></script>
   </body>
 </html>

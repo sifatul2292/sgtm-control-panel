@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { mkdir, open, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
@@ -144,6 +144,9 @@ const alertMemory = new Map();
 const summaryCache = new Map();
 const resetTokens = new Map();
 const databasePath = join(config.dataDir, "history.json");
+const backupsDir = join(config.dataDir, "backups");
+const BACKUPS_TO_KEEP = 4;
+const BACKUP_ID_PATTERN = /^backup-[0-9]{8}T[0-9]{6}-[a-f0-9]{6}\.json$/;
 
 // SQLite event store (data/events.db). Optional: if the native module fails to load
 // the panel keeps working on the log-tail + history.json path, so a bad build can
@@ -613,6 +616,40 @@ function getSession(req) {
   return valid ? session : null;
 }
 
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.socket?.remoteAddress || "unknown";
+}
+
+const rateLimitBuckets = new Map();
+
+function checkRateLimit(req, name, limit, windowMs) {
+  const key = `${name}:${getClientIp(req)}`;
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(key);
+  if (!bucket || now - bucket.windowStart >= windowMs) {
+    rateLimitBuckets.set(key, { windowStart: now, count: 1 });
+    return true;
+  }
+  bucket.count += 1;
+  return bucket.count <= limit;
+}
+
+setInterval(() => {
+  const cutoff = Date.now() - 15 * 60 * 1000;
+  for (const [key, bucket] of rateLimitBuckets) {
+    if (bucket.windowStart < cutoff) rateLimitBuckets.delete(key);
+  }
+}, 5 * 60 * 1000).unref();
+
+function tooManyRequests(res) {
+  res.writeHead(429, { "content-type": "text/plain", "retry-after": "60", "cache-control": "no-store" });
+  res.end("Too many requests. Try again later.");
+}
+
 function isAuthenticated(req) {
   return Boolean(getSession(req));
 }
@@ -676,12 +713,12 @@ function readRawBody(req, maxBytes = 4 * 1024 * 1024) {
   });
 }
 
-function readJson(req) {
+function readJson(req, maxBytes = 50000) {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 50000) {
+      if (body.length > maxBytes) {
         reject(new Error("JSON body too large"));
         req.destroy();
       }
@@ -2597,6 +2634,46 @@ async function sendAlertHooks(alerts) {
   }
 }
 
+// Owner-facing error log: server exceptions and reported client-side JS errors
+// land in the SQLite error_logs table (visible in Admin → Error Logs) and, at
+// most once per distinct message per hour, trigger an email so a silent bug
+// (like a crash that doesn't take the process down) doesn't go unnoticed.
+const ERROR_EMAIL_INTERVAL_MS = 60 * 60 * 1000;
+
+async function recordErrorLog(source, error, context = {}) {
+  const message = error instanceof Error ? error.message : String(error?.message || error || "Unknown error");
+  const stack = String(error?.stack || "");
+  console.error(`[error-log:${source}] ${message}`);
+
+  if (eventStore) {
+    try {
+      eventStore.insertErrorLog({ source, message, stack, context: JSON.stringify(context) });
+    } catch (e) {
+      console.error(`[error-log] failed to persist: ${e.message}`);
+    }
+  }
+
+  const key = `error:${source}:${message}`.slice(0, 200);
+  const now = Date.now();
+  const last = alertMemory.get(key) || 0;
+  if (now - last < ERROR_EMAIL_INTERVAL_MS) return;
+  alertMemory.set(key, now);
+
+  const to = config.customerSupportEmail;
+  if (!to) return;
+  sendEmail({
+    to,
+    subject: `⚠️ Tagioo error: ${message.slice(0, 80)}`,
+    bodyHtml: [
+      `<p style="font-size:18px;font-weight:900;margin:0 0 8px;color:#0F0A1E">New error logged</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 16px;line-height:1.6">Source: <strong>${escapeHtml(source)}</strong></p>`,
+      `<pre style="white-space:pre-wrap;background:#F5F3FF;padding:12px;border-radius:8px;font-size:12px;color:#0F0A1E">${escapeHtml(message)}</pre>`,
+      context.url ? `<p style="color:#5B6B8A;font-size:13px;margin:12px 0 0">${escapeHtml(context.method || "")} ${escapeHtml(context.url)}</p>` : "",
+      `<p style="color:#9BA8C0;font-size:12px;margin:16px 0 0">Full details in Admin → Error Logs. Further "${escapeHtml(message.slice(0, 40))}" errors are muted for 1 hour.</p>`
+    ].join("")
+  }).catch(() => {});
+}
+
 async function getDockerSummary() {
   const ps = await command("docker", [
     "ps",
@@ -3301,6 +3378,98 @@ async function writeDatabase(data) {
   const tempPath = `${databasePath}.${Date.now()}.tmp`;
   await writeFile(tempPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
   await rename(tempPath, databasePath);
+}
+
+// ── Backups (history.json snapshots) ───────────────────────────────────────
+// Local-VPS-only snapshots of the JSON database (tenants, payments, customer
+// logins, settings). Kept as plain files under data/backups/, pruned to the
+// newest BACKUPS_TO_KEEP. Not a substitute for offsite backup, but protects
+// against a bad write, accidental delete, or owner mistake on this box.
+
+function backupIdFor(date, random) {
+  const stamp = date.toISOString().replace(/[-:.]/g, "").replace("Z", "").slice(0, 15);
+  return `backup-${stamp}-${random}.json`;
+}
+
+async function pruneBackups() {
+  const entries = await readdir(backupsDir).catch(() => []);
+  const files = entries.filter((name) => BACKUP_ID_PATTERN.test(name)).sort().reverse();
+  for (const name of files.slice(BACKUPS_TO_KEEP)) {
+    await unlink(join(backupsDir, name)).catch(() => {});
+  }
+}
+
+async function createBackup(source = "manual") {
+  const loaded = await readDatabase();
+  if (!loaded.available) throw new Error(loaded.detail || loaded.message || "Database unavailable.");
+  await mkdir(backupsDir, { recursive: true });
+  const now = new Date();
+  const id = backupIdFor(now, randomBytes(3).toString("hex"));
+  const payload = { id, createdAt: now.toISOString(), source, data: loaded.data };
+  await writeFile(join(backupsDir, id), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await pruneBackups();
+  return id;
+}
+
+async function listBackups() {
+  const entries = await readdir(backupsDir).catch(() => []);
+  const files = entries.filter((name) => BACKUP_ID_PATTERN.test(name)).sort().reverse();
+  const backups = [];
+  for (const name of files) {
+    const path = join(backupsDir, name);
+    const info = await stat(path).catch(() => null);
+    if (!info) continue;
+    let meta = { createdAt: null, source: "manual" };
+    try {
+      const raw = JSON.parse(await readFile(path, "utf8"));
+      meta = { createdAt: raw.createdAt || info.mtime.toISOString(), source: raw.source || "manual" };
+    } catch { /* corrupt file: still list it so the owner can delete it */ }
+    backups.push({ id: name, createdAt: meta.createdAt, source: meta.source, sizeBytes: info.size });
+  }
+  return backups;
+}
+
+function isValidBackupData(data) {
+  return Boolean(data) && typeof data === "object" && Array.isArray(data.tenants) && Array.isArray(data.payments);
+}
+
+async function restoreBackupLocked(id) {
+  if (!BACKUP_ID_PATTERN.test(id)) return { ok: false, status: 400, errors: ["Invalid backup id."] };
+  const path = join(backupsDir, id);
+  let payload;
+  try {
+    payload = JSON.parse(await readFile(path, "utf8"));
+  } catch {
+    return { ok: false, status: 404, errors: ["Backup not found or unreadable."] };
+  }
+  if (!isValidBackupData(payload.data)) return { ok: false, status: 400, errors: ["Backup file is not a valid database snapshot."] };
+  await writeDatabase(payload.data);
+  return { ok: true, id };
+}
+
+function restoreBackup(id) {
+  return withDbLock(() => restoreBackupLocked(id));
+}
+
+async function deleteBackup(id) {
+  if (!BACKUP_ID_PATTERN.test(id)) return { ok: false, status: 400, errors: ["Invalid backup id."] };
+  await unlink(join(backupsDir, id)).catch(() => {});
+  return { ok: true };
+}
+
+async function importBackupLocked(rawData) {
+  if (!isValidBackupData(rawData)) return { ok: false, status: 400, errors: ["File is not a valid database snapshot (expected tenants/payments arrays)."] };
+  await mkdir(backupsDir, { recursive: true });
+  const now = new Date();
+  const id = backupIdFor(now, randomBytes(3).toString("hex"));
+  const payload = { id, createdAt: now.toISOString(), source: "import", data: rawData };
+  await writeFile(join(backupsDir, id), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await pruneBackups();
+  return { ok: true, id };
+}
+
+function importBackup(rawData) {
+  return withDbLock(() => importBackupLocked(rawData));
 }
 
 function pruneDailyHistory(daily) {
@@ -4480,6 +4649,16 @@ function paymentInstructionsFor(tenant, data) {
   };
 }
 
+// Serializes read-modify-write cycles against the JSON database so two concurrent
+// payment requests (e.g. owner double-clicking confirm) can't both read stale
+// "pending" state and race past the status checks below.
+let dbLockChain = Promise.resolve();
+function withDbLock(fn) {
+  const run = dbLockChain.then(fn, fn);
+  dbLockChain = run.then(() => {}, () => {});
+  return run;
+}
+
 // Customer chooses a plan. Free applies immediately; a PAID plan does NOT activate
 // service — it moves the tenant to `pending_payment` and issues an invoice. Only an
 // owner-confirmed payment (confirmPayment) flips the tenant to `active` with paid
@@ -4565,6 +4744,10 @@ async function selectCustomerPlan(input, session) {
 // Customer reports they paid: records a pending payment claim with the transaction
 // ID and emails the owner to verify. Does NOT activate anything on its own.
 async function submitPaymentClaim(input, session) {
+  return withDbLock(() => submitPaymentClaimLocked(input, session));
+}
+
+async function submitPaymentClaimLocked(input, session) {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   const method = String(input.method || "").trim().toLowerCase();
   const txnId = String(input.txnId || input.transactionId || "").trim().slice(0, 64);
@@ -4617,6 +4800,10 @@ async function submitPaymentClaim(input, session) {
 // Owner confirms a pending payment: applies the paid plan, sets a 30-day window,
 // starts the tenant's container if one exists, and emails the customer.
 async function confirmPayment(paymentId, session) {
+  return withDbLock(() => confirmPaymentLocked(paymentId, session));
+}
+
+async function confirmPaymentLocked(paymentId, session) {
   if (session?.role !== "owner") return { ok: false, status: 403, errors: ["Owner access required."] };
   const loaded = await readDatabase();
   if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
@@ -4677,6 +4864,10 @@ async function confirmPayment(paymentId, session) {
 
 // Owner rejects a pending payment (wrong / duplicate / unverifiable transaction).
 async function rejectPayment(paymentId, reason, session) {
+  return withDbLock(() => rejectPaymentLocked(paymentId, reason, session));
+}
+
+async function rejectPaymentLocked(paymentId, reason, session) {
   if (session?.role !== "owner") return { ok: false, status: 403, errors: ["Owner access required."] };
   const loaded = await readDatabase();
   if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
@@ -8017,6 +8208,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === "/forgot-password" && req.method === "POST") {
+      if (!checkRateLimit(req, "forgot-password", 5, 60 * 60 * 1000)) { tooManyRequests(res); return; }
       const form = await readForm(req);
       const email = String(form.get("email") || "").trim().toLowerCase();
       if (email) {
@@ -8087,6 +8279,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === "/signup" && req.method === "POST") {
+      if (!checkRateLimit(req, "signup", 5, 60 * 60 * 1000)) { tooManyRequests(res); return; }
       const form = await readForm(req);
       const values = Object.fromEntries(form.entries());
       const result = await addCustomerSignup(values);
@@ -8111,6 +8304,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === "/login" && req.method === "POST") {
+      if (!checkRateLimit(req, "login", 10, 60 * 1000)) { tooManyRequests(res); return; }
       const form = await readForm(req);
       const username = form.get("username") || "";
       const password = form.get("password") || "";
@@ -8432,6 +8626,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === "/api/customer/payment-claim" && req.method === "POST") {
+      if (!checkRateLimit(req, "payment-claim", 10, 60 * 60 * 1000)) { tooManyRequests(res); return; }
       const session = getSession(req);
       if (!session || session.role !== "customer") {
         jsonResponse(res, 401, { error: "Customer session required." });
@@ -8583,6 +8778,88 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Owner: local database backups (create/list/restore/import/delete).
+    if (pathname === "/api/admin/backups" && req.method === "GET") {
+      if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
+      const backups = await listBackups();
+      jsonResponse(res, 200, { backups });
+      return;
+    }
+
+    if (pathname === "/api/admin/backups" && req.method === "POST") {
+      if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
+      try {
+        const id = await createBackup("manual");
+        jsonResponse(res, 201, { id, backups: await listBackups() });
+      } catch (error) {
+        jsonResponse(res, 500, { errors: [error.message || "Backup failed."] });
+      }
+      return;
+    }
+
+    if (pathname === "/api/admin/backups/import" && req.method === "POST") {
+      if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
+      let body;
+      try {
+        body = await readJson(req, 25 * 1024 * 1024);
+      } catch (error) {
+        jsonResponse(res, 400, { errors: [error.message || "Invalid JSON body."] });
+        return;
+      }
+      const result = await importBackup(body?.data ?? body);
+      jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok ? { id: result.id, backups: await listBackups() } : { errors: result.errors });
+      return;
+    }
+
+    const backupActionMatch = pathname.match(/^\/api\/admin\/backups\/([^/]+)\/restore$/);
+    if (backupActionMatch && req.method === "POST") {
+      if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
+      const id = decodeURIComponent(backupActionMatch[1]);
+      const result = await restoreBackup(id);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { id: result.id } : { errors: result.errors });
+      return;
+    }
+
+    const backupDeleteMatch = pathname.match(/^\/api\/admin\/backups\/([^/]+)$/);
+    if (backupDeleteMatch && req.method === "DELETE") {
+      if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
+      const id = decodeURIComponent(backupDeleteMatch[1]);
+      const result = await deleteBackup(id);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { backups: await listBackups() } : { errors: result.errors });
+      return;
+    }
+
+    // Owner: error log (server exceptions + reported client-side JS errors).
+    if (pathname === "/api/admin/error-logs" && req.method === "GET") {
+      if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
+      if (!eventStore) { jsonResponse(res, 200, { errors: [], total: 0 }); return; }
+      jsonResponse(res, 200, { errors: eventStore.listErrorLogs(200), total: eventStore.countErrorLogs() });
+      return;
+    }
+
+    if (pathname === "/api/admin/error-logs" && req.method === "DELETE") {
+      if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
+      if (eventStore) eventStore.clearErrorLogs();
+      jsonResponse(res, 200, { ok: true });
+      return;
+    }
+
+    // Public: browser reports a client-side JS error. Rate-limited (no auth — errors
+    // can happen on the login/landing pages too), payload size capped in insertErrorLog.
+    if (pathname === "/api/client-error" && req.method === "POST") {
+      if (!checkRateLimit(req, "client-error", 20, 60 * 1000)) { tooManyRequests(res); return; }
+      let body;
+      try {
+        body = await readJson(req, 20000);
+      } catch {
+        jsonResponse(res, 400, { errors: ["Invalid JSON body."] });
+        return;
+      }
+      recordErrorLog("client", { message: body.message, stack: body.stack }, { url: body.url }).catch(() => {});
+      jsonResponse(res, 202, { ok: true });
+      return;
+    }
+
     // Owner container controls: restart / stop / start / resize an sgtm-* container.
     const containerActionMatch = pathname.match(/^\/api\/admin\/containers\/([^/]+)\/(restart|stop|start|resize)$/);
     if (containerActionMatch && req.method === "POST") {
@@ -8727,6 +9004,7 @@ const server = createServer(async (req, res) => {
 
     await serveStatic(req, res);
   } catch (error) {
+    recordErrorLog("server", error, { url: req.url, method: req.method }).catch(() => {});
     jsonResponse(res, 500, {
       error: "Dashboard failed to load.",
       detail: error instanceof Error ? error.message : String(error)
@@ -8928,6 +9206,32 @@ async function persistSnapshotTick() {
 }
 setInterval(persistSnapshotTick, persistSnapshotIntervalMs).unref();
 setTimeout(persistSnapshotTick, 30 * 1000).unref();
+
+// Auto-create a daily database backup. Checks every 6h whether the newest
+// backup is over 20h old rather than relying on a fixed clock time, so it
+// still fires correctly after a restart or missed tick.
+async function autoBackupTick() {
+  try {
+    const backups = await listBackups();
+    const newest = backups[0];
+    const ageMs = newest ? Date.now() - new Date(newest.createdAt).getTime() : Infinity;
+    if (ageMs > 20 * 60 * 60 * 1000) await createBackup("auto");
+  } catch (error) {
+    console.error(`[backups] auto backup failed: ${error.message}`);
+  }
+}
+setInterval(autoBackupTick, 6 * 60 * 60 * 1000).unref();
+setTimeout(autoBackupTick, 60 * 1000).unref();
+
+// Catch crashes that happen outside a request (background timers, unawaited
+// promises) so they land in the same error log/email path instead of only
+// showing up as a silent pm2 restart in the watchdog.
+process.on("uncaughtException", (error) => {
+  recordErrorLog("server", error, { context: "uncaughtException" }).catch(() => {});
+});
+process.on("unhandledRejection", (reason) => {
+  recordErrorLog("server", reason instanceof Error ? reason : new Error(String(reason)), { context: "unhandledRejection" }).catch(() => {});
+});
 
 server.listen(config.port, config.host, () => {
   console.log(`SGTM control panel running at http://${config.host}:${config.port}`);

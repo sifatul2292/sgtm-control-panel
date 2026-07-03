@@ -194,6 +194,7 @@ const viewTitles = {
   deployment: ["Operations / Deployment", "Deployment Health"],
   provisioning: ["Operations / Provisioning", "Container Provisioning"],
   admin: ["Service / Admin", "Admin"],
+  errorLogs: ["Service / Error Logs", "Error Logs"],
   integrations: ["Service / Integrations", "Integrations"],
   billing: ["Account & Billing", "My Subscription"],
   docs: ["Public / Docs", "Landing & Docs"]
@@ -208,10 +209,10 @@ let setupAssistantStep = 1;
 let generatedAssistantTemplates = null;
 let currentSession = { role: "pending" };
 let currentViewName = "dashboard";
-const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "integrations", "docs"]);
+const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "errorLogs", "integrations", "docs"]);
 const customerOnlyViews = new Set(["customerContainers", "setupAssistant", "customerAccountSettings", "offlineConversions"]);
 const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "customerAccountSettings", "billing"]);
-const ownerNavViews = new Set(["dashboard", "admin", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs", "powerUps"]);
+const ownerNavViews = new Set(["dashboard", "admin", "errorLogs", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs", "powerUps"]);
 try {
   const cachedRole = window.localStorage.getItem("tagioo_session_role");
   if (cachedRole === "customer" || cachedRole === "owner") {
@@ -454,7 +455,8 @@ function setView(name, options = {}) {
   window.location.hash = next;
   if (!options.skipRender && latestData) renderCurrentView(latestData);
   // Payment panels load independently of the (sometimes-failing) dashboard fetch.
-  if (next === "admin") { loadOwnerPayments(); loadPaymentSettings(); }
+  if (next === "admin") { loadOwnerPayments(); loadPaymentSettings(); loadBackups(); }
+  if (next === "errorLogs") loadErrorLogs();
   if (next === "billing") loadBillingPayment();
   if (next === "customerContainers") loadOnboarding();
 }
@@ -4139,6 +4141,7 @@ function renderAdmin(data) {
   renderWorkerNodes(data);
   loadOwnerPayments();
   loadPaymentSettings();
+  loadBackups();
   const customers = data.owner?.customers || data.customers?.tenants || [];
   els.adminBadge.textContent = customers.length ? `${customers.length} tenant${customers.length === 1 ? "" : "s"}` : "No tenants";
   els.customersBadge.className = `badge ${customers.length ? "ok" : "warn"}`;
@@ -4737,6 +4740,179 @@ async function savePaymentSettings(event) {
     if (msg) msg.textContent = error.message;
   }
 }
+
+// ── Owner: local database backups ──────────────────────────────────────────
+function formatBackupBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function loadBackups() {
+  const list = document.getElementById("backupsList");
+  const badge = document.getElementById("backupsBadge");
+  if (!list) return;
+  try {
+    const response = await fetch("/api/admin/backups");
+    if (!response.ok) return;
+    const { backups } = await response.json();
+    const all = Array.isArray(backups) ? backups : [];
+    if (badge) badge.textContent = `${all.length} backup${all.length === 1 ? "" : "s"}`;
+    list.innerHTML = all.length
+      ? all.map((b) => `
+          <div class="summary-item">
+            <div class="summary-item-main">
+              <strong>${escapeHtml(new Date(b.createdAt).toLocaleString())}</strong>
+              <span>${escapeHtml(b.source)} · ${escapeHtml(formatBackupBytes(b.sizeBytes))}</span>
+            </div>
+            <div class="summary-item-actions">
+              <button class="button button-primary" type="button" data-backup-restore="${escapeHtml(b.id)}">Restore</button>
+              <button class="button" type="button" data-backup-delete="${escapeHtml(b.id)}">Delete</button>
+            </div>
+          </div>`).join("")
+      : `<div class="summary-item"><div class="summary-item-main"><strong>No backups yet</strong><span>The first automatic backup runs shortly after startup; daily after that.</span></div></div>`;
+    list.querySelectorAll("[data-backup-restore]").forEach((b) => { b.onclick = () => restoreBackupAction(b.dataset.backupRestore); });
+    list.querySelectorAll("[data-backup-delete]").forEach((b) => { b.onclick = () => deleteBackupAction(b.dataset.backupDelete); });
+  } catch { /* leave list as-is */ }
+
+  const createBtn = document.getElementById("createBackupBtn");
+  if (createBtn && !createBtn.dataset.wired) {
+    createBtn.dataset.wired = "1";
+    createBtn.onclick = createBackupNow;
+  }
+  const importInput = document.getElementById("importBackupInput");
+  if (importInput && !importInput.dataset.wired) {
+    importInput.dataset.wired = "1";
+    importInput.onchange = importBackupFile;
+  }
+}
+
+async function createBackupNow() {
+  const msg = document.getElementById("backupsMessage");
+  if (msg) msg.textContent = "Creating backup…";
+  try {
+    const response = await fetch("/api/admin/backups", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Backup failed."]).join(" "));
+    if (msg) msg.textContent = "Backup created.";
+    await loadBackups();
+  } catch (error) {
+    if (msg) msg.textContent = error.message;
+  }
+}
+
+async function restoreBackupAction(id) {
+  if (!window.confirm("Restore this backup? This overwrites current tenants, payments, and customer logins with the snapshot's data. This cannot be undone.")) return;
+  const msg = document.getElementById("backupsMessage");
+  try {
+    const response = await fetch(`/api/admin/backups/${encodeURIComponent(id)}/restore`, { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Restore failed."]).join(" "));
+    window.alert("Backup restored. The page will reload.");
+    window.location.reload();
+  } catch (error) {
+    if (msg) msg.textContent = error.message;
+  }
+}
+
+async function deleteBackupAction(id) {
+  if (!window.confirm("Delete this backup? This cannot be undone.")) return;
+  const msg = document.getElementById("backupsMessage");
+  try {
+    const response = await fetch(`/api/admin/backups/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Delete failed."]).join(" "));
+    await loadBackups();
+  } catch (error) {
+    if (msg) msg.textContent = error.message;
+  }
+}
+
+async function importBackupFile(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  const msg = document.getElementById("backupsMessage");
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (msg) msg.textContent = "Importing…";
+    const response = await fetch("/api/admin/backups/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: parsed.data ?? parsed })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Import failed."]).join(" "));
+    if (msg) msg.textContent = "Imported. Use Restore to activate it.";
+    await loadBackups();
+  } catch (error) {
+    if (msg) msg.textContent = error.message.includes("JSON") ? "That file isn't valid JSON." : error.message;
+  }
+}
+
+// ── Owner: error logs ───────────────────────────────────────────────────────
+async function loadErrorLogs() {
+  const list = document.getElementById("errorLogsList");
+  const dot = document.getElementById("errorLogsBadge");
+  const navBadge = document.getElementById("errorLogsNavBadge");
+  if (!list) return;
+  try {
+    const response = await fetch("/api/admin/error-logs");
+    if (!response.ok) return;
+    const { errors, total } = await response.json();
+    const all = Array.isArray(errors) ? errors : [];
+    if (dot) { dot.textContent = total ? `${total} logged` : "Clear"; dot.className = `status-dot ${total ? "warn" : ""}`; }
+    if (navBadge) {
+      navBadge.hidden = !total;
+      navBadge.textContent = total > 99 ? "99+" : String(total);
+    }
+    list.innerHTML = all.length
+      ? all.map((e) => `
+          <div class="summary-item">
+            <div class="summary-item-main">
+              <strong>${escapeHtml(e.source)} · ${escapeHtml(new Date(e.created_at).toLocaleString())}</strong>
+              <span>${escapeHtml(e.message)}</span>
+              ${e.context && e.context !== "{}" ? `<span>${escapeHtml(e.context)}</span>` : ""}
+              ${e.stack ? `<pre style="white-space:pre-wrap;font-size:11px;color:var(--color-dim);margin:6px 0 0">${escapeHtml(e.stack.slice(0, 800))}</pre>` : ""}
+            </div>
+          </div>`).join("")
+      : `<div class="summary-item"><div class="summary-item-main"><strong>No errors logged</strong><span>Server exceptions and reported browser errors will show up here.</span></div></div>`;
+  } catch { /* leave list as-is */ }
+
+  const clearBtn = document.getElementById("clearErrorLogsBtn");
+  if (clearBtn && !clearBtn.dataset.wired) {
+    clearBtn.dataset.wired = "1";
+    clearBtn.onclick = async () => {
+      if (!window.confirm("Clear all error logs? This cannot be undone.")) return;
+      await fetch("/api/admin/error-logs", { method: "DELETE" });
+      await loadErrorLogs();
+    };
+  }
+}
+
+// Global client-side error reporter — runs on every page (login, landing,
+// dashboard) so a broken admin render or a customer-facing JS crash both
+// surface in Admin → Error Logs instead of going unnoticed.
+(function setupClientErrorReporter() {
+  let reported = 0;
+  const MAX_REPORTS_PER_LOAD = 20;
+  function report(message, stack) {
+    if (reported >= MAX_REPORTS_PER_LOAD) return;
+    reported += 1;
+    fetch("/api/client-error", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: String(message || "Unknown error").slice(0, 2000), stack: String(stack || "").slice(0, 8000), url: window.location.href })
+    }).catch(() => {});
+  }
+  window.addEventListener("error", (event) => {
+    report(event.message, event.error?.stack);
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    report(event.reason?.message || String(event.reason), event.reason?.stack);
+  });
+})();
 
 function renderDocs(data) {
   const base = data.config?.publicBaseUrl || window.location.origin;
