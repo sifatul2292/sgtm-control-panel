@@ -5748,7 +5748,14 @@ els.customerSetupForm.addEventListener("submit", async (event) => {
     if (!response.ok) throw new Error((result.errors || [result.error || "Setup request failed"]).join(" "));
     els.customerSetupFormMessage.textContent = `Container created for ${result.request.trackingDomain}.`;
     await loadDashboard();
-    setView("dashboard");
+    // Prefill the Setup Assistant tracking domain from the new container, then
+    // send the user straight there to finish wiring GA4 / Meta / etc.
+    if (els.setupAssistantForm) {
+      const td = els.setupAssistantForm.elements.trackingDomain;
+      if (td && !td.value) td.value = result.request.trackingDomain || "";
+    }
+    setView("setupAssistant");
+    document.querySelector("#setupAssistantView")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     els.customerSetupFormMessage.textContent = error.message;
   }

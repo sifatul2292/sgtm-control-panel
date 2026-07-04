@@ -680,6 +680,100 @@ h2 {
   align-items: center;
 }
 
+/* ── "Container live → finish setup" hero banner ──────────────────────── */
+.assistant-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: var(--space-xl);
+  align-items: center;
+  padding: var(--space-xl);
+  border: var(--rule-thin) solid var(--color-accent-line);
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--color-accent-wash), transparent 55%),
+    var(--color-surface);
+}
+
+.assistant-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+  color: var(--color-ok);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.assistant-hero-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-ok);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--color-ok), transparent 82%);
+}
+
+.assistant-hero-main h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-xs);
+}
+
+.assistant-hero-main p {
+  color: var(--color-muted);
+  line-height: 1.55;
+  max-width: 46ch;
+}
+
+.assistant-hero-steps {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assistant-hero-steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.assistant-hero-step-num {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.assistant-hero-steps li div {
+  display: grid;
+  gap: 1px;
+}
+
+.assistant-hero-steps strong {
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.assistant-hero-steps li span {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
 .assistant-layout {
   display: grid;
   grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
@@ -742,12 +836,25 @@ h2 {
 }
 
 .assistant-step strong {
-  font-size: var(--text-lg);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+
+.assistant-step.is-active strong {
+  color: var(--color-text);
 }
 
 .assistant-step span,
 .assistant-steps p {
   color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+.assistant-steps p {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-md);
+  border-top: var(--rule-thin) solid var(--color-line);
+  line-height: 1.5;
 }
 
 .assistant-panel {
@@ -771,9 +878,35 @@ h2 {
 
 .assistant-form-grid label {
   display: grid;
-  gap: var(--space-xs);
+  gap: var(--space-2xs);
   color: var(--color-muted);
-  font-weight: 850;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Inputs inherit their label's font — force a normal weight so values and
+   placeholders don't render bold. */
+.assistant-form-grid input,
+.assistant-form-grid select,
+.assistant-form-grid input::placeholder,
+.assistant-destination-grid input {
+  font-weight: 400;
+}
+
+.assistant-form-grid input,
+.assistant-form-grid select {
+  min-height: 42px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.assistant-form-grid input:focus,
+.assistant-form-grid select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-wash);
 }
 
 .label-optional {
@@ -792,22 +925,33 @@ h2 {
 }
 
 .assistant-destination-grid label {
-  min-height: 86px;
+  min-height: 72px;
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  padding: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
   border: var(--rule-thin) solid var(--color-line);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-2);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
   cursor: pointer;
-  font-weight: 900;
+  font-weight: 600;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.assistant-destination-grid label:hover {
+  border-color: var(--color-line-strong);
+}
+
+.assistant-destination-grid label:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-wash);
+  box-shadow: var(--shadow-card);
 }
 
 .assistant-destination-grid input {
-  width: 22px;
-  height: 22px;
-  accent-color: var(--color-ok);
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-accent);
 }
 
 .assistant-download-card {
@@ -891,9 +1035,10 @@ h2 {
   border: var(--rule-thin) solid var(--color-line);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
-  color: var(--color-text);
-  font-family: inherit;
-  font-weight: 850;
+  color: var(--color-accent-deep);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
 }
 
 .assistant-actions {
@@ -3526,6 +3671,7 @@ textarea::placeholder {
   .customer-home-grid,
   .customer-two-col,
   .container-detail-grid,
+  .assistant-hero,
   .assistant-layout,
   .assistant-form-grid,
   .assistant-destination-grid,
