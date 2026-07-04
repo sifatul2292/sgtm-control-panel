@@ -215,12 +215,26 @@ or the existing `tagioo-watchdog.sh` cron host). Each tick, per tenant:
   `/api/admin/settings/payment`). Confirm → active + paid limits + renewal `paidAt+30d` +
   container start + customer email. Duplicate txn blocked (409). Verified end-to-end (UI + API).
   Asset bump app.js?v=30, styles.css?v=18.
-- **Phase 2 — Free-tier cycle + enforcement.** Rolling 30-day cycle fields; 12K nudge,
-  15K hard-cap stop; daily cron; cycle reset.
+- **Phase 2 — Free-tier cycle + enforcement. ✅ DONE 2026-06-27.** Rolling 30-day cycle
+  per Free tenant (`cycleStart`/`cycleEnd`/`cycleBaseline`/`cycleNudge`/`cappedAt`);
+  escalating nudges at 10K/12K/13K/14K (one per threshold per cycle, deduped via
+  `cycleNudge`), each email shows events used/limit + purchases & revenue this cycle;
+  hard cap at 15K → `free_capped` + container stop + "paused" email; cycle rollover
+  resumes container + flips to `free`. Runs in `enforceFreeTierUsage(data)` from the
+  `persistDailySummary` tick (every 10 min). Verified: nudge tiers, cap+stop, rollover.
 - **Phase 3 — Full email system.** Generalize `sendEmail`; all templates in §6.
-- **Phase 4 — Renewal + dunning.** Reminders, overdue→expired, container suspend/resume.
-- **Phase 5 — Landing polish.** Fix price mismatch, real testimonials, signal-recovery
-  hero, manual-payment expectation note near pricing.
+- **Phase 4 — Renewal + dunning. ✅ DONE 2026-06-27.** `enforcePaidRenewals(data)` in the
+  `persistDailySummary` tick: T-7/T-3/T-1 reminders (deduped via `renewalReminder`, show
+  plan+amount+bKash/Nagad numbers); past `renewalDate` → `overdue` (grace, container runs)
+  + email; overdue + `RENEWAL_GRACE_DAYS` (7) → `expired` + stop container + email.
+  `confirmPayment` resets reminder/overdue/expired flags so a renewal resumes service.
+  Verified: T-3 reminder, overdue, expiry+suspend.
+- **Phase 5 — Landing polish. ~PARTLY DONE 2026-06-27.** Hero rewritten signal-recovery /
+  Brave-bypass moat-forward; badge "Brave & ad-blocker proof"; pricing footer = manual
+  bKash/Nagad reality (no card). Welcome email on signup added (Phase 3 remainder).
+  STILL TODO (needs owner-supplied real content): replace fabricated testimonial
+  ("Rafiqul Islam") + "A/B/C/D" social-proof avatars + unverified +31%/+58% stats with
+  real customer quotes/logos (Shobaz, amolbooks); guided signup→onboarding handoff.
 - **Later — WhatsApp automation.** Needs license + WhatsApp Business API (issue #3).
 
 ---

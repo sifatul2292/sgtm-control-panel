@@ -143,6 +143,10 @@ const CUSTOMER_SUMMARY_CACHE_TTL_MS = Number(process.env.CUSTOMER_SUMMARY_CACHE_
 const alertMemory = new Map();
 const summaryCache = new Map();
 const resetTokens = new Map();
+// Unverified signups awaiting email code confirmation. Keyed by an opaque token
+// stored in an HttpOnly cookie. No customer account exists until the code is
+// confirmed, so an unverified email never becomes a usable login.
+const pendingSignups = new Map();
 const databasePath = join(config.dataDir, "history.json");
 const backupsDir = join(config.dataDir, "backups");
 const BACKUPS_TO_KEEP = 4;
@@ -1904,6 +1908,72 @@ function resetPasswordPage(token = "", error = "") {
 </html>`;
 }
 
+function verifyPage({ email = "", error = "", info = "" } = {}) {
+  const masked = email.replace(/^(.)(.*)(.@.*)$/, (_, a, b, c) => a + "*".repeat(Math.max(b.length, 1)) + c);
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Verify your email — Tagioo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/login.css" />
+  </head>
+  <body class="login-body">
+    <div class="login-layout">
+      <aside class="login-brand">
+        <a class="lb-logo" href="/">
+          <span class="lb-mark">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
+              <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
+            </svg>
+          </span>
+          <span>Tagioo</span>
+        </a>
+        <div class="lb-hero">
+          <h2>Check your inbox.<br>Confirm it's you.</h2>
+          <p>We sent a 6-digit code to your email. Enter it to activate your account and go live.</p>
+        </div>
+        <div class="su-steps">
+          <div class="su-step su-step--done"><span class="su-step-num">1</span>Create your account</div>
+          <div class="su-step su-step--active"><span class="su-step-num">2</span>Verify your email</div>
+          <div class="su-step"><span class="su-step-num">3</span>Go live &amp; track</div>
+        </div>
+        <p class="lb-footer">© 2025 Tagioo · Made in Bangladesh 🇧🇩</p>
+      </aside>
+
+      <main class="login-form-panel su-form-panel">
+        <div class="login-form-wrap su-form-wrap">
+          <div class="lf-header su-anim" style="--d:0ms">
+            <h1>Verify your email</h1>
+            <p class="lf-subtitle">Enter the 6-digit code we sent to <strong>${escapeHtml(masked)}</strong>.</p>
+          </div>
+          ${error ? `<div class="lf-error su-anim" style="--d:40ms">${escapeHtml(error)}</div>` : ""}
+          ${info ? `<div class="lf-plan-note su-anim" style="--d:40ms;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#166534;font-size:14px">${escapeHtml(info)}</div>` : ""}
+
+          <form method="post" action="/verify" class="lf-form" id="verifyForm">
+            <div class="lf-field su-anim" style="--d:80ms">
+              <label for="vCode">Verification code</label>
+              <input id="vCode" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="000000" style="letter-spacing:8px;font-size:20px;text-align:center" required autofocus />
+            </div>
+            <button type="submit" class="button button-primary full-width su-anim" style="--d:130ms">Verify &amp; continue</button>
+          </form>
+
+          <form method="post" action="/verify/resend" class="su-anim" style="--d:180ms;margin-top:14px;text-align:center">
+            <p class="lf-subtitle" style="margin:0">Didn't get it? <button type="submit" class="lf-forgot-link" style="background:none;border:none;padding:0;cursor:pointer;color:inherit;text-decoration:underline">Resend code</button> · <a href="/signup" class="su-signin-link">Change email</a></p>
+          </form>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>`;
+}
+
 function signupPage(error = "", values = {}) {
   const selectedCountry = values.country || "BD";
   const countryOptions = [
@@ -2007,6 +2077,9 @@ function signupPage(error = "", values = {}) {
           ${error ? `<div class="lf-error su-anim" style="--d:40ms">${escapeHtml(error)}</div>` : ""}
 
           <form method="post" action="/signup" class="lf-form" id="signupForm">
+            <input type="hidden" name="plan" value="${escapeHtml(values.plan || "")}" />
+            <input type="hidden" name="billingCycle" value="${escapeHtml(values.billingCycle || "")}" />
+            ${values.plan && values.plan !== "Free" ? `<div class="lf-plan-note su-anim" style="--d:60ms;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#5B21B6;font-size:14px">You're signing up for the <strong>${escapeHtml(values.plan)}</strong> plan. After creating your account, you'll pay via bKash or Nagad to activate it.</div>` : ""}
 
             <div class="lf-field su-anim" style="--d:80ms">
               <label for="suFullName">Full name</label>
@@ -4717,6 +4790,53 @@ function uniqueTenantId(base, data) {
   return sanitizeId(`${base}-${Date.now().toString(36)}`);
 }
 
+// Validate signup fields WITHOUT creating an account — used to gate the
+// email-verification step so we only send a code for well-formed, non-duplicate
+// signups. addCustomerSignup re-validates on final create (defense in depth).
+async function validateSignupInput(input) {
+  const fullName = String(input.fullName || "").trim();
+  const email = String(input.email || input.username || "").trim().toLowerCase();
+  const phone = String(input.phone || "").trim();
+  const password = String(input.password || "");
+  const confirmPassword = String(input.confirmPassword || input.confirm_password || "");
+  const errors = [];
+  if (!fullName) errors.push("Full name is required.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("Enter a valid email address.");
+  if (!phone) errors.push("Phone number is required.");
+  if (password.length < 8) errors.push("Password must be at least 8 characters.");
+  if (password !== confirmPassword) errors.push("Passwords do not match.");
+  if (errors.length) return { ok: false, errors };
+
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  if ((loaded.data.customerAccounts || []).some((a) => a.username === email)) {
+    return { ok: false, errors: ["An account already exists with this email or username."] };
+  }
+  return { ok: true, email };
+}
+
+// 6-digit numeric verification code as a zero-padded string.
+function makeVerificationCode() {
+  return String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
+}
+
+async function emailVerificationCode(toEmail, fullName, code) {
+  const name = String(fullName || "").trim().split(" ")[0] || "there";
+  // Dev fallback: with no email provider configured, print the code so local
+  // signup can be completed. Never reached in production (RESEND_API_KEY set).
+  if (!config.resendApiKey) console.warn(`[verify] code for ${toEmail}: ${code}`);
+  return sendEmail({
+    to: toEmail,
+    subject: `${code} is your Tagioo verification code`,
+    bodyHtml: [
+      `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Verify your email</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Hi ${escapeHtml(name)}, enter this code to finish creating your Tagioo account:</p>`,
+      `<p style="font-size:34px;font-weight:900;letter-spacing:8px;margin:0 0 18px;color:#0F0A1E;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:12px;padding:18px 0;text-align:center">${escapeHtml(code)}</p>`,
+      `<p style="color:#9BA8C0;font-size:13px;margin:0">This code expires in 15 minutes. If you didn't request it, ignore this email.</p>`
+    ].join("")
+  });
+}
+
 async function addCustomerSignup(input) {
   const loaded = await readDatabase();
   if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
@@ -4815,9 +4935,9 @@ function withDbLock(fn) {
 // limits. This is the gate that closes the "active before payment" revenue leak.
 const billingCycleConfig = {
   monthly:    { months: 1,  discount: 0,    label: "Monthly" },
-  quarterly:  { months: 3,  discount: 0.05, label: "3-Month" },
-  semiannual: { months: 6,  discount: 0.10, label: "6-Month" },
-  yearly:     { months: 12, discount: 0.15, label: "Yearly" }
+  quarterly:  { months: 3,  discount: 0.10, label: "3-Month" },
+  semiannual: { months: 6,  discount: 0.20, label: "6-Month" },
+  yearly:     { months: 12, discount: 0.25, label: "Yearly" }
 };
 
 function computeCycleAmount(planName, cycleId) {
@@ -8465,6 +8585,14 @@ const server = createServer(async (req, res) => {
         return;
       }
       const prefillEmail = reqUrl.searchParams.get("email") || "";
+      // Carry a chosen paid plan from the pricing page through signup so a
+      // paid-plan visitor is routed to payment after registering, not dropped
+      // onto the Free/trial dashboard. Only accept known paid plans; anything
+      // else (incl. "Free") falls through to the normal free signup.
+      const rawPlan = String(reqUrl.searchParams.get("plan") || "").trim();
+      const selectedPlan = ["Starter", "Pro", "Enterprise"].includes(rawPlan) ? rawPlan : "";
+      const rawCycle = String(reqUrl.searchParams.get("cycle") || "").trim();
+      const selectedCycle = billingCycleConfig[rawCycle] ? rawCycle : "monthly";
       const cookies = parseCookies(req.headers.cookie);
       // Reached the signup form = real purchase intent for a self-serve trial
       // (SaaS equivalent of InitiateCheckout) — worth a Meta "Lead" so unfinished
@@ -8483,7 +8611,7 @@ const server = createServer(async (req, res) => {
         setCookies.push(`tg_lead_sent=1; Path=/; Max-Age=86400; SameSite=Lax`);
       }
       const headers = setCookies.length ? { "set-cookie": setCookies } : {};
-      htmlResponse(res, 200, signupPage("", { email: prefillEmail }), headers);
+      htmlResponse(res, 200, signupPage("", { email: prefillEmail, plan: selectedPlan, billingCycle: selectedCycle }), headers);
       return;
     }
 
@@ -8491,11 +8619,97 @@ const server = createServer(async (req, res) => {
       if (!checkRateLimit(req, "signup", 5, 60 * 60 * 1000)) { tooManyRequests(res); return; }
       const form = await readForm(req);
       const values = Object.fromEntries(form.entries());
+      // Don't create the account yet — validate, then email a code. The account
+      // is only created once the code is confirmed at POST /verify, so an
+      // unverified email never becomes a usable login.
+      const check = await validateSignupInput(values);
+      if (!check.ok) {
+        htmlResponse(res, 400, signupPage((check.errors || ["Signup failed."]).join(" "), values));
+        return;
+      }
+      for (const [k, v] of pendingSignups) if (v.expires < Date.now()) pendingSignups.delete(k);
+      const token = randomBytes(32).toString("hex");
+      const code = makeVerificationCode();
+      pendingSignups.set(token, {
+        values,
+        email: check.email,
+        code,
+        expires: Date.now() + 15 * 60 * 1000,
+        attempts: 0,
+        resendAt: Date.now() + 30 * 1000
+      });
+      emailVerificationCode(check.email, values.fullName, code).catch(() => {});
+      res.writeHead(302, {
+        location: "/verify",
+        "set-cookie": `tg_signup=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=900`,
+        "cache-control": "no-store"
+      });
+      res.end();
+      return;
+    }
+
+    if (pathname === "/verify" && req.method === "GET") {
+      if (isAuthenticated(req)) { redirect(res, "/"); return; }
+      const token = parseCookies(req.headers.cookie).tg_signup || "";
+      const pending = pendingSignups.get(token);
+      if (!token || !pending || pending.expires < Date.now()) {
+        redirect(res, "/signup");
+        return;
+      }
+      htmlResponse(res, 200, verifyPage({ email: pending.email }));
+      return;
+    }
+
+    if (pathname === "/verify/resend" && req.method === "POST") {
+      const token = parseCookies(req.headers.cookie).tg_signup || "";
+      const pending = pendingSignups.get(token);
+      if (!token || !pending || pending.expires < Date.now()) {
+        redirect(res, "/signup");
+        return;
+      }
+      if (Date.now() < pending.resendAt) {
+        htmlResponse(res, 429, verifyPage({ email: pending.email, error: "Please wait a moment before requesting another code." }));
+        return;
+      }
+      pending.code = makeVerificationCode();
+      pending.expires = Date.now() + 15 * 60 * 1000;
+      pending.attempts = 0;
+      pending.resendAt = Date.now() + 30 * 1000;
+      emailVerificationCode(pending.email, pending.values.fullName, pending.code).catch(() => {});
+      htmlResponse(res, 200, verifyPage({ email: pending.email, info: "A new code is on its way to your inbox." }));
+      return;
+    }
+
+    if (pathname === "/verify" && req.method === "POST") {
+      if (!checkRateLimit(req, "verify", 10, 60 * 60 * 1000)) { tooManyRequests(res); return; }
+      const token = parseCookies(req.headers.cookie).tg_signup || "";
+      const pending = pendingSignups.get(token);
+      if (!token || !pending || pending.expires < Date.now()) {
+        if (token) pendingSignups.delete(token);
+        htmlResponse(res, 400, signupPage("Your verification session expired. Please sign up again."));
+        return;
+      }
+      const form = await readForm(req);
+      const submitted = String(form.get("code") || "").trim();
+      pending.attempts += 1;
+      if (pending.attempts > 6) {
+        pendingSignups.delete(token);
+        htmlResponse(res, 400, signupPage("Too many incorrect attempts. Please sign up again."));
+        return;
+      }
+      if (submitted !== pending.code) {
+        htmlResponse(res, 400, verifyPage({ email: pending.email, error: "Incorrect code. Check your email and try again." }));
+        return;
+      }
+
+      // Code confirmed — now create the account.
+      const values = pending.values;
       const result = await addCustomerSignup(values);
       if (!result.ok) {
         htmlResponse(res, 400, signupPage((result.errors || ["Signup failed."]).join(" "), values));
         return;
       }
+      pendingSignups.delete(token);
 
       // Self-signup is always plan "Free" (addCustomerSignup hardcodes it) — this
       // is tagioo's own acquisition-funnel conversion, forwarded to tagioo's own
@@ -8515,6 +8729,21 @@ const server = createServer(async (req, res) => {
       // merges in the hashed email/phone/name for real match quality.
       sendTagiooSignupToMetaCapi(values, signupEventId).catch(() => {});
 
+      // If the visitor picked a paid plan on the pricing page, don't drop them
+      // on the Free/trial dashboard — stage the upgrade as pending_payment
+      // (issues an invoice, keeps limits at Free until owner confirms) and send
+      // them to the billing view to pay via bKash/Nagad. Payment is manual:
+      // owner verifies the transaction, then confirmPayment flips to active.
+      const chosenPlan = String(values.plan || "").trim();
+      let landing = "/#customerContainers";
+      if (["Starter", "Pro", "Enterprise"].includes(chosenPlan)) {
+        const staged = await selectCustomerPlan(
+          { plan: chosenPlan, billingCycle: values.billingCycle || "monthly" },
+          { tenantId: result.account.tenantId }
+        );
+        if (staged.ok) landing = "/#billing";
+      }
+
       const account = {
         username: result.account.username,
         role: "customer",
@@ -8522,8 +8751,11 @@ const server = createServer(async (req, res) => {
         accountId: result.account.id
       };
       res.writeHead(302, {
-        location: "/#customerContainers",
-        "set-cookie": `sgtm_session=${makeSessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`,
+        location: landing,
+        "set-cookie": [
+          `sgtm_session=${makeSessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`,
+          `tg_signup=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
+        ],
         "cache-control": "no-store"
       });
       res.end();

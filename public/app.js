@@ -276,9 +276,9 @@ const planRank = { Free: 0, Starter: 1, Growth: 2, Pro: 3, Enterprise: 4, Agency
 
 const billingCycles = [
   { id: "monthly", label: "Monthly", months: 1, discount: 0 },
-  { id: "quarterly", label: "3-Month", months: 3, discount: 0.05 },
-  { id: "semiannual", label: "6-Month", months: 6, discount: 0.10 },
-  { id: "yearly", label: "Yearly", months: 12, discount: 0.15 }
+  { id: "quarterly", label: "3-Month", months: 3, discount: 0.10 },
+  { id: "semiannual", label: "6-Month", months: 6, discount: 0.20 },
+  { id: "yearly", label: "Yearly", months: 12, discount: 0.25 }
 ];
 let selectedCycle = billingCycles[0];
 

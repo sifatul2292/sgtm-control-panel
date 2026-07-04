@@ -128,7 +128,7 @@
               <li><span class="pf-check">✓</span> Cookie life extension</li>
               <li><span class="pf-check">✓</span> WhatsApp support · 7-day retention</li>
             </ul>
-            <a class="button button-outline full-width" href="/signup">Start Starter</a>
+            <a class="button button-outline full-width" data-plan-cta href="/signup?plan=Starter&cycle=monthly">Start Starter</a>
           </article>
 
           <article class="pricing-card featured" data-reveal data-monthly="2900">
@@ -148,7 +148,7 @@
               <li><span class="pf-check">✓</span> Advanced reports + diagnostics</li>
               <li><span class="pf-check">✓</span> Priority WhatsApp + call · 15-day retention</li>
             </ul>
-            <a class="button button-primary full-width" href="/signup">Start Pro</a>
+            <a class="button button-primary full-width" data-plan-cta href="/signup?plan=Pro&cycle=monthly">Start Pro</a>
           </article>
 
           <article class="pricing-card" data-reveal data-monthly="5900">
@@ -167,7 +167,7 @@
               <li><span class="pf-check">✓</span> Free migration + setup</li>
               <li><span class="pf-check">✓</span> 30-day log retention</li>
             </ul>
-            <a class="button button-outline full-width" href="/signup">Start Enterprise</a>
+            <a class="button button-outline full-width" data-plan-cta href="/signup?plan=Enterprise&cycle=monthly">Start Enterprise</a>
           </article>
 
         </div>
@@ -477,6 +477,12 @@
           tab.classList.add("is-active");
           tab.setAttribute("aria-selected", "true");
           const cycle = Number(tab.dataset.cycle);
+          const cycleId = cycle === 3 ? "quarterly" : cycle === 6 ? "semiannual" : "monthly";
+          document.querySelectorAll("[data-plan-cta]").forEach(cta => {
+            const u = new URL(cta.getAttribute("href"), window.location.origin);
+            u.searchParams.set("cycle", cycleId);
+            cta.setAttribute("href", u.pathname + u.search);
+          });
           cycleCards.forEach(card => {
             const monthly = Number(card.dataset.monthly);
             const priceEl = card.querySelector("[data-price-display]");
