@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=29" />
+    <link rel="stylesheet" href="/styles.css?v=34" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -68,6 +68,11 @@
           <button class="nav-item" type="button" data-view-target="admin" data-owner-only aria-label="Admin" title="Admin">
             <span class="nav-icon" aria-hidden="true">▣</span>
             <span>Admin</span>
+            <span id="ownerPaymentsNavBadge" class="nav-badge" hidden>0</span>
+          </button>
+          <button class="nav-item" type="button" data-view-target="customers" data-owner-only aria-label="Customers" title="Customers">
+            <span class="nav-icon" aria-hidden="true">☰</span>
+            <span>Customers</span>
           </button>
           <button class="nav-item" type="button" data-view-target="errorLogs" data-owner-only aria-label="Error Logs" title="Error Logs">
             <span class="nav-icon" aria-hidden="true">⚠</span>
@@ -128,6 +133,7 @@
           </section>
 
           <section class="customer-home" data-customer-only hidden>
+            <div id="customerUpgradeNudge" class="upgrade-nudge" hidden></div>
             <article class="customer-hero-card">
               <div class="customer-hero-main">
                 <span id="customerSetupBadge" class="status-pill">No container</span>
@@ -2182,6 +2188,22 @@ window.dataLayer.push({
           </section>
         </section>
 
+        <section id="customersView" class="view" data-view="customers">
+          <section class="customer-page-head">
+            <div>
+              <h2>Customers</h2>
+              <p>Every customer account — plan, usage, status. Click one to manage their containers and plan.</p>
+            </div>
+            <input id="manageCustomersSearch" class="input" type="search" placeholder="Search name, email, tenant…" autocomplete="off" />
+          </section>
+          <div class="customers-layout">
+            <div id="manageCustomersList" class="customers-list"></div>
+            <div id="manageCustomerDetail" class="customer-detail-pane">
+              <div class="customer-detail-empty">Select a customer to view details.</div>
+            </div>
+          </div>
+        </section>
+
         <section id="errorLogsView" class="view" data-view="errorLogs">
           <section class="customer-page-head">
             <div>
@@ -2391,6 +2413,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=45" type="module"></script>
+    <script src="/app.js?v=51" type="module"></script>
   </body>
 </html>

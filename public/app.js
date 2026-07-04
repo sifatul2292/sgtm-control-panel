@@ -195,6 +195,7 @@ const viewTitles = {
   deployment: ["Operations / Deployment", "Deployment Health"],
   provisioning: ["Operations / Provisioning", "Container Provisioning"],
   admin: ["Service / Admin", "Admin"],
+  customers: ["Service / Customers", "Customers"],
   errorLogs: ["Service / Error Logs", "Error Logs"],
   integrations: ["Service / Integrations", "Integrations"],
   billing: ["Account & Billing", "My Subscription"],
@@ -206,14 +207,16 @@ let customerChartRange = "24h";
 let customerKpiRange = "24h";
 let purchaseRange = "day";
 let selectedCustomerContainerId = "";
+let selectedManageCustomerId = "";
+const MANAGE_PLANS = ["Free", "Starter", "Pro", "Enterprise"];
 let setupAssistantStep = 1;
 let generatedAssistantTemplates = null;
 let currentSession = { role: "pending" };
 let currentViewName = "dashboard";
-const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "errorLogs", "integrations", "docs"]);
+const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "customers", "errorLogs", "integrations", "docs"]);
 const customerOnlyViews = new Set(["customerContainers", "setupAssistant", "customerAccountSettings", "offlineConversions"]);
 const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "customerAccountSettings", "billing"]);
-const ownerNavViews = new Set(["dashboard", "admin", "errorLogs", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs", "powerUps"]);
+const ownerNavViews = new Set(["dashboard", "admin", "customers", "errorLogs", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs", "powerUps"]);
 try {
   const cachedRole = window.localStorage.getItem("tagioo_session_role");
   if (cachedRole === "customer" || cachedRole === "owner") {
@@ -1864,6 +1867,39 @@ function renderBusinessSnapshot(data) {
     : fromOrders ? "Tracking duplicates do not affect orders" : "No duplicate purchase hits";
 }
 
+// In-app upgrade nudge shown to Free-tier customers approaching or hitting their
+// monthly event cap. Soft nudge (>=80%) is dismissible for the session; the hard
+// cap (>=100%, tracking paused) is not dismissible — it's a service-down state.
+function renderUpgradeNudge(usage) {
+  const el = document.getElementById("customerUpgradeNudge");
+  if (!el) return;
+  const plan = String(usage.plan || "");
+  const pct = Math.max(0, Number(usage.usagePercent || 0));
+  if (plan !== "Free" || pct < 80) { el.hidden = true; el.innerHTML = ""; return; }
+
+  const capped = pct >= 100;
+  if (!capped && window.sessionStorage.getItem("tagioo_nudge_dismissed") === "1") {
+    el.hidden = true; el.innerHTML = ""; return;
+  }
+  const limit = Number(usage.requestLimit || 15000).toLocaleString();
+  el.hidden = false;
+  el.className = `upgrade-nudge ${capped ? "is-capped" : "is-warning"}`;
+  el.innerHTML = capped
+    ? `<div class="un-main"><span class="un-icon">🛑</span><div><strong>Tracking paused — you hit your ${limit} free events</strong>
+         <p>New conversions are not reaching Meta, GA4, or Google Ads. Upgrade to a paid plan to resume tracking instantly.</p></div></div>
+       <button class="button button-primary" type="button" data-nudge-upgrade>Upgrade now</button>`
+    : `<div class="un-main"><span class="un-icon">⚡</span><div><strong>You've used ${Math.round(pct)}% of your ${limit} free events</strong>
+         <p>Upgrade before you hit the cap to keep conversions flowing without interruption.</p></div></div>
+       <div class="un-actions"><button class="button button-primary" type="button" data-nudge-upgrade>Upgrade</button>
+       <button class="button" type="button" data-nudge-dismiss>Later</button></div>`;
+
+  el.querySelector("[data-nudge-upgrade]")?.addEventListener("click", () => setView("billing"));
+  el.querySelector("[data-nudge-dismiss]")?.addEventListener("click", () => {
+    window.sessionStorage.setItem("tagioo_nudge_dismissed", "1");
+    el.hidden = true; el.innerHTML = "";
+  });
+}
+
 function renderCustomerSetup(data) {
   const requests = (data.customerSetup?.requests || []).filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()));
   const latest = requests[0];
@@ -1887,6 +1923,8 @@ function renderCustomerSetup(data) {
   }
   if (els.customerUsagePercent) els.customerUsagePercent.textContent = `${usagePercent}%`;
   if (els.customerUsageRing) els.customerUsageRing.style.setProperty("--usage-percent", usagePercent);
+  customerSubscriptionStatus = String(usage.subscriptionStatus || "");
+  renderUpgradeNudge(usage);
   if (els.customerPlanName) els.customerPlanName.textContent = usage.plan || "Starter";
   if (els.customerMonthEvents) {
     els.customerMonthEvents.textContent = `${Number(usage.requestsMonth || 0).toLocaleString()} of ${Number(usage.requestLimit || 0).toLocaleString()} requests`;
@@ -4058,6 +4096,126 @@ function renderOwnerDashboard(data) {
   }).join("");
 }
 
+// ── Owner: Customers management view ────────────────────────────────────────
+function renderCustomersView(data) {
+  const customers = (data?.owner && data.owner.customers) || [];
+  const listEl = document.getElementById("manageCustomersList");
+  const searchEl = document.getElementById("manageCustomersSearch");
+  if (!listEl) return;
+
+  const q = (searchEl?.value || "").trim().toLowerCase();
+  const filtered = q
+    ? customers.filter((c) => [c.fullName, c.name, c.email, c.phone, c.id, c.plan]
+        .some((v) => String(v || "").toLowerCase().includes(q)))
+    : customers;
+
+  listEl.innerHTML = filtered.length
+    ? filtered.map((c) => `
+        <button type="button" class="customer-row${c.id === selectedManageCustomerId ? " is-selected" : ""}" data-manage-customer="${escapeHtml(c.id)}">
+          <div class="cr-main">
+            <strong>${escapeHtml(c.fullName || c.name || c.id)}</strong>
+            <span>${escapeHtml(c.email || "no email")}</span>
+          </div>
+          <div class="cr-meta">
+            ${statusPill(c.subscriptionStatus || "unknown", lifecycleStatusClass(c.subscriptionStatus))}
+            <span>${escapeHtml(c.plan || "—")}</span>
+          </div>
+        </button>`).join("")
+    : `<div class="customer-detail-empty">No customers match.</div>`;
+
+  listEl.querySelectorAll("[data-manage-customer]").forEach((b) => {
+    b.onclick = () => { selectedManageCustomerId = b.dataset.manageCustomer; renderCustomersView(latestData); };
+  });
+
+  if (searchEl && !searchEl.dataset.wired) {
+    searchEl.dataset.wired = "1";
+    searchEl.addEventListener("input", () => renderCustomersView(latestData));
+  }
+
+  const detail = customers.find((c) => c.id === selectedManageCustomerId) || null;
+  renderCustomerDetail(detail);
+}
+
+function renderCustomerDetail(customer) {
+  const pane = document.getElementById("manageCustomerDetail");
+  if (!pane) return;
+  if (!customer) {
+    pane.innerHTML = `<div class="customer-detail-empty">Select a customer to view details.</div>`;
+    return;
+  }
+  const c = customer;
+  const money = (n) => `৳${Number(n || 0).toLocaleString()}`;
+  const containers = c.customerContainers || [];
+  const info = [
+    ["Name", c.fullName || c.name || c.id],
+    ["Email", c.email || "—"],
+    ["Phone", c.phone || "—"],
+    ["Tenant ID", c.id],
+    ["Plan", c.plan || "—"],
+    ["Status", String(c.subscriptionStatus || "—").replaceAll("_", " ")],
+    ["Payment", c.paymentStatus || "—"],
+    ["Renews", c.renewalDate ? formatShortDate(c.renewalDate) : "—"],
+    ["Monthly", money(c.monthlyAmount)],
+    ["Requests (month)", `${Number(c.requestsMonth || 0).toLocaleString()} / ${Number(c.requestLimit || 0).toLocaleString()} (${Number(c.usagePercent || 0)}%)`],
+    ["Requests (today)", Number(c.requestsToday || 0).toLocaleString()],
+    ["Containers", String(containers.length)]
+  ];
+  const planOpts = MANAGE_PLANS.map((p) => `<option value="${p}"${p === c.plan ? " selected" : ""}>${p}</option>`).join("");
+  const containerRows = containers.length
+    ? containers.map((ct) => `
+        <div class="cd-container">
+          <div><strong>${escapeHtml(ct.name || "container")}</strong>
+            <span>${escapeHtml(ct.domain || ct.websiteUrl || "no domain")} · ${escapeHtml(String(ct.status || "requested").replaceAll("_", " "))}</span></div>
+          <span class="cd-loc">${escapeHtml(ct.serverLocation || ct.workerName || "")}</span>
+        </div>`).join("")
+    : `<div class="customer-detail-empty">No containers yet.</div>`;
+
+  pane.innerHTML = `
+    <div class="cd-head">
+      <div><h3>${escapeHtml(c.fullName || c.name || c.id)}</h3><span>${escapeHtml(c.email || "")}</span></div>
+      ${statusPill(c.subscriptionStatus || "unknown", lifecycleStatusClass(c.subscriptionStatus))}
+    </div>
+    <div class="cd-grid">${info.map(([k, v]) => `<div class="cd-cell"><span>${escapeHtml(k)}</span><strong>${escapeHtml(String(v))}</strong></div>`).join("")}</div>
+    <div class="cd-actions">
+      <label class="cd-plan-label">Change plan
+        <select id="cdPlanSelect">${planOpts}</select>
+      </label>
+      <button class="button button-primary" type="button" id="cdPlanSave">Save plan</button>
+      <button class="button button-danger" type="button" id="cdDeleteCustomer">Delete customer</button>
+    </div>
+    <div id="cdActionMsg" class="cd-msg"></div>
+    <h4 class="cd-subhead">Docker containers</h4>
+    <div class="cd-containers">${containerRows}</div>`;
+
+  const msg = pane.querySelector("#cdActionMsg");
+  pane.querySelector("#cdPlanSave").onclick = async () => {
+    const plan = pane.querySelector("#cdPlanSelect").value;
+    msg.textContent = "Updating plan…";
+    try {
+      const r = await fetch(`/api/admin/customers/${encodeURIComponent(c.id)}/plan`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Plan change failed.");
+      msg.textContent = `Plan changed to ${plan}. Resizing container if applicable…`;
+      await loadDashboard();
+      renderCustomersView(latestData);
+    } catch (e) { msg.textContent = e.message; }
+  };
+  pane.querySelector("#cdDeleteCustomer").onclick = async () => {
+    if (!window.confirm(`Delete customer "${c.fullName || c.id}" permanently?\n\nThis tears down their containers and removes all their records. This cannot be undone.`)) return;
+    msg.textContent = "Deleting customer…";
+    try {
+      const r = await fetch(`/api/admin/customers/${encodeURIComponent(c.id)}`, { method: "DELETE" });
+      const j = await r.json();
+      if (!r.ok) throw new Error((j.errors || [j.error || "Delete failed."]).join(" "));
+      selectedManageCustomerId = "";
+      await loadDashboard();
+      renderCustomersView(latestData);
+    } catch (e) { msg.textContent = e.message; }
+  };
+}
+
 function renderCustomerAccounts(data) {
   const accounts = data.customerAccounts?.accounts || [];
   els.customerAccountsBadge.className = `badge ${accounts.length ? "ok" : "warn"}`;
@@ -4385,6 +4543,14 @@ function renderPlanCards(activePlanName) {
 
 // Cache of the latest billing snapshot so the modal can render without refetching.
 let latestBilling = null;
+// Tenant subscription status from the last dashboard render. Drives the client
+// paywall: a pending_payment customer is steered to billing before they can
+// reach the container-create form (server also enforces this with a 402).
+let customerSubscriptionStatus = "";
+// Auto-refresh: while a payment claim is under review, poll billing so the
+// customer's page flips to "active" the moment the owner confirms — no reload.
+let billingPollTimer = null;
+let lastClaimPending = false;
 
 // Customer picks a plan -> create the pending invoice, then open the payment modal.
 async function selectSubscriptionPlan(planName) {
@@ -4435,6 +4601,8 @@ function renderPaymentStatusCard(billing) {
   const lastConfirmed = claims.find((c) => c.status === "confirmed");
   const renew = billing.renewalDate ? new Date(billing.renewalDate).toLocaleDateString() : "";
   const money = (n) => `৳${Number(n || 0).toLocaleString()}`;
+  // Just flipped from "claim under review" to active+paid this render → celebrate.
+  const justActivated = lastClaimPending && !openClaim && status === "active" && billing.paymentStatus === "paid";
 
   let tone = "", icon = "", title = "", sub = "", action = "", invoiceRow = "";
 
@@ -4459,8 +4627,8 @@ function renderPaymentStatusCard(billing) {
     sub = `Your ${escapeHtml(billing.plan)} plan renewal is due${renew ? ` (was ${escapeHtml(renew)})` : ""}. Renew now to avoid your tracking being paused.`;
     action = `<button class="button button-primary" type="button" data-renew-plan="${escapeHtml(billing.plan)}">Renew now</button>`;
   } else if (status === "active" && lastConfirmed && billing.paymentStatus === "paid") {
-    tone = "is-active"; icon = "✅";
-    title = `${escapeHtml(billing.plan)} plan is active`;
+    tone = "is-active"; icon = justActivated ? "🎉" : "✅";
+    title = justActivated ? "Payment confirmed — your plan is now active!" : `${escapeHtml(billing.plan)} plan is active`;
     sub = renew ? `Verified and running. Renews on <strong>${escapeHtml(renew)}</strong>.` : "Payment verified — your plan is active.";
   } else {
     panel.hidden = true;
@@ -4468,7 +4636,7 @@ function renderPaymentStatusCard(billing) {
   }
 
   panel.hidden = false;
-  panel.className = `payment-status-card ${tone}`;
+  panel.className = `payment-status-card ${tone}${justActivated ? " psc-just-activated" : ""}`;
   panel.innerHTML = `
     <div class="psc-main">
       <span class="psc-icon">${icon}</span>
@@ -4484,6 +4652,29 @@ function renderPaymentStatusCard(billing) {
   if (open) open.onclick = () => openPaymentModal(billing.payment);
   const renewBtn = panel.querySelector("[data-renew-plan]");
   if (renewBtn) renewBtn.onclick = () => selectSubscriptionPlan(renewBtn.dataset.renewPlan);
+
+  manageBillingPolling(Boolean(openClaim), status, billing.paymentStatus);
+}
+
+// Start/stop billing polling based on whether a claim is awaiting owner review.
+// When a pending claim clears into active+paid, celebrate once and refresh the
+// dashboard so the paywall lifts and container creation unlocks immediately.
+function manageBillingPolling(claimPending, status, paymentStatus) {
+  if (claimPending) {
+    if (!billingPollTimer) {
+      billingPollTimer = setInterval(() => { loadBillingPayment().catch(() => {}); }, 20000);
+    }
+  } else if (billingPollTimer) {
+    clearInterval(billingPollTimer);
+    billingPollTimer = null;
+  }
+  // Transition: was waiting on a claim, now activated → refresh dashboard so the
+  // paywall lifts and container creation unlocks. The celebratory card state is
+  // rendered by renderPaymentStatusCard (reads lastClaimPending, still true here).
+  if (lastClaimPending && !claimPending && status === "active" && paymentStatus === "paid") {
+    loadDashboard().catch(() => {});
+  }
+  lastClaimPending = claimPending;
 }
 
 // ── Payment modal ──────────────────────────────────────────────────────────
@@ -4586,7 +4777,7 @@ async function submitPaymentClaimForm(event) {
 async function loadOwnerPayments() {
   const list = document.getElementById("ownerPaymentsList");
   const badge = document.getElementById("ownerPaymentsBadge");
-  if (!list) return;
+  const navBadge = document.getElementById("ownerPaymentsNavBadge");
   try {
     const response = await fetch("/api/admin/payments");
     if (!response.ok) return;
@@ -4594,6 +4785,12 @@ async function loadOwnerPayments() {
     const all = Array.isArray(payments) ? payments : [];
     const pending = all.filter((p) => p.status === "pending");
     if (badge) badge.textContent = `${pending.length} pending`;
+    // Global nav badge so the owner sees new claims to confirm from any view.
+    if (navBadge) {
+      navBadge.hidden = pending.length === 0;
+      navBadge.textContent = pending.length > 99 ? "99+" : String(pending.length);
+    }
+    if (!list) return;
     const show = pending.length ? pending : all.slice(0, 8);
     list.innerHTML = show.length
       ? show.map((p) => `
@@ -5347,6 +5544,9 @@ function renderCurrentView(data) {
     case "admin":
       renderAdmin(data);
       break;
+    case "customers":
+      renderCustomersView(data);
+      break;
     case "customerAccountSettings":
       renderCustomerAccountSettings();
       break;
@@ -5736,6 +5936,13 @@ els.customerPasswordForm.addEventListener("submit", async (event) => {
 
 els.customerSetupForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  // Paywall: don't let a customer with an unpaid paid-plan invoice provision a
+  // container. Steer them to billing. (Server also blocks this with a 402.)
+  if (customerSubscriptionStatus === "pending_payment") {
+    els.customerSetupFormMessage.textContent = "Complete your plan payment first — opening Account & Billing…";
+    setView("billing");
+    return;
+  }
   els.customerSetupFormMessage.textContent = "Submitting setup request...";
   const payload = Object.fromEntries(new FormData(els.customerSetupForm).entries());
   try {
@@ -5766,4 +5973,10 @@ window.addEventListener("hashchange", () => setView(window.location.hash.replace
   await initSession();                                   // resolve role first (cheap)
   setView(window.location.hash.replace("#", "") || "dashboard");
   loadDashboard();                                       // heavy data; may fail without breaking access
+  // Owner: keep the pending-payments nav badge fresh so new claims surface fast
+  // from any view (the activation bottleneck is owner awareness, not clicks).
+  if (currentSession.role === "owner") {
+    loadOwnerPayments();
+    setInterval(() => { loadOwnerPayments().catch(() => {}); }, 30000);
+  }
 })();

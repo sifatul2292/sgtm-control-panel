@@ -434,7 +434,8 @@ async function notifyOwnerPaymentClaim(payment, ownerEmail) {
       `<tr><td style="padding:6px 0;color:#5B6B8A">Method</td><td style="padding:6px 0;font-weight:700">${escapeHtml(payment.method)}</td></tr>`,
       `<tr><td style="padding:6px 0;color:#5B6B8A">Transaction ID</td><td style="padding:6px 0;font-weight:700">${escapeHtml(payment.txnId)}</td></tr>`,
       `<tr><td style="padding:6px 0;color:#5B6B8A">Sender</td><td style="padding:6px 0;font-weight:700">${escapeHtml(payment.senderNumber)}</td></tr>`,
-      `</table>`
+      `</table>`,
+      `<a href="${escapeHtml(config.appUrl)}/#admin" style="display:inline-block;margin:22px 0 0;background:#5B21B6;color:#fff;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:10px">Review &amp; confirm in Admin →</a>`
     ].join("")
   });
 }
@@ -5365,13 +5366,26 @@ function validateCustomerSetupInput(input, session) {
 }
 
 async function addCustomerSetupRequest(input, session) {
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const data = loaded.data;
+
+  // Paywall (checked before input validation so an unpaid customer always gets
+  // the payment prompt, not a form error): a customer who picked a PAID plan but
+  // hasn't paid (pending_payment) cannot provision a container until the owner
+  // confirms payment. Free tier includes a container, so "free"/"active" pass.
+  const gateTenant = (data.tenants || []).find((tenant) => tenant.id === session?.tenantId);
+  if (gateTenant && gateTenant.subscriptionStatus === "pending_payment") {
+    return {
+      ok: false,
+      status: 402,
+      errors: ["Complete your plan payment before creating a container. Open Account & Billing to pay — we activate within hours of confirming your transaction."]
+    };
+  }
+
   const validated = validateCustomerSetupInput(input, session);
   if (validated.errors.length) return { ok: false, errors: validated.errors };
 
-  const loaded = await readDatabase();
-  if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
-
-  const data = loaded.data;
   data.customerSetupRequests ||= [];
   data.tenants ||= [];
   data.provisioning ||= { requests: [] };
@@ -5900,9 +5914,15 @@ function getTenantContainers(tenantId, tenant = null, setupRequests = [], provis
   );
 }
 
-function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers, tenantUsage = {} }) {
+function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers, tenantUsage = {}, customerAccounts }) {
   const soleCustomer = (customers.tenants || []).length === 1;
+  // Join account contact details (email/phone) onto each tenant for the owner's
+  // Customers view — these live on customerAccounts, not the tenant record.
+  const accountByTenant = new Map(
+    ((customerAccounts && customerAccounts.accounts) || []).map((a) => [a.tenantId, a])
+  );
   const enrichedCustomers = (customers.tenants || []).map((customer) => {
+    const account = accountByTenant.get(customer.id) || null;
     const customerContainers = getTenantContainers(customer.id, customer, customerSetup?.requests || [], provisioning?.requests || []);
     const plan = customer.plan || config.billingPlan;
     // Derive the limit from the current plan profile so existing customers
@@ -5938,6 +5958,11 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
 
     return {
       ...customer,
+      accountId: account?.id || "",
+      username: account?.username || "",
+      email: account?.email || "",
+      phone: account?.phone || "",
+      fullName: account?.fullName || customer.name || "",
       tracking: safeTracking,
       offlineUploads30d,
       offlineEventsSent30d,
@@ -6771,6 +6796,51 @@ async function deleteCustomerContainer(id, session) {
 
   await writeDatabase(data);
   return { ok: true, request: publicSetupRequest(request), provisioning: provision || null };
+}
+
+// Owner-only: fully remove a customer — tear down their containers (best-effort),
+// then purge account, tenant, setup requests, and provisioning records. Payment
+// records are kept for financial history. Destructive; the UI confirms first.
+async function deleteCustomerCompletely(tenantId, session) {
+  if (session?.role !== "owner") return { ok: false, status: 403, errors: ["Owner access required."] };
+  const id = String(tenantId || "").trim();
+  if (!id) return { ok: false, status: 400, errors: ["Missing customer id."] };
+
+  const pre = await readDatabase();
+  if (!pre.available) return { ok: false, status: 500, errors: [pre.detail || pre.message || "Database unavailable."] };
+  const exists = (pre.data.tenants || []).some((t) => t.id === id) ||
+    (pre.data.customerAccounts || []).some((a) => a.tenantId === id);
+  if (!exists) return { ok: false, status: 404, errors: ["Customer was not found."] };
+  if (id === "default" || (pre.data.tenants || []).find((t) => t.id === id)?.source === "environment") {
+    return { ok: false, status: 400, errors: ["The environment/default customer cannot be deleted."] };
+  }
+
+  // Best-effort container teardown so a Docker/Nginx hiccup never blocks the
+  // record purge. Each call re-reads the DB, so run sequentially.
+  const containerIds = (pre.data.customerSetupRequests || [])
+    .filter((r) => r.tenantId === id && !["deleted"].includes(String(r.status || "").toLowerCase()))
+    .map((r) => r.id);
+  const teardownErrors = [];
+  for (const cid of containerIds) {
+    try {
+      const r = await deleteCustomerContainer(cid, session);
+      if (!r.ok) teardownErrors.push(...(r.errors || []));
+    } catch (e) {
+      teardownErrors.push(e.message || String(e));
+    }
+  }
+
+  // Reload after teardown writes, then purge all records for this tenant.
+  const loaded = await readDatabase();
+  const data = loaded.data;
+  data.customerAccounts = (data.customerAccounts || []).filter((a) => a.tenantId !== id);
+  data.tenants = (data.tenants || []).filter((t) => t.id !== id);
+  data.customerSetupRequests = (data.customerSetupRequests || []).filter((r) => r.tenantId !== id);
+  if (data.provisioning?.requests) {
+    data.provisioning.requests = data.provisioning.requests.filter((r) => r.tenantId !== id);
+  }
+  await writeDatabase(data);
+  return { ok: true, tenantId: id, teardownErrors };
 }
 
 async function getProvisioningSummary() {
@@ -7737,7 +7807,7 @@ async function getDashboardData() {
   const reconciliation = getReconciliationSummary({ requestSummary, orders });
   const integrations = getIntegrationSummary({ orders, requestSummary });
   const setupWizard = getSetupWizard({ customers, provisioning, integrations, ssl, requestSummary });
-  const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers, tenantUsage });
+  const owner = buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, usage, reconciliation, customerSetup, provisioning, workers, tenantUsage, customerAccounts });
   attachContainerOwnership(docker, owner.customers || []);
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
@@ -8940,7 +9010,7 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await addCustomerSetupRequest(body, session);
-      jsonResponse(res, result.ok ? 201 : 400, result.ok ? { request: result.request } : { errors: result.errors });
+      jsonResponse(res, result.ok ? 201 : (result.status || 400), result.ok ? { request: result.request } : { errors: result.errors });
       return;
     }
 
@@ -9345,6 +9415,18 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await changeTenantPlan(decodeURIComponent(planChangeMatch[1]), String(body.plan || "").trim());
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { error: result.error });
+      return;
+    }
+
+    // Owner deletes a customer entirely (containers torn down + records purged).
+    const customerAdminDeleteMatch = pathname.match(/^\/api\/admin\/customers\/([^/]+)$/);
+    if (customerAdminDeleteMatch && req.method === "DELETE") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const result = await deleteCustomerCompletely(decodeURIComponent(customerAdminDeleteMatch[1]), getSession(req));
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { errors: result.errors });
       return;
     }
 
