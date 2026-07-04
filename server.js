@@ -8039,11 +8039,21 @@ async function getCustomerDashboardDataCached(session) {
 // background so the admin panel loads immediately instead of blocking on the
 // full rebuild every time.
 const OWNER_DASHBOARD_FRESH_MS = Number(process.env.OWNER_DASHBOARD_FRESH_MS || 8000);
-const OWNER_DASHBOARD_STALE_MS = Number(process.env.OWNER_DASHBOARD_STALE_MS || 120000);
+// Serve a stale-but-instant copy for up to an hour so an owner logging in after
+// idle never blocks on a cold rebuild — they get the last payload immediately
+// and it refreshes in the background.
+const OWNER_DASHBOARD_STALE_MS = Number(process.env.OWNER_DASHBOARD_STALE_MS || 3600000);
 let ownerDashboardCache = null;       // { payload, at, refreshing }
 let ownerDashboardLastAccess = 0;
 
-function invalidateOwnerDashboardCache() { ownerDashboardCache = null; }
+// Mark the cache dirty WITHOUT dropping it: keep serving the last payload
+// instantly and rebuild in the background. Nulling it would force the next
+// load to block on a full cold build right after an owner action.
+function invalidateOwnerDashboardCache() {
+  if (!ownerDashboardCache) return;
+  ownerDashboardLastAccess = Date.now();
+  if (!ownerDashboardCache.refreshing) refreshOwnerDashboardCache();
+}
 
 function refreshOwnerDashboardCache() {
   if (ownerDashboardCache) ownerDashboardCache.refreshing = true;
@@ -9835,4 +9845,8 @@ process.on("unhandledRejection", (reason) => {
 
 server.listen(config.port, config.host, () => {
   console.log(`SGTM control panel running at http://${config.host}:${config.port}`);
+  // Pre-warm the owner dashboard cache so the first login after a restart hits a
+  // ready payload instead of paying the cold build. Non-blocking, best-effort.
+  ownerDashboardLastAccess = Date.now();
+  refreshOwnerDashboardCache().catch(() => {});
 });
