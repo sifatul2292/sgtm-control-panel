@@ -3838,6 +3838,40 @@ async function forwardOrderToSgtm(order, tracking) {
   }
 }
 
+// tagioo.com's own marketing/funnel tracking — distinct from any customer
+// tenant's tracking config above. Same gtag /g/collect mechanism (GA4 client
+// fires GA4 + the in-container Meta CAPI tag from one hit), pointed at
+// tagioo's own container so signup/upgrade conversions land on tagioo's own
+// GA4 property + Meta pixel, not the customer's.
+const TAGIOO_OWN_TRACKING = {
+  measurementId: process.env.TAGIOO_GA4_MEASUREMENT_ID || "G-BS35TPGHR8",
+  domain: process.env.TAGIOO_SGTM_DOMAIN || "https://server.tagioo.com"
+};
+
+async function forwardTagiooOwnEvent(eventName, { seed, eventParams = {}, pageLocation } = {}) {
+  const params = new URLSearchParams({
+    v: "2",
+    tid: TAGIOO_OWN_TRACKING.measurementId,
+    cid: mpClientId(seed),
+    en: eventName,
+    _et: "1",
+    ...eventParams
+  });
+  if (pageLocation) params.set("dl", pageLocation);
+  const endpoint = `${TAGIOO_OWN_TRACKING.domain}/g/collect?${params.toString()}`;
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "text/plain;charset=UTF-8" }
+    });
+    if (!response.ok) {
+      console.warn(`[tagioo-self-track] ${eventName} forward returned ${response.status}`);
+    }
+  } catch (error) {
+    console.warn(`[tagioo-self-track] ${eventName} forward failed: ${error.message}`);
+  }
+}
+
 // Direct Meta Conversions API send for a recovered order, reusing the offline
 // hashing (sha256Hex) and sender (sendMetaOfflineConversions). Runs alongside the
 // gtag forward: the gtag path covers GA4 and triggers the in-container Meta tag
@@ -4854,6 +4888,21 @@ async function confirmPaymentLocked(paymentId, session) {
   payment.confirmedBy = session.username || "owner";
   payment.confirmedAt = now.toISOString();
   await writeDatabase(data);
+
+  // Every confirmed payment is a real paid conversion for tagioo's own
+  // acquisition funnel (regardless of which customer) — forwarded to tagioo's
+  // own GA4/Meta (TAGIOO_OWN_TRACKING) for ad optimization/attribution, same
+  // gtag /g/collect mechanism as the per-tenant purchase forward above.
+  forwardTagiooOwnEvent("purchase", {
+    seed: payment.id,
+    eventParams: {
+      cu: "BDT",
+      "ep.transaction_id": String(payment.id),
+      "epn.value": String(payment.amount),
+      "ep.plan": payment.plan,
+      "ep.tenant_id": payment.tenantId
+    }
+  }).catch(() => {});
 
   // Start/resume the tenant's container if one is provisioned, and resize to plan.
   let container = null;
@@ -8314,6 +8363,17 @@ const server = createServer(async (req, res) => {
         htmlResponse(res, 400, signupPage((result.errors || ["Signup failed."]).join(" "), values));
         return;
       }
+
+      // Self-signup is always plan "Free" (addCustomerSignup hardcodes it) — this
+      // is tagioo's own acquisition-funnel conversion, forwarded to tagioo's own
+      // GA4/Meta (TAGIOO_OWN_TRACKING), never the new tenant's own tracking.
+      forwardTagiooOwnEvent("sign_up", {
+        seed: result.account.tenantId,
+        eventParams: {
+          "ep.plan": "Free",
+          "ep.tenant_id": result.account.tenantId
+        }
+      }).catch(() => {});
 
       const account = {
         username: result.account.username,
