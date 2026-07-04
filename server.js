@@ -3867,7 +3867,12 @@ async function forwardOrderToSgtm(order, tracking) {
 // GA4 property + Meta pixel, not the customer's.
 const TAGIOO_OWN_TRACKING = {
   measurementId: process.env.TAGIOO_GA4_MEASUREMENT_ID || "G-BS35TPGHR8",
-  domain: process.env.TAGIOO_SGTM_DOMAIN || "https://server.tagioo.com"
+  domain: process.env.TAGIOO_SGTM_DOMAIN || "https://server.tagioo.com",
+  // Pixel id isn't secret (already shipped client-side in the pixel base tag),
+  // safe to default. The CAPI access token IS a secret — env var only, never
+  // a hardcoded fallback, since this file is committed to git.
+  metaPixelId: process.env.TAGIOO_META_PIXEL_ID || "1039411801891124",
+  metaCapiToken: process.env.TAGIOO_META_CAPI_TOKEN || ""
 };
 
 async function forwardTagiooOwnEvent(eventName, { seed, eventParams = {}, pageLocation } = {}) {
@@ -3891,6 +3896,45 @@ async function forwardTagiooOwnEvent(eventName, { seed, eventParams = {}, pageLo
     }
   } catch (error) {
     console.warn(`[tagioo-self-track] ${eventName} forward failed: ${error.message}`);
+  }
+}
+
+// Direct Meta CAPI send for tagioo's own CompleteRegistration, mirroring
+// sendOrderToMetaCapi below: the gtag forward above is IP/UA match only, this
+// adds hashed email/phone/name for real match quality. Shares eventId with the
+// gtag hit's ep.event_id so Meta dedupes to one CompleteRegistration instead of
+// counting both. No-ops silently if TAGIOO_META_CAPI_TOKEN isn't set.
+async function sendTagiooSignupToMetaCapi(values, eventId) {
+  if (!TAGIOO_OWN_TRACKING.metaPixelId || !TAGIOO_OWN_TRACKING.metaCapiToken) return;
+
+  const fullName = String(values.fullName || "").trim();
+  const [firstName, ...rest] = fullName.split(/\s+/);
+  const lastName = rest.join(" ");
+
+  const userData = {};
+  const em = sha256Hex(values.email); if (em) userData.em = [em];
+  const ph = sha256Hex(values.phone, { digitsOnly: true }); if (ph) userData.ph = [ph];
+  const fn = sha256Hex(firstName); if (fn) userData.fn = [fn];
+  const ln = sha256Hex(lastName); if (ln) userData.ln = [ln];
+  const country = sha256Hex(values.country); if (country) userData.country = [country];
+  if (!Object.keys(userData).length) return;
+
+  const event = {
+    event_name: "CompleteRegistration",
+    event_time: Math.floor(Date.now() / 1000),
+    action_source: "website",
+    event_id: eventId,
+    user_data: userData
+  };
+
+  const tagiooOwnTenant = { tracking: { meta: { pixelId: TAGIOO_OWN_TRACKING.metaPixelId, capiToken: TAGIOO_OWN_TRACKING.metaCapiToken } } };
+  try {
+    const result = await sendMetaOfflineConversions(tagiooOwnTenant, [event], { useTestCode: false });
+    if (!result.ok) {
+      console.warn(`[tagioo-self-track] Meta CAPI sign_up send: ${(result.fbErrors || [result.reason]).join("; ")}`);
+    }
+  } catch (error) {
+    console.warn(`[tagioo-self-track] Meta CAPI sign_up send failed: ${error.message}`);
   }
 }
 
@@ -8409,13 +8453,18 @@ const server = createServer(async (req, res) => {
       // GA4/Meta (TAGIOO_OWN_TRACKING), never the new tenant's own tracking. Seed
       // with tg_vid (set on the GET /signup Lead hit) when present so GA4/Meta
       // tie this CompleteRegistration to the same visitor as the earlier Lead.
+      const signupEventId = `signup_${result.account.id}`;
       forwardTagiooOwnEvent("sign_up", {
         seed: parseCookies(req.headers.cookie).tg_vid || result.account.tenantId,
         eventParams: {
           "ep.plan": "Free",
-          "ep.tenant_id": result.account.tenantId
+          "ep.tenant_id": result.account.tenantId,
+          "ep.event_id": signupEventId
         }
       }).catch(() => {});
+      // Same event_id as above so Meta dedupes into one CompleteRegistration and
+      // merges in the hashed email/phone/name for real match quality.
+      sendTagiooSignupToMetaCapi(values, signupEventId).catch(() => {});
 
       const account = {
         username: result.account.username,
