@@ -8372,7 +8372,25 @@ const server = createServer(async (req, res) => {
         return;
       }
       const prefillEmail = reqUrl.searchParams.get("email") || "";
-      htmlResponse(res, 200, signupPage("", { email: prefillEmail }));
+      const cookies = parseCookies(req.headers.cookie);
+      // Reached the signup form = real purchase intent for a self-serve trial
+      // (SaaS equivalent of InitiateCheckout) — worth a Meta "Lead" so unfinished
+      // signups can be retargeted. tg_vid is a stable per-visitor seed reused by
+      // the sign_up forward on actual completion, so GA4/Meta tie Lead ->
+      // CompleteRegistration to the same visitor. tg_lead_sent just dedupes
+      // reloads/repeat visits within a day so Lead volume stays a real-intent signal.
+      const setCookies = [];
+      let visitorId = cookies.tg_vid;
+      if (!visitorId) {
+        visitorId = randomBytes(16).toString("hex");
+        setCookies.push(`tg_vid=${visitorId}; Path=/; Max-Age=7776000; SameSite=Lax`);
+      }
+      if (!cookies.tg_lead_sent) {
+        forwardTagiooOwnEvent("generate_lead", { seed: visitorId }).catch(() => {});
+        setCookies.push(`tg_lead_sent=1; Path=/; Max-Age=86400; SameSite=Lax`);
+      }
+      const headers = setCookies.length ? { "set-cookie": setCookies } : {};
+      htmlResponse(res, 200, signupPage("", { email: prefillEmail }), headers);
       return;
     }
 
@@ -8388,9 +8406,11 @@ const server = createServer(async (req, res) => {
 
       // Self-signup is always plan "Free" (addCustomerSignup hardcodes it) — this
       // is tagioo's own acquisition-funnel conversion, forwarded to tagioo's own
-      // GA4/Meta (TAGIOO_OWN_TRACKING), never the new tenant's own tracking.
+      // GA4/Meta (TAGIOO_OWN_TRACKING), never the new tenant's own tracking. Seed
+      // with tg_vid (set on the GET /signup Lead hit) when present so GA4/Meta
+      // tie this CompleteRegistration to the same visitor as the earlier Lead.
       forwardTagiooOwnEvent("sign_up", {
-        seed: result.account.tenantId,
+        seed: parseCookies(req.headers.cookie).tg_vid || result.account.tenantId,
         eventParams: {
           "ep.plan": "Free",
           "ep.tenant_id": result.account.tenantId
