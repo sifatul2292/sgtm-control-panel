@@ -8021,6 +8021,54 @@ async function getCustomerDashboardDataCached(session) {
   return payload;
 }
 
+// ── Owner dashboard cache (stale-while-revalidate) ──────────────────────────
+// The owner payload is expensive to build (Docker stats, Nginx log scans,
+// per-tenant usage). Serve a cached copy instantly and refresh in the
+// background so the admin panel loads immediately instead of blocking on the
+// full rebuild every time.
+const OWNER_DASHBOARD_FRESH_MS = Number(process.env.OWNER_DASHBOARD_FRESH_MS || 8000);
+const OWNER_DASHBOARD_STALE_MS = Number(process.env.OWNER_DASHBOARD_STALE_MS || 120000);
+let ownerDashboardCache = null;       // { payload, at, refreshing }
+let ownerDashboardLastAccess = 0;
+
+function invalidateOwnerDashboardCache() { ownerDashboardCache = null; }
+
+function refreshOwnerDashboardCache() {
+  if (ownerDashboardCache) ownerDashboardCache.refreshing = true;
+  return getDashboardData()
+    .then((payload) => { ownerDashboardCache = { payload, at: Date.now(), refreshing: false }; })
+    .catch(() => { if (ownerDashboardCache) ownerDashboardCache.refreshing = false; });
+}
+
+async function getDashboardDataCached() {
+  const now = Date.now();
+  ownerDashboardLastAccess = now;
+  const entry = ownerDashboardCache;
+  if (entry && now - entry.at < OWNER_DASHBOARD_FRESH_MS) {
+    return { ...entry.payload, timing: { ...(entry.payload.timing || {}), cache: "fresh" } };
+  }
+  if (entry && now - entry.at < OWNER_DASHBOARD_STALE_MS) {
+    if (!entry.refreshing) refreshOwnerDashboardCache();
+    return { ...entry.payload, timing: { ...(entry.payload.timing || {}), cache: "stale" } };
+  }
+  const startedAt = Date.now();
+  const payload = await getDashboardData();
+  payload.timing = { dashboardMs: Date.now() - startedAt, cache: "miss" };
+  ownerDashboardCache = { payload, at: Date.now(), refreshing: false };
+  return payload;
+}
+
+// Keep the payload hot while an owner is actively using the panel; idle after
+// 15 minutes of no access so an unattended server isn't running Docker/Nginx
+// collectors forever.
+const OWNER_DASHBOARD_WARM_MS = Number(process.env.OWNER_DASHBOARD_WARM_MS || 30000);
+const ownerDashboardWarmer = setInterval(() => {
+  if (Date.now() - ownerDashboardLastAccess > 15 * 60 * 1000) return;
+  if (ownerDashboardCache?.refreshing) return;
+  refreshOwnerDashboardCache();
+}, OWNER_DASHBOARD_WARM_MS);
+ownerDashboardWarmer.unref?.();
+
 function provisioningRequestsForTenant(data, tenantId) {
   const setupIds = new Set((data.customerSetup?.requests || [])
     .filter((request) => request.tenantId === tenantId && !isDeletedStatus(request.status))
@@ -8780,6 +8828,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       pendingSignups.delete(token);
+      invalidateOwnerDashboardCache();
 
       // Self-signup is always plan "Free" (addCustomerSignup hardcodes it) — this
       // is tagioo's own acquisition-funnel conversion, forwarded to tagioo's own
@@ -8993,10 +9042,10 @@ const server = createServer(async (req, res) => {
         await jsonResponseGzip(req, res, 200, payload);
         return;
       }
-      const dashboardData = await getDashboardData();
-      const payload = { ...dashboardData, session, timing: { dashboardMs: Date.now() - startedAt, role: session?.role || "unknown" } };
-      if (payload.timing.dashboardMs > 2000) {
-        console.warn(`[dashboard] owner dashboard took ${payload.timing.dashboardMs}ms`);
+      const dashboardData = await getDashboardDataCached();
+      const payload = { ...dashboardData, session, timing: { ...(dashboardData.timing || {}), role: session?.role || "unknown", requestMs: Date.now() - startedAt } };
+      if (payload.timing.cache === "miss" && payload.timing.dashboardMs > 2000) {
+        console.warn(`[dashboard] owner dashboard cold build took ${payload.timing.dashboardMs}ms`);
       }
       await jsonResponseGzip(req, res, 200, payload);
       return;
@@ -9010,6 +9059,7 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await addCustomerSetupRequest(body, session);
+      if (result.ok) invalidateOwnerDashboardCache();
       jsonResponse(res, result.ok ? 201 : (result.status || 400), result.ok ? { request: result.request } : { errors: result.errors });
       return;
     }
@@ -9130,6 +9180,7 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await selectCustomerPlan(body, session);
+      if (result.ok) invalidateOwnerDashboardCache();
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { tenant: result.tenant, payment: result.payment || null } : { errors: result.errors });
       return;
     }
@@ -9163,6 +9214,7 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await submitPaymentClaim(body, session);
+      if (result.ok) invalidateOwnerDashboardCache();
       jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok ? { payment: result.payment } : { errors: result.errors });
       return;
     }
@@ -9303,6 +9355,7 @@ const server = createServer(async (req, res) => {
       const result = paymentActionMatch[2] === "confirm"
         ? await confirmPayment(paymentId, session)
         : await rejectPayment(paymentId, (await readJson(req)).reason, session);
+      if (result.ok) invalidateOwnerDashboardCache();
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { errors: result.errors });
       return;
     }
@@ -9414,6 +9467,7 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await changeTenantPlan(decodeURIComponent(planChangeMatch[1]), String(body.plan || "").trim());
+      if (result.ok) invalidateOwnerDashboardCache();
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { error: result.error });
       return;
     }
@@ -9426,6 +9480,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const result = await deleteCustomerCompletely(decodeURIComponent(customerAdminDeleteMatch[1]), getSession(req));
+      if (result.ok) invalidateOwnerDashboardCache();
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { errors: result.errors });
       return;
     }
