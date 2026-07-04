@@ -7191,6 +7191,41 @@ async function persistDailySummary(summary) {
   }
 }
 
+// Read-only history for the dashboard hot path: returns stored daily snapshots
+// and per-tenant counts WITHOUT the expensive persistence work (per-tenant log
+// scans, free-tier/renewal enforcement, and the full DB write). Persistence is
+// done on a background timer instead (runPersistenceCycle), so dashboard loads
+// only read.
+async function getHistorySummary() {
+  const loaded = await readDatabaseCached();
+  const data = loaded.data;
+  return {
+    available: loaded.available,
+    path: databasePath,
+    retentionDays: config.historyRetentionDays,
+    tenantDailyRequests: data.tenantDailyRequests || {},
+    tenantEventHistory: data.tenantEventHistory || {},
+    daily: Object.values(data.daily || {}).sort((a, b) => b.date.localeCompare(a.date))
+  };
+}
+
+// Background persistence: compute today's shared-log summary and fold it into
+// stored history (daily snapshots + per-tenant counts), then run usage/renewal
+// enforcement and write once. Runs on a timer, decoupled from dashboard reads.
+let persistenceCycleRunning = false;
+async function runPersistenceCycle() {
+  if (persistenceCycleRunning) return;
+  persistenceCycleRunning = true;
+  try {
+    const summary = await summarizeRequestsToday(config.accessLog);
+    await persistDailySummary(summary);
+  } catch (error) {
+    console.error("[persistence] cycle error:", error.message);
+  } finally {
+    persistenceCycleRunning = false;
+  }
+}
+
 async function summarizeRequestsTodayUncached(pathname, lineLimit = config.summaryTailLines) {
   const token = nginxDateToken();
   const emptyPurchases = {
@@ -7825,7 +7860,7 @@ async function getDashboardData() {
   // Run independent DB-backed collectors in parallel. Only persistDailySummary writes
   // (atomic temp+rename), the rest read, so concurrent access is safe.
   const [history, provisioning, workers, orders, customerAccounts, customerSetup] = await Promise.all([
-    persistDailySummary(requestSummary),
+    getHistorySummary(),
     getProvisioningSummary(),
     getWorkerSummary(),
     getOrderSummary(),
@@ -9869,10 +9904,20 @@ process.on("unhandledRejection", (reason) => {
   recordErrorLog("server", reason instanceof Error ? reason : new Error(String(reason)), { context: "unhandledRejection" }).catch(() => {});
 });
 
+// Persist daily/tenant history + run usage/renewal enforcement on a timer,
+// off the dashboard read path. Was previously done inside every owner dashboard
+// build (big DB write + per-tenant log scans + enforcement each load).
+const PERSISTENCE_INTERVAL_MS = Number(process.env.PERSISTENCE_INTERVAL_MS || 60000);
+const persistenceTimer = setInterval(() => { runPersistenceCycle(); }, PERSISTENCE_INTERVAL_MS);
+persistenceTimer.unref?.();
+
 server.listen(config.port, config.host, () => {
   console.log(`SGTM control panel running at http://${config.host}:${config.port}`);
-  // Pre-warm the owner dashboard cache so the first login after a restart hits a
-  // ready payload instead of paying the cold build. Non-blocking, best-effort.
-  ownerDashboardLastAccess = Date.now();
-  refreshOwnerDashboardCache().catch(() => {});
+  // Populate stored history once at boot (today's snapshot) so a fresh restart
+  // isn't missing today's counts until the first timer tick.
+  runPersistenceCycle()
+    // Pre-warm the owner dashboard cache after history is current, so the first
+    // login after a restart hits a ready payload instead of a cold build.
+    .then(() => { ownerDashboardLastAccess = Date.now(); return refreshOwnerDashboardCache(); })
+    .catch(() => {});
 });
