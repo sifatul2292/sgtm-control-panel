@@ -3480,7 +3480,7 @@ async function readDatabase() {
 // the whole history.json — the dominant cost (~3.5s). This shares ONE parse
 // across the burst. READ-ONLY callers only; mutating paths use readDatabase()
 // directly (fresh copy) and writeDatabase() invalidates this cache.
-const DB_READ_CACHE_TTL_MS = Number(process.env.DB_READ_CACHE_TTL_MS || 1500);
+const DB_READ_CACHE_TTL_MS = Number(process.env.DB_READ_CACHE_TTL_MS || 5000);
 let dbReadCacheEntry = null;   // { at, loaded }
 let dbReadInFlight = null;     // Promise<loaded>
 
