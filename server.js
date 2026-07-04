@@ -7768,6 +7768,10 @@ async function getSystemMetrics() {
 }
 
 async function getDashboardData() {
+  const __t0 = Date.now();
+  const __stage = {};
+  let __mark = __t0;
+  const __lap = (name) => { __stage[name] = Date.now() - __mark; __mark = Date.now(); };
   const [docker, requestSummary, accessLog, errorLog, ssl, system] = await Promise.all([
     getDockerSummary(),
     summarizeRequestsToday(config.accessLog),
@@ -7776,6 +7780,7 @@ async function getDashboardData() {
     getSslSummary(),
     getSystemMetrics()
   ]);
+  __lap("io");
 
   const dockerLogs = docker.available
     ? await withTimeout(
@@ -7801,9 +7806,11 @@ async function getDashboardData() {
     getCustomerAccountsSummary(),
     getCustomerSetupSummary()
   ]);
+  __lap("db");
   const customers = await getCustomerCatalog({ docker, ssl, orders });
   const usage = getUsageSummary({ requestSummary, history });
-  const tenantUsage = await tenantBillingUsageMap({ customerSetup, provisioning, tenantDailyRequests: history.tenantDailyRequests || {} }, customers.tenants || []);
+  const tenantUsage = tenantBillingUsageMap({ customerSetup, provisioning, tenantDailyRequests: history.tenantDailyRequests || {} }, customers.tenants || []);
+  __lap("catalog");
   const reconciliation = getReconciliationSummary({ requestSummary, orders });
   const integrations = getIntegrationSummary({ orders, requestSummary });
   const setupWizard = getSetupWizard({ customers, provisioning, integrations, ssl, requestSummary });
@@ -7812,6 +7819,11 @@ async function getDashboardData() {
   const alerts = buildServerAlerts({ docker, requestCount: requestSummary, accessLog, errorLog, ssl });
   const deploymentChecks = buildDeploymentChecks({ docker, requestSummary, accessLog, errorLog, ssl, database: history });
   const retainedEvents = retainedSummaryFromSnapshots((history.daily || []).slice(0, 30), requestSummary);
+  __lap("assemble");
+  const __total = Date.now() - __t0;
+  if (__total > 2000) {
+    console.warn(`[dashboard] owner build ${__total}ms — stages(ms): io=${__stage.io} db=${__stage.db} catalog=${__stage.catalog} assemble=${__stage.assemble}`);
+  }
   void sendAlertHooks(alerts);
 
   return {
@@ -8121,37 +8133,29 @@ async function customerAccessLogForTenant(data, tenantId) {
   };
 }
 
-async function tenantBillingUsageMap(data, tenants = []) {
-  const entries = await Promise.all((tenants || []).map(async (tenant) => {
+function tenantBillingUsageMap(data, tenants = []) {
+  // Owner hot path: derive each tenant's billing-period usage from the stored
+  // daily counts (rotation-safe, maintained by persistDailySummary) — NOT from a
+  // live per-tenant Nginx log scan. The old version ran `tail -n 50000` + a 50k
+  // line regex parse PER TENANT on the JS main thread, blocking the event loop
+  // for tens of seconds once there were many tenants. Stored daily data is the
+  // billing source of truth; the customer's own dashboard still does the precise
+  // live scan for its single tenant.
+  const todayKey = localDateKey();
+  const entries = (tenants || []).map((tenant) => {
     const tenantSetupRequests = (data.customerSetup?.requests || []).filter((request) => request.tenantId === tenant.id && !isDeletedStatus(request.status));
     const period = billingPeriodForTenant(tenant, tenantSetupRequests);
-    const paths = tenant.source === "environment" ? [config.accessLog].filter(Boolean) : customerAccessLogPaths(data, tenant.id);
-
-    // Compute accumulated billing-period count from stored daily data (rotation-safe)
     const tenantDailyReqs = (data.tenantDailyRequests || {})[tenant.id] || {};
     const startKey = localDateKey(period.start);
-    const todayKey = localDateKey();
-    const historicCount = Object.entries(tenantDailyReqs)
-      .filter(([d]) => d >= startKey && d < todayKey)
+    const accumulatedCount = Object.entries(tenantDailyReqs)
+      .filter(([d]) => d >= startKey && d <= todayKey)
       .reduce((sum, [, c]) => sum + Number(c), 0);
-    const todayStored = Number(tenantDailyReqs[todayKey] || 0);
-    const accumulatedCount = historicCount + todayStored;
-
-    if (!paths.length) {
-      return [tenant.id, {
-        requestsMonth: Math.max(accumulatedCount, Number(tenant.requestsMonth || 0)),
-        period: period.label,
-        available: Boolean(accumulatedCount > 0)
-      }];
-    }
-    const summary = await summarizeRequestsForPeriodForPaths(paths, period);
-    const livePeriodCount = summary.available ? Number(summary.count || 0) : 0;
     return [tenant.id, {
-      requestsMonth: Math.max(accumulatedCount, livePeriodCount),
+      requestsMonth: Math.max(accumulatedCount, Number(tenant.requestsMonth || 0)),
       period: period.label,
-      available: Boolean(summary.available)
+      available: accumulatedCount > 0
     }];
-  }));
+  });
   return Object.fromEntries(entries);
 }
 
