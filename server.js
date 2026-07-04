@@ -3938,6 +3938,50 @@ async function sendTagiooSignupToMetaCapi(values, eventId) {
   }
 }
 
+// Same idea as sendTagiooSignupToMetaCapi, for the paid-conversion side: the
+// purchase gtag forward is IP/UA match only, this adds hashed email/phone/name
+// from the tenant record (set at signup) for real match quality. Shares
+// eventId with the gtag hit so Meta dedupes to one Purchase.
+async function sendTagiooPurchaseToMetaCapi(tenant, payment, eventId) {
+  if (!TAGIOO_OWN_TRACKING.metaPixelId || !TAGIOO_OWN_TRACKING.metaCapiToken) return;
+
+  const fullName = String(tenant?.fullName || "").trim();
+  const [firstName, ...rest] = fullName.split(/\s+/);
+  const lastName = rest.join(" ");
+
+  const userData = {};
+  const em = sha256Hex(tenant?.email); if (em) userData.em = [em];
+  const ph = sha256Hex(tenant?.phone, { digitsOnly: true }); if (ph) userData.ph = [ph];
+  const fn = sha256Hex(firstName); if (fn) userData.fn = [fn];
+  const ln = sha256Hex(lastName); if (ln) userData.ln = [ln];
+  const country = sha256Hex(tenant?.country); if (country) userData.country = [country];
+  if (!Object.keys(userData).length) return;
+
+  const value = Number(payment.amount);
+  const event = {
+    event_name: "Purchase",
+    event_time: Math.floor(Date.now() / 1000),
+    action_source: "website",
+    event_id: eventId,
+    user_data: userData,
+    custom_data: {
+      currency: "BDT",
+      order_id: String(payment.id),
+      ...(Number.isFinite(value) ? { value } : {})
+    }
+  };
+
+  const tagiooOwnTenant = { tracking: { meta: { pixelId: TAGIOO_OWN_TRACKING.metaPixelId, capiToken: TAGIOO_OWN_TRACKING.metaCapiToken } } };
+  try {
+    const result = await sendMetaOfflineConversions(tagiooOwnTenant, [event], { useTestCode: false });
+    if (!result.ok) {
+      console.warn(`[tagioo-self-track] Meta CAPI purchase send: ${(result.fbErrors || [result.reason]).join("; ")}`);
+    }
+  } catch (error) {
+    console.warn(`[tagioo-self-track] Meta CAPI purchase send failed: ${error.message}`);
+  }
+}
+
 // Direct Meta Conversions API send for a recovered order, reusing the offline
 // hashing (sha256Hex) and sender (sendMetaOfflineConversions). Runs alongside the
 // gtag forward: the gtag path covers GA4 and triggers the in-container Meta tag
@@ -4959,6 +5003,7 @@ async function confirmPaymentLocked(paymentId, session) {
   // acquisition funnel (regardless of which customer) — forwarded to tagioo's
   // own GA4/Meta (TAGIOO_OWN_TRACKING) for ad optimization/attribution, same
   // gtag /g/collect mechanism as the per-tenant purchase forward above.
+  const purchaseEventId = `purchase_${payment.id}`;
   forwardTagiooOwnEvent("purchase", {
     seed: payment.id,
     eventParams: {
@@ -4966,9 +5011,13 @@ async function confirmPaymentLocked(paymentId, session) {
       "ep.transaction_id": String(payment.id),
       "epn.value": String(payment.amount),
       "ep.plan": payment.plan,
-      "ep.tenant_id": payment.tenantId
+      "ep.tenant_id": payment.tenantId,
+      "ep.event_id": purchaseEventId
     }
   }).catch(() => {});
+  // Same event_id as above so Meta dedupes into one Purchase and merges in the
+  // hashed email/phone/name for real match quality.
+  sendTagiooPurchaseToMetaCapi(tenant, payment, purchaseEventId).catch(() => {});
 
   // Start/resume the tenant's container if one is provisioned, and resize to plan.
   let container = null;
