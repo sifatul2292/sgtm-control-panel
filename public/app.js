@@ -2257,15 +2257,13 @@ function renderCustomerContainers(data) {
   if (els.customerDnsTargetInline) els.customerDnsTargetInline.textContent = dnsTarget;
   const createSection = document.getElementById("customerContainerCreate");
   if (createSection) createSection.hidden = requests.length > 0;
+  const listPanel = document.getElementById("customerContainerListPanel");
+  if (listPanel) listPanel.hidden = !requests.length;
   els.customerContainersBadge.className = `badge ${requests.length ? "ok" : "warn"}`;
   els.customerContainersBadge.textContent = `${requests.length} container${requests.length === 1 ? "" : "s"}`;
   if (!requests.length) {
     selectedCustomerContainerId = "";
-    els.customerContainersTable.innerHTML = `<article class="empty-container-list">
-      <strong>No containers yet</strong>
-      <p>Create your first container below. Tagioo will keep DNS, Docker, Nginx, and SSL status easy to follow.</p>
-      <button class="button button-primary" type="button" data-scroll-target="customerContainerCreate">Create Container</button>
-    </article>`;
+    els.customerContainersTable.innerHTML = "";
     if (els.customerContainerDetail) els.customerContainerDetail.innerHTML = "";
     return;
   }

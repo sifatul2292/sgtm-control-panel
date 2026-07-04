@@ -2726,9 +2726,12 @@ textarea::placeholder {
 }
 
 .provisioning-form input,
-.provisioning-form textarea {
+.provisioning-form textarea,
+.provisioning-form select {
   width: 100%;
   min-width: 0;
+  font-weight: 400;
+  color: var(--color-text);
 }
 
 .field-help {
