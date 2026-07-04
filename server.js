@@ -3475,11 +3475,37 @@ async function readDatabase() {
   }
 }
 
+// Short-TTL, in-flight-deduped read cache. The owner dashboard build fires ~7
+// readDatabase() calls concurrently (6 collectors + catalog), each re-parsing
+// the whole history.json — the dominant cost (~3.5s). This shares ONE parse
+// across the burst. READ-ONLY callers only; mutating paths use readDatabase()
+// directly (fresh copy) and writeDatabase() invalidates this cache.
+const DB_READ_CACHE_TTL_MS = Number(process.env.DB_READ_CACHE_TTL_MS || 1500);
+let dbReadCacheEntry = null;   // { at, loaded }
+let dbReadInFlight = null;     // Promise<loaded>
+
+async function readDatabaseCached() {
+  const now = Date.now();
+  if (dbReadCacheEntry && now - dbReadCacheEntry.at < DB_READ_CACHE_TTL_MS) {
+    return dbReadCacheEntry.loaded;
+  }
+  if (dbReadInFlight) return dbReadInFlight;
+  dbReadInFlight = readDatabase()
+    .then((loaded) => {
+      if (loaded.available) dbReadCacheEntry = { at: Date.now(), loaded };
+      dbReadInFlight = null;
+      return loaded;
+    })
+    .catch((error) => { dbReadInFlight = null; throw error; });
+  return dbReadInFlight;
+}
+
 async function writeDatabase(data) {
   await mkdir(config.dataDir, { recursive: true });
   const tempPath = `${databasePath}.${Date.now()}.tmp`;
   await writeFile(tempPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
   await rename(tempPath, databasePath);
+  dbReadCacheEntry = null;   // written data changed → drop the read cache
 }
 
 // ── Backups (history.json snapshots) ───────────────────────────────────────
@@ -4530,7 +4556,7 @@ function getOrderSummaryFromData(loadedDb) {
 }
 
 async function getOrderSummary() {
-  const loaded = await readDatabase();
+  const loaded = await readDatabaseCached();
   const today = localDateKey();
   const orders = (loaded.data.orders || []).filter((order) => localDateKey(orderDate(order.createdAt)) === today);
   const currencies = new Set(orders.map((order) => order.currency).filter(Boolean));
@@ -5285,7 +5311,7 @@ async function markCustomerAccountLogin(id) {
 }
 
 async function getCustomerAccountsSummary() {
-  const loaded = await readDatabase();
+  const loaded = await readDatabaseCached();
   return {
     available: loaded.available,
     path: databasePath,
@@ -5492,7 +5518,7 @@ async function addCustomerSetupRequest(input, session) {
 }
 
 async function getCustomerSetupSummary() {
-  const loaded = await readDatabase();
+  const loaded = await readDatabaseCached();
   return {
     available: loaded.available,
     path: databasePath,
@@ -5593,7 +5619,7 @@ function getWorkerSummaryFromData(data) {
 }
 
 async function getWorkerSummary() {
-  const loaded = await readDatabase();
+  const loaded = await readDatabaseCached();
   return {
     available: loaded.available,
     path: databasePath,
@@ -6089,7 +6115,7 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
 }
 
 async function getCustomerCatalog({ docker, ssl, orders }) {
-  const loaded = await readDatabase();
+  const loaded = await readDatabaseCached();
   return getCustomerCatalogFromData(loaded.data, { docker, ssl, orders, available: loaded.available });
 }
 
@@ -6844,7 +6870,7 @@ async function deleteCustomerCompletely(tenantId, session) {
 }
 
 async function getProvisioningSummary() {
-  const loaded = await readDatabase();
+  const loaded = await readDatabaseCached();
   const requests = loaded.data.provisioning?.requests || [];
   // Skip live DNS lookups on the dashboard hot path. Each enrichProvisioningRequest
   // ran a `getent ahosts` per record (800ms timeout each), which dominated reload time
