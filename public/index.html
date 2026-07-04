@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=25" />
+    <link rel="stylesheet" href="/styles.css?v=27" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -672,18 +672,99 @@
             <button class="button button-primary" type="button" data-scroll-target="customerContainerCreate">New Container</button>
           </section>
 
-          <section id="onboardingCard" class="panel onboarding-card" hidden>
-            <div class="onboarding-head">
-              <div>
-                <h2>Get your tracking live in 3 steps</h2>
-                <p>No code needed — our setup assistant walks you through each one.</p>
+          <section id="customerContainerCreate" class="customer-two-col container-onboard-layout" hidden>
+            <article class="panel create-container-panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Create New Container</h2>
+                  <p>Add your website, tracking subdomain, and GTM server container config below. Tagioo provisions Docker, Nginx, and SSL for you.</p>
+                </div>
+                <span class="badge">Automatic launch</span>
               </div>
-              <div class="onboarding-progress">
-                <span id="onboardingProgressText">0 / 3 done</span>
-                <div class="onboarding-bar"><span id="onboardingBar" style="width:0%"></span></div>
-              </div>
-            </div>
-            <div id="onboardingSteps" class="onboarding-steps"></div>
+              <form id="customerSetupForm" class="provisioning-form customer-create-form">
+                <label>
+                  Name
+                  <input name="containerName" placeholder="My Website Tracker" required />
+                </label>
+                <label>
+                  Website domain
+                  <input name="websiteUrl" placeholder="https://example.com" required />
+                </label>
+                <label>
+                  Tracking subdomain
+                  <input name="trackingDomain" placeholder="server.example.com" required />
+                </label>
+                <label>
+                  Server Location
+                  <select name="serverLocation">
+                    <option value="Bangladesh BDIX">Bangladesh BDIX</option>
+                    <option value="Singapore">Singapore</option>
+                  </select>
+                </label>
+                <input name="containerType" type="hidden" value="sGTM" />
+                <input name="platform" type="hidden" value="custom" />
+                <label class="form-wide">
+                  Container Config
+                  <textarea name="containerConfig" placeholder="Paste the Container Config from Google Tag Manager > Admin > Container Settings > Manually provision tagging server" required></textarea>
+                  <span class="field-help">Paste the full value exactly from GTM, including any ending = or == characters. Tagioo checks it before Docker starts.</span>
+                </label>
+                <button class="button button-primary form-wide" type="submit">Create Container</button>
+                <p id="customerSetupFormMessage" class="form-message form-wide"></p>
+              </form>
+            </article>
+
+            <aside class="onboard-guide-stack">
+              <article class="panel onboard-guide-panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>How to create a container</h2>
+                    <p>Four steps, no code required.</p>
+                  </div>
+                </div>
+                <ol class="onboard-guide-steps">
+                  <li>
+                    <strong>Point a subdomain at Tagioo</strong>
+                    <span>Create a subdomain like <code>server.yourdomain.com</code>, then add a <strong>CNAME record</strong> in your domain's DNS: Host = your subdomain, Value = <code id="customerDnsTargetInline">bd.tagioo.com</code>.</span>
+                  </li>
+                  <li>
+                    <strong>Copy your GTM container config</strong>
+                    <span>In Google Tag Manager: Admin → Container Settings → Manually provision tagging server. Copy the full value shown there.</span>
+                  </li>
+                  <li>
+                    <strong>Fill in the form</strong>
+                    <span>Enter the website, the same subdomain, and paste the config exactly as copied.</span>
+                  </li>
+                  <li>
+                    <strong>Create the container</strong>
+                    <span>Tagioo launches Docker, Nginx, and SSL automatically — no server access needed.</span>
+                  </li>
+                </ol>
+              </article>
+
+              <article class="panel dns-setup-panel">
+                <div class="panel-header">
+                  <div>
+                    <h2>DNS record</h2>
+                    <p>Add this before launch.</p>
+                  </div>
+                  <span class="badge">Required</span>
+                </div>
+                <div class="dns-record-card">
+                  <div>
+                    <span>Type</span>
+                    <strong>CNAME</strong>
+                  </div>
+                  <div>
+                    <span>Host</span>
+                    <strong>server.yourdomain.com</strong>
+                  </div>
+                  <div>
+                    <span>Value</span>
+                    <strong id="customerDnsTarget">bd.tagioo.com</strong>
+                  </div>
+                </div>
+              </article>
+            </aside>
           </section>
 
           <section class="panel container-list-panel">
@@ -699,10 +780,6 @@
                 <span>Search</span>
                 <input id="customerContainerSearch" placeholder="Search by name, website, or tracking domain" />
               </label>
-              <div class="container-toolbar-hint">
-                <span>CNAME target</span>
-                <strong id="customerDnsTarget">bd.tagioo.com</strong>
-              </div>
             </div>
             <div id="customerContainersTable" class="customer-container-list">
               <div class="empty-log">No containers yet.</div>
@@ -710,84 +787,6 @@
           </section>
 
           <section id="customerContainerDetail" class="container-detail-shell"></section>
-
-          <section id="customerContainerCreate" class="panel create-container-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Create New Container</h2>
-                <p>Add your website, tracking subdomain, and GTM server container config. Tagioo launches Docker, Nginx, and SSL automatically.</p>
-              </div>
-              <span class="badge">Automatic launch</span>
-            </div>
-            <form id="customerSetupForm" class="provisioning-form customer-create-form">
-              <label>
-                Name
-                <input name="containerName" placeholder="My Website Tracker" required />
-              </label>
-              <label>
-                Website domain
-                <input name="websiteUrl" placeholder="https://example.com" required />
-              </label>
-              <label>
-                Tracking subdomain
-                <input name="trackingDomain" placeholder="server.example.com" required />
-              </label>
-              <label>
-                Server Location
-                <select name="serverLocation">
-                  <option value="Bangladesh BDIX">Bangladesh BDIX</option>
-                  <option value="Singapore">Singapore</option>
-                </select>
-              </label>
-              <input name="containerType" type="hidden" value="sGTM" />
-              <input name="platform" type="hidden" value="custom" />
-              <label class="form-wide">
-                Container Config
-                <textarea name="containerConfig" placeholder="Paste the Container Config from Google Tag Manager > Admin > Container Settings > Manually provision tagging server" required></textarea>
-                <span class="field-help">Paste the full value exactly from GTM, including any ending = or == characters. Tagioo checks it before Docker starts.</span>
-              </label>
-              <button class="button button-primary" type="submit">Create Container</button>
-              <p id="customerSetupFormMessage" class="form-message"></p>
-            </form>
-          </section>
-
-          <article class="panel dns-setup-panel">
-            <div class="panel-header">
-              <div>
-                <h2>DNS Setup</h2>
-                <p>Point your tracking subdomain to Tagioo before launch.</p>
-              </div>
-              <span class="badge">Required</span>
-            </div>
-            <div class="dns-record-card">
-              <div>
-                <span>Type</span>
-                <strong>CNAME</strong>
-              </div>
-              <div>
-                <span>Host</span>
-                <strong>server.yourdomain.com</strong>
-              </div>
-              <div>
-                <span>Value</span>
-                <strong id="customerDnsTarget">bd.tagioo.com</strong>
-              </div>
-            </div>
-            <div class="dns-guide compact-dns-guide">
-              <article>
-                <strong>1</strong>
-                <span>Create a subdomain like <code>server.yourdomain.com</code>.</span>
-              </article>
-              <article>
-                <strong>2</strong>
-                <span>Add the CNAME above in your domain DNS.</span>
-              </article>
-              <article>
-                <strong>3</strong>
-                <span>Use that same subdomain when creating the container.</span>
-              </article>
-            </div>
-          </article>
 
         </section>
 
@@ -2358,6 +2357,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=40" type="module"></script>
+    <script src="/app.js?v=42" type="module"></script>
   </body>
 </html>

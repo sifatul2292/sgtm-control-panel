@@ -4517,24 +4517,115 @@ a.button.button-primary {
 .summary-item.claim-pending { border-left: 3px solid #F59E0B; }
 .summary-item-actions { display: flex; gap: 8px; align-items: center; }
 
-/* ── Onboarding checklist (new-customer handoff) ──────────────────────── */
-.onboarding-card { border: 1px solid var(--color-border, #E5E7EB); }
-.onboarding-head { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-.onboarding-progress { min-width: 160px; }
-.onboarding-progress > span { font-size: 0.8rem; color: var(--color-text-muted, #667085); font-weight: 700; }
-.onboarding-bar { height: 8px; background: #E5E7EB; border-radius: 99px; overflow: hidden; margin-top: 6px; }
-.onboarding-bar > span { display: block; height: 8px; background: var(--color-primary, #5B21B6); transition: width .3s; }
-.onboarding-steps { display: grid; gap: 10px; }
-.onboarding-step { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--color-border, #E5E7EB); border-radius: 12px; }
-.onboarding-step.is-active { border-color: var(--color-primary, #4F46E5); background: rgba(79,70,229,.05); }
-.onboarding-step.is-done { opacity: .65; }
-.onboarding-step-mark { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 0.9rem; background: #E5E7EB; color: #475467; }
-.onboarding-step.is-done .onboarding-step-mark { background: #059669; color: #fff; }
-.onboarding-step.is-active .onboarding-step-mark { background: var(--color-primary, #5B21B6); color: #fff; }
-.onboarding-step-body { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-.onboarding-step-body strong { font-size: 0.95rem; }
-.onboarding-step-body span { font-size: 0.82rem; color: var(--color-text-muted, #667085); }
-.onboarding-step-cta { white-space: nowrap; }
+/* ── Container creation guide (new-customer handoff) ──────────────────── */
+.container-onboard-layout { align-items: start; }
+
+.onboard-guide-stack { display: grid; gap: var(--space-lg); }
+
+.onboard-guide-steps {
+  display: grid;
+  gap: 0;
+  padding: var(--space-sm) var(--space-lg) var(--space-lg);
+  margin: 0;
+  list-style: none;
+  counter-reset: guide-step;
+}
+
+.onboard-guide-steps li {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  padding: var(--space-sm) 0 var(--space-md) 44px;
+  counter-increment: guide-step;
+}
+
+.onboard-guide-steps li::after {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 42px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--color-line);
+}
+
+.onboard-guide-steps li:last-child {
+  padding-bottom: var(--space-sm);
+}
+
+.onboard-guide-steps li:last-child::after {
+  display: none;
+}
+
+.onboard-guide-steps li::before {
+  content: counter(guide-step);
+  position: absolute;
+  left: 0;
+  top: var(--space-sm);
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: var(--rule-thin) solid var(--color-line-strong);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.onboard-guide-steps strong {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.onboard-guide-steps span {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.onboard-guide-steps code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  border: var(--rule-thin) solid var(--color-line);
+  color: var(--color-text);
+}
+
+.dns-setup-panel .dns-record-card {
+  grid-template-columns: 1fr;
+  gap: 0;
+  padding: 0;
+  border-top: var(--rule-thin) solid var(--color-line);
+}
+
+.dns-setup-panel .dns-record-card div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  border: 0;
+  border-bottom: var(--rule-thin) solid var(--color-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.dns-setup-panel .dns-record-card div:last-child {
+  border-bottom: 0;
+}
+
+.dns-setup-panel .dns-record-card strong {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent-deep);
+}
 
 /* ── Payment status card (top of subscription) ────────────────────────── */
 .payment-status-card { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; padding: 18px 20px; border-radius: 14px; border: 1px solid var(--color-border, #E5E7EB); margin-bottom: 18px; background: #fff; animation: planCardIn 400ms cubic-bezier(.22,1,.36,1) both; }

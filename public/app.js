@@ -62,6 +62,7 @@ const els = {
   customerContainerSearch: document.querySelector("#customerContainerSearch"),
   customerContainerDetail: document.querySelector("#customerContainerDetail"),
   customerDnsTarget: document.querySelector("#customerDnsTarget"),
+  customerDnsTargetInline: document.querySelector("#customerDnsTargetInline"),
   powerUpsBadge: document.querySelector("#powerUpsBadge"),
   powerUpsFilters: document.querySelector("#powerUpsFilters"),
   powerUpsGrid: document.querySelector("#powerUpsGrid"),
@@ -458,7 +459,6 @@ function setView(name, options = {}) {
   if (next === "admin") { loadOwnerPayments(); loadPaymentSettings(); loadBackups(); }
   if (next === "errorLogs") loadErrorLogs();
   if (next === "billing") loadBillingPayment();
-  if (next === "customerContainers") loadOnboarding();
 }
 
 function applySessionAccess(data) {
@@ -2251,10 +2251,12 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
 }
 
 function renderCustomerContainers(data) {
-  loadOnboarding();
   const requests = (data.customerSetup?.requests || []).filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()));
   const dnsTarget = data.config?.provisionDnsTarget || data.config?.publicBaseUrl || window.location.host || "the SGTM server";
   if (els.customerDnsTarget) els.customerDnsTarget.textContent = dnsTarget;
+  if (els.customerDnsTargetInline) els.customerDnsTargetInline.textContent = dnsTarget;
+  const createSection = document.getElementById("customerContainerCreate");
+  if (createSection) createSection.hidden = requests.length > 0;
   els.customerContainersBadge.className = `badge ${requests.length ? "ok" : "warn"}`;
   els.customerContainersBadge.textContent = `${requests.length} container${requests.length === 1 ? "" : "s"}`;
   if (!requests.length) {
@@ -2264,12 +2266,7 @@ function renderCustomerContainers(data) {
       <p>Create your first container below. Tagioo will keep DNS, Docker, Nginx, and SSL status easy to follow.</p>
       <button class="button button-primary" type="button" data-scroll-target="customerContainerCreate">Create Container</button>
     </article>`;
-    if (els.customerContainerDetail) {
-      els.customerContainerDetail.innerHTML = `<section class="panel container-empty-detail">
-        <h2>Create a container to see setup details</h2>
-        <p>After launch, this area will show the server container URL, first-party domain, DNS record, logs, and quick links.</p>
-      </section>`;
-    }
+    if (els.customerContainerDetail) els.customerContainerDetail.innerHTML = "";
     return;
   }
 
@@ -4388,70 +4385,6 @@ function renderPlanCards(activePlanName) {
   });
 }
 
-// New-customer onboarding checklist: 3 plug-and-play steps to go live.
-// Driven by the tenant's tracking state; hides itself once all steps pass.
-async function loadOnboarding() {
-  const card = document.getElementById("onboardingCard");
-  if (!card) return;
-  try {
-    const response = await fetch("/api/customer/me");
-    if (!response.ok) { card.hidden = true; return; }
-    const { tracking } = await response.json();
-    renderOnboarding(tracking || {});
-  } catch {
-    card.hidden = true;
-  }
-}
-
-function renderOnboarding(tracking) {
-  const card = document.getElementById("onboardingCard");
-  if (!card) return;
-  const steps = [
-    {
-      done: Boolean(tracking.domain && tracking.measurementId),
-      title: "Add your website & GA4",
-      desc: "Enter your store domain and Google Analytics ID in the setup assistant."
-    },
-    {
-      done: Boolean(tracking.meta?.pixelId && tracking.meta?.hasToken),
-      title: "Connect Meta (Pixel + CAPI)",
-      desc: "Paste your Meta Pixel ID and Conversions API token to recover lost sales."
-    },
-    {
-      done: Boolean(tracking.lastVerify?.ok),
-      title: "Go live & confirm tracking",
-      desc: "Run the one-click tracking test — we check GA4 and Meta are receiving events."
-    }
-  ];
-  const doneCount = steps.filter((s) => s.done).length;
-
-  // Hide the whole card once everything is set up.
-  if (doneCount === steps.length) { card.hidden = true; return; }
-  card.hidden = false;
-
-  const text = document.getElementById("onboardingProgressText");
-  const bar = document.getElementById("onboardingBar");
-  if (text) text.textContent = `${doneCount} / ${steps.length} done`;
-  if (bar) bar.style.width = `${Math.round((doneCount / steps.length) * 100)}%`;
-
-  // First not-yet-done step is the active call-to-action.
-  const activeIndex = steps.findIndex((s) => !s.done);
-  const list = document.getElementById("onboardingSteps");
-  if (list) {
-    list.innerHTML = steps.map((s, i) => `
-      <div class="onboarding-step ${s.done ? "is-done" : i === activeIndex ? "is-active" : ""}">
-        <span class="onboarding-step-mark">${s.done ? "✓" : i + 1}</span>
-        <div class="onboarding-step-body">
-          <strong>${escapeHtml(s.title)}</strong>
-          <span>${escapeHtml(s.desc)}</span>
-        </div>
-        ${!s.done && i === activeIndex ? `<button class="button button-primary onboarding-step-cta" type="button">Start →</button>` : ""}
-      </div>`).join("");
-    const cta = list.querySelector(".onboarding-step-cta");
-    if (cta) cta.onclick = () => setView("setupAssistant");
-  }
-}
-
 // Cache of the latest billing snapshot so the modal can render without refetching.
 let latestBilling = null;
 
@@ -5480,7 +5413,11 @@ document.addEventListener("click", (event) => {
   if (shortcut) setView(shortcut.dataset.viewShortcut);
   const scrollTarget = event.target.closest("[data-scroll-target]");
   if (scrollTarget) {
-    document.querySelector(`#${CSS.escape(scrollTarget.dataset.scrollTarget)}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const targetEl = document.querySelector(`#${CSS.escape(scrollTarget.dataset.scrollTarget)}`);
+    if (targetEl) {
+      targetEl.hidden = false;
+      targetEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 });
 
