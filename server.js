@@ -8403,26 +8403,41 @@ async function customerDashboardData(data, session) {
   // On cold cache (first load or after TTL) each can block up to DASHBOARD_COMMAND_TIMEOUT_MS.
   // Serial: 3× timeout = 3–9s. Parallel: max(all three) = ~1s worst case.
   // When the tenant has its own per-container access log, use it (multi-tenant prod).
-  // Otherwise fall back to the shared nginx access log so single-VPS / pre-provisioning
-  // setups still show real tracking events instead of zeros.
+  // Otherwise fall back to the shared nginx access log ONLY for the single-VPS
+  // "environment" default customer — on that setup all traffic is theirs. A freshly
+  // signed-up customer with no container has no event source of its own, so it must
+  // NOT read the shared log (that would leak global scan noise / other tenants'
+  // traffic into a brand-new account). Such accounts show empty until a container
+  // is provisioned and their dedicated log appears.
   const useDedicatedLogs = tenantLogPaths.length > 0;
-  const fallbackPaths = useDedicatedLogs ? tenantLogPaths : [config.accessLog].filter(Boolean);
+  const allowSharedFallback = !useDedicatedLogs && tenant?.source === "environment";
+  const hasEventSource = useDedicatedLogs || allowSharedFallback;
+  const fallbackPaths = useDedicatedLogs ? tenantLogPaths
+    : allowSharedFallback ? [config.accessLog].filter(Boolean)
+    : [];
+  const emptyPeriodSummary = { available: false, count: 0, period: billingPeriod };
   const [tenantAccessLog, rawTodaySummary, rawPeriodSummary] = await Promise.all([
     useDedicatedLogs
       ? customerAccessLogForTenant(data, session.tenantId)
-      : tailFile(config.accessLog, config.logTailLines),
+      : allowSharedFallback
+        ? tailFile(config.accessLog, config.logTailLines)
+        : Promise.resolve(unavailable("No container access log is available yet.", "Create a live container first.")),
     fallbackPaths.length
       ? summarizeRequestsTodayForPaths(fallbackPaths, customerSummaryOptions)
-      : Promise.resolve(data.nginx.todayEvents),
+      : Promise.resolve({ available: false, count: 0, recentEvents: [] }),
     fallbackPaths.length
       ? summarizeRequestsForPeriodForPaths(fallbackPaths, billingPeriod, customerSummaryOptions)
-      : Promise.resolve({ available: false, count: tenant?.requestsMonth || 0, period: billingPeriod })
+      : Promise.resolve(emptyPeriodSummary)
   ]);
   const tenantRequestSummary = filterRequestSummaryForTenant(rawTodaySummary, tenant);
   const tenantPeriodSummary = rawPeriodSummary;
   const requestLimit = tenant?.requestLimit || data.usage.requestLimit;
   const todayKey = localDateKey();
-  const tenantEventHistory = (data.history?.tenantEventHistory || data.tenantEventHistory || {})[session.tenantId] || {};
+  // No event source → no retained history / SQLite snapshots either, so the daily
+  // charts and Event-Log-by-Day table stay empty for containerless accounts.
+  const tenantEventHistory = hasEventSource
+    ? (data.history?.tenantEventHistory || data.tenantEventHistory || {})[session.tenantId] || {}
+    : {};
   const eventHistoryCutoff = localDateKey(addDays(new Date(), -29));
   const retainedSnapshotsByDate = Object.fromEntries(
     Object.entries(tenantEventHistory).filter(([dateKey]) => dateKey >= eventHistoryCutoff)
@@ -8433,7 +8448,7 @@ async function customerDashboardData(data, session) {
   // SQLite event store: per-day snapshots rebuilt from raw ingested lines. Survives
   // log rotation and works across worker VPSes. Per date, keep whichever source saw
   // more events (tail summaries undercount after rotation; SQLite may lag a tick).
-  const sqliteSnapshotsByDate = sqliteSnapshotsForTenant(session.tenantId, tenant);
+  const sqliteSnapshotsByDate = hasEventSource ? sqliteSnapshotsForTenant(session.tenantId, tenant) : {};
   for (const [dateKey, snapshot] of Object.entries(sqliteSnapshotsByDate)) {
     const existing = retainedSnapshotsByDate[dateKey];
     if (!existing || Number(snapshot.total || 0) > Number(existing.total || 0)) {
