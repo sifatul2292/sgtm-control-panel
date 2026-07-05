@@ -4104,10 +4104,35 @@ function renderCustomersView(data) {
   if (!listEl) return;
 
   const q = (searchEl?.value || "").trim().toLowerCase();
-  const filtered = q
+  const matched = q
     ? customers.filter((c) => [c.fullName, c.name, c.email, c.phone, c.id, c.plan]
         .some((v) => String(v || "").toLowerCase().includes(q)))
-    : customers;
+    : customers.slice();
+
+  // Paying customers first, then pending, then trial, then free/other. Within a
+  // rank, higher monthly amount first, then name.
+  const isPaid = (c) => c.subscriptionStatus === "active" && c.paymentStatus === "paid";
+  const rankOf = (c) => isPaid(c) ? 0
+    : c.subscriptionStatus === "pending_payment" ? 1
+    : c.subscriptionStatus === "trial" ? 2 : 3;
+  const filtered = matched.sort((a, b) =>
+    rankOf(a) - rankOf(b)
+    || Number(b.monthlyAmount || 0) - Number(a.monthlyAmount || 0)
+    || String(a.fullName || a.name || a.id).localeCompare(String(b.fullName || b.name || b.id)));
+
+  // Summary: how many are actually paying and the combined monthly revenue.
+  const statsEl = document.getElementById("customerStats");
+  if (statsEl) {
+    const paid = customers.filter(isPaid);
+    const mrr = paid.reduce((sum, c) => sum + Number(c.monthlyAmount || 0), 0);
+    const free = customers.length - paid.length;
+    const stat = (label, value) => `<div class="cstat"><span>${label}</span><strong>${value}</strong></div>`;
+    statsEl.innerHTML =
+      stat("Paying customers", paid.length.toLocaleString())
+      + stat("Monthly revenue", `৳${mrr.toLocaleString()}`)
+      + stat("Free / non-paying", free.toLocaleString())
+      + stat("Total customers", customers.length.toLocaleString());
+  }
 
   listEl.innerHTML = filtered.length
     ? filtered.map((c) => `
