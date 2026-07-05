@@ -291,7 +291,9 @@
 /* Inputs */
 .lf-form input[type="text"],
 .lf-form input[type="password"],
-.lf-form input[type="email"] {
+.lf-form input[type="email"],
+.lf-form input[type="tel"],
+.lf-form input[type="number"] {
   width: 100%;
   height: 48px;
   border: 1.5px solid rgba(14,16,21,0.14);
