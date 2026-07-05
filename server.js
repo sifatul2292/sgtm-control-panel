@@ -1975,6 +1975,131 @@ function verifyPage({ email = "", error = "", info = "" } = {}) {
 </html>`;
 }
 
+// Standalone payment step shown after email verification for paid-plan signups.
+// The customer sends money via bKash/Nagad, then submits the transaction ID here.
+// A transaction ID is REQUIRED to reach the dashboard (POST /checkout gates entry);
+// owner confirmation later flips the plan to active and emails the customer.
+function checkoutPage({ instructions, error = "", values = {} } = {}) {
+  const money = (n) => `৳${Number(n || 0).toLocaleString()}`;
+  const cycle = billingCycleConfig[instructions.billingCycle] || billingCycleConfig.monthly;
+  const cycleLabel = cycle.months === 1 ? "per month" : `every ${cycle.months} months`;
+  const numberRow = (label, num) => num
+    ? `<div class="co-number"><div class="co-number-info"><span>${label}</span><strong>${escapeHtml(num)}</strong></div><button type="button" class="co-copy" data-copy="${escapeHtml(num)}">Copy</button></div>`
+    : "";
+  const numbers = [numberRow("bKash", instructions.bkashNumber), numberRow("Nagad", instructions.nagadNumber)].join("");
+  const methodChecked = (m) => values.method === m ? " checked" : "";
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Complete payment — Tagioo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/login.css" />
+    <style>
+      .co-summary{background:#F5F3FF;border:1px solid #DDD6FE;border-radius:12px;padding:16px 18px;margin-bottom:18px}
+      .co-summary .co-plan{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+      .co-summary .co-plan strong{font-size:22px;color:#3B0764}
+      .co-summary .co-amount{font-size:22px;font-weight:800;color:#0F0A1E;white-space:nowrap}
+      .co-summary .co-amount small{font-size:12px;font-weight:500;color:#7C6BA8;margin-left:4px}
+      .co-summary .co-invoice{margin:6px 0 0;font-size:13px;color:#7C6BA8}
+      .co-numbers{margin:0 0 18px}
+      .co-number{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#F8FAFC;border:1px solid #E5E7EB;border-radius:10px;padding:12px 14px;margin-bottom:8px}
+      .co-number-info span{display:block;font-size:12px;color:#5B6B8A}
+      .co-number-info strong{font-size:16px;letter-spacing:.5px}
+      .co-copy{background:#0F0A1E;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer}
+      .co-steps{margin:0 0 18px;padding-left:18px;color:#5B6B8A;font-size:14px;line-height:1.7}
+      .co-methods{display:flex;gap:10px;margin-bottom:14px}
+      .co-methods label{flex:1;border:1.5px solid #E5E7EB;border-radius:10px;padding:11px;text-align:center;cursor:pointer;font-weight:600;font-size:14px}
+      .co-methods input{position:absolute;opacity:0}
+      .co-methods input:checked + span{color:#3B0764}
+      .co-methods label:has(input:checked){border-color:#7C3AED;background:#F5F3FF}
+    </style>
+  </head>
+  <body class="login-body">
+    <div class="login-layout">
+      <aside class="login-brand">
+        <a class="lb-logo" href="/">
+          <span class="lb-mark">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
+              <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
+            </svg>
+          </span>
+          <span>Tagioo</span>
+        </a>
+        <div class="lb-hero">
+          <h2>One last step.<br>Activate your plan.</h2>
+          <p>Send the amount via bKash or Nagad, then enter your transaction ID. We verify it and activate your plan — usually within a few hours.</p>
+        </div>
+        <div class="su-steps">
+          <div class="su-step su-step--done"><span class="su-step-num">1</span>Create your account</div>
+          <div class="su-step su-step--done"><span class="su-step-num">2</span>Verify your email</div>
+          <div class="su-step su-step--active"><span class="su-step-num">3</span>Complete payment</div>
+        </div>
+        <p class="lb-footer">© 2025 Tagioo · Made in Bangladesh 🇧🇩</p>
+      </aside>
+
+      <main class="login-form-panel su-form-panel">
+        <div class="login-form-wrap su-form-wrap">
+          <div class="lf-header su-anim" style="--d:0ms">
+            <h1>Complete your payment</h1>
+            <p class="lf-subtitle">Pay to activate your <strong>${escapeHtml(instructions.plan)}</strong> plan.</p>
+          </div>
+          ${error ? `<div class="lf-error su-anim" style="--d:40ms">${escapeHtml(error)}</div>` : ""}
+
+          <div class="co-summary su-anim" style="--d:60ms">
+            <div class="co-plan">
+              <strong>${escapeHtml(instructions.plan)}</strong>
+              <span class="co-amount">${money(instructions.amount)}<small>${cycleLabel}</small></span>
+            </div>
+            <p class="co-invoice">Invoice ${escapeHtml(instructions.invoiceNo)}</p>
+          </div>
+
+          ${numbers ? `<div class="co-numbers su-anim" style="--d:80ms">${numbers}</div>` : ""}
+
+          <ol class="co-steps su-anim" style="--d:100ms">
+            <li>Open bKash or Nagad and choose <strong>Send Money</strong>.</li>
+            <li>Send <strong>${money(instructions.amount)}</strong> to the number above.</li>
+            <li>Enter the <strong>Transaction ID</strong> and your sending number below.</li>
+          </ol>
+
+          <form method="post" action="/checkout" class="lf-form" id="checkoutForm">
+            <div class="co-methods su-anim" style="--d:120ms">
+              <label><input type="radio" name="method" value="bkash"${methodChecked("bkash") || (!values.method ? " checked" : "")} /><span>bKash</span></label>
+              <label><input type="radio" name="method" value="nagad"${methodChecked("nagad")} /><span>Nagad</span></label>
+            </div>
+            <div class="lf-field su-anim" style="--d:140ms">
+              <label for="coTxn">Transaction ID</label>
+              <input id="coTxn" name="txnId" type="text" placeholder="e.g. 9GH4K2LM7" value="${escapeHtml(values.txnId || "")}" required autofocus />
+            </div>
+            <div class="lf-field su-anim" style="--d:160ms">
+              <label for="coSender">Your bKash / Nagad number</label>
+              <input id="coSender" name="senderNumber" type="text" inputmode="numeric" placeholder="01XXXXXXXXX" value="${escapeHtml(values.senderNumber || "")}" required />
+            </div>
+            <button type="submit" class="button button-primary full-width su-anim" style="--d:190ms">Submit payment &amp; continue</button>
+          </form>
+          <p class="lf-subtitle su-anim" style="--d:220ms;margin-top:14px;text-align:center">${instructions.ownerWhatsApp ? `Trouble paying? <a class="su-signin-link" href="https://wa.me/${escapeHtml(instructions.ownerWhatsApp.replace(/[^0-9]/g, ""))}" target="_blank" rel="noopener">Message us on WhatsApp →</a>` : ""}</p>
+        </div>
+      </main>
+    </div>
+    <script>
+      document.querySelectorAll("[data-copy]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          navigator.clipboard?.writeText(btn.dataset.copy).then(() => {
+            const t = btn.textContent; btn.textContent = "Copied"; setTimeout(() => { btn.textContent = t; }, 1500);
+          }).catch(() => {});
+        });
+      });
+    </script>
+  </body>
+</html>`;
+}
+
 function signupPage(error = "", values = {}) {
   const selectedCountry = values.country || "BD";
   const countryOptions = [
@@ -4944,6 +5069,18 @@ function paymentInstructionsFor(tenant, data) {
     ownerWhatsApp: settings.ownerWhatsApp,
     instructions: settings.instructions
   };
+}
+
+// A paid-plan signup must submit a transaction ID before reaching the dashboard.
+// True while the tenant has a staged pending paid plan and no payment record yet
+// (pending or confirmed). Once they submit a claim, the gate lifts.
+function checkoutRequired(tenant, data) {
+  if (!tenant || !tenant.pendingPlan) return false;
+  if (!["Starter", "Pro", "Enterprise", "Growth", "Agency"].includes(tenant.pendingPlan)) return false;
+  const hasClaim = (data.payments || []).some(
+    (p) => p.tenantId === tenant.id && (p.status === "pending" || p.status === "confirmed")
+  );
+  return !hasClaim;
 }
 
 // Serializes read-modify-write cycles against the JSON database so two concurrent
@@ -8659,6 +8796,20 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Paid-plan customer hasn't submitted their transaction ID yet → hold them on
+    // the /checkout page instead of the dashboard until they do.
+    if (pathname === "/" && req.method === "GET") {
+      const session = getSession(req);
+      if (session?.role === "customer") {
+        const loaded = await readDatabaseCached();
+        const tenant = loaded.available ? (loaded.data.tenants || []).find((t) => t.id === session.tenantId) : null;
+        if (tenant && checkoutRequired(tenant, loaded.data)) {
+          redirect(res, "/checkout");
+          return;
+        }
+      }
+    }
+
     if (pathname === "/landing.css" || pathname === "/terms.css" || pathname.startsWith("/assets/")) {
       await serveStatic(req, res);
       return;
@@ -8928,6 +9079,9 @@ const server = createServer(async (req, res) => {
       // (issues an invoice, keeps limits at Free until owner confirms) and send
       // them to the billing view to pay via bKash/Nagad. Payment is manual:
       // owner verifies the transaction, then confirmPayment flips to active.
+      // Paid plan → stage the upgrade and route to the standalone /checkout page
+      // where they must submit a bKash/Nagad transaction ID before the dashboard
+      // opens. Free signups go straight in.
       const chosenPlan = String(values.plan || "").trim();
       let landing = "/#customerContainers";
       if (["Starter", "Pro", "Enterprise"].includes(chosenPlan)) {
@@ -8935,7 +9089,7 @@ const server = createServer(async (req, res) => {
           { plan: chosenPlan, billingCycle: values.billingCycle || "monthly" },
           { tenantId: result.account.tenantId }
         );
-        if (staged.ok) landing = "/#billing";
+        if (staged.ok) landing = "/checkout";
       }
 
       const account = {
@@ -8953,6 +9107,41 @@ const server = createServer(async (req, res) => {
         "cache-control": "no-store"
       });
       res.end();
+      return;
+    }
+
+    if (pathname === "/checkout" && req.method === "GET") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") { redirect(res, "/login"); return; }
+      const loaded = await readDatabase();
+      const tenant = loaded.available ? (loaded.data.tenants || []).find((t) => t.id === session.tenantId) : null;
+      // Nothing to pay for (free, already claimed, or already active) → dashboard.
+      if (!tenant || !checkoutRequired(tenant, loaded.data)) { redirect(res, "/"); return; }
+      htmlResponse(res, 200, checkoutPage({ instructions: paymentInstructionsFor(tenant, loaded.data) }));
+      return;
+    }
+
+    if (pathname === "/checkout" && req.method === "POST") {
+      if (!checkRateLimit(req, "payment-claim", 10, 60 * 60 * 1000)) { tooManyRequests(res); return; }
+      const session = getSession(req);
+      if (!session || session.role !== "customer") { redirect(res, "/login"); return; }
+      const form = await readForm(req);
+      const values = Object.fromEntries(form.entries());
+      const result = await submitPaymentClaim(values, session);
+      if (result.ok) {
+        invalidateOwnerDashboardCache();
+        redirect(res, "/#billing");
+        return;
+      }
+      // Re-render with errors; reload the tenant for fresh payment instructions.
+      const loaded = await readDatabase();
+      const tenant = loaded.available ? (loaded.data.tenants || []).find((t) => t.id === session.tenantId) : null;
+      if (!tenant || !checkoutRequired(tenant, loaded.data)) { redirect(res, "/"); return; }
+      htmlResponse(res, 400, checkoutPage({
+        instructions: paymentInstructionsFor(tenant, loaded.data),
+        error: (result.errors || ["Payment submission failed."]).join(" "),
+        values
+      }));
       return;
     }
 
