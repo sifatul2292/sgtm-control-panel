@@ -335,6 +335,34 @@
 }
 .lf-btn-primary:active { transform: translateY(0); }
 
+/* Shared .button classes used by signup / verify / checkout pages (these pages
+   don't load the app's styles.css, so re-declare the primary button here). */
+.button {
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.button-primary {
+  height: 52px;
+  background: #0E1015;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: background 150ms, transform 150ms, box-shadow 150ms;
+  margin-top: 4px;
+}
+.button-primary:hover {
+  background: #4F46E5;
+  transform: translateY(-1px);
+}
+.button-primary:active { transform: translateY(0); }
+.button.full-width { width: 100%; }
+
 /* Signup prompt */
 .lf-signup-prompt {
   text-align: center;

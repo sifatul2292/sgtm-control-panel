@@ -471,6 +471,20 @@ async function emailCustomerActivated(toEmail, payment, renewalDate) {
   });
 }
 
+// Owner manually changed a customer's plan from the admin dashboard — tell the
+// customer their plan was updated by the Tagioo team.
+async function emailPlanUpgradedByAdmin(toEmail, fullName, plan) {
+  return sendEmail({
+    to: toEmail,
+    subject: `🚀 Your Tagioo plan was updated to ${plan}`,
+    bodyHtml: [
+      `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Plan updated 🚀</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 20px;line-height:1.6">Hi ${escapeHtml(fullName || "there")}, the Tagioo team has updated your account to the <strong>${escapeHtml(plan)}</strong> plan. Your new limits are active now — nothing more to do on your end.</p>`,
+      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:#5B21B6;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">View your plan →</a>`
+    ].join("")
+  });
+}
+
 // Tell the customer their payment claim was rejected (wrong / duplicate TxnID).
 async function emailCustomerPaymentRejected(toEmail, payment, reason) {
   return sendEmail({
@@ -2474,6 +2488,7 @@ async function changeTenantPlan(tenantId, planName) {
     return { ok: false, status: 404, error: "Customer not found (the Default account cannot be changed here)." };
   }
 
+  const previousPlan = data.tenants[index].plan;
   const profile = resourceProfileForPlan(planName);
   data.tenants[index] = {
     ...data.tenants[index],
@@ -2485,6 +2500,14 @@ async function changeTenantPlan(tenantId, planName) {
     planUpdatedAt: new Date().toISOString()
   };
   await writeDatabase(data);
+
+  // Notify the customer their plan was changed by the Tagioo team (only on a real
+  // change). Best-effort — never blocks the plan update.
+  if (previousPlan !== planName) {
+    const account = (data.customerAccounts || []).find((a) => a.tenantId === tenantId);
+    const toEmail = account?.email || account?.username;
+    if (toEmail) emailPlanUpgradedByAdmin(toEmail, account?.fullName || data.tenants[index].fullName, planName).catch(() => {});
+  }
 
   // Auto-resize the tenant's container to match the new plan, if one exists.
   let resize = null;
