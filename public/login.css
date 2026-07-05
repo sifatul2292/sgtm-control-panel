@@ -443,9 +443,10 @@
   animation-delay: var(--d, 0ms);
 }
 
-/* Scrollable form panel for taller signup form */
+/* Vertically center the form; tall forms grow the panel past 100vh and the
+   page scrolls, so nothing gets clipped. */
 .su-form-panel {
-  align-items: flex-start;
+  align-items: center;
   padding-top: 48px;
   padding-bottom: 48px;
 }
