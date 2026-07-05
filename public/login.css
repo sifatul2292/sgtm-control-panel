@@ -581,9 +581,14 @@
     min-height: 100vh;
   }
 
-  .login-brand {
-    padding: 28px 24px;
+  /* Beat the higher-specificity `.login-layout .login-brand { height:100vh }`
+     desktop rule so the dark brand panel shrinks to its content instead of
+     eating the whole viewport and pushing the form below the fold. */
+  .login-layout .login-brand {
+    position: static;
+    height: auto;
     min-height: auto;
+    padding: 28px 24px;
   }
 
   .lb-hero { margin-top: 24px; }
