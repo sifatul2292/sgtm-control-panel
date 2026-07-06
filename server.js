@@ -8588,7 +8588,30 @@ async function customerDashboardData(data, session) {
       retainedSnapshotsByDate[dateKey] = snapshot;
     }
   }
-  const retainedEventsSummary = retainedSummaryFromSnapshots(Object.values(retainedSnapshotsByDate), tenantRequestSummary);
+
+  // The SQLite event store is the source of truth the Event Logs read from; the live
+  // nginx tail is lossy (rotation, partial dedup) and can report fewer purchases /
+  // revenue for the same day. Prefer today's FULL SQLite summary (cached by
+  // sqliteSnapshotsForTenant) whenever it has seen at least as many events, so the
+  // dashboard's today KPIs / top events / distribution / graph match the Event Logs.
+  // Only fall back to the tail when SQLite is momentarily lagging (fewer events).
+  const sqliteTodayCache = hasEventSource ? todaySnapshotCache.get(session.tenantId) : null;
+  const sqliteTodaySummary = (sqliteTodayCache && sqliteTodayCache.dateKey === todayKey && sqliteTodayCache.summary?.available)
+    ? sqliteTodayCache.summary
+    : null;
+  let todayEventsSummary = (sqliteTodaySummary && Number(sqliteTodaySummary.count || 0) >= Number(tenantRequestSummary.count || 0))
+    ? sqliteTodaySummary
+    : tenantRequestSummary;
+  // Aggregate counts (events/purchases/hourly) are already computed over all lines,
+  // so trimming the raw recentEvents list keeps totals accurate while bounding the
+  // dashboard payload to the same size the live tail produced.
+  if (todayEventsSummary === sqliteTodaySummary && Array.isArray(todayEventsSummary.recentEvents) && todayEventsSummary.recentEvents.length > config.customerSummaryTailLines) {
+    todayEventsSummary = { ...todayEventsSummary, recentEvents: todayEventsSummary.recentEvents.slice(-config.customerSummaryTailLines) };
+  }
+  if (todayEventsSummary.available) {
+    retainedSnapshotsByDate[todayKey] = historySnapshotFromSummary(todayEventsSummary, todayKey);
+  }
+  const retainedEventsSummary = retainedSummaryFromSnapshots(Object.values(retainedSnapshotsByDate), todayEventsSummary);
 
   // Compute billing-period event count that survives nightly log rotation.
   // Strategy: sum stored per-tenant daily counts for past days (from persistDailySummary)
@@ -8661,7 +8684,7 @@ async function customerDashboardData(data, session) {
     usagePercent,
     status: !requestLimit ? "unmetered" : usagePercent >= 100 ? "over_limit" : usagePercent >= 80 ? "warning" : "healthy"
   };
-  const tenantReconciliation = getReconciliationSummary({ requestSummary: tenantRequestSummary, orders: tenantOrders });
+  const tenantReconciliation = getReconciliationSummary({ requestSummary: todayEventsSummary, orders: tenantOrders });
 
   return {
     ...data,
@@ -8701,7 +8724,7 @@ async function customerDashboardData(data, session) {
     nginx: {
       ...data.nginx,
       requestCountToday: tenantRequestSummary,
-      todayEvents: tenantRequestSummary,
+      todayEvents: todayEventsSummary,
       retainedEvents: retainedEventsSummary,
       accessLog: tenantAccessLog,
       errorLog: unavailable("Nginx error logs are owner-only.")
@@ -8713,7 +8736,7 @@ async function customerDashboardData(data, session) {
     orders: tenantOrders,
     usage: tenantUsage,
     reconciliation: tenantReconciliation,
-    integrations: getIntegrationSummary({ orders: tenantOrders, requestSummary: tenantRequestSummary }),
+    integrations: getIntegrationSummary({ orders: tenantOrders, requestSummary: todayEventsSummary }),
     config: publicCustomerConfig(data)
   };
 }
@@ -10217,8 +10240,11 @@ function sqliteSnapshotsForTenant(tenantId, tenant, days = 30) {
       if (!summary?.available) continue;
       const snapshot = historySnapshotFromSummary(summary, dateKey);
       snapshots[dateKey] = snapshot;
+      // Cache today's FULL summary (untruncated, unlike the ~500-line live tail) so
+      // the dashboard's today KPIs / top events / distribution / graph read accurate
+      // counts that match the Event Logs, not the truncated tail summary.
       if (dateKey !== todayKey) eventStore.setDailySummary(tenantId, dateKey, snapshot);
-      else todaySnapshotCache.set(tenantId, { dateKey, lineCount: lines.length, snapshot });
+      else todaySnapshotCache.set(tenantId, { dateKey, lineCount: lines.length, snapshot, summary });
     }
   } catch (error) {
     console.error(`[events] snapshot build failed for tenant ${tenantId}: ${error.message}`);
