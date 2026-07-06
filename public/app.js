@@ -4737,13 +4737,20 @@ function renderPaymentStatusCard(billing) {
     title = justActivated ? "Payment confirmed — your plan is now active!" : `${escapeHtml(billing.plan)} plan is active`;
     const limit = Number(billing.containerLimit || 0);
     const extra = Number(billing.extraContainers || 0);
+    const used = Number(billing.containersUsed || 0);
+    const freeSlots = Math.max(0, limit - used);
     sub = (renew ? `Verified and running. Renews on <strong>${escapeHtml(renew)}</strong>. ` : "Payment verified — your plan is active. ")
-      + `You can run up to <strong>${limit}</strong> container${limit === 1 ? "" : "s"}${extra ? ` (incl. ${extra} extra)` : ""}.`;
+      + `Containers: <strong>${used}</strong> of <strong>${limit}</strong> used${extra ? ` (incl. ${extra} paid extra)` : ""}.`;
     if (billing.scheduledPlan) {
       const when = billing.scheduledEffectiveDate ? new Date(billing.scheduledEffectiveDate).toLocaleDateString() : "the end of your billing cycle";
       sub += `<br><span class="psc-scheduled">↓ Downgrade to <strong>${escapeHtml(billing.scheduledPlan)}</strong> scheduled for <strong>${escapeHtml(when)}</strong>. You keep ${escapeHtml(billing.plan)} until then.</span>`;
       action = `<button class="button button-ghost" type="button" data-cancel-downgrade="${escapeHtml(billing.plan)}">Keep ${escapeHtml(billing.plan)}</button>`;
+    } else if (freeSlots > 0) {
+      // Plan still has included container slots — creating one is free, no upsell.
+      sub += ` <span class="psc-slots">${freeSlots} more included in your plan.</span>`;
+      action = `<button class="button" type="button" data-view-shortcut="customerContainers">Create container</button>`;
     } else {
+      // All included containers used — extra containers are the paid add-on.
       action = `<button class="button" type="button" data-add-container>+ Add container · ৳${Number(billing.extraContainerPrice || 1200).toLocaleString()}/mo</button>`;
     }
   } else {

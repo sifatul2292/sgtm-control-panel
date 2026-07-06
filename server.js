@@ -5526,6 +5526,7 @@ async function getCustomerBilling(session) {
       renewalDate: tenant.renewalDate || "",
       requestLimit: Number(tenant.requestLimit || 0),
       containerLimit: Number(tenant.containerLimit || resourceProfileForPlan(tenant.plan || "Free").containerLimit),
+      containersUsed: getTenantContainers(tenant.id, tenant, data.customerSetupRequests || [], data.provisioning?.requests || []).length,
       domainLimit: Number(tenant.domainLimit || resourceProfileForPlan(tenant.plan || "Free").domainLimit),
       extraContainers: Number(tenant.extraContainers || 0),
       extraContainerPrice: EXTRA_CONTAINER_PRICE,
