@@ -485,6 +485,19 @@ async function emailPlanUpgradedByAdmin(toEmail, fullName, plan) {
   });
 }
 
+// Confirm an extra-container add-on purchase to the customer.
+async function emailExtraContainerConfirmed(toEmail, fullName, containerLimit) {
+  return sendEmail({
+    to: toEmail,
+    subject: `✅ Extra container added to your Tagioo account`,
+    bodyHtml: [
+      `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Extra container ready 📦</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 20px;line-height:1.6">Hi ${escapeHtml(fullName || "there")}, we verified your payment and added an extra sGTM container. You can now run up to <strong>${Number(containerLimit || 0)}</strong> containers. The ৳${EXTRA_CONTAINER_PRICE.toLocaleString()}/month add-on is included in your next renewal.</p>`,
+      `<a href="https://tagioo.com/#customerContainers" style="display:inline-block;background:#059669;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Create your container →</a>`
+    ].join("")
+  });
+}
+
 // Tell the customer their payment claim was rejected (wrong / duplicate TxnID).
 async function emailCustomerPaymentRejected(toEmail, payment, reason) {
   return sendEmail({
@@ -2494,8 +2507,9 @@ async function changeTenantPlan(tenantId, planName) {
     ...data.tenants[index],
     plan: planName,
     requestLimit: profile.monthlyRequestLimit,
-    containerLimit: profile.containerLimit,
-    monthlyAmount: monthlyAmountForPlan(planName),
+    containerLimit: profile.containerLimit + Number(data.tenants[index].extraContainers || 0),
+    domainLimit: profile.domainLimit,
+    monthlyAmount: monthlyAmountForPlan(planName) + Number(data.tenants[index].extraContainers || 0) * EXTRA_CONTAINER_PRICE,
     resourceLimits: { ...(data.tenants[index].resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
     planUpdatedAt: new Date().toISOString()
   };
@@ -4859,6 +4873,8 @@ async function addCustomerAccount(input, options = {}) {
     paymentStatus: validated.value.paymentStatus,
     requestLimit: tenantProfile.monthlyRequestLimit,
     containerLimit: tenantProfile.containerLimit,
+    domainLimit: tenantProfile.domainLimit,
+    extraContainers: 0,
     monthlyAmount: monthlyAmountForPlan(validated.value.plan),
     status: "active",
     source: validated.value.source,
@@ -5162,6 +5178,8 @@ async function selectCustomerPlan(input, session) {
       plan: "Free",
       requestLimit: profile.monthlyRequestLimit,
       containerLimit: profile.containerLimit,
+      domainLimit: profile.domainLimit,
+      extraContainers: 0,
       monthlyAmount: 0,
       subscriptionStatus: "free",
       paymentStatus: "free",
@@ -5254,6 +5272,63 @@ async function submitPaymentClaimLocked(input, session) {
   return { ok: true, payment };
 }
 
+// Customer buys one extra sGTM container (recurring +৳1200/mo). Records a payment
+// claim of type "addon_container"; owner confirmation bumps the tenant's container
+// limit and monthly amount. Only paid/active tenants can add extras.
+async function submitExtraContainerClaim(input, session) {
+  return withDbLock(() => submitExtraContainerClaimLocked(input, session));
+}
+
+async function submitExtraContainerClaimLocked(input, session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  const method = String(input.method || "").trim().toLowerCase();
+  const txnId = String(input.txnId || input.transactionId || "").trim().slice(0, 64);
+  const senderNumber = String(input.senderNumber || input.sender || "").trim().slice(0, 32);
+  const errors = [];
+  if (!["bkash", "nagad"].includes(method)) errors.push("Choose bKash or Nagad.");
+  if (!txnId) errors.push("Transaction ID is required.");
+  if (!senderNumber) errors.push("Sender number is required.");
+  if (errors.length) return { ok: false, status: 400, errors };
+
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const data = loaded.data;
+  data.payments ||= [];
+  const tenant = (data.tenants || []).find((t) => t.id === session.tenantId);
+  if (!tenant) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+  if (!(tenant.subscriptionStatus === "active" && tenant.paymentStatus === "paid")) {
+    return { ok: false, status: 400, errors: ["Activate a paid plan before buying extra containers."] };
+  }
+  if (data.payments.some((p) => p.txnId && p.txnId.toLowerCase() === txnId.toLowerCase())) {
+    return { ok: false, status: 409, errors: ["This transaction ID was already submitted."] };
+  }
+
+  const now = new Date().toISOString();
+  const payment = {
+    id: `pay_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
+    type: "addon_container",
+    invoiceNo: nextInvoiceNo(data, tenant.id),
+    tenantId: tenant.id,
+    plan: tenant.plan,
+    amount: EXTRA_CONTAINER_PRICE,
+    method,
+    txnId,
+    senderNumber,
+    status: "pending",
+    claimedAt: now,
+    confirmedBy: "",
+    confirmedAt: "",
+    note: "Extra container add-on"
+  };
+  data.payments.push(payment);
+  await writeDatabase(data);
+
+  notifyOwnerPaymentClaim(payment, paymentSettings(data).ownerNotifyEmail).catch(() => {});
+  const account = (data.customerAccounts || []).find((a) => a.tenantId === tenant.id);
+  emailCustomerClaimReceived(account?.email || account?.username, payment).catch(() => {});
+  return { ok: true, payment };
+}
+
 // Owner confirms a pending payment: applies the paid plan, sets a 30-day window,
 // starts the tenant's container if one exists, and emails the customer.
 async function confirmPayment(paymentId, session) {
@@ -5273,6 +5348,30 @@ async function confirmPaymentLocked(paymentId, session) {
   const tenantIndex = (data.tenants || []).findIndex((t) => t.id === payment.tenantId);
   if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
 
+  // Extra-container add-on: bump the tenant's container limit + monthly amount by
+  // one unit, don't touch the plan/subscription window. Then start/resize handled
+  // below via the shared tail of this function.
+  if (payment.type === "addon_container") {
+    const addTenant = data.tenants[tenantIndex];
+    const nowIso = new Date().toISOString();
+    const nextExtra = Number(addTenant.extraContainers || 0) + 1;
+    const baseProfile = resourceProfileForPlan(addTenant.plan || "Free");
+    data.tenants[tenantIndex] = {
+      ...addTenant,
+      extraContainers: nextExtra,
+      containerLimit: baseProfile.containerLimit + nextExtra,
+      monthlyAmount: monthlyAmountForPlan(addTenant.plan) + nextExtra * EXTRA_CONTAINER_PRICE,
+      updatedAt: nowIso
+    };
+    payment.status = "confirmed";
+    payment.confirmedBy = session.username || "owner";
+    payment.confirmedAt = nowIso;
+    await writeDatabase(data);
+    const acct = (data.customerAccounts || []).find((a) => a.tenantId === payment.tenantId);
+    emailExtraContainerConfirmed(acct?.email || acct?.username, acct?.fullName, data.tenants[tenantIndex].containerLimit).catch(() => {});
+    return { ok: true, payment, tenant: data.tenants[tenantIndex] };
+  }
+
   const now = new Date();
   const tenant = data.tenants[tenantIndex];
   const cycleId = tenant.pendingBillingCycle || "monthly";
@@ -5284,8 +5383,9 @@ async function confirmPaymentLocked(paymentId, session) {
     plan: payment.plan,
     billingCycle: cycleId,
     requestLimit: profile.monthlyRequestLimit,
-    containerLimit: profile.containerLimit,
-    monthlyAmount: monthlyAmountForPlan(payment.plan),
+    containerLimit: profile.containerLimit + Number(tenant.extraContainers || 0),
+    domainLimit: profile.domainLimit,
+    monthlyAmount: monthlyAmountForPlan(payment.plan) + Number(tenant.extraContainers || 0) * EXTRA_CONTAINER_PRICE,
     resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
     subscriptionStatus: "active",
     paymentStatus: "paid",
@@ -5386,10 +5486,15 @@ async function getCustomerBilling(session) {
       monthlyAmount: Number(tenant.monthlyAmount || 0),
       renewalDate: tenant.renewalDate || "",
       requestLimit: Number(tenant.requestLimit || 0),
+      containerLimit: Number(tenant.containerLimit || resourceProfileForPlan(tenant.plan || "Free").containerLimit),
+      domainLimit: Number(tenant.domainLimit || resourceProfileForPlan(tenant.plan || "Free").domainLimit),
+      extraContainers: Number(tenant.extraContainers || 0),
+      extraContainerPrice: EXTRA_CONTAINER_PRICE,
       pendingPlan: tenant.pendingPlan || "",
       pendingAmount: Number(tenant.pendingAmount || 0),
       pendingInvoiceNo: tenant.pendingInvoiceNo || "",
       payment: tenant.pendingPlan ? paymentInstructionsFor(tenant, data) : null,
+      paymentNumbers: (() => { const s = paymentSettings(data); return { bkashNumber: s.bkashNumber, nagadNumber: s.nagadNumber, ownerWhatsApp: s.ownerWhatsApp, instructions: s.instructions }; })(),
       latestPending,
       claims: claims.slice(0, 10)
     }
@@ -5567,6 +5672,25 @@ async function addCustomerSetupRequest(input, session) {
       status: 402,
       errors: ["Complete your plan payment before creating a container. Open Account & Billing to pay — we activate within hours of confirming your transaction."]
     };
+  }
+
+  // Hard container-limit gate: block creating more containers than the plan (plus
+  // any paid extra-container add-ons) allows. containerLimit on the tenant already
+  // includes confirmed add-ons; fall back to the plan profile if unset.
+  if (gateTenant) {
+    const effectiveLimit = Number(gateTenant.containerLimit) > 0
+      ? Number(gateTenant.containerLimit)
+      : resourceProfileForPlan(gateTenant.plan || "Free").containerLimit;
+    const currentCount = getTenantContainers(
+      session.tenantId, gateTenant, data.customerSetupRequests || [], data.provisioning?.requests || []
+    ).length;
+    if (currentCount >= effectiveLimit) {
+      return {
+        ok: false,
+        status: 402,
+        errors: [`You've reached your plan's container limit (${effectiveLimit}). Buy an extra container for ৳${EXTRA_CONTAINER_PRICE.toLocaleString()}/month from Account & Billing, or upgrade your plan.`]
+      };
+    }
   }
 
   const validated = validateCustomerSetupInput(input, session);
@@ -5880,15 +6004,21 @@ const planMonthlyAmounts = {
   Agency: 7500
 };
 
+// Canonical plan limits (single source of truth for containers + domains). Keep
+// the subscription cards (app.js), customer dashboard, and homepage in sync with
+// these numbers: Free/Starter 1 container · 1 domain, Pro 3 · 2, Enterprise 5 · 3.
 const planResourceProfiles = {
-  Free:       { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 15000,    containerLimit: 1  },
-  Starter:    { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 500000,   containerLimit: 1  },
-  Growth:     { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2  },
-  Pro:        { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 2000000,  containerLimit: 3  },
-  Agency:     { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 8000000,  containerLimit: 10 },
-  Enterprise: { memoryMb: 2048, cpuLimit: "2.00", monthlyRequestLimit: 5000000,  containerLimit: 10 },
-  Customer:   { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 500000,   containerLimit: 1  }
+  Free:       { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 15000,    containerLimit: 1,  domainLimit: 1 },
+  Starter:    { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 500000,   containerLimit: 1,  domainLimit: 1 },
+  Growth:     { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2,  domainLimit: 1 },
+  Pro:        { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 2000000,  containerLimit: 3,  domainLimit: 2 },
+  Agency:     { memoryMb: 1536, cpuLimit: "1.50", monthlyRequestLimit: 8000000,  containerLimit: 10, domainLimit: 5 },
+  Enterprise: { memoryMb: 2048, cpuLimit: "2.00", monthlyRequestLimit: 5000000,  containerLimit: 5,  domainLimit: 3 },
+  Customer:   { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 500000,   containerLimit: 1,  domainLimit: 1 }
 };
+
+// Recurring add-on: each extra sGTM container beyond the plan's included count.
+const EXTRA_CONTAINER_PRICE = 1200;
 
 function monthlyAmountForPlan(planName) {
   return planMonthlyAmounts[String(planName || "").trim()] || 0;
@@ -5899,11 +6029,13 @@ function resourceProfileForPlan(planName, overrides = {}) {
   const memoryMb = Number(overrides.memoryMb || overrides.memory_mb || profile.memoryMb || config.defaultContainerMemoryMb);
   const monthlyRequestLimit = Number(overrides.requestLimit || overrides.request_limit || overrides.monthlyRequestLimit || profile.monthlyRequestLimit || config.monthlyRequestLimit);
   const containerLimit = Number(overrides.containerLimit || overrides.container_limit || profile.containerLimit || config.monthlyContainerLimit);
+  const domainLimit = Number(overrides.domainLimit || overrides.domain_limit || profile.domainLimit || 1);
   return {
     memoryMb: Number.isFinite(memoryMb) && memoryMb > 0 ? memoryMb : config.defaultContainerMemoryMb,
     cpuLimit: String(overrides.cpuLimit || overrides.cpu_limit || profile.cpuLimit || config.defaultContainerCpuLimit),
     monthlyRequestLimit: Number.isFinite(monthlyRequestLimit) && monthlyRequestLimit > 0 ? monthlyRequestLimit : config.monthlyRequestLimit,
-    containerLimit: Number.isFinite(containerLimit) && containerLimit > 0 ? containerLimit : config.monthlyContainerLimit
+    containerLimit: Number.isFinite(containerLimit) && containerLimit > 0 ? containerLimit : config.monthlyContainerLimit,
+    domainLimit: Number.isFinite(domainLimit) && domainLimit > 0 ? domainLimit : 1
   };
 }
 
@@ -9516,6 +9648,20 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await submitPaymentClaim(body, session);
+      if (result.ok) invalidateOwnerDashboardCache();
+      jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok ? { payment: result.payment } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/extra-container-claim" && req.method === "POST") {
+      if (!checkRateLimit(req, "payment-claim", 10, 60 * 60 * 1000)) { tooManyRequests(res); return; }
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await submitExtraContainerClaim(body, session);
       if (result.ok) invalidateOwnerDashboardCache();
       jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok ? { payment: result.payment } : { errors: result.errors });
       return;

@@ -236,7 +236,7 @@ const subscriptionPlans = [
     name: "Free",
     price: "Free",
     requests: 15000,
-    containers: 2,
+    containers: 1,
     domains: 1,
     receivers: 5,
     retention: "3 days log retention",
@@ -246,7 +246,7 @@ const subscriptionPlans = [
     name: "Starter",
     price: "৳1,200",
     requests: 500000,
-    containers: 5,
+    containers: 1,
     domains: 1,
     receivers: 5,
     retention: "7 days log retention",
@@ -256,7 +256,7 @@ const subscriptionPlans = [
     name: "Pro",
     price: "৳2,900",
     requests: 2000000,
-    containers: 15,
+    containers: 3,
     domains: 2,
     receivers: 5,
     retention: "15 days log retention",
@@ -267,8 +267,8 @@ const subscriptionPlans = [
     name: "Enterprise",
     price: "৳5,900",
     requests: 5000000,
-    containers: 100,
-    domains: 10,
+    containers: 5,
+    domains: 3,
     receivers: 5,
     retention: "30 days log retention",
     features: ["Priority Migration", "Dedicated Support", "Multi-Domain Support", "Advanced Reports", "Traffic Filtering, IP, Country Block", "Bot Detection & Filtering", "Event Logs", "WordPress Plugin"]
@@ -4654,7 +4654,11 @@ function renderPaymentStatusCard(billing) {
   } else if (status === "active" && lastConfirmed && billing.paymentStatus === "paid") {
     tone = "is-active"; icon = justActivated ? "🎉" : "✅";
     title = justActivated ? "Payment confirmed — your plan is now active!" : `${escapeHtml(billing.plan)} plan is active`;
-    sub = renew ? `Verified and running. Renews on <strong>${escapeHtml(renew)}</strong>.` : "Payment verified — your plan is active.";
+    const limit = Number(billing.containerLimit || 0);
+    const extra = Number(billing.extraContainers || 0);
+    sub = (renew ? `Verified and running. Renews on <strong>${escapeHtml(renew)}</strong>. ` : "Payment verified — your plan is active. ")
+      + `You can run up to <strong>${limit}</strong> container${limit === 1 ? "" : "s"}${extra ? ` (incl. ${extra} extra)` : ""}.`;
+    action = `<button class="button" type="button" data-add-container>+ Add container · ৳${Number(billing.extraContainerPrice || 1200).toLocaleString()}/mo</button>`;
   } else {
     panel.hidden = true;
     return;
@@ -4677,6 +4681,8 @@ function renderPaymentStatusCard(billing) {
   if (open) open.onclick = () => openPaymentModal(billing.payment);
   const renewBtn = panel.querySelector("[data-renew-plan]");
   if (renewBtn) renewBtn.onclick = () => selectSubscriptionPlan(renewBtn.dataset.renewPlan);
+  const addBtn = panel.querySelector("[data-add-container]");
+  if (addBtn) addBtn.onclick = () => openExtraContainerModal(billing);
 
   manageBillingPolling(Boolean(openClaim), status, billing.paymentStatus);
 }
@@ -4790,6 +4796,84 @@ async function submitPaymentClaimForm(event) {
         <span class="pm-success-icon">⏳</span>
         <h3>Payment submitted!</h3>
         <p>We've received Transaction ID <strong>${escapeHtml(body.txnId)}</strong> and emailed you a confirmation. We'll verify it and activate your plan shortly — you'll get another email the moment it's live.</p>
+        <button class="button button-primary" type="button" data-payment-modal-close>Done</button>
+      </div>`;
+  } catch (error) {
+    if (msg) { msg.textContent = error.message; msg.className = "pm-message is-error"; }
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ── Extra-container add-on modal (recurring ৳1,200/mo) ─────────────────────
+function openExtraContainerModal(billing) {
+  const overlay = document.getElementById("paymentModalOverlay");
+  const body = document.getElementById("paymentModalBody");
+  if (!overlay || !body) return;
+  const money = (n) => `৳${Number(n || 0).toLocaleString()}`;
+  const nums = billing.paymentNumbers || {};
+  const price = Number(billing.extraContainerPrice || 1200);
+  const numberRow = (label, num) => num
+    ? `<div class="pm-number"><div><span>${label}</span><strong>${escapeHtml(num)}</strong></div><button class="pm-copy" type="button" data-copy="${escapeHtml(num)}">Copy</button></div>`
+    : "";
+  const numbers = [numberRow("bKash", nums.bkashNumber), numberRow("Nagad", nums.nagadNumber)].join("");
+  body.innerHTML = `
+    <div class="pm-header">
+      <span class="pm-eyebrow">Add one extra sGTM container</span>
+      <span class="pm-amount">${money(price)}<small>/month</small></span>
+    </div>
+    <ol class="pm-steps">
+      <li><strong>Open bKash or Nagad</strong> and choose <strong>Send Money</strong>.</li>
+      <li>Send <strong>${money(price)}</strong> to the number below.</li>
+      <li>Enter the <strong>Transaction ID</strong> you receive, then submit.</li>
+    </ol>
+    <div class="pm-numbers">${numbers || `<p class="pm-warn">⚠️ Payment numbers aren't configured yet. Please contact support before paying.</p>`}</div>
+    <form id="extraContainerForm" class="pm-form">
+      <label>Paid with
+        <select name="method" required>
+          <option value="bkash">bKash</option>
+          <option value="nagad">Nagad</option>
+        </select>
+      </label>
+      <label>Transaction ID
+        <input name="txnId" type="text" placeholder="e.g. 8N7A1B2C3D" required />
+      </label>
+      <label>Your sending number
+        <input name="senderNumber" type="text" inputmode="numeric" placeholder="01XXXXXXXXX" required />
+      </label>
+      <button class="button button-primary pm-submit" type="submit">I've paid — submit Transaction ID</button>
+      <span id="extraContainerMessage" class="pm-message"></span>
+    </form>`;
+  body.querySelectorAll(".pm-copy").forEach((b) => {
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copied ✓"; setTimeout(() => (b.textContent = "Copy"), 1500); } catch { /* ignore */ }
+    };
+  });
+  const form = body.querySelector("#extraContainerForm");
+  if (form) form.onsubmit = submitExtraContainerForm;
+  overlay.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+async function submitExtraContainerForm(event) {
+  event.preventDefault();
+  const form = event.target;
+  const msg = document.getElementById("extraContainerMessage");
+  const btn = form.querySelector(".pm-submit");
+  const body = { method: form.method.value, txnId: form.txnId.value.trim(), senderNumber: form.senderNumber.value.trim() };
+  if (msg) { msg.textContent = "Submitting…"; msg.className = "pm-message"; }
+  if (btn) btn.disabled = true;
+  try {
+    const response = await fetch("/api/customer/extra-container-claim", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Submit failed."]).join(" "));
+    const modalBody = document.getElementById("paymentModalBody");
+    if (modalBody) modalBody.innerHTML = `
+      <div class="pm-success">
+        <span class="pm-success-icon">⏳</span>
+        <h3>Payment submitted!</h3>
+        <p>We've received Transaction ID <strong>${escapeHtml(body.txnId)}</strong>. Once we verify it, your extra container unlocks and you'll get a confirmation email.</p>
         <button class="button button-primary" type="button" data-payment-modal-close>Done</button>
       </div>`;
   } catch (error) {
