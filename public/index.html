@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=5" />
-    <link rel="stylesheet" href="/styles.css?v=35" />
+    <link rel="stylesheet" href="/styles.css?v=36" />
   </head>
   <body class="app-loading">
     <div class="app-shell">
@@ -2375,6 +2375,16 @@ window.dataLayer.push({
           <section class="panel subscription-panel">
             <div class="panel-header">
               <div>
+                <h2>Invoices</h2>
+                <p>Your billing history. Open any invoice to print or save as PDF.</p>
+              </div>
+            </div>
+            <div id="invoicesList" class="invoices-list"></div>
+          </section>
+
+          <section class="panel subscription-panel">
+            <div class="panel-header">
+              <div>
                 <h2 id="planSectionTitle">Available Plans</h2>
                 <p>Choose the package that fits your monthly traffic and number of containers.</p>
               </div>
@@ -2382,6 +2392,17 @@ window.dataLayer.push({
             <div id="subscriptionPlans" class="subscription-plan-section"></div>
           </section>
         </section>
+
+        <!-- Printable invoice overlay -->
+        <div id="invoiceOverlay" class="invoice-overlay" hidden>
+          <div class="invoice-sheet" role="dialog" aria-modal="true" aria-label="Invoice">
+            <div class="invoice-toolbar">
+              <button class="button" type="button" id="invoicePrintBtn">Print / Save PDF</button>
+              <button class="button button-ghost" type="button" id="invoiceCloseBtn">Close</button>
+            </div>
+            <div id="invoiceDoc" class="invoice-doc"></div>
+          </div>
+        </div>
 
         <!-- Payment modal: opens on plan select / "Complete payment". -->
         <div id="paymentModalOverlay" class="payment-modal-overlay" hidden>
@@ -2414,6 +2435,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=53" type="module"></script>
+    <script src="/app.js?v=54" type="module"></script>
   </body>
 </html>

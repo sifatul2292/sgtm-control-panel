@@ -5480,6 +5480,7 @@ async function getCustomerBilling(session) {
   return {
     ok: true,
     billing: {
+      accountName: tenant.fullName || tenant.name || tenant.id,
       plan: tenant.plan || "Free",
       subscriptionStatus: tenant.subscriptionStatus || "free",
       paymentStatus: tenant.paymentStatus || "free",
