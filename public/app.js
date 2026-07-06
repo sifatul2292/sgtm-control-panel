@@ -4577,12 +4577,12 @@ let customerSubscriptionStatus = "";
 let billingPollTimer = null;
 let lastClaimPending = false;
 
-// Customer picks a plan -> create the pending invoice, then open the payment modal.
+// Customer picks a plan. Upgrades/renewals return a payment to pay now (open the
+// modal only once real payment data is back — never flash an empty form).
+// Downgrades are scheduled server-side for the end of the cycle: no payment now.
 async function selectSubscriptionPlan(planName) {
-  const plan = subscriptionPlans.find((p) => p.name === planName);
-  const cp = plan ? cyclePrice(plan, selectedCycle) : { total: 0 };
-  const previewAmount = selectedCycle.months === 1 ? cp.monthly || cp.total : cp.total;
-  openPaymentModal({ plan: planName, amount: previewAmount, billingCycle: selectedCycle.id, invoiceNo: "…", bkashNumber: null, nagadNumber: null, _loading: true });
+  const buttons = document.querySelectorAll(`[data-plan-select], [data-renew-plan]`);
+  buttons.forEach((b) => (b.disabled = true));
   try {
     const response = await fetch("/api/customer/subscription", {
       method: "POST",
@@ -4593,11 +4593,16 @@ async function selectSubscriptionPlan(planName) {
     if (!response.ok) throw new Error((result.errors || [result.error || "Plan update failed."]).join(" "));
     setView("billing");
     await loadBillingPayment();
+    if (result.scheduled) {
+      // Downgrade scheduled — no payment. The status card already shows the notice.
+      return;
+    }
+    if (result.scheduledCancelled) return;
     if (result.payment) openPaymentModal(result.payment);
-    else closePaymentModal();
   } catch (error) {
-    closePaymentModal();
     window.alert(error.message);
+  } finally {
+    document.querySelectorAll(`[data-plan-select], [data-renew-plan]`).forEach((b) => (b.disabled = false));
   }
 }
 
@@ -4734,7 +4739,13 @@ function renderPaymentStatusCard(billing) {
     const extra = Number(billing.extraContainers || 0);
     sub = (renew ? `Verified and running. Renews on <strong>${escapeHtml(renew)}</strong>. ` : "Payment verified — your plan is active. ")
       + `You can run up to <strong>${limit}</strong> container${limit === 1 ? "" : "s"}${extra ? ` (incl. ${extra} extra)` : ""}.`;
-    action = `<button class="button" type="button" data-add-container>+ Add container · ৳${Number(billing.extraContainerPrice || 1200).toLocaleString()}/mo</button>`;
+    if (billing.scheduledPlan) {
+      const when = billing.scheduledEffectiveDate ? new Date(billing.scheduledEffectiveDate).toLocaleDateString() : "the end of your billing cycle";
+      sub += `<br><span class="psc-scheduled">↓ Downgrade to <strong>${escapeHtml(billing.scheduledPlan)}</strong> scheduled for <strong>${escapeHtml(when)}</strong>. You keep ${escapeHtml(billing.plan)} until then.</span>`;
+      action = `<button class="button button-ghost" type="button" data-cancel-downgrade="${escapeHtml(billing.plan)}">Keep ${escapeHtml(billing.plan)}</button>`;
+    } else {
+      action = `<button class="button" type="button" data-add-container>+ Add container · ৳${Number(billing.extraContainerPrice || 1200).toLocaleString()}/mo</button>`;
+    }
   } else {
     panel.hidden = true;
     return;
@@ -4759,6 +4770,8 @@ function renderPaymentStatusCard(billing) {
   if (renewBtn) renewBtn.onclick = () => selectSubscriptionPlan(renewBtn.dataset.renewPlan);
   const addBtn = panel.querySelector("[data-add-container]");
   if (addBtn) addBtn.onclick = () => openExtraContainerModal(billing);
+  const cancelBtn = panel.querySelector("[data-cancel-downgrade]");
+  if (cancelBtn) cancelBtn.onclick = () => selectSubscriptionPlan(cancelBtn.dataset.cancelDowngrade);
 
   manageBillingPolling(Boolean(openClaim), status, billing.paymentStatus);
 }

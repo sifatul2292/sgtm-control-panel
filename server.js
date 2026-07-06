@@ -5169,8 +5169,40 @@ async function selectCustomerPlan(input, session) {
 
   const now = new Date();
   const current = data.tenants[tenantIndex];
+  const isPayingNow = current.subscriptionStatus === "active" && current.paymentStatus === "paid";
+  const currentRank = isPayingNow ? planRankFor(current.plan) : 0;
+  const newRank = planRankFor(planName);
 
-  // Free plan: apply right away, no payment needed.
+  // Re-selecting the current plan while a downgrade is scheduled = cancel the
+  // scheduled downgrade (customer decided to stay).
+  if (isPayingNow && planName === current.plan && current.scheduledPlan) {
+    data.tenants[tenantIndex] = { ...current, scheduledPlan: "", scheduledPlanCycle: "", updatedAt: now.toISOString() };
+    await writeDatabase(data);
+    return { ok: true, scheduledCancelled: true, tenant: data.tenants[tenantIndex] };
+  }
+
+  // Downgrade from an active paid plan (incl. to Free): do NOT charge now and do NOT
+  // pause the current plan. Schedule the change for the end of the paid cycle; the
+  // customer keeps their current plan + benefits until then, and pays the lower
+  // plan's price on renewal. Applied by enforcePaidRenewals when the cycle ends.
+  if (isPayingNow && newRank < currentRank) {
+    data.tenants[tenantIndex] = {
+      ...current,
+      scheduledPlan: planName,
+      scheduledPlanCycle: cycleId,
+      updatedAt: now.toISOString()
+    };
+    await writeDatabase(data);
+    return {
+      ok: true,
+      scheduled: true,
+      scheduledPlan: planName,
+      effectiveDate: current.renewalDate || "",
+      tenant: data.tenants[tenantIndex]
+    };
+  }
+
+  // Free plan chosen while not on a paid plan: apply right away, no payment needed.
   if (planName === "Free") {
     const profile = resourceProfileForPlan("Free");
     data.tenants[tenantIndex] = {
@@ -5186,14 +5218,16 @@ async function selectCustomerPlan(input, session) {
       pendingPlan: "",
       pendingAmount: 0,
       pendingInvoiceNo: "",
+      scheduledPlan: "",
+      scheduledPlanCycle: "",
       updatedAt: now.toISOString()
     };
     await writeDatabase(data);
     return { ok: true, tenant: data.tenants[tenantIndex] };
   }
 
-  // Paid plan: stage an upgrade awaiting manual payment. Keep effective limits where
-  // they are (typically Free) until the owner confirms payment.
+  // Paid plan upgrade / renewal: stage awaiting manual payment. Keep effective limits
+  // where they are until the owner confirms payment.
   const amount = computeCycleAmount(planName, cycleId);
   const cycle = billingCycleConfig[cycleId] || billingCycleConfig.monthly;
   const invoiceNo = current.pendingInvoiceNo || nextInvoiceNo(data, current.id);
@@ -5398,6 +5432,10 @@ async function confirmPaymentLocked(paymentId, session) {
     pendingAmount: 0,
     pendingBillingCycle: "",
     pendingInvoiceNo: "",
+    // Paying for a plan clears any scheduled downgrade UNLESS this payment IS the
+    // scheduled downgrade being applied at renewal (then it's already the new plan).
+    scheduledPlan: tenant.scheduledPlan === payment.plan ? "" : (tenant.scheduledPlan || ""),
+    scheduledPlanCycle: tenant.scheduledPlan === payment.plan ? "" : (tenant.scheduledPlanCycle || ""),
     updatedAt: now.toISOString()
   };
 
@@ -5494,6 +5532,9 @@ async function getCustomerBilling(session) {
       pendingPlan: tenant.pendingPlan || "",
       pendingAmount: Number(tenant.pendingAmount || 0),
       pendingInvoiceNo: tenant.pendingInvoiceNo || "",
+      scheduledPlan: tenant.scheduledPlan || "",
+      scheduledPlanCycle: tenant.scheduledPlanCycle || "",
+      scheduledEffectiveDate: tenant.scheduledPlan ? (tenant.renewalDate || "") : "",
       payment: tenant.pendingPlan ? paymentInstructionsFor(tenant, data) : null,
       paymentNumbers: (() => { const s = paymentSettings(data); return { bkashNumber: s.bkashNumber, nagadNumber: s.nagadNumber, ownerWhatsApp: s.ownerWhatsApp, instructions: s.instructions }; })(),
       latestPending,
@@ -6020,6 +6061,10 @@ const planResourceProfiles = {
 
 // Recurring add-on: each extra sGTM container beyond the plan's included count.
 const EXTRA_CONTAINER_PRICE = 1200;
+
+// Plan ordering for upgrade vs downgrade decisions.
+const planRankOrder = { Free: 0, Starter: 1, Growth: 2, Pro: 3, Agency: 4, Enterprise: 4 };
+const planRankFor = (name) => Number(planRankOrder[String(name || "").trim()] ?? 0);
 
 function monthlyAmountForPlan(planName) {
   return planMonthlyAmounts[String(planName || "").trim()] || 0;
@@ -7343,6 +7388,18 @@ async function enforcePaidRenewals(data) {
     // Past the renewal date.
     const daysOver = Math.floor((now.getTime() - renewal.getTime()) / 86400000);
     if (status !== "overdue") {
+      // A scheduled downgrade takes effect now: the renewal the customer pays is for
+      // the lower plan, not the current one. Stage it as the pending plan so the
+      // "Renew" flow charges the downgraded price and confirmPayment applies it.
+      if (tenant.scheduledPlan && planResourceProfiles[tenant.scheduledPlan]) {
+        const cyc = billingCycleConfig[tenant.scheduledPlanCycle] ? tenant.scheduledPlanCycle : "monthly";
+        tenant.pendingPlan = tenant.scheduledPlan;
+        tenant.pendingBillingCycle = cyc;
+        tenant.pendingAmount = computeCycleAmount(tenant.scheduledPlan, cyc);
+        tenant.pendingInvoiceNo = tenant.pendingInvoiceNo || nextInvoiceNo(data, tenant.id);
+        tenant.scheduledPlan = "";
+        tenant.scheduledPlanCycle = "";
+      }
       tenant.subscriptionStatus = "overdue";
       tenant.overdueAt = now.toISOString();
       emailOverdue(toEmail, tenant, data, RENEWAL_GRACE_DAYS).catch(() => {});
@@ -9639,7 +9696,9 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const result = await selectCustomerPlan(body, session);
       if (result.ok) invalidateOwnerDashboardCache();
-      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { tenant: result.tenant, payment: result.payment || null } : { errors: result.errors });
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
+        ? { tenant: result.tenant, payment: result.payment || null, scheduled: Boolean(result.scheduled), scheduledCancelled: Boolean(result.scheduledCancelled), scheduledPlan: result.scheduledPlan || "", effectiveDate: result.effectiveDate || "" }
+        : { errors: result.errors });
       return;
     }
 

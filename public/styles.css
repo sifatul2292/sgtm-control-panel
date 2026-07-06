@@ -4983,3 +4983,5 @@ body.modal-open { overflow: hidden; }
   .invoice-sheet { box-shadow: none; width: 100%; border-radius: 0; }
   .invoice-toolbar { display: none !important; }
 }
+
+.payment-status-card .psc-scheduled { display: inline-block; margin-top: 8px; font-size: .85rem; color: #B4790C; background: #FEF6E7; border: 1px solid #F6E2B8; border-radius: 8px; padding: 6px 10px; line-height: 1.5; }
