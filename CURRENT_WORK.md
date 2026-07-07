@@ -1,19 +1,21 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-07-05.
+Living status doc. Update after meaningful progress. Last updated: 2026-07-07.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
 ## Recently completed
-Recent commits (newest first):
-- **Owner dashboard perf** (5 commits): cache payload stale-while-revalidate; drop per-tenant Nginx log scan; dedupe DB reads (one `history.json` parse, db stage 3.5s → ~1 parse); move history persistence off read path; warm-on-start + serve-stale + non-blocking invalidate; widen DB read-cache TTL to 5s so dashboard catalog reuses the parse.
-- **SaaS Phase 1 payments** (`0c97c3c`, `9026cfd`): payment paywall, one-click owner confirm, auto-refresh, upgrade nudge, customer admin; email-verified signup + paid-plan payment gate.
-- **Tagioo self-tracking** (`d0b7b8c`, `725d61c`, `a5b0553`, `5468976`, `b91c9f1`): own GTM + funnel conversion events, hashed-PII Meta CAPI for signup + purchase, Lead event on signup visit, GTM snippet on server-rendered signup/login.
-- **Setup Assistant + UI** (`f9a0b32`, `51bc2d8`, `0a4e945` …): Setup Assistant polish, Containers onboarding redesign, enterprise dark redesign + billing cycles.
+Recent commits (newest first, Jul 4–7):
+- **Billing/plan polish** (`f513de9`, `203a99e`): only upsell paid extra container after plan's included slots used; no empty payment-modal flash; downgrades scheduled at cycle end.
+- **Customer billing views** (`4157e0f`, `eed282a`, `f4b241c`, `2f6c74a`): invoices section + premium polish; design tokens retuned to homepage; plan-limit alignment + extra-container add-on + homepage billing cycles; landing plan CTAs carry plan param to signup.
+- **Dashboard KPI correctness** (`135ceda`, `13ce655`, `a4899ad`): today KPIs read SQLite event store (not lossy nginx tail); no stale/global events for containerless accounts; paid-customer summary + sort on owner Customers view.
+- **Signup/checkout UI** (`41105c4`, `ec177f5`, `d124b52`, `bd6e787`, `3c3630e`): mandatory payment step after email verify for paid plans; responsive + centered forms; styled tel/number inputs + standalone buttons; email customer on admin plan change.
+- **Owner dashboard perf** (`536aade`→`d9fa707`, 6 commits): cache payload stale-while-revalidate; drop per-tenant Nginx log scan; dedupe DB reads (db stage 3.5s → ~1 parse); move history persistence off read path; warm-on-start + serve-stale + non-blocking invalidate; widen DB read-cache TTL to 5s.
+- **SaaS Phase 1 payments** (`0c97c3c`): payment paywall, one-click owner confirm, auto-refresh, upgrade nudge, customer admin.
 
 ## In progress
-- SaaS payments phase 1 on this branch. Manual bKash/Nagad claim → owner-confirm lifecycle wired (emails + routes exist). Verify remaining lifecycle states from `docs/saas-plan.md` are fully enforced (esp. free-tier 15K cap → container stop, and rolling-cycle usage window).
+- SaaS payments phase 1 on this branch. Manual bKash/Nagad claim → owner-confirm lifecycle wired (emails + routes exist). Billing UI, invoices, plan limits, extra-container add-on, and downgrade-at-cycle-end now landed. Still verify enforcement of free-tier 15K cap → container stop and rolling-cycle usage window from `docs/saas-plan.md`.
 
 ## Files recently changed / why
 - `server.js` — payments, self-tracking, dashboard perf caching, provisioning. Main monolith; most churn here.
