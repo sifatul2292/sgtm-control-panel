@@ -180,7 +180,10 @@ const els = {
   accountPlanBadge: document.querySelector("#accountPlanBadge")
 };
 
-document.body.classList.remove("app-loading");
+// Splash (pulsing Tagioo mark) stays until the first dashboard render completes —
+// see loadDashboard. Safety net: never trap the user behind the splash if the
+// heavy /api/dashboard call hangs.
+setTimeout(() => document.body.classList.remove("app-loading"), 8000);
 
 const viewTitles = {
   dashboard: ["Dashboard", "Server Overview"],
@@ -489,7 +492,6 @@ function applySession(session) {
   } catch {
     // Ignore local storage failures; this only improves the next page refresh.
   }
-  document.body.classList.remove("app-loading");
   document.body.classList.toggle("customer-session", customerMode);
   document.querySelectorAll("[data-owner-only]").forEach((element) => {
     element.hidden = customerMode;
@@ -5801,6 +5803,7 @@ async function loadDashboard() {
     if (!response.ok) throw new Error(data.detail || data.error || "Request failed");
     latestData = data;
     renderAll(data);
+    document.body.classList.remove("app-loading");
   } catch (error) {
     els.generatedAt.textContent = "Update failed";
     els.containerCards.innerHTML = `<div class="empty-log">${escapeHtml(error.message)}</div>`;
