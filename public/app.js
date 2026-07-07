@@ -2428,6 +2428,9 @@ function customerContainerDetail(request, data, dnsTarget) {
           <span>of ${Number(requestLimit).toLocaleString()} requests this billing period</span>
           <em>${usagePercent}% used</em>
         </div>
+        <div class="usage-bar" role="progressbar" aria-valuenow="${usagePercent}" aria-valuemin="0" aria-valuemax="100">
+          <span style="width:${Math.max(2, Math.min(100, usagePercent))}%"></span>
+        </div>
       </div>
       <div class="container-plan-chip">
         <strong>${escapeHtml(planName)}</strong>

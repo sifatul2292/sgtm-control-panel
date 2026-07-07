@@ -512,17 +512,11 @@ async function emailCustomerPaymentRejected(toEmail, payment, reason) {
 }
 
 // ── Phase 2: Free-tier usage nudges ────────────────────────────────────────
-// One escalating block per threshold. Tone ramps from informational (10K) to
-// urgent (14K). `purchases`/`revenue` show the customer what's at stake.
+// Locked SaaS rule: one upgrade nudge at 12K, then a hard cap at 15K.
+// `purchases`/`revenue` show the customer what's at stake.
 const FREE_NUDGE_TIERS = {
-  10000: { color: "#5B21B6", emoji: "📈", heading: "You're halfway through your free events",
-    tone: "You've used 10,000 of your 15,000 free monthly events. Plenty of room left — but if you run ads, it's worth knowing the cap is coming." },
   12000: { color: "#B45309", emoji: "⚠️", heading: "80% of your free events used",
-    tone: "You've used 12,000 of 15,000 free events this cycle. At 15,000 your tracking pauses until your cycle resets — Meta and GA4 stop receiving conversions." },
-  13000: { color: "#EA580C", emoji: "🔶", heading: "Only ~2,000 free events left",
-    tone: "You've used 13,000 of 15,000 free events. You're close to the cap. Upgrade now so your tracking never stops mid-campaign." },
-  14000: { color: "#DC2626", emoji: "🚨", heading: "URGENT — your tracking is about to stop",
-    tone: "You've used 14,000 of 15,000 free events. At 15,000, tracking pauses and new sales stop reaching Meta and Google Ads — your campaigns lose their optimization signal. Upgrade now to keep selling." }
+    tone: "You've used 12,000 of 15,000 free events this cycle. At 15,000 your tracking pauses until your cycle resets — Meta and GA4 stop receiving conversions." }
 };
 
 function purchaseStatHtml({ purchases, revenue, currency }) {
@@ -532,7 +526,7 @@ function purchaseStatHtml({ purchases, revenue, currency }) {
 }
 
 async function emailFreeTierNudge(toEmail, tenant, threshold, used, limit, purchaseData) {
-  const tier = FREE_NUDGE_TIERS[threshold] || FREE_NUDGE_TIERS[10000];
+  const tier = FREE_NUDGE_TIERS[threshold] || FREE_NUDGE_TIERS[12000];
   const remaining = Math.max(0, limit - used);
   return sendEmail({
     to: toEmail,
@@ -4835,6 +4829,7 @@ async function addCustomerAccount(input, options = {}) {
   if (duplicate) return { ok: false, errors: ["Username is already used by another customer."] };
 
   const now = new Date().toISOString();
+  const freeCycleEnd = new Date(Date.now() + 30 * 86400000).toISOString();
   const accountIndex = data.customerAccounts.findIndex((account) => account.tenantId === validated.value.tenantId);
   if (!allowUpdate && accountIndex !== -1) return { ok: false, errors: ["An account already exists for this customer."] };
   const account = {
@@ -4876,6 +4871,7 @@ async function addCustomerAccount(input, options = {}) {
     domainLimit: tenantProfile.domainLimit,
     extraContainers: 0,
     monthlyAmount: monthlyAmountForPlan(validated.value.plan),
+    ...(validated.value.plan === "Free" ? { cycleStart: now, cycleEnd: freeCycleEnd, nudgedAt: "", cappedAt: "", cycleNudge: 0 } : {}),
     status: "active",
     source: validated.value.source,
     updatedAt: now
@@ -5169,23 +5165,31 @@ async function selectCustomerPlan(input, session) {
 
   const now = new Date();
   const current = data.tenants[tenantIndex];
-  const isPayingNow = current.subscriptionStatus === "active" && current.paymentStatus === "paid";
-  const currentRank = isPayingNow ? planRankFor(current.plan) : 0;
+  // A tenant "holds a paid plan" whenever they have paid for a non-Free plan —
+  // true through the active window AND the overdue grace period (enforcePaidRenewals
+  // flips subscriptionStatus to "overdue" but leaves paymentStatus "paid" until the
+  // plan expires). Upgrade/downgrade must be decided against the plan they actually
+  // hold, NOT gated on subscriptionStatus === "active" — otherwise an overdue Pro
+  // customer selecting Starter reads as currentRank 0 and gets mislabeled an
+  // "upgrade" that demands payment for a cheaper plan.
+  const holdsPaidPlan = current.plan !== "Free" && current.paymentStatus === "paid"
+    && ["active", "overdue"].includes(current.subscriptionStatus);
+  const currentRank = holdsPaidPlan ? planRankFor(current.plan) : 0;
   const newRank = planRankFor(planName);
 
   // Re-selecting the current plan while a downgrade is scheduled = cancel the
   // scheduled downgrade (customer decided to stay).
-  if (isPayingNow && planName === current.plan && current.scheduledPlan) {
+  if (holdsPaidPlan && planName === current.plan && current.scheduledPlan) {
     data.tenants[tenantIndex] = { ...current, scheduledPlan: "", scheduledPlanCycle: "", updatedAt: now.toISOString() };
     await writeDatabase(data);
     return { ok: true, scheduledCancelled: true, tenant: data.tenants[tenantIndex] };
   }
 
-  // Downgrade from an active paid plan (incl. to Free): do NOT charge now and do NOT
+  // Downgrade from a held paid plan (incl. to Free): do NOT charge now and do NOT
   // pause the current plan. Schedule the change for the end of the paid cycle; the
   // customer keeps their current plan + benefits until then, and pays the lower
   // plan's price on renewal. Applied by enforcePaidRenewals when the cycle ends.
-  if (isPayingNow && newRank < currentRank) {
+  if (holdsPaidPlan && newRank < currentRank) {
     data.tenants[tenantIndex] = {
       ...current,
       scheduledPlan: planName,
@@ -5205,6 +5209,8 @@ async function selectCustomerPlan(input, session) {
   // Free plan chosen while not on a paid plan: apply right away, no payment needed.
   if (planName === "Free") {
     const profile = resourceProfileForPlan("Free");
+    const cycleStart = now.toISOString();
+    const cycleEnd = new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString();
     data.tenants[tenantIndex] = {
       ...current,
       plan: "Free",
@@ -5220,6 +5226,11 @@ async function selectCustomerPlan(input, session) {
       pendingInvoiceNo: "",
       scheduledPlan: "",
       scheduledPlanCycle: "",
+      cycleStart,
+      cycleEnd,
+      nudgedAt: "",
+      cappedAt: "",
+      cycleNudge: 0,
       updatedAt: now.toISOString()
     };
     await writeDatabase(data);
@@ -5231,16 +5242,26 @@ async function selectCustomerPlan(input, session) {
   const amount = computeCycleAmount(planName, cycleId);
   const cycle = billingCycleConfig[cycleId] || billingCycleConfig.monthly;
   const invoiceNo = current.pendingInvoiceNo || nextInvoiceNo(data, current.id);
-  data.tenants[tenantIndex] = {
+  const staged = {
     ...current,
-    subscriptionStatus: "pending_payment",
-    paymentStatus: "pending",
     pendingPlan: planName,
     pendingAmount: amount,
     pendingBillingCycle: cycleId,
     pendingInvoiceNo: invoiceNo,
     updatedAt: now.toISOString()
   };
+  // Only a tenant with NO live paid plan (Free / new signup) is moved into
+  // pending_payment — that gates their dashboard + container until they pay. A tenant
+  // who already holds a paid plan (active or overdue) is UPGRADING/renewing: keep
+  // their current subscriptionStatus/paymentStatus intact so the paid plan stays live
+  // and tracking keeps running until the owner confirms the new payment. Demoting a
+  // paid plan to "pending" before the upgrade is paid is the bug that made a paid Pro
+  // account read "pending" across both dashboards.
+  if (!holdsPaidPlan) {
+    staged.subscriptionStatus = "pending_payment";
+    staged.paymentStatus = "pending";
+  }
+  data.tenants[tenantIndex] = staged;
 
   await writeDatabase(data);
   return {
@@ -6202,6 +6223,18 @@ function addDays(date, days) {
 
 function billingPeriodForTenant(tenant, setupRequests = []) {
   const now = new Date();
+  const cycleStart = validDate(tenant?.cycleStart);
+  const cycleEnd = validDate(tenant?.cycleEnd);
+  const isFreeCycle = tenant?.plan === "Free" || ["free", "free_capped", "pending_payment"].includes(String(tenant?.subscriptionStatus || ""));
+  if (isFreeCycle && cycleStart && cycleEnd) {
+    return {
+      start: cycleStart,
+      end: cycleEnd > now ? now : cycleEnd,
+      renewal: cycleEnd,
+      label: `${localDateKey(cycleStart)} to ${localDateKey(cycleEnd)}`
+    };
+  }
+
   const renewal = validDate(tenant?.renewalDate);
   if (renewal) {
     const start = addDays(renewal, -30);
@@ -7250,17 +7283,23 @@ async function enrichProvisioningRequest(request) {
 }
 
 // ── Phase 2: Free-tier rolling-cycle usage enforcement ─────────────────────
-const FREE_NUDGE_THRESHOLDS = [10000, 12000, 13000, 14000];
+const FREE_NUDGE_THRESHOLD = 12000;
 const FREE_HARD_CAP = 15000;
 const FREE_CYCLE_DAYS = 30;
 
-// Sum of all of a tenant's stored daily request counts. Used with a per-cycle
-// baseline (snapshotted at cycle start) so cycle usage = currentSum - baseline.
-// This resets cleanly on rollover even when the old and new cycle share a day.
-function tenantUsageSum(data, tenantId) {
+// Sum a tenant's stored daily request counts inside the active rolling cycle.
+// Counts are persisted by Dhaka calendar day, so compare with Dhaka date keys.
+function tenantUsageInCycle(data, tenantId, cycleStart, cycleEnd) {
   const days = data.tenantDailyRequests?.[tenantId] || {};
+  const start = validDate(cycleStart);
+  const end = validDate(cycleEnd);
+  if (!start || !end) return 0;
+  const startKey = localDateKey(start);
+  const endKey = localDateKey(end);
   let total = 0;
-  for (const count of Object.values(days)) total += Number(count || 0);
+  for (const [dateKey, count] of Object.entries(days)) {
+    if (dateKey >= startKey && dateKey <= endKey) total += Number(count || 0);
+  }
   return total;
 }
 
@@ -7285,10 +7324,10 @@ function tenantContainerName(data, tenantId) {
 }
 
 // Evaluate every Free-tier tenant against its rolling 30-day cycle: roll the
-// window when it expires (resuming a capped container), send escalating upgrade
-// nudges at 10K/12K/13K/14K (once each per cycle), and hard-cap (stop the
-// container) at 15K. Mutates `data`; the caller persists it. Side-effects
-// (emails, docker start/stop) are best-effort and never throw.
+// window when it expires (resuming a capped container), send one upgrade nudge
+// at 12K per cycle, and hard-cap (stop the container) at 15K. Mutates `data`;
+// the caller persists it. Side-effects (emails, docker start/stop) are
+// best-effort and never throw.
 async function enforceFreeTierUsage(data) {
   const now = new Date();
   const todayKey = localDateKey(now);
@@ -7304,16 +7343,16 @@ async function enforceFreeTierUsage(data) {
     if (!tenant.cycleStart || !tenant.cycleEnd) {
       tenant.cycleStart = now.toISOString();
       tenant.cycleEnd = new Date(now.getTime() + cycleMs).toISOString();
+      tenant.nudgedAt = "";
       tenant.cycleNudge = 0;
-      tenant.cycleBaseline = tenantUsageSum(data, tenant.id);
     }
 
     // Cycle rollover: reset usage baseline + nudge state, resume if capped.
     if (now >= new Date(tenant.cycleEnd)) {
       tenant.cycleStart = now.toISOString();
       tenant.cycleEnd = new Date(now.getTime() + cycleMs).toISOString();
+      tenant.nudgedAt = "";
       tenant.cycleNudge = 0;
-      tenant.cycleBaseline = tenantUsageSum(data, tenant.id);
       if (status === "free_capped") {
         tenant.subscriptionStatus = "free";
         tenant.cappedAt = "";
@@ -7324,7 +7363,7 @@ async function enforceFreeTierUsage(data) {
     }
 
     const startKey = localDateKey(new Date(tenant.cycleStart));
-    const used = Math.max(0, tenantUsageSum(data, tenant.id) - Number(tenant.cycleBaseline || 0));
+    const used = tenantUsageInCycle(data, tenant.id, tenant.cycleStart, tenant.cycleEnd);
     const account = (data.customerAccounts || []).find((a) => a.tenantId === tenant.id);
     const toEmail = account?.email || account?.username || "";
 
@@ -7340,14 +7379,12 @@ async function enforceFreeTierUsage(data) {
       continue;
     }
 
-    // Escalating nudges: send the highest crossed threshold not yet sent this cycle.
-    let toSend = 0;
-    for (const threshold of FREE_NUDGE_THRESHOLDS) {
-      if (used >= threshold && threshold > Number(tenant.cycleNudge || 0)) toSend = threshold;
-    }
-    if (toSend) {
-      tenant.cycleNudge = toSend;
-      emailFreeTierNudge(toEmail, tenant, toSend, used, FREE_HARD_CAP, cyclePurchaseStats(data, tenant.id, startKey, todayKey)).catch(() => {});
+    // 12K nudge: fire once per cycle. Respect the legacy cycleNudge marker so
+    // customers who already received the 12K+ nudge are not emailed again.
+    if (used >= FREE_NUDGE_THRESHOLD && !tenant.nudgedAt && Number(tenant.cycleNudge || 0) < FREE_NUDGE_THRESHOLD) {
+      tenant.nudgedAt = now.toISOString();
+      tenant.cycleNudge = FREE_NUDGE_THRESHOLD;
+      emailFreeTierNudge(toEmail, tenant, FREE_NUDGE_THRESHOLD, used, FREE_HARD_CAP, cyclePurchaseStats(data, tenant.id, startKey, todayKey)).catch(() => {});
     }
   }
 }
@@ -7363,6 +7400,28 @@ async function enforcePaidRenewals(data) {
   const now = new Date();
   for (const tenant of (data.tenants || [])) {
     if (!tenant?.id) continue;
+
+    // Self-heal legacy corruption from the old plan-change flow, which demoted a
+    // paid plan to "pending_payment" and could stage a downgrade as a pending
+    // "upgrade" (see selectCustomerPlan). A tenant that has paid for a non-Free plan
+    // but sits in pending_payment is a live paid subscription mislabeled unpaid:
+    // restore it to active/overdue by its renewal date so both dashboards show the
+    // real state, and reclassify any pending plan that is actually a downgrade into
+    // a scheduled change instead of a payment demand.
+    if (tenant.plan !== "Free" && tenant.paymentStatus === "paid" && tenant.subscriptionStatus === "pending_payment") {
+      const stillValid = tenant.renewalDate && !Number.isNaN(new Date(tenant.renewalDate).getTime()) && new Date(tenant.renewalDate) > now;
+      tenant.subscriptionStatus = stillValid ? "active" : "overdue";
+      if (tenant.pendingPlan && planResourceProfiles[tenant.pendingPlan] && planRankFor(tenant.pendingPlan) < planRankFor(tenant.plan)) {
+        tenant.scheduledPlan = tenant.pendingPlan;
+        tenant.scheduledPlanCycle = tenant.pendingBillingCycle || "monthly";
+        tenant.pendingPlan = "";
+        tenant.pendingAmount = 0;
+        tenant.pendingBillingCycle = "";
+        tenant.pendingInvoiceNo = "";
+      }
+      tenant.updatedAt = now.toISOString();
+    }
+
     const status = tenant.subscriptionStatus;
     if (!["active", "overdue"].includes(status)) continue;
     if (tenant.plan === "Free" || !tenant.renewalDate) continue;
@@ -8569,9 +8628,25 @@ function tenantBillingUsageMap(data, tenants = []) {
     const period = billingPeriodForTenant(tenant, tenantSetupRequests);
     const tenantDailyReqs = (data.tenantDailyRequests || {})[tenant.id] || {};
     const startKey = localDateKey(period.start);
-    const accumulatedCount = Object.entries(tenantDailyReqs)
-      .filter(([d]) => d >= startKey && d <= todayKey)
-      .reduce((sum, [, c]) => sum + Number(c), 0);
+    // Merge the SQLite event-store daily snapshots (same source the customer
+    // dashboard reads) so the owner's per-tenant count matches the customer's. These
+    // are cached daily summaries, precomputed by persistSnapshotTick and rebuilt only
+    // for uncached days — an in-process SQLite read, NOT a live nginx log scan, so the
+    // owner hot path stays cheap and this never touches live tracking. Empty {} for
+    // tenants with no event source, leaving their JSON-only count unchanged.
+    const sqliteSnaps = sqliteSnapshotsForTenant(tenant.id, tenant);
+    // Per day in the billing period take the larger of the JSON-stored count and the
+    // SQLite snapshot total, so a day missed/undercounted by one source is covered by
+    // the other (rotation loss, un-persisted days). Matches customerDashboardData.
+    const dayKeys = new Set([
+      ...Object.keys(tenantDailyReqs),
+      ...Object.keys(sqliteSnaps)
+    ]);
+    let accumulatedCount = 0;
+    for (const d of dayKeys) {
+      if (d < startKey || d > todayKey) continue;
+      accumulatedCount += Math.max(Number(tenantDailyReqs[d] || 0), Number(sqliteSnaps[d]?.total || 0));
+    }
     return [tenant.id, {
       requestsMonth: Math.max(accumulatedCount, Number(tenant.requestsMonth || 0)),
       period: period.label,

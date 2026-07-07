@@ -15,23 +15,24 @@ Recent commits (newest first, Jul 4–7):
 - **SaaS Phase 1 payments** (`0c97c3c`): payment paywall, one-click owner confirm, auto-refresh, upgrade nudge, customer admin.
 
 ## In progress
-- SaaS payments phase 1 on this branch. Manual bKash/Nagad claim → owner-confirm lifecycle wired (emails + routes exist). Billing UI, invoices, plan limits, extra-container add-on, and downgrade-at-cycle-end now landed. Still verify enforcement of free-tier 15K cap → container stop and rolling-cycle usage window from `docs/saas-plan.md`.
+- SaaS payments phase 1 on this branch. Manual bKash/Nagad claim → owner-confirm lifecycle wired (emails + routes exist). Billing UI, invoices, plan limits, extra-container add-on, downgrade-at-cycle-end, and free-tier §3 enforcement alignment now landed. Still review paid renewal grace/expired suspension when touching billing next.
 
 ## Files recently changed / why
-- `server.js` — payments, self-tracking, dashboard perf caching, provisioning. Main monolith; most churn here.
+- `server.js` — payments, self-tracking, dashboard perf caching, provisioning, and Free-tier rolling-cycle enforcement. Main monolith; most churn here.
 - `db.js` — SQLite event store schema/queries.
 - `public/*` — landing/marketing redesign, Setup Assistant, billing UI.
 - `docs/saas-plan.md` — monetization spec (DRAFT, 2026-06-27).
 - Untracked at doc-writing time: `.claude/`, `PROJECT_CONTEXT.md`, `CURRENT_WORK.md`, `AGENTS.md`, `CLAUDE.md` (these onboarding docs).
 
 ## Known gaps / TODO (from docs/saas-plan.md)
-- Rolling 30-day usage cycle (`cycleStart`/`cycleEnd`) — plan says switch Free-tier counting from calendar-month (`server.js:4951` area) to rolling window. Confirm implemented.
-- 12K nudge (once/cycle via `nudgedAt`) + 15K hard stop (`free_capped` → stop container). Confirm enforced by a daily cron tick.
+- Rolling 30-day usage cycle (`cycleStart`/`cycleEnd`) — implemented for Free enforcement and Free billing-period display; new Free tenants and Free reselects initialize the cycle window.
+- 12K nudge (once/cycle via `nudgedAt`) + 15K hard stop (`free_capped` → stop container) — aligned in `enforceFreeTierUsage(data)`, which runs from the persistence timer.
 - Overdue → grace → expired suspension transitions.
 - No automated tests anywhere.
 
 ## Commands run + results
 - `node --check server.js` (`npm run check`) — syntax gate. Run this after every `server.js` edit.
+- 2026-07-07: `npm run check` after each `server.js` edit for Free-tier enforcement alignment — passed.
 - No test/lint/build commands exist to run.
 
 ## Next recommended tasks for Codex (safest first)
