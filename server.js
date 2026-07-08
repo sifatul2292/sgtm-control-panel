@@ -3,7 +3,7 @@ import { mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from 
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
-import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import { deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -5002,9 +5002,10 @@ async function validateSignupInput(input) {
   return { ok: true, email };
 }
 
-// 6-digit numeric verification code as a zero-padded string.
+// 6-digit numeric verification code as a zero-padded string. Uses the CSPRNG —
+// Math.random is predictable enough to matter for an auth code.
 function makeVerificationCode() {
-  return String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0");
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
 
 async function emailVerificationCode(toEmail, fullName, code) {
@@ -5111,6 +5112,12 @@ function paymentInstructionsFor(tenant, data) {
 // (pending or confirmed). Once they submit a claim, the gate lifts.
 function checkoutRequired(tenant, data) {
   if (!tenant || !tenant.pendingPlan) return false;
+  // Only gate tenants whose service is actually blocked on this payment (new
+  // paid signups / Free upgrades put into pending_payment by selectCustomerPlan).
+  // A tenant with a live plan staging an upgrade keeps subscriptionStatus
+  // "active"/"overdue" — locking them to /checkout would cut off a paid (or
+  // admin-granted) account's dashboard over an optional upgrade invoice.
+  if (tenant.subscriptionStatus !== "pending_payment") return false;
   if (!["Starter", "Pro", "Enterprise", "Growth", "Agency"].includes(tenant.pendingPlan)) return false;
   const hasClaim = (data.payments || []).some(
     (p) => p.tenantId === tenant.id && (p.status === "pending" || p.status === "confirmed")
@@ -5146,6 +5153,10 @@ function computeCycleAmount(planName, cycleId) {
 }
 
 async function selectCustomerPlan(input, session) {
+  return withDbLock(() => selectCustomerPlanLocked(input, session));
+}
+
+async function selectCustomerPlanLocked(input, session) {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   const planName = String(input.plan || input.planName || "").trim();
   const cycleId = billingCycleConfig[String(input.billingCycle || "").trim()] ? String(input.billingCycle).trim() : "monthly";
@@ -7474,7 +7485,14 @@ async function enforcePaidRenewals(data) {
   }
 }
 
+// The whole tick is one read→mutate→write cycle holding data across slow awaits
+// (docker lifecycle, emails via enforceFreeTierUsage/enforcePaidRenewals). Without
+// the lock, a payment confirmed mid-tick gets clobbered by the tick's stale write.
 async function persistDailySummary(summary) {
+  return withDbLock(() => persistDailySummaryLocked(summary));
+}
+
+async function persistDailySummaryLocked(summary) {
   const loaded = await readDatabase();
   // Only a DB read failure blocks persistence. An unavailable shared-log summary must
   // NOT skip the per-tenant section below — tenants with dedicated per-container logs

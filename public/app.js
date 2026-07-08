@@ -465,6 +465,9 @@ function setView(name, options = {}) {
   if (next === "admin") { loadOwnerPayments(); loadPaymentSettings(); loadBackups(); }
   if (next === "errorLogs") loadErrorLogs();
   if (next === "billing") loadBillingPayment();
+  // Hash routing is invisible to PostHog's pageview autodetection — record view
+  // changes as explicit events so funnels/paths work per panel section.
+  try { window.posthog?.capture?.("panel_view_opened", { view: next, role: currentSession.role }); } catch { /* noop */ }
 }
 
 function applySessionAccess(data) {
@@ -484,9 +487,32 @@ async function initSession() {
   }
 }
 
+// Tie PostHog events/replays to the logged-in account. tenantId (stable, non-PII)
+// is the distinct id for customers; email lives in person properties only.
+function identifyPostHog() {
+  try {
+    if (!window.posthog || typeof window.posthog.identify !== "function") return;
+    if (currentSession.role === "customer" && (currentSession.tenantId || currentSession.username)) {
+      window.posthog.identify(currentSession.tenantId || currentSession.username, {
+        role: "customer",
+        email: currentSession.username || ""
+      });
+    } else if (currentSession.role === "owner") {
+      window.posthog.identify("tagioo-owner", { role: "owner" });
+    }
+  } catch { /* analytics must never break the panel */ }
+}
+
+// Logout must unlink the device from the account so the next login (possibly a
+// different customer on a shared machine) doesn't inherit the previous identity.
+document.querySelector('a[href="/logout"]')?.addEventListener("click", () => {
+  try { window.posthog?.reset?.(); } catch { /* noop */ }
+});
+
 function applySession(session) {
   currentSession = session || { role: "owner" };
   const customerMode = currentSession.role === "customer";
+  identifyPostHog();
   try {
     window.localStorage.setItem("tagioo_session_role", customerMode ? "customer" : "owner");
   } catch {
