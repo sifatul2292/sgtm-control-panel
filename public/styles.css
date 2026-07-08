@@ -2894,7 +2894,27 @@ h2 {
 .card-pro .spc-header { background: linear-gradient(135deg, #4F46E5, #818CF8); }
 .card-enterprise .spc-header { background: linear-gradient(135deg, #BE185D, #EC4899); }
 .spc-name { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; opacity: .85; }
-.spc-active-badge { display: inline-block; width: fit-content; padding: 2px 8px; border-radius: var(--radius-pill, 100px); background: rgba(255,255,255,.25); font-size: 0.65rem; font-weight: 800; letter-spacing: .06em; }
+.spc-active-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill, 100px);
+  background: rgba(255,255,255,.92);
+  color: var(--color-accent-deep, #4338CA);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  box-shadow: 0 1px 4px rgba(14,16,21,.15);
+}
+.spc-active-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-ok, #059669);
+}
 .spc-price { font-size: 1.6rem; font-weight: 900; line-height: 1.15; }
 .spc-price small { font-size: 0.78rem; font-weight: 600; opacity: .7; }
 .spc-metric { display: inline-block; width: fit-content; margin-top: 2px; padding: 3px 10px; border-radius: var(--radius-pill, 100px); background: rgba(255,255,255,.2); font-size: 0.7rem; font-weight: 700; }
@@ -2921,15 +2941,22 @@ h2 {
 }
 .spc-btn:hover:not(:disabled) { filter: brightness(1.1); transform: scale(1.02); }
 .spc-btn-current {
-  background: transparent;
-  color: var(--color-muted);
-  border-color: var(--color-line);
+  background: color-mix(in oklch, var(--color-ok, #059669), transparent 92%);
+  color: var(--color-ok, #059669);
+  border-color: color-mix(in oklch, var(--color-ok, #059669), transparent 60%);
   cursor: default;
 }
+.spc-btn-current::before { content: "✓ "; }
 
 .subscription-plan-card.is-active-plan {
-  border-color: var(--color-focus, #7C3AED);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-focus, #7C3AED), transparent 72%);
+  border-color: transparent;
+  box-shadow:
+    0 0 0 2px var(--color-accent, #4F46E5),
+    0 12px 32px color-mix(in oklch, var(--color-accent, #4F46E5), transparent 78%);
+  transform: translateY(-4px);
+}
+.subscription-plan-card.is-active-plan:hover {
+  transform: translateY(-4px);
 }
 
 .popular-label {
@@ -4961,11 +4988,26 @@ a.button.button-primary {
 }
 
 /* ── Payment status card (top of subscription) ────────────────────────── */
-.payment-status-card { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; padding: 18px 20px; border-radius: 14px; border: 1px solid var(--color-border, #E5E7EB); margin-bottom: 18px; background: #fff; animation: planCardIn 400ms cubic-bezier(.22,1,.36,1) both; }
+.payment-status-card { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; padding: 20px 24px; border-radius: var(--radius-lg); border: 1px solid var(--color-border, #E5E7EB); margin-bottom: 18px; background: #fff; box-shadow: var(--shadow-card); animation: planCardIn 400ms cubic-bezier(.22,1,.36,1) both; }
 .payment-status-card .psc-main { display: flex; gap: 14px; align-items: flex-start; flex: 1; min-width: 260px; }
-.payment-status-card .psc-icon { font-size: 1.6rem; line-height: 1; }
-.payment-status-card .psc-text strong { display: block; font-size: 1.05rem; margin-bottom: 2px; }
-.payment-status-card .psc-text p { margin: 0; color: var(--color-text-muted, #667085); font-size: 0.9rem; line-height: 1.5; }
+.payment-status-card .psc-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: rgba(255,255,255,.75);
+  box-shadow: inset 0 0 0 1px rgba(14,16,21,.07), 0 1px 3px rgba(14,16,21,.05);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+/* Direct child only — the title. Inline <strong> inside the paragraph (dates,
+   container counts) must stay inline or the sentence shatters one word per line. */
+.payment-status-card .psc-text > strong { display: block; font-size: 1.05rem; margin-bottom: 2px; }
+.payment-status-card .psc-text p strong { display: inline; color: var(--color-text); }
+.payment-status-card .psc-text p { margin: 0; color: var(--color-text-muted, #667085); font-size: 0.9rem; line-height: 1.6; max-width: 62ch; }
+.payment-status-card .psc-slots { color: var(--color-ok); font-weight: 700; }
 .payment-status-card .psc-invoice { display: inline-block; margin-top: 6px; font-size: 0.78rem; color: var(--color-text-muted, #667085); }
 .payment-status-card.is-pending { border-left: 4px solid #F59E0B; background: #FFFBEB; }
 .payment-status-card.is-verifying { border-left: 4px solid #6366F1; background: #EEF2FF; }
