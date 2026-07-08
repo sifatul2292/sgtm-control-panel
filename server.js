@@ -6083,7 +6083,11 @@ const planMonthlyAmounts = {
 // the subscription cards (app.js), customer dashboard, and homepage in sync with
 // these numbers: Free/Starter 1 container · 1 domain, Pro 3 · 2, Enterprise 5 · 3.
 const planResourceProfiles = {
-  Free:       { memoryMb: 512,  cpuLimit: "0.50", monthlyRequestLimit: 15000,    containerLimit: 1,  domainLimit: 1 },
+  // Free is sized for its 15K events/30d cap (~500/day, near-zero concurrency).
+  // 320MB keeps headroom for GTM Preview/Debug sessions (the memory-heavy thing
+  // trial users actually do); 256 risks OOM-kill mid-setup. Applies to NEW
+  // provisions and plan-change resizes only — running containers keep their limits.
+  Free:       { memoryMb: 320,  cpuLimit: "0.25", monthlyRequestLimit: 15000,    containerLimit: 1,  domainLimit: 1 },
   Starter:    { memoryMb: 768,  cpuLimit: "0.50", monthlyRequestLimit: 500000,   containerLimit: 1,  domainLimit: 1 },
   Growth:     { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 1500000,  containerLimit: 2,  domainLimit: 1 },
   Pro:        { memoryMb: 1024, cpuLimit: "0.75", monthlyRequestLimit: 2000000,  containerLimit: 3,  domainLimit: 2 },
