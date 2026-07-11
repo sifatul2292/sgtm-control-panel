@@ -1,12 +1,13 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-07-07.
+Living status doc. Update after meaningful progress. Last updated: 2026-07-11.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
 ## Recently completed
 Recent commits (newest first, Jul 4–7):
+- **Paid-signup checkout guard** (working tree, Jul 11): app shell checkout gate now covers `/index.html` as well as `/`, so pending paid-plan signups cannot bypass the standalone payment step with a direct/static dashboard URL.
 - **Billing/plan polish** (`f513de9`, `203a99e`): only upsell paid extra container after plan's included slots used; no empty payment-modal flash; downgrades scheduled at cycle end.
 - **Customer billing views** (`4157e0f`, `eed282a`, `f4b241c`, `2f6c74a`): invoices section + premium polish; design tokens retuned to homepage; plan-limit alignment + extra-container add-on + homepage billing cycles; landing plan CTAs carry plan param to signup.
 - **Dashboard KPI correctness** (`135ceda`, `13ce655`, `a4899ad`): today KPIs read SQLite event store (not lossy nginx tail); no stale/global events for containerless accounts; paid-customer summary + sort on owner Customers view.
@@ -32,6 +33,7 @@ Recent commits (newest first, Jul 4–7):
 
 ## Commands run + results
 - `node --check server.js` (`npm run check`) — syntax gate. Run this after every `server.js` edit.
+- 2026-07-11: `npm run check` after paid-signup checkout guard fix — passed.
 - 2026-07-07: `npm run check` after each `server.js` edit for Free-tier enforcement alignment — passed.
 - No test/lint/build commands exist to run.
 

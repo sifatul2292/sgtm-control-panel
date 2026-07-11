@@ -5125,6 +5125,10 @@ function checkoutRequired(tenant, data) {
   return !hasClaim;
 }
 
+function shouldGateAppShellToCheckout(pathname, method = "GET") {
+  return method === "GET" && (pathname === "/" || pathname === "/index.html");
+}
+
 // Serializes read-modify-write cycles against the JSON database so two concurrent
 // payment requests (e.g. owner double-clicking confirm) can't both read stale
 // "pending" state and race past the status checks below.
@@ -9147,7 +9151,7 @@ const server = createServer(async (req, res) => {
 
     // Paid-plan customer hasn't submitted their transaction ID yet → hold them on
     // the /checkout page instead of the dashboard until they do.
-    if (pathname === "/" && req.method === "GET") {
+    if (shouldGateAppShellToCheckout(pathname, req.method)) {
       const session = getSession(req);
       if (session?.role === "customer") {
         const loaded = await readDatabaseCached();
@@ -9642,6 +9646,21 @@ const server = createServer(async (req, res) => {
       }
       redirect(res, "/login");
       return;
+    }
+
+    // The dashboard shell is normally requested as "/", but browsers/bookmarks can
+    // hit /index.html directly. Keep the checkout wall on both app-shell URLs so
+    // paid-plan signups cannot bypass the standalone payment step.
+    if (shouldGateAppShellToCheckout(pathname, req.method)) {
+      const session = getSession(req);
+      if (session?.role === "customer") {
+        const loaded = await readDatabaseCached();
+        const tenant = loaded.available ? (loaded.data.tenants || []).find((t) => t.id === session.tenantId) : null;
+        if (tenant && checkoutRequired(tenant, loaded.data)) {
+          redirect(res, "/checkout");
+          return;
+        }
+      }
     }
 
     if (req.url?.startsWith("/api/dashboard")) {
