@@ -5937,6 +5937,18 @@ els.assistantNext?.addEventListener("click", async () => {
 });
 els.downloadWebTemplate?.addEventListener("click", () => downloadGeneratedTemplate("web"));
 els.downloadServerTemplate?.addEventListener("click", () => downloadGeneratedTemplate("server"));
+function playSetupVideo() {
+  const preview = document.querySelector("[data-setup-video-preview]");
+  if (!preview || preview.querySelector("iframe")) return;
+  const iframe = document.createElement("iframe");
+  iframe.src = "https://www.youtube-nocookie.com/embed/vSvpiK4vXdc?autoplay=1&rel=0";
+  iframe.title = "Tagioo server-side tracking setup video";
+  iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+  iframe.allowFullscreen = true;
+  preview.replaceChildren(iframe);
+}
+document.querySelector("#setupVideoPlay")?.addEventListener("click", playSetupVideo);
+document.querySelector("[data-setup-video-play]")?.addEventListener("click", playSetupVideo);
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest(".download-plugin-btn");
   if (!btn) return;
