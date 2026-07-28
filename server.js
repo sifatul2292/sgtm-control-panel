@@ -3795,7 +3795,11 @@ function historySnapshotFromSummary(summary, date = localDateKey()) {
       averageOrderValue: 0,
       currency: ""
     },
-    recentEvents: (summary.recentEvents || []).slice(0, config.eventLogLimit)
+    recentEvents: (summary.recentEvents || []).slice(0, config.eventLogLimit),
+    // Keep purchases independently from the general event-log cap. On a busy day
+    // the latest 500 events may contain only a handful of the day's orders even
+    // though the aggregate purchase count correctly covers every stored line.
+    purchaseEvents: (summary.purchaseEvents || (summary.recentEvents || []).filter((event) => event.eventName === "Purchase")).slice(0, 2000)
   };
 }
 
@@ -3887,7 +3891,7 @@ function retainedSummaryFromSnapshots(snapshots, fallbackSummary = null) {
   // recentEvents cap is dominated by a busy day's traffic, which starves the
   // Week/Month views; pull Purchase rows across all retained days separately.
   const purchaseEvents = rows
-    .flatMap((snapshot) => (snapshot.recentEvents || []).filter((event) => event.eventName === "Purchase"))
+    .flatMap((snapshot) => snapshot.purchaseEvents || (snapshot.recentEvents || []).filter((event) => event.eventName === "Purchase"))
     .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
     .slice(0, 2000);
   return {
@@ -7698,6 +7702,7 @@ async function summarizeRequestsTodayUncached(pathname, lineLimit = config.summa
       hourly: [],
       noiseReasons: [],
       recentEvents: [],
+      purchaseEvents: [],
       purchases: emptyPurchases,
       eventLogLimit: config.eventLogLimit,
       summaryTailLines: lineLimit
@@ -7730,6 +7735,7 @@ function aggregateTrackingLines(lines, { token = "", dayKey = "", path: pathname
   const eventDedupe = { exact: new Set(), estimated: new Map() };
   const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, total: 0, errors: 0, purchases: 0, pageView: 0, viewItem: 0, addToCart: 0, beginCheckout: 0 }));
   const recentEvents = [];
+  const purchaseEvents = [];
 
   for (const line of lines) {
     if (dayKey) {
@@ -7775,6 +7781,7 @@ function aggregateTrackingLines(lines, { token = "", dayKey = "", path: pathname
     }
 
     if (parsed.eventName === "Purchase") {
+      purchaseEvents.push(serializeEventRow(parsed));
       const key = purchaseTransactionIdentity(parsed);
       const amount = parseMoney(parsed.value);
       const currency = String(parsed.currency || "").trim().toUpperCase();
@@ -7883,6 +7890,7 @@ function aggregateTrackingLines(lines, { token = "", dayKey = "", path: pathname
     hourly,
     noiseReasons: serializeSummaryMap(noiseReasons),
     recentEvents: recentEvents.reverse(),
+    purchaseEvents: purchaseEvents.reverse(),
     eventLogLimit: config.eventLogLimit
   };
 }
@@ -7999,6 +8007,10 @@ async function summarizeRequestsTodayForPaths(paths, options = {}) {
     .flatMap((summary) => summary.recentEvents || [])
     .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
     .slice(0, config.eventLogLimit);
+  const purchaseEvents = readable
+    .flatMap((summary) => summary.purchaseEvents || (summary.recentEvents || []).filter((event) => event.eventName === "Purchase"))
+    .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+    .slice(0, 2000);
   return {
     ...readable[0],
     path: uniquePaths.join(", "),
@@ -8014,6 +8026,7 @@ async function summarizeRequestsTodayForPaths(paths, options = {}) {
     noiseReasons: mergeSummaryRows(readable, "noiseReasons"),
     purchases: mergePurchaseSummaries(readable),
     recentEvents,
+    purchaseEvents,
     message: "Customer container request summary loaded."
   };
 }
@@ -8915,13 +8928,15 @@ function filterRequestSummaryForTenant(summary, tenant) {
   // format does not), every event reads as "Unknown host" and domain matching would
   // filter everything to zero. On a single-VPS setup all requests belong to the only
   // customer, so return the full summary instead of zeroing it out.
-  const hasHostInfo = (summary.recentEvents || []).some((event) => {
+  const hasHostInfo = [...(summary.recentEvents || []), ...(summary.purchaseEvents || [])].some((event) => {
     const host = normalizeHost(event.host);
     return host && host !== "unknown host";
   });
   if (!hasHostInfo) return summary;
 
   const recentEvents = (summary.recentEvents || []).filter((event) => hostMatchesTenant(event.host, tenant));
+  const purchaseEvents = (summary.purchaseEvents || (summary.recentEvents || []).filter((event) => event.eventName === "Purchase"))
+    .filter((event) => hostMatchesTenant(event.host, tenant));
   const eventCounts = new Map();
   const clientCounts = new Map();
   const hostCounts = new Map();
@@ -8976,7 +8991,13 @@ function filterRequestSummaryForTenant(summary, tenant) {
       else if (event.eventName === "AddToCart") bucket.addToCart += 1;
       else if (event.eventName === "BeginCheckout") bucket.beginCheckout += 1;
     }
+  }
 
+  // Purchase cards have their own uncapped feed. Derive the tenant's purchase
+  // totals from it as well, otherwise host filtering would still reduce a busy
+  // day's accurate aggregate to however many purchases happened to be in the
+  // latest general-event slice.
+  for (const event of purchaseEvents) {
     if (event.eventName === "Purchase") {
       purchases.rawCount += 1;
       const amount = parseMoney(event.value);
@@ -9015,6 +9036,7 @@ function filterRequestSummaryForTenant(summary, tenant) {
     hosts: serializeSummaryMap(hostCounts),
     hourly,
     recentEvents,
+    purchaseEvents,
     purchases
   };
 }

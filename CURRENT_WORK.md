@@ -1,12 +1,13 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-07-14.
+Living status doc. Update after meaningful progress. Last updated: 2026-07-28.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
 ## Recently completed
 Recent commits (newest first, Jul 4–7):
+- **Purchase Inspector completeness** (working tree, Jul 28): retained a dedicated purchase-only event feed outside the general 500-event cap, so busy days show every tracked order represented by the aggregate purchase count; exact overlap between live and retained feeds is deduplicated.
 - **Container creation video guide** (working tree, Jul 14): reused the lazy privacy-enhanced setup video inside the Create New Container walkthrough so customers can follow along while completing the form.
 - **Customer setup video** (working tree, Jul 13): added a lazy-loaded privacy-enhanced YouTube walkthrough to the customer-only Setup Assistant and linked it from public documentation.
 - **Paid-signup checkout guard** (working tree, Jul 11): app shell checkout gate now covers `/index.html` as well as `/`, so pending paid-plan signups cannot bypass the standalone payment step with a direct/static dashboard URL.
@@ -35,6 +36,7 @@ Recent commits (newest first, Jul 4–7):
 
 ## Commands run + results
 - `node --check server.js` (`npm run check`) — syntax gate. Run this after every `server.js` edit.
+- 2026-07-28: `node --check public/app.js` and `npm run check` after fixing the Purchase Inspector feed — passed.
 - 2026-07-14: `node --check public/app.js` and `npm run check` after adding the video to container creation — passed.
 - 2026-07-13: `npm run check` after customer setup video UI — passed.
 - 2026-07-11: `npm run check` after paid-signup checkout guard fix — passed.

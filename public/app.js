@@ -935,15 +935,42 @@ function serverEventRows(data) {
 
 // Purchase rows for the inspector. Prefer the dedicated multi-day purchaseEvents
 // feed (covers Week/Month) and fall back to the generic today/retained rows.
-// Always supplement with today's live recentEvents so SQLite-lag can't cause
+// Always supplement with today's live purchase feed so SQLite lag cannot cause
 // the inspector to show fewer purchases than the dashboard's uniqueCount.
 function inspectorPurchaseRows(data) {
   const purchaseEvents = data.nginx?.retainedEvents?.purchaseEvents;
-  const todayLive = (data.nginx?.todayEvents?.recentEvents || []).filter((e) => e.eventName === "Purchase");
+  const todaySummary = data.nginx?.todayEvents;
+  const todayLive = todaySummary?.purchaseEvents
+    || (todaySummary?.recentEvents || []).filter((event) => event.eventName === "Purchase");
   if (Array.isArray(purchaseEvents) && purchaseEvents.length) {
-    return [...purchaseEvents, ...todayLive].map(mapServerEventRow);
+    // The retained feed normally already includes today. Supplement it for the
+    // few seconds before the retained snapshot refreshes, while removing identical
+    // rows so the UI does not label every purchase as a duplicate/re-send.
+    const rows = [...purchaseEvents];
+    const retainedCopies = new Map();
+    const exactKey = (event) => [
+      event.date,
+      event.path,
+      event.status,
+      event.host,
+      event.transactionId,
+      event.eventId,
+      event.value,
+      event.currency
+    ].join("|");
+    for (const event of purchaseEvents) {
+      const key = exactKey(event);
+      retainedCopies.set(key, Number(retainedCopies.get(key) || 0) + 1);
+    }
+    for (const event of todayLive) {
+      const key = exactKey(event);
+      const copies = Number(retainedCopies.get(key) || 0);
+      if (copies) retainedCopies.set(key, copies - 1);
+      else rows.push(event);
+    }
+    return rows.map(mapServerEventRow);
   }
-  return purchaseRows(data);
+  return todayLive.length ? todayLive.map(mapServerEventRow) : purchaseRows(data);
 }
 
 function renderEventLogStats(allItems, visibleItems, summary) {
