@@ -4135,7 +4135,71 @@ const TAGIOO_OWN_TRACKING = {
   metaCapiToken: process.env.TAGIOO_META_CAPI_TOKEN || ""
 };
 
-async function forwardTagiooOwnEvent(eventName, { seed, eventParams = {}, pageLocation } = {}) {
+// Snapshot the real visitor's match signals off an inbound request. Everything
+// below sends to Meta server-to-server, which by default carries NONE of this —
+// Meta then sees this VPS's own IP/UA on every event and match quality collapses
+// (Lead sat at 3.0/10 for exactly this reason). Tagioo's own funnel only; never
+// touches a customer tenant's tracking.
+function tagiooVisitorContext(req) {
+  if (!req || !req.headers) return null;
+  const cookies = parseCookies(req.headers.cookie);
+  const ip = getClientIp(req);
+  // event_source_url is stripped of its query string on purpose: /signup can
+  // carry ?email= prefill and that must never leave the box in a URL.
+  const host = String(req.headers["x-forwarded-host"] || req.headers.host || "tagioo.com").split(",")[0].trim();
+  const proto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+  const path = String(req.url || "/").split("?")[0];
+  // fbevents.js normally writes _fbc itself, but only once the pixel has loaded.
+  // Rebuild it from the raw ?fbclid= when the ad click is still mid-landing.
+  let fbc = cookies._fbc || "";
+  if (!fbc) {
+    const fbclid = new URL(req.url || "/", `${proto}://${host}`).searchParams.get("fbclid");
+    if (fbclid) fbc = `fb.1.${Date.now()}.${fbclid}`;
+  }
+  return {
+    ip: ip && ip !== "unknown" ? ip : "",
+    ua: String(req.headers["user-agent"] || ""),
+    fbp: cookies._fbp || "",
+    fbc,
+    vid: cookies.tg_vid || "",
+    url: `${proto}://${host}${path}`
+  };
+}
+
+// Merge a visitor snapshot into a Meta CAPI event. Mutates and returns `event`.
+function applyTagiooVisitorContext(event, visitor) {
+  if (!visitor) return event;
+  const ud = (event.user_data ||= {});
+  if (visitor.ip) ud.client_ip_address = visitor.ip;
+  if (visitor.ua) ud.client_user_agent = visitor.ua;
+  if (visitor.fbp) ud.fbp = visitor.fbp;
+  if (visitor.fbc) ud.fbc = visitor.fbc;
+  // tg_vid is tagioo's own stable per-visitor cookie (90d, set on first /signup
+  // view). Hashed it's a valid external_id, so every event gets one for free.
+  if (visitor.vid && !ud.external_id) {
+    const ext = sha256Hex(visitor.vid);
+    if (ext) ud.external_id = [ext];
+  }
+  if (visitor.url) event.event_source_url = visitor.url;
+  return event;
+}
+
+// Fire one tagioo-own Meta CAPI event. Centralises the pixel/token guard and the
+// throwaway tenant shape sendMetaOfflineConversions expects.
+async function sendTagiooOwnMetaEvent(event, label) {
+  if (!TAGIOO_OWN_TRACKING.metaPixelId || !TAGIOO_OWN_TRACKING.metaCapiToken) return;
+  const tagiooOwnTenant = { tracking: { meta: { pixelId: TAGIOO_OWN_TRACKING.metaPixelId, capiToken: TAGIOO_OWN_TRACKING.metaCapiToken } } };
+  try {
+    const result = await sendMetaOfflineConversions(tagiooOwnTenant, [event], { useTestCode: false });
+    if (!result.ok) {
+      console.warn(`[tagioo-self-track] Meta CAPI ${label} send: ${(result.fbErrors || [result.reason]).join("; ")}`);
+    }
+  } catch (error) {
+    console.warn(`[tagioo-self-track] Meta CAPI ${label} send failed: ${error.message}`);
+  }
+}
+
+async function forwardTagiooOwnEvent(eventName, { seed, eventParams = {}, pageLocation, visitor } = {}) {
   const params = new URLSearchParams({
     v: "2",
     tid: TAGIOO_OWN_TRACKING.measurementId,
@@ -4145,11 +4209,23 @@ async function forwardTagiooOwnEvent(eventName, { seed, eventParams = {}, pageLo
     ...eventParams
   });
   if (pageLocation) params.set("dl", pageLocation);
+  else if (visitor?.url) params.set("dl", visitor.url);
   const endpoint = `${TAGIOO_OWN_TRACKING.domain}/g/collect?${params.toString()}`;
+  // Without these headers the hit looks like it came from the VPS itself: GA4
+  // geolocates every signup to the datacentre and the in-container Meta tag has
+  // no usable IP/UA/cookies. Nginx in front of sGTM appends its own hop to
+  // x-forwarded-for, so the visitor stays first in the list.
+  const headers = { "content-type": "text/plain;charset=UTF-8" };
+  if (visitor?.ip) headers["x-forwarded-for"] = visitor.ip;
+  if (visitor?.ua) headers["user-agent"] = visitor.ua;
+  const forwardedCookies = [];
+  if (visitor?.fbp) forwardedCookies.push(`_fbp=${visitor.fbp}`);
+  if (visitor?.fbc) forwardedCookies.push(`_fbc=${visitor.fbc}`);
+  if (forwardedCookies.length) headers.cookie = forwardedCookies.join("; ");
   try {
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "content-type": "text/plain;charset=UTF-8" }
+      headers
     });
     if (!response.ok) {
       console.warn(`[tagioo-self-track] ${eventName} forward returned ${response.status}`);
@@ -4159,17 +4235,37 @@ async function forwardTagiooOwnEvent(eventName, { seed, eventParams = {}, pageLo
   }
 }
 
-// Direct Meta CAPI send for tagioo's own CompleteRegistration, mirroring
-// sendOrderToMetaCapi below: the gtag forward above is IP/UA match only, this
-// adds hashed email/phone/name for real match quality. Shares eventId with the
-// gtag hit's ep.event_id so Meta dedupes to one CompleteRegistration instead of
-// counting both. No-ops silently if TAGIOO_META_CAPI_TOKEN isn't set.
-async function sendTagiooSignupToMetaCapi(values, eventId) {
-  if (!TAGIOO_OWN_TRACKING.metaPixelId || !TAGIOO_OWN_TRACKING.metaCapiToken) return;
-
-  const fullName = String(values.fullName || "").trim();
+// Hashed name parts from a "Firstname Lastname" string.
+function tagiooNameParts(fullNameRaw) {
+  const fullName = String(fullNameRaw || "").trim();
   const [firstName, ...rest] = fullName.split(/\s+/);
-  const lastName = rest.join(" ");
+  return { firstName, lastName: rest.join(" ") };
+}
+
+// Direct Meta CAPI send for the Lead fired when a visitor opens /signup. Used to
+// be gtag-forward-only, which meant Meta received the VPS's IP/UA and nothing
+// else on all of them — the visitor context here is the whole point. Shares
+// eventId with the gtag hit so Meta dedupes to a single Lead.
+async function sendTagiooLeadToMetaCapi(visitor, eventId) {
+  const event = applyTagiooVisitorContext({
+    event_name: "Lead",
+    event_time: Math.floor(Date.now() / 1000),
+    action_source: "website",
+    event_id: eventId,
+    user_data: {}
+  }, visitor);
+  if (!Object.keys(event.user_data).length) return;
+  await sendTagiooOwnMetaEvent(event, "generate_lead");
+}
+
+// Direct Meta CAPI send for tagioo's own CompleteRegistration, mirroring
+// sendOrderToMetaCapi below: the gtag forward above only reaches Meta through
+// the in-container tag, so this carries the hashed email/phone/name plus the
+// visitor's own IP/UA/fbp/fbc/external_id. Shares eventId with the gtag hit's
+// ep.event_id so Meta dedupes to one CompleteRegistration instead of counting
+// both. No-ops silently if TAGIOO_META_CAPI_TOKEN isn't set.
+async function sendTagiooSignupToMetaCapi(values, eventId, visitor) {
+  const { firstName, lastName } = tagiooNameParts(values.fullName);
 
   const userData = {};
   const em = sha256Hex(values.email); if (em) userData.em = [em];
@@ -4177,37 +4273,26 @@ async function sendTagiooSignupToMetaCapi(values, eventId) {
   const fn = sha256Hex(firstName); if (fn) userData.fn = [fn];
   const ln = sha256Hex(lastName); if (ln) userData.ln = [ln];
   const country = sha256Hex(values.country); if (country) userData.country = [country];
-  if (!Object.keys(userData).length) return;
 
-  const event = {
+  const event = applyTagiooVisitorContext({
     event_name: "CompleteRegistration",
     event_time: Math.floor(Date.now() / 1000),
     action_source: "website",
     event_id: eventId,
     user_data: userData
-  };
-
-  const tagiooOwnTenant = { tracking: { meta: { pixelId: TAGIOO_OWN_TRACKING.metaPixelId, capiToken: TAGIOO_OWN_TRACKING.metaCapiToken } } };
-  try {
-    const result = await sendMetaOfflineConversions(tagiooOwnTenant, [event], { useTestCode: false });
-    if (!result.ok) {
-      console.warn(`[tagioo-self-track] Meta CAPI sign_up send: ${(result.fbErrors || [result.reason]).join("; ")}`);
-    }
-  } catch (error) {
-    console.warn(`[tagioo-self-track] Meta CAPI sign_up send failed: ${error.message}`);
-  }
+  }, visitor);
+  if (!Object.keys(event.user_data).length) return;
+  await sendTagiooOwnMetaEvent(event, "sign_up");
 }
 
-// Same idea as sendTagiooSignupToMetaCapi, for the paid-conversion side: the
-// purchase gtag forward is IP/UA match only, this adds hashed email/phone/name
-// from the tenant record (set at signup) for real match quality. Shares
-// eventId with the gtag hit so Meta dedupes to one Purchase.
+// Same idea as sendTagiooSignupToMetaCapi, for the paid-conversion side: hashed
+// email/phone/name from the tenant record (set at signup). Payment confirmation
+// runs in an OWNER session, so there is no visitor request to read — the buyer's
+// own IP/UA/fbp/fbc snapshot is replayed from tenant.tracking.tagiooVisitor,
+// stored when they signed up. Shares eventId with the gtag hit so Meta dedupes
+// to one Purchase.
 async function sendTagiooPurchaseToMetaCapi(tenant, payment, eventId) {
-  if (!TAGIOO_OWN_TRACKING.metaPixelId || !TAGIOO_OWN_TRACKING.metaCapiToken) return;
-
-  const fullName = String(tenant?.fullName || "").trim();
-  const [firstName, ...rest] = fullName.split(/\s+/);
-  const lastName = rest.join(" ");
+  const { firstName, lastName } = tagiooNameParts(tenant?.fullName);
 
   const userData = {};
   const em = sha256Hex(tenant?.email); if (em) userData.em = [em];
@@ -4215,10 +4300,9 @@ async function sendTagiooPurchaseToMetaCapi(tenant, payment, eventId) {
   const fn = sha256Hex(firstName); if (fn) userData.fn = [fn];
   const ln = sha256Hex(lastName); if (ln) userData.ln = [ln];
   const country = sha256Hex(tenant?.country); if (country) userData.country = [country];
-  if (!Object.keys(userData).length) return;
 
   const value = Number(payment.amount);
-  const event = {
+  const event = applyTagiooVisitorContext({
     event_name: "Purchase",
     event_time: Math.floor(Date.now() / 1000),
     action_source: "website",
@@ -4229,16 +4313,51 @@ async function sendTagiooPurchaseToMetaCapi(tenant, payment, eventId) {
       order_id: String(payment.id),
       ...(Number.isFinite(value) ? { value } : {})
     }
-  };
+  }, storedTagiooVisitor(tenant));
+  if (!Object.keys(event.user_data).length) return;
+  await sendTagiooOwnMetaEvent(event, "purchase");
+}
 
-  const tagiooOwnTenant = { tracking: { meta: { pixelId: TAGIOO_OWN_TRACKING.metaPixelId, capiToken: TAGIOO_OWN_TRACKING.metaCapiToken } } };
+// Replay a stored signup-time visitor snapshot. IP and user agent are dropped
+// once they're older than a week: Meta treats a stale IP/UA pair as a wrong
+// signal rather than a missing one, while fbp/fbc/tg_vid stay valid for months.
+function storedTagiooVisitor(tenant) {
+  const saved = tenant?.tracking?.tagiooVisitor;
+  if (!saved) return null;
+  const savedAt = Date.parse(saved.at || "");
+  const fresh = Number.isFinite(savedAt) && Date.now() - savedAt < 7 * 24 * 60 * 60 * 1000;
+  return {
+    ip: fresh ? saved.ip || "" : "",
+    ua: fresh ? saved.ua || "" : "",
+    fbp: saved.fbp || "",
+    fbc: saved.fbc || "",
+    vid: saved.vid || "",
+    url: saved.url || ""
+  };
+}
+
+// Persist the signup-time visitor snapshot on the tenant so a later owner-side
+// payment confirmation can still attribute the Purchase to the real buyer.
+// Additive key under `tracking` — nothing on the customer tracking read path
+// looks at it.
+async function saveTagiooVisitorContext(tenantId, visitor) {
+  if (!tenantId || !visitor) return;
   try {
-    const result = await sendMetaOfflineConversions(tagiooOwnTenant, [event], { useTestCode: false });
-    if (!result.ok) {
-      console.warn(`[tagioo-self-track] Meta CAPI purchase send: ${(result.fbErrors || [result.reason]).join("; ")}`);
-    }
-  } catch (error) {
-    console.warn(`[tagioo-self-track] Meta CAPI purchase send failed: ${error.message}`);
+    // Read-modify-write of the whole tenant list — take the same lock the billing
+    // writes use so this can't clobber a concurrent plan/payment change.
+    await withDbLock(async () => {
+      const loaded = await readDatabase();
+      if (!loaded.available) return;
+      const data = loaded.data;
+      const index = (data.tenants || []).findIndex((tenant) => tenant.id === tenantId);
+      if (index === -1) return;
+      const tracking = { ...(data.tenants[index].tracking || {}) };
+      tracking.tagiooVisitor = { at: new Date().toISOString(), ...visitor };
+      data.tenants[index] = { ...data.tenants[index], tracking };
+      await writeDatabase(data);
+    });
+  } catch {
+    // Attribution bookkeeping must never fail a signup or a payment claim.
   }
 }
 
@@ -5489,8 +5608,13 @@ async function confirmPaymentLocked(paymentId, session) {
   // own GA4/Meta (TAGIOO_OWN_TRACKING) for ad optimization/attribution, same
   // gtag /g/collect mechanism as the per-tenant purchase forward above.
   const purchaseEventId = `purchase_${payment.id}`;
+  // This runs in the OWNER's session, so req here belongs to the owner, not the
+  // buyer — never snapshot it. Replay the buyer's signup-time context instead,
+  // so GA4 geo and Meta match land on the customer.
+  const purchaseVisitor = storedTagiooVisitor(tenant);
   forwardTagiooOwnEvent("purchase", {
     seed: payment.id,
+    visitor: purchaseVisitor,
     eventParams: {
       cu: "BDT",
       "ep.transaction_id": String(payment.id),
@@ -9326,7 +9450,19 @@ const server = createServer(async (req, res) => {
         setCookies.push(`tg_vid=${visitorId}; Path=/; Max-Age=7776000; SameSite=Lax`);
       }
       if (!cookies.tg_lead_sent) {
-        forwardTagiooOwnEvent("generate_lead", { seed: visitorId }).catch(() => {});
+        // Snapshot this visitor's IP/UA/_fbp/_fbc before responding — both sends
+        // below run server-to-server and would otherwise carry the VPS's own
+        // identity. On a first visit tg_vid isn't in the cookie header yet, so
+        // seed the snapshot with the id we just minted.
+        const leadVisitor = { ...(tagiooVisitorContext(req) || {}), vid: visitorId };
+        const leadEventId = `lead_${visitorId}_${Math.floor(Date.now() / 1000)}`;
+        forwardTagiooOwnEvent("generate_lead", {
+          seed: visitorId,
+          visitor: leadVisitor,
+          eventParams: { "ep.event_id": leadEventId }
+        }).catch(() => {});
+        // Same event_id so Meta dedupes to one Lead and merges the richer copy.
+        sendTagiooLeadToMetaCapi(leadVisitor, leadEventId).catch(() => {});
         setCookies.push(`tg_lead_sent=1; Path=/; Max-Age=86400; SameSite=Lax`);
       }
       const headers = setCookies.length ? { "set-cookie": setCookies } : {};
@@ -9437,8 +9573,10 @@ const server = createServer(async (req, res) => {
       // with tg_vid (set on the GET /signup Lead hit) when present so GA4/Meta
       // tie this CompleteRegistration to the same visitor as the earlier Lead.
       const signupEventId = `signup_${result.account.id}`;
+      const signupVisitor = tagiooVisitorContext(req);
       forwardTagiooOwnEvent("sign_up", {
         seed: parseCookies(req.headers.cookie).tg_vid || result.account.tenantId,
+        visitor: signupVisitor,
         eventParams: {
           "ep.plan": "Free",
           "ep.tenant_id": result.account.tenantId,
@@ -9446,8 +9584,11 @@ const server = createServer(async (req, res) => {
         }
       }).catch(() => {});
       // Same event_id as above so Meta dedupes into one CompleteRegistration and
-      // merges in the hashed email/phone/name for real match quality.
-      sendTagiooSignupToMetaCapi(values, signupEventId).catch(() => {});
+      // merges in the hashed email/phone/name plus the visitor's IP/UA/fbp/fbc.
+      sendTagiooSignupToMetaCapi(values, signupEventId, signupVisitor).catch(() => {});
+      // Keep the snapshot: a paid upgrade is confirmed later in an owner session,
+      // where the buyer's own request context is no longer available.
+      saveTagiooVisitorContext(result.account.tenantId, signupVisitor).catch(() => {});
 
       // If the visitor picked a paid plan on the pricing page, don't drop them
       // on the Free/trial dashboard — stage the upgrade as pending_payment
@@ -9505,6 +9646,9 @@ const server = createServer(async (req, res) => {
       const result = await submitPaymentClaim(values, session);
       if (result.ok) {
         invalidateOwnerDashboardCache();
+        // Same as /api/customer/payment-claim: capture the buyer's own match
+        // signals now, since the Purchase fires later in an owner session.
+        saveTagiooVisitorContext(session.tenantId, tagiooVisitorContext(req)).catch(() => {});
         redirect(res, "/#billing");
         return;
       }
@@ -9870,7 +10014,13 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await submitPaymentClaim(body, session);
-      if (result.ok) invalidateOwnerDashboardCache();
+      if (result.ok) {
+        invalidateOwnerDashboardCache();
+        // Owner confirmation happens later without the buyer's request, so
+        // refresh their match snapshot now — this is the closest real visit to
+        // the eventual Purchase event.
+        saveTagiooVisitorContext(session.tenantId, tagiooVisitorContext(req)).catch(() => {});
+      }
       jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok ? { payment: result.payment } : { errors: result.errors });
       return;
     }
