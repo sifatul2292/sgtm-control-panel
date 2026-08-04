@@ -1301,24 +1301,28 @@ function tagiooGalleryTemplateGuide(destinations) {
 // Resolve the dedup id + the ecommerce object for the dataLayer message that
 // actually fired this tag.
 //
-// The id comes from {{dlv - event_id}}, which GTM snapshots at the triggering
-// message — NOT from scanning window.dataLayer at runtime. The old runtime scan
-// took the newest event_id in the whole dataLayer, so on storefronts that push
-// several events per page load (the WooCommerce plugin pushes a queued
-// add_to_cart in wp_footer after begin_checkout renders in the body) the
-// browser pixel attached the WRONG event's id while the server GA4 tag sent the
-// right one — the two never deduplicated.
+// The id comes from {{Tagioo - event_id}}, which resolves against the dataLayer
+// state at the triggering message — NOT from scanning window.dataLayer at
+// runtime. The old runtime scan took the newest event_id in the whole
+// dataLayer, so on storefronts that push several events per page load (the
+// WooCommerce plugin pushes a queued add_to_cart in wp_footer after
+// begin_checkout renders in the body) the browser pixel attached the WRONG
+// event's id while the server GA4 tag sent the right one — the two never
+// deduplicated.
 //
 // The ecommerce object is then taken from the dataLayer push carrying that same
 // event_id, falling back to the newest ecommerce object when the storefront
-// sends no event_id at all. GTM substitutes variables into custom HTML raw and
-// writes the bare token `undefined` when unset, hence the quoted read plus the
+// sends no event_id at all. The comparison re-applies the variable's sanitiser
+// so a storefront id containing stripped characters still matches its own push.
+// GTM substitutes variables into custom HTML raw and writes the bare token
+// `undefined` when a variable errors, hence the quoted read plus the
 // "undefined" string guard.
 const PIXEL_CONTEXT_SCRIPT =
   "var eid='{{Tagioo - event_id}}';if(eid==='undefined')eid='';" +
+  "function s(v){return String(v).replace(/[^A-Za-z0-9_.:@-]/g,'').substring(0,120);}" +
   "var dl=window.dataLayer||[],ec=null,fb=null;" +
   "for(var i=dl.length-1;i>=0;i--){var e=dl[i];if(!e||!e.ecommerce)continue;" +
-  "if(eid&&String(e.event_id)===eid){ec=e.ecommerce;break;}if(!fb)fb=e.ecommerce;}" +
+  "if(eid&&e.event_id&&s(e.event_id)===eid){ec=e.ecommerce;break;}if(!fb)fb=e.ecommerce;}" +
   "ec=ec||fb||{};";
 
 // Browser-side Meta Pixel event tag. eventID is omitted entirely when no id
