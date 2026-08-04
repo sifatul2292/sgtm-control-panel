@@ -1387,15 +1387,21 @@ function buildWebGtmTemplate(input) {
     },
     // Single dedup key for every destination. Resolves, in order: the event_id
     // the storefront pushed with THIS dataLayer message, the transaction_id, then
-    // a generated per-page-load id. The last case is what makes browser PageView
-    // dedupe against the server-side CAPI PageView — storefronts push no event_id
-    // on a plain page view, so without it both sides sent no key and Meta counted
-    // the visit twice. Always returns a string, so it is safe to inline (quoted)
-    // into custom HTML tags.
+    // a generated per-URL id. The last case is what makes browser PageView dedupe
+    // against the server-side CAPI PageView — storefronts push no event_id on a
+    // plain page view, so without it both sides sent no key and Meta counted the
+    // visit twice. Keyed on location.href, not just page load, so an SPA route
+    // change mints a fresh id instead of collapsing a whole session into one
+    // PageView.
+    //
+    // The result is inlined (quoted) into custom HTML tags, so it is restricted
+    // to characters that cannot terminate the string literal or inject script.
+    // Both the pixel tags and the GA4 tag read this same variable, so sanitising
+    // here keeps the browser and server keys identical.
     {
       accountId: "0", containerId: "0", variableId: "32",
       name: "Tagioo - event_id", type: "jsm",
-      parameter: [gtmTemplateParam("javascript", "function(){var e={{dlv - event_id}};if(e)return String(e);var t={{dlv - ecommerce.transaction_id}};if(t)return String(t);if(!window.__tagiooPageEventId){window.__tagiooPageEventId='tagioo-pv-'+(new Date()).getTime()+'-'+Math.random().toString(36).substring(2,10);}return window.__tagiooPageEventId;}")],
+      parameter: [gtmTemplateParam("javascript", "function(){function s(v){return String(v).replace(/[^A-Za-z0-9_.:@-]/g,'').substring(0,120);}var e={{dlv - event_id}};if(e)return s(e);var t={{dlv - ecommerce.transaction_id}};if(t)return s(t);var k=location.href;var c=window.__tagiooPageEventId;if(!c||c.k!==k){c={k:k,v:'tagioo-pv-'+(new Date()).getTime()+'-'+Math.random().toString(36).substring(2,10)};window.__tagiooPageEventId=c;}return c.v;}")],
       fingerprint: String(Date.now()), parentFolderId: "2"
     }
   ];
