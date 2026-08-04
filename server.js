@@ -1298,18 +1298,39 @@ function tagiooGalleryTemplateGuide(destinations) {
   return guide;
 }
 
-// Browser-side Meta Pixel event tag. Reads ecommerce + event_id from dataLayer
-// at runtime. event_id falls back to ecommerce.transaction_id so it matches the
-// server CAPI hit (which uses the same fallback) and dedupes. eventID is omitted
-// entirely when no id exists, to avoid sending the literal string "undefined".
+// Resolve the dedup id + the ecommerce object for the dataLayer message that
+// actually fired this tag.
+//
+// The id comes from {{dlv - event_id}}, which GTM snapshots at the triggering
+// message — NOT from scanning window.dataLayer at runtime. The old runtime scan
+// took the newest event_id in the whole dataLayer, so on storefronts that push
+// several events per page load (the WooCommerce plugin pushes a queued
+// add_to_cart in wp_footer after begin_checkout renders in the body) the
+// browser pixel attached the WRONG event's id while the server GA4 tag sent the
+// right one — the two never deduplicated.
+//
+// The ecommerce object is then taken from the dataLayer push carrying that same
+// event_id, falling back to the newest ecommerce object when the storefront
+// sends no event_id at all. GTM substitutes variables into custom HTML raw and
+// writes the bare token `undefined` when unset, hence the quoted read plus the
+// "undefined" string guard.
+const PIXEL_CONTEXT_SCRIPT =
+  "var eid='{{Tagioo - event_id}}';if(eid==='undefined')eid='';" +
+  "var dl=window.dataLayer||[],ec=null,fb=null;" +
+  "for(var i=dl.length-1;i>=0;i--){var e=dl[i];if(!e||!e.ecommerce)continue;" +
+  "if(eid&&String(e.event_id)===eid){ec=e.ecommerce;break;}if(!fb)fb=e.ecommerce;}" +
+  "ec=ec||fb||{};";
+
+// Browser-side Meta Pixel event tag. eventID is omitted entirely when no id
+// exists, to avoid sending the literal string "undefined".
 function metaPixelEventScript(metaEventName) {
   const orderId = metaEventName === "Purchase" ? "if(ec.transaction_id)p.order_id=ec.transaction_id;" : "";
-  return "<script>(function(){var dl=window.dataLayer||[];var ec=null,eid='';for(var i=dl.length-1;i>=0;i--){var e=dl[i];if(!e)continue;if(!eid&&e.event_id)eid=e.event_id;if(!ec&&e.ecommerce)ec=e.ecommerce;}ec=ec||{};if(!eid&&ec.transaction_id)eid=ec.transaction_id;var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;" + orderId + "if(window.fbq)fbq('track','" + metaEventName + "',p,eid?{eventID:String(eid)}:{});})();</script>";
+  return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + "var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;" + orderId + "if(window.fbq)fbq('track','" + metaEventName + "',p,eid?{eventID:String(eid)}:{});})();</script>";
 }
 
-// Browser-side TikTok Pixel event tag. Same runtime-read + event_id fallback.
+// Browser-side TikTok Pixel event tag. Same message-anchored id + fallback.
 function tiktokPixelEventScript(tiktokEventName) {
-  return "<script>(function(){var dl=window.dataLayer||[];var ec=null,eid='';for(var i=dl.length-1;i>=0;i--){var e=dl[i];if(!e)continue;if(!eid&&e.event_id)eid=e.event_id;if(!ec&&e.ecommerce)ec=e.ecommerce;}ec=ec||{};if(!eid&&ec.transaction_id)eid=ec.transaction_id;var items=ec.items||[];var contents=items.map(function(it){return {content_id:String(it.item_id||it.id||''),content_name:it.item_name,quantity:it.quantity||1,price:it.price};});var p={contents:contents,content_type:'product'};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;if(window.ttq)ttq.track('" + tiktokEventName + "',p,eid?{event_id:String(eid)}:{});})();</script>";
+  return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + "var items=ec.items||[];var contents=items.map(function(it){return {content_id:String(it.item_id||it.id||''),content_name:it.item_name,quantity:it.quantity||1,price:it.price};});var p={contents:contents,content_type:'product'};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;if(window.ttq)ttq.track('" + tiktokEventName + "',p,eid?{event_id:String(eid)}:{});})();</script>";
 }
 
 function buildWebGtmTemplate(input) {
@@ -1363,6 +1384,19 @@ function buildWebGtmTemplate(input) {
       name: "Tagioo - page_title", type: "jsm",
       parameter: [gtmTemplateParam("javascript", "function(){return document.title;}")],
       fingerprint: String(Date.now()), parentFolderId: "2"
+    },
+    // Single dedup key for every destination. Resolves, in order: the event_id
+    // the storefront pushed with THIS dataLayer message, the transaction_id, then
+    // a generated per-page-load id. The last case is what makes browser PageView
+    // dedupe against the server-side CAPI PageView — storefronts push no event_id
+    // on a plain page view, so without it both sides sent no key and Meta counted
+    // the visit twice. Always returns a string, so it is safe to inline (quoted)
+    // into custom HTML tags.
+    {
+      accountId: "0", containerId: "0", variableId: "32",
+      name: "Tagioo - event_id", type: "jsm",
+      parameter: [gtmTemplateParam("javascript", "function(){var e={{dlv - event_id}};if(e)return String(e);var t={{dlv - ecommerce.transaction_id}};if(t)return String(t);if(!window.__tagiooPageEventId){window.__tagiooPageEventId='tagioo-pv-'+(new Date()).getTime()+'-'+Math.random().toString(36).substring(2,10);}return window.__tagiooPageEventId;}")],
+      fingerprint: String(Date.now()), parentFolderId: "2"
     }
   ];
   const triggers = [
@@ -1393,7 +1427,7 @@ function buildWebGtmTemplate(input) {
       const eventSettingsRows = [
         { parameter: "page_location", parameterValue: "{{Page URL}}" },
         { parameter: "page_title", parameterValue: "{{Tagioo - page_title}}" },
-        { parameter: "event_id", parameterValue: "{{dlv - event_id}}" },
+        { parameter: "event_id", parameterValue: "{{Tagioo - event_id}}" },
         { parameter: "user_data.email_address", parameterValue: "{{dlv - user_data.email_address}}" },
         { parameter: "user_data.phone_number", parameterValue: "{{dlv - user_data.phone_number}}" },
         { parameter: "user_data.first_name", parameterValue: "{{dlv - user_data.first_name}}" },
@@ -1442,7 +1476,7 @@ function buildWebGtmTemplate(input) {
   }
   if (destinations.includes("meta")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo Meta - Pixel Base", "html", [
-      gtmTemplateParam("html", "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{Tagioo - meta_pixel_id}}');(function(){var dl=window.dataLayer||[],eid='';for(var i=dl.length-1;i>=0;i--){if(dl[i]&&dl[i].event_id){eid=dl[i].event_id;break;}}fbq('track','PageView',{},eid?{eventID:String(eid)}:{});})();</script>")
+      gtmTemplateParam("html", "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{Tagioo - meta_pixel_id}}');(function(){var eid='{{Tagioo - event_id}}';if(eid==='undefined')eid='';fbq('track','PageView',{},eid?{eventID:String(eid)}:{});})();</script>")
     ], ["2147479553"], "4"));
     // Browser pixel events, deduped with server CAPI via event_id.
     const metaEventMap = [

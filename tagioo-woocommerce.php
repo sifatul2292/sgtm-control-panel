@@ -3,7 +3,7 @@
  * Plugin Name: Tagioo for WooCommerce
  * Plugin URI:  https://tagioo.com
  * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.4.0
+ * Version:     2.4.1
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author:      Tagioo
@@ -14,7 +14,7 @@
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.4.0');
+define('TAGIOO_VERSION', '2.4.1');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
@@ -329,6 +329,15 @@ function tagioo_event_id(string $prefix): string {
     return 'tagioo-' . $prefix . '-' . str_replace('.', '', uniqid('', true));
 }
 
+// Purchase dedup key. Deliberately the RAW WooCommerce order ID (not the
+// customer-facing order number, which sequential-order-number plugins change,
+// and no "tagioo-purchase-" prefix): the Tagioo panel's order-webhook purchase
+// recovery sends event_id = the Woo webhook's `id` field. Any other format makes
+// Meta treat the recovery hit as a separate Purchase → double counting.
+function tagioo_purchase_event_id(\WC_Order $order): string {
+    return (string) $order->get_id();
+}
+
 function tagioo_push_script(array $data, bool $echo = true): string {
     $out = '';
     // GTM v2 merges nested objects — always clear stale ecommerce before each event.
@@ -543,7 +552,9 @@ add_action('woocommerce_before_checkout_form', function () {
 
 // ---------------------------------------------------------------------------
 // purchase — thank-you page (browser hit)
-// event_id = order number → matches server-side hit so Meta deduplicates to 1
+// event_id = raw WooCommerce order ID → matches the plugin's own server hit AND
+// the panel's order-webhook purchase recovery (which keys on the Woo order id),
+// so Meta deduplicates all of them to a single Purchase.
 // ---------------------------------------------------------------------------
 add_action('woocommerce_thankyou', function (int $order_id) {
     if (tagioo_opt('track_purchase') !== '1' || !$order_id) return;
@@ -555,7 +566,7 @@ add_action('woocommerce_thankyou', function (int $order_id) {
     $order->update_meta_data(TAGIOO_META_FIRED, '1');
     $order->save();
 
-    $event_id = 'tagioo-purchase-' . $order->get_order_number();
+    $event_id = tagioo_purchase_event_id($order);
 
     tagioo_push_script([
         'event'    => 'purchase',
@@ -610,7 +621,7 @@ add_action('tagioo_server_purchase', function (int $order_id, int $attempt = 1) 
     if ($order->get_meta(TAGIOO_META_SS_FIRED)) return;   // already sent
 
     $order_num = (string) $order->get_order_number();
-    $event_id  = 'tagioo-purchase-' . $order_num;          // same as browser hit
+    $event_id  = tagioo_purchase_event_id($order);         // same as browser hit
     $user_data = tagioo_user_data_from_order($order);
 
     // fbp/fbc/UA captured from the browser at checkout; IP prefers the IPv6 the

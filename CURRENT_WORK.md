@@ -23,6 +23,13 @@ Recent commits (newest first, Jul 4–7):
 ## In progress
 - SaaS payments phase 1 on this branch. Manual bKash/Nagad claim → owner-confirm lifecycle wired (emails + routes exist). Billing UI, invoices, plan limits, extra-container add-on, downgrade-at-cycle-end, and free-tier §3 enforcement alignment now landed. Still review paid renewal grace/expired suspension when touching billing next.
 
+## 2026-08-05 — Meta event deduplication fix (alurkohv / WooCommerce plugin)
+Symptom: alurkohv (WordPress + Tagioo plugin) showed Purchase "deduplication has not been set up" and InitiateCheckout Event ID coverage 65.69%. amolbooks/shobaz unaffected because they run no plugin and push one event per page load.
+Two independent root causes, both fixed:
+1. **Purchase** — plugin used `event_id = 'tagioo-purchase-' . order_number`, while the panel's order-webhook recovery (`forwardOrderToSgtm` + `sendOrderToMetaCapi`) uses the raw Woo order id. Different keys → Meta counted each order twice. Plugin now sends `event_id = $order->get_id()` (`tagioo_purchase_event_id()`), matching the webhook's `id` field. Plugin bumped 2.4.0 → 2.4.1; **alurkohv must reinstall the plugin zip from the panel**.
+2. **Upper funnel** — browser Meta/TikTok custom HTML tags scanned `window.dataLayer` backwards for *any* `event_id` at runtime, so on WooCommerce (queued `add_to_cart` flushes in `wp_footer` after `begin_checkout` renders in the body) the pixel attached the wrong event's id *and* the wrong `ecommerce` object, while the server GA4 tag sent the right one. Tags now read the new `{{Tagioo - event_id}}` variable (GTM snapshots it at the triggering message) and pick the `ecommerce` object of the push carrying that id. Same variable also gives plain PageViews a per-page-load id so browser PageView dedupes against the CAPI PageView.
+Requires each affected tenant to re-import `web.json` and republish the **web** container. Server container untouched.
+
 ## Files recently changed / why
 - `server.js` — payments, self-tracking, dashboard perf caching, provisioning, and Free-tier rolling-cycle enforcement. Main monolith; most churn here.
 - `db.js` — SQLite event store schema/queries.
@@ -38,6 +45,7 @@ Recent commits (newest first, Jul 4–7):
 
 ## Commands run + results
 - `node --check server.js` (`npm run check`) — syntax gate. Run this after every `server.js` edit.
+- 2026-08-05: `npm run check` after the dedup fix — passed. Also ran a throwaway harness that extracted `PIXEL_CONTEXT_SCRIPT` + `metaPixelEventScript` + `tiktokPixelEventScript` from `server.js`, substituted the GTM variable, asserted the generated pixel JS parses for id/undefined values, and replayed the WooCommerce `begin_checkout`-then-`add_to_cart` dataLayer race: `eventID` and `value` now come from the triggering push (500, `tagioo-bc-x`) instead of the later one (99, `tagioo-atc-y`). No PHP binary on this Mac, so `tagioo-woocommerce.php` was not lint-checked.
 - 2026-08-04: `npm run check` after the Meta match-quality work — passed. Also ran a throwaway harness that extracted the new pure helpers (`tagiooVisitorContext`, `applyTagiooVisitorContext`, `storedTagiooVisitor`, `tagiooNameParts`) straight out of `server.js` and asserted 22 cases — XFF first-hop parsing, `?fbclid=` → `_fbc` rebuild, query-string stripped from `event_source_url` (so `?email=` prefill never leaks), null-visitor no-op, and stale-snapshot IP/UA dropping. Worth turning into the `node:test` smoke suite mentioned below.
 - 2026-07-28: `node --check public/app.js` and `npm run check` after fixing the Purchase Inspector feed — passed.
 - 2026-07-14: `node --check public/app.js` and `npm run check` after adding the video to container creation — passed.
