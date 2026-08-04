@@ -1,6 +1,6 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-08-04.
+Living status doc. Update after meaningful progress. Last updated: 2026-08-05.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
@@ -22,6 +22,13 @@ Recent commits (newest first, Jul 4–7):
 
 ## In progress
 - SaaS payments phase 1 on this branch. Manual bKash/Nagad claim → owner-confirm lifecycle wired (emails + routes exist). Billing UI, invoices, plan limits, extra-container add-on, downgrade-at-cycle-end, and free-tier §3 enforcement alignment now landed. Still review paid renewal grace/expired suspension when touching billing next.
+
+## 2026-08-05 — Transactional email moved to Brevo
+All 14 `emailX()` wrappers funnel through one `sendEmail()`, so the provider swap is confined to that function. Brevo (`POST https://api.brevo.com/v3/smtp/email`, `api-key` header, **201** on success) is now the sender; Resend stays as a fallback and is used only when `BREVO_API_KEY` is empty, so a half-finished cutover cannot black-hole signup verification codes. Sends now carry a `textContent` plain-text part derived from the HTML (`htmlToPlainText`) — Gmail/Yahoo bulk-sender rules favour multipart. Failure logging now includes the response body, since Brevo's `{code,message}` is what distinguishes a bad key (`unauthorized`) from an unauthenticated sender domain (`Domain does not exist`) — a bare status code cannot.
+
+Alternatives rejected: **Amazon SES** — sandbox only sends to verified recipients, so signup codes never reach real customers; production access is stuck behind a support case AWS bounced back, and it needs hand-rolled SigV4. **Cloudflare Email Sending** — auto-creates DNS records (tagioo.com is on Cloudflare) but costs $5/mo Workers Paid for the same 3,000/mo Resend gives free, and is beta.
+
+**Ops:** set `BREVO_API_KEY` in the VPS `.env`, and authenticate tagioo.com in Brevo (Brevo code + DKIM + DMARC TXT records in Cloudflare DNS). `CUSTOMER_SUPPORT_EMAIL` is the From address and must sit on the authenticated domain. A DNS check on 2026-08-05 found **no** SES/DKIM/DMARC/SPF records published on tagioo.com at its authoritative Cloudflare nameservers — the domain has never had sender authentication, so this is new work, not a migration.
 
 ## 2026-08-05 — Meta event deduplication fix (alurkohv / WooCommerce plugin)
 Symptom: alurkohv (WordPress + Tagioo plugin) showed Purchase "deduplication has not been set up" and InitiateCheckout Event ID coverage 65.69%. amolbooks/shobaz unaffected because they run no plugin and push one event per page load.

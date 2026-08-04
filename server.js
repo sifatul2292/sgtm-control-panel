@@ -121,6 +121,7 @@ const config = {
   monthlyRequestLimit: Number(process.env.MONTHLY_REQUEST_LIMIT || 500000),
   monthlyContainerLimit: Number(process.env.MONTHLY_CONTAINER_LIMIT || 1),
   customerSupportEmail: process.env.CUSTOMER_SUPPORT_EMAIL || "",
+  brevoApiKey: process.env.BREVO_API_KEY || "",
   resendApiKey: process.env.RESEND_API_KEY || "",
   appUrl: process.env.APP_URL || `http://localhost:${process.env.PORT || 3100}`,
   sslCertPath: process.env.SSL_CERT_PATH || "",
@@ -352,11 +353,30 @@ async function findCustomerAccountByEmail(email) {
   ) || null;
 }
 
-// Generic transactional email sender (Resend). Wraps `bodyHtml` in the standard
-// Tagioo email shell so every message looks consistent. Returns {ok}.
+// Plain-text fallback for the HTML body. Gmail and Yahoo's bulk-sender rules
+// favour multipart messages, so every send carries both parts.
+function htmlToPlainText(html) {
+  return String(html)
+    .replace(/<\s*(br|\/p|\/div|\/h[1-6]|hr)\s*\/?\s*>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Generic transactional email sender. Wraps `bodyHtml` in the standard Tagioo
+// email shell so every message looks consistent. Sends via Brevo; Resend stays
+// as a fallback so a half-finished cutover cannot black-hole signup codes.
+// Never throws — email failure must not break a signup or payment handler.
 async function sendEmail({ to, subject, bodyHtml }) {
-  if (!config.resendApiKey) {
-    console.error(`[email] RESEND_API_KEY not set — cannot send "${subject}" to ${to}`);
+  if (!config.brevoApiKey && !config.resendApiKey) {
+    console.error(`[email] no provider key set — cannot send "${subject}" to ${to}`);
     return { ok: false };
   }
   if (!to) {
@@ -372,12 +392,35 @@ async function sendEmail({ to, subject, bodyHtml }) {
       `<p style="color:#C4CCDB;font-size:12px;margin:0">Tagioo · Server-side tracking for Bangladesh ecommerce</p>`,
       `</div>`
     ].join("");
-    const r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${config.resendApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: `Tagioo <${fromAddr}>`, to: [to], subject, html })
-    });
-    if (!r.ok) console.error(`[email] Resend API error for "${subject}":`, r.status);
+    const provider = config.brevoApiKey ? "Brevo" : "Resend";
+    const r = config.brevoApiKey
+      ? await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: {
+            "api-key": config.brevoApiKey,
+            "Content-Type": "application/json",
+            Accept: "application/json"
+          },
+          body: JSON.stringify({
+            sender: { name: "Tagioo", email: fromAddr },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+            textContent: htmlToPlainText(html)
+          })
+        })
+      : await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${config.resendApiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ from: `Tagioo <${fromAddr}>`, to: [to], subject, html })
+        });
+    // Brevo answers 201 on success. Log the body too — its {code,message} tells
+    // a bad key apart from an unauthenticated sender domain, which a bare
+    // status code cannot.
+    if (!r.ok) {
+      const detail = await r.text().catch(() => "");
+      console.error(`[email] ${provider} API error for "${subject}":`, r.status, detail.slice(0, 300));
+    }
     return { ok: r.ok };
   } catch (e) {
     console.error(`[email] send error for "${subject}":`, e.message);
@@ -5178,8 +5221,8 @@ function makeVerificationCode() {
 async function emailVerificationCode(toEmail, fullName, code) {
   const name = String(fullName || "").trim().split(" ")[0] || "there";
   // Dev fallback: with no email provider configured, print the code so local
-  // signup can be completed. Never reached in production (RESEND_API_KEY set).
-  if (!config.resendApiKey) console.warn(`[verify] code for ${toEmail}: ${code}`);
+  // signup can be completed. Never reached in production (BREVO_API_KEY set).
+  if (!config.brevoApiKey && !config.resendApiKey) console.warn(`[verify] code for ${toEmail}: ${code}`);
   return sendEmail({
     to: toEmail,
     subject: `${code} is your Tagioo verification code`,
