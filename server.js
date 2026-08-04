@@ -371,8 +371,9 @@ function htmlToPlainText(html) {
 }
 
 // Generic transactional email sender. Wraps `bodyHtml` in the standard Tagioo
-// email shell so every message looks consistent. Sends via Brevo; Resend stays
-// as a fallback so a half-finished cutover cannot black-hole signup codes.
+// email shell so every message looks consistent. Resend is the sender; Brevo is
+// used only when RESEND_API_KEY is empty, so setting BREVO_API_KEY alone is
+// never enough to divert live mail.
 // Never throws — email failure must not break a signup or payment handler.
 async function sendEmail({ to, subject, bodyHtml }) {
   if (!config.brevoApiKey && !config.resendApiKey) {
@@ -392,9 +393,20 @@ async function sendEmail({ to, subject, bodyHtml }) {
       `<p style="color:#C4CCDB;font-size:12px;margin:0">Tagioo · Server-side tracking for Bangladesh ecommerce</p>`,
       `</div>`
     ].join("");
-    const provider = config.brevoApiKey ? "Brevo" : "Resend";
-    const r = config.brevoApiKey
-      ? await fetch("https://api.brevo.com/v3/smtp/email", {
+    const provider = config.resendApiKey ? "Resend" : "Brevo";
+    const r = config.resendApiKey
+      ? await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${config.resendApiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from: `Tagioo <${fromAddr}>`,
+            to: [to],
+            subject,
+            html,
+            text: htmlToPlainText(html)
+          })
+        })
+      : await fetch("https://api.brevo.com/v3/smtp/email", {
           method: "POST",
           headers: {
             "api-key": config.brevoApiKey,
@@ -408,15 +420,10 @@ async function sendEmail({ to, subject, bodyHtml }) {
             htmlContent: html,
             textContent: htmlToPlainText(html)
           })
-        })
-      : await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${config.resendApiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ from: `Tagioo <${fromAddr}>`, to: [to], subject, html })
         });
-    // Brevo answers 201 on success. Log the body too — its {code,message} tells
-    // a bad key apart from an unauthenticated sender domain, which a bare
-    // status code cannot.
+    // `r.ok` covers both: Resend answers 200, Brevo 201. Log the body too — the
+    // provider's error message tells a bad key apart from an unverified sender
+    // domain, which a bare status code cannot.
     if (!r.ok) {
       const detail = await r.text().catch(() => "");
       console.error(`[email] ${provider} API error for "${subject}":`, r.status, detail.slice(0, 300));
@@ -5221,7 +5228,7 @@ function makeVerificationCode() {
 async function emailVerificationCode(toEmail, fullName, code) {
   const name = String(fullName || "").trim().split(" ")[0] || "there";
   // Dev fallback: with no email provider configured, print the code so local
-  // signup can be completed. Never reached in production (BREVO_API_KEY set).
+  // signup can be completed. Never reached in production (RESEND_API_KEY set).
   if (!config.brevoApiKey && !config.resendApiKey) console.warn(`[verify] code for ${toEmail}: ${code}`);
   return sendEmail({
     to: toEmail,

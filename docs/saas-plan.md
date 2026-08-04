@@ -141,8 +141,8 @@ customer emailed to resubmit.
 
 ## 6. Notifications
 
-Email is the **automated** channel (Brevo integration, `sendEmail` in [server.js](../server.js);
-Resend remains as a fallback when `BREVO_API_KEY` is unset).
+Email is the **automated** channel (Resend integration, `sendEmail` in [server.js](../server.js);
+Brevo is wired as an alternative, used only when `RESEND_API_KEY` is unset).
 Generalize `sendPasswordResetEmail` → `sendEmail(to, template, vars)`.
 
 | Trigger                         | To       | Channel        |
