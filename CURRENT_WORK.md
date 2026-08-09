@@ -1,12 +1,13 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-08-05.
+Living status doc. Update after meaningful progress. Last updated: 2026-08-09.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
 ## Recently completed
 Recent commits (newest first, Jul 4–7):
+- **Checkout wall is one-time, not a lockout** (working tree, Aug 9): someone who signed up on a paid plan and never paid was bounced to `/checkout` on *every* login, with no way into the product. `releaseUnpaidSignupToFree()` now drops the staged invoice and puts the tenant on Free (15k requests / 30-day cycle, `subscriptionStatus: "free"`) on the next login, and from a new "Not now — continue on the Free plan" button on the checkout page. The pay-first prompt still fires for the signup session itself. Untouched: a tenant with a submitted claim awaiting owner confirmation, and any live paid plan. Existing free cycle window is preserved so releasing can't mint a fresh allowance. Upgrading is a normal plan pick in Account & Billing. Also fixed a write race this exposed: `markCustomerAccountLogin()` (fire-and-forget during login) did an unlocked read-modify-write and could collide with the release write — same-millisecond `writeDatabase()` calls shared one temp path and renamed a **corrupted history.json** into place. Login telemetry now runs under `withDbLock`, and the temp filename carries a random suffix.
 - **Meta event match quality — Tagioo's own funnel** (working tree, Aug 4): tagioo.com's own Lead/CompleteRegistration/Purchase were sent server-to-server with no visitor context, so Meta saw the VPS's own IP/UA on every event (Lead sat at 3.0/10, CompleteRegistration 4.2/10). Added `tagiooVisitorContext(req)` to snapshot the real visitor's IP / user-agent / `_fbp` / `_fbc` / `tg_vid`, `applyTagiooVisitorContext()` to merge it into each CAPI event (incl. `external_id` = sha256(`tg_vid`) and `event_source_url`), and header passthrough on `forwardTagiooOwnEvent` so GA4 stops geolocating every signup to the datacentre. New `sendTagiooLeadToMetaCapi` — Lead was gtag-only before. Purchase is confirmed in an owner session, so the buyer's snapshot is persisted at signup + payment-claim under `tenant.tracking.tagiooVisitor` and replayed (IP/UA dropped after 7d as stale). **Customer tenant tracking untouched** — no edits to the shared Meta template builder, `sendMetaOfflineConversions`, `sendOrderToMetaCapi`, nginx, or container lifecycle.
 - **Facebook link-preview title** (working tree, Aug 2): updated the landing page Open Graph title to `ফেসবুকে সেল বাড়ান Tagioo দিয়ে`.
 - **Purchase Inspector completeness** (working tree, Jul 28): retained a dedicated purchase-only event feed outside the general 500-event cap, so busy days show every tracked order represented by the aggregate purchase count; exact overlap between live and retained feeds is deduplicated.

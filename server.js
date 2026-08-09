@@ -2133,6 +2133,10 @@ function checkoutPage({ instructions, error = "", values = {} } = {}) {
       .co-methods input{position:absolute;opacity:0}
       .co-methods input:checked + span{color:#3B0764}
       .co-methods label:has(input:checked){border-color:#7C3AED;background:#F5F3FF}
+      .co-skip{margin:14px 0 0;text-align:center}
+      .co-skip button{background:none;border:none;padding:0;color:#7C6BA8;font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline}
+      .co-skip button:hover{color:#3B0764}
+      .co-skip small{display:block;margin-top:4px;font-size:12px;color:#8B93A7}
     </style>
   </head>
   <body class="login-body">
@@ -2199,6 +2203,10 @@ function checkoutPage({ instructions, error = "", values = {} } = {}) {
             <button type="submit" class="button button-primary full-width su-anim" style="--d:190ms">Submit payment &amp; continue</button>
           </form>
           <p class="lf-subtitle su-anim" style="--d:220ms;margin-top:14px;text-align:center">${instructions.ownerWhatsApp ? `Trouble paying? <a class="su-signin-link" href="https://wa.me/${escapeHtml(instructions.ownerWhatsApp.replace(/[^0-9]/g, ""))}" target="_blank" rel="noopener">Message us on WhatsApp →</a>` : ""}</p>
+          <form method="post" action="/checkout/skip" class="co-skip su-anim" style="--d:240ms">
+            <button type="submit">Not now — continue on the Free plan</button>
+            <small>15,000 events every 30 days. Upgrade any time from Account &amp; Billing.</small>
+          </form>
         </div>
       </main>
     </div>
@@ -3752,7 +3760,10 @@ async function readDatabaseCached() {
 
 async function writeDatabase(data) {
   await mkdir(config.dataDir, { recursive: true });
-  const tempPath = `${databasePath}.${Date.now()}.tmp`;
+  // Random suffix, not just the timestamp: two writes landing in the same
+  // millisecond would otherwise share one temp file, interleave their bytes and
+  // rename a corrupted history.json into place.
+  const tempPath = `${databasePath}.${Date.now()}.${randomBytes(4).toString("hex")}.tmp`;
   await writeFile(tempPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
   await rename(tempPath, databasePath);
   dbReadCacheEntry = null;   // written data changed → drop the read cache
@@ -5346,6 +5357,61 @@ function shouldGateAppShellToCheckout(pathname, method = "GET") {
   return method === "GET" && (pathname === "/" || pathname === "/index.html");
 }
 
+// The checkout wall is a ONE-TIME prompt for the signup session, not a lock on the
+// account. Someone who picked a paid plan at signup and never paid is released onto
+// the Free plan (15k requests / 30-day cycle) the next time they log in — or when
+// they press "continue on the Free plan" on the checkout page. The staged invoice is
+// dropped, subscriptionStatus goes back to "free" (so the container paywall at
+// /api/customer/setup lifts too), and upgrading later is a normal plan pick in
+// Account & Billing, which stages a fresh invoice.
+//
+// No-op unless checkoutRequired() is still true: a submitted claim awaiting owner
+// confirmation, an active/overdue paid plan, or a plain Free tenant is left alone.
+async function releaseUnpaidSignupToFree(tenantId) {
+  if (!tenantId) return { released: false };
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { released: false };
+    const data = loaded.data;
+    const index = (data.tenants || []).findIndex((tenant) => tenant.id === tenantId);
+    if (index === -1) return { released: false };
+    const tenant = data.tenants[index];
+    if (!checkoutRequired(tenant, data)) return { released: false };
+    // Defensive: a live paid plan mislabeled pending_payment is repaired by
+    // enforcePaidRenewals — never downgrade it here.
+    if (tenant.plan !== "Free" && tenant.paymentStatus === "paid") return { released: false };
+
+    const now = new Date();
+    const profile = resourceProfileForPlan("Free");
+    // Keep any existing free cycle window: releasing must never hand out a fresh
+    // 15k allowance to a tenant that already burned part of one.
+    const cycleStart = tenant.cycleStart || now.toISOString();
+    const cycleEnd = tenant.cycleEnd || new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString();
+    data.tenants[index] = {
+      ...tenant,
+      plan: "Free",
+      requestLimit: profile.monthlyRequestLimit,
+      containerLimit: profile.containerLimit,
+      domainLimit: profile.domainLimit,
+      extraContainers: 0,
+      monthlyAmount: 0,
+      subscriptionStatus: "free",
+      paymentStatus: "free",
+      pendingPlan: "",
+      pendingAmount: 0,
+      pendingBillingCycle: "",
+      pendingInvoiceNo: "",
+      scheduledPlan: "",
+      scheduledPlanCycle: "",
+      cycleStart,
+      cycleEnd,
+      updatedAt: now.toISOString()
+    };
+    await writeDatabase(data);
+    return { released: true, tenant: data.tenants[index] };
+  });
+}
+
 // Serializes read-modify-write cycles against the JSON database so two concurrent
 // payment requests (e.g. owner double-clicking confirm) can't both read stale
 // "pending" state and race past the status checks below.
@@ -5865,12 +5931,17 @@ function tenantWebhookSecret(data, tenantId) {
 
 async function markCustomerAccountLogin(id) {
   try {
-    const loaded = await readDatabase();
-    if (!loaded.available) return;
-    const account = (loaded.data.customerAccounts || []).find((item) => item.id === id);
-    if (!account) return;
-    account.lastLoginAt = new Date().toISOString();
-    await writeDatabase(loaded.data);
+    // Under the DB lock: this fires and forgets during login, so it would
+    // otherwise race the login handler's own read-modify-write (releasing an
+    // unpaid signup to Free) and one of the two writes would be lost.
+    await withDbLock(async () => {
+      const loaded = await readDatabase();
+      if (!loaded.available) return;
+      const account = (loaded.data.customerAccounts || []).find((item) => item.id === id);
+      if (!account) return;
+      account.lastLoginAt = new Date().toISOString();
+      await writeDatabase(loaded.data);
+    });
   } catch {
     // Login telemetry should never block authentication.
   }
@@ -9731,6 +9802,18 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // "Not now — continue on the Free plan": drops the unpaid invoice and opens
+    // the dashboard on Free. Same release the next login would perform, so the
+    // customer isn't stuck behind the wall for the rest of this session.
+    if (pathname === "/checkout/skip" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") { redirect(res, "/login"); return; }
+      const released = await releaseUnpaidSignupToFree(session.tenantId).catch(() => ({ released: false }));
+      if (released.released) invalidateOwnerDashboardCache();
+      redirect(res, "/");
+      return;
+    }
+
     if (pathname === "/checkout" && req.method === "POST") {
       if (!checkRateLimit(req, "payment-claim", 10, 60 * 60 * 1000)) { tooManyRequests(res); return; }
       const session = getSession(req);
@@ -9768,6 +9851,14 @@ const server = createServer(async (req, res) => {
       if (!account) {
         htmlResponse(res, 401, loginPage("Invalid username or password."));
         return;
+      }
+
+      // Paid-plan signup that never paid: don't send them back to the checkout
+      // wall on every login. Drop the unpaid invoice and let them in on Free —
+      // they can re-pick a paid plan from Account & Billing whenever they want.
+      if (account.role === "customer" && account.tenantId) {
+        const released = await releaseUnpaidSignupToFree(account.tenantId).catch(() => ({ released: false }));
+        if (released.released) invalidateOwnerDashboardCache();
       }
 
       res.writeHead(302, {
