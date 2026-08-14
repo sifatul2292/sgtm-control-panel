@@ -127,7 +127,16 @@ const config = {
   sslCertPath: process.env.SSL_CERT_PATH || "",
   sslDomain: process.env.SSL_DOMAIN || "",
   sslPort: Number(process.env.SSL_PORT || 443),
-  nginxConfdDir: process.env.NGINX_CONF_D_DIR || "/etc/nginx/conf.d"
+  nginxConfdDir: process.env.NGINX_CONF_D_DIR || "/etc/nginx/conf.d",
+  paddleApiKey: process.env.PADDLE_API_KEY || "",
+  paddleWebhookSecret: process.env.PADDLE_WEBHOOK_SECRET || "",
+  paddleEnv: process.env.PADDLE_ENV || "sandbox",
+  paddleClientToken: process.env.PADDLE_CLIENT_TOKEN || "",
+  paddlePriceIds: {
+    Starter: process.env.PADDLE_PRICE_ID_STARTER || "",
+    Growth: process.env.PADDLE_PRICE_ID_GROWTH || "",
+    Pro: process.env.PADDLE_PRICE_ID_PRO || ""
+  }
 };
 
 const authSecret = config.authSecret || config.authPassword || randomBytes(32).toString("hex");
@@ -147,7 +156,13 @@ const resetTokens = new Map();
 // Unverified signups awaiting email code confirmation. Keyed by an opaque token
 // stored in an HttpOnly cookie. No customer account exists until the code is
 // confirmed, so an unverified email never becomes a usable login.
+//
+// In-memory fallback only. The real store is SQLite (see pendingSignupStore below):
+// a process Map was losing every in-flight signup on each deploy/restart, sending
+// the visitor to "Your verification session expired" mid-flow — the prime suspect
+// for the signup-page → verified-signup drop-off.
 const pendingSignups = new Map();
+const SIGNUP_VERIFY_TTL_MS = 60 * 60 * 1000;
 const databasePath = join(config.dataDir, "history.json");
 const backupsDir = join(config.dataDir, "backups");
 const BACKUPS_TO_KEEP = 4;
@@ -173,6 +188,31 @@ try {
 } catch (error) {
   console.error(`[events] SQLite event store unavailable (${error.message}); using log tail + history.json only`);
 }
+
+// Pending signups persist in SQLite so a restart mid-verification doesn't strand the
+// visitor. Falls back to the in-memory Map when the native module didn't load, which
+// keeps signup working (just as restart-fragile as before) rather than failing closed.
+const pendingSignupStore = {
+  put(token, record) {
+    if (eventStore) { eventStore.putPendingSignup(token, record); return; }
+    pendingSignups.set(token, record);
+  },
+  get(token) {
+    if (eventStore) return eventStore.getPendingSignup(token);
+    const record = pendingSignups.get(token);
+    if (!record) return null;
+    if (record.expires < Date.now()) { pendingSignups.delete(token); return null; }
+    return record;
+  },
+  delete(token) {
+    if (eventStore) { eventStore.deletePendingSignup(token); return; }
+    pendingSignups.delete(token);
+  },
+  sweep() {
+    if (eventStore) { eventStore.expirePendingSignups(); return; }
+    for (const [key, value] of pendingSignups) if (value.expires < Date.now()) pendingSignups.delete(key);
+  }
+};
 const powerUpMapsPath = join(config.nginxConfdDir, "tagioo-powerups-maps.conf");
 let powerUpsActive = false;
 
@@ -1780,19 +1820,10 @@ function loginPage(error = "", opts = {}) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
-    <!-- Google Tag Manager -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-MCR3FD4W');</script>
-    <!-- End Google Tag Manager -->
+    ${gtmHead()}
   </head>
   <body class="login-body">
-    <!-- Google Tag Manager (noscript) -->
-    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MCR3FD4W"
-    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-    <!-- End Google Tag Manager (noscript) -->
+    ${gtmNoscript()}
     <div class="login-layout">
 
       <!-- ── Brand panel ── -->
@@ -2024,6 +2055,36 @@ function resetPasswordPage(token = "", error = "") {
 </html>`;
 }
 
+// Web GTM container for tagioo.com's own funnel pages. Every page a paid visitor can
+// land on needs it: a page without the container is invisible to tagioo's own GA4/Meta,
+// so its visitors can't be measured or retargeted. Kept in one place because the funnel
+// pages are rendered from three separate template functions here plus public/*.html.
+const TAGIOO_GTM_ID = "GTM-MCR3FD4W";
+
+// `seed` is pushed to the dataLayer BEFORE gtm.js loads so a tag can read it on the very
+// first container load — used by the signup page to hand the browser the same event_id
+// the server already sent to Meta CAPI (see the Lead forward in GET /signup).
+function gtmHead(seed = "") {
+  // Escape "<" so no value interpolated into the seed can close this inline <script>.
+  // Callers already JSON-stringify their values; this is the belt-and-braces layer.
+  const safeSeed = String(seed).replace(/</g, "\\u003c");
+  return `${seed ? `<script>window.dataLayer=window.dataLayer||[];window.dataLayer.push(${safeSeed});</script>
+    ` : ""}<!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','${TAGIOO_GTM_ID}');</script>
+    <!-- End Google Tag Manager -->`;
+}
+
+function gtmNoscript() {
+  return `<!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${TAGIOO_GTM_ID}"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->`;
+}
+
 function verifyPage({ email = "", error = "", info = "" } = {}) {
   const masked = email.replace(/^(.)(.*)(.@.*)$/, (_, a, b, c) => a + "*".repeat(Math.max(b.length, 1)) + c);
   return `<!doctype html>
@@ -2038,8 +2099,10 @@ function verifyPage({ email = "", error = "", info = "" } = {}) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
+    ${gtmHead()}
   </head>
   <body class="login-body">
+    ${gtmNoscript()}
     <div class="login-layout">
       <aside class="login-brand">
         <a class="lb-logo" href="/">
@@ -2094,7 +2157,7 @@ function verifyPage({ email = "", error = "", info = "" } = {}) {
 // The customer sends money via bKash/Nagad, then submits the transaction ID here.
 // A transaction ID is REQUIRED to reach the dashboard (POST /checkout gates entry);
 // owner confirmation later flips the plan to active and emails the customer.
-function checkoutPage({ instructions, error = "", values = {} } = {}) {
+function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {}) {
   const money = (n) => `৳${Number(n || 0).toLocaleString()}`;
   const cycle = billingCycleConfig[instructions.billingCycle] || billingCycleConfig.monthly;
   const cycleLabel = cycle.months === 1 ? "per month" : `every ${cycle.months} months`;
@@ -2137,9 +2200,16 @@ function checkoutPage({ instructions, error = "", values = {} } = {}) {
       .co-skip button{background:none;border:none;padding:0;color:#7C6BA8;font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline}
       .co-skip button:hover{color:#3B0764}
       .co-skip small{display:block;margin-top:4px;font-size:12px;color:#8B93A7}
+      .co-divider{display:flex;align-items:center;gap:10px;margin:18px 0;color:#8B93A7;font-size:12px;font-weight:600;text-transform:uppercase}
+      .co-divider::before,.co-divider::after{content:"";flex:1;height:1px;background:#E5E7EB}
+      .co-card-btn{width:100%;background:#0F0A1E;color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer}
+      .co-card-btn:hover{background:#221845}
+      .co-card-note{margin:8px 0 0;text-align:center;font-size:12px;color:#8B93A7}
     </style>
+    ${gtmHead()}
   </head>
   <body class="login-body">
+    ${gtmNoscript()}
     <div class="login-layout">
       <aside class="login-brand">
         <a class="lb-logo" href="/">
@@ -2178,6 +2248,12 @@ function checkoutPage({ instructions, error = "", values = {} } = {}) {
             </div>
             <p class="co-invoice">Invoice ${escapeHtml(instructions.invoiceNo)}</p>
           </div>
+
+          ${paddle.enabled ? `
+          <button type="button" id="coPayCard" class="co-card-btn su-anim" style="--d:70ms">Pay with card — $${paddle.usdAmount}/mo</button>
+          <p class="co-card-note su-anim" style="--d:75ms">Instant activation. Visa, Mastercard, and more — billed in USD via Paddle.</p>
+          <div class="co-divider su-anim" style="--d:78ms">or pay with bKash / Nagad</div>
+          ` : ""}
 
           ${numbers ? `<div class="co-numbers su-anim" style="--d:80ms">${numbers}</div>` : ""}
 
@@ -2219,11 +2295,43 @@ function checkoutPage({ instructions, error = "", values = {} } = {}) {
         });
       });
     </script>
+    ${paddle.enabled ? `
+    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+    <script>
+      (function () {
+        if (${JSON.stringify(paddle.env)} === "sandbox" && Paddle.Environment) Paddle.Environment.set("sandbox");
+        Paddle.Initialize({
+          token: ${JSON.stringify(paddle.clientToken)},
+          eventCallback: function (event) {
+            // Activation happens async via the Paddle webhook, not this callback —
+            // this just moves the customer off the checkout wall once Paddle
+            // confirms the transaction. checkoutRequired() re-checks on load;
+            // if the webhook hasn't landed yet the customer is safely back here.
+            if (event.name === "checkout.completed") window.location.href = "/";
+          }
+        });
+        var btn = document.getElementById("coPayCard");
+        if (btn) {
+          btn.addEventListener("click", function () {
+            Paddle.Checkout.open({
+              items: [{ priceId: ${JSON.stringify(paddle.priceId)}, quantity: 1 }],
+              customData: { tenantId: ${JSON.stringify(paddle.tenantId)}, planName: ${JSON.stringify(paddle.planName)} }
+            });
+          });
+        }
+      })();
+    </script>
+    ` : ""}
   </body>
 </html>`;
 }
 
-function signupPage(error = "", values = {}) {
+// `leadEventId` is set only on the request that actually forwarded a Lead to Meta CAPI
+// (GET /signup, first visit of the day — see the tg_lead_sent guard). Passing it through
+// lets GTM fire the browser-side Meta Pixel Lead with the SAME event_id, so Meta dedupes
+// the pair into one event and stops classifying Lead as Conversions-API-only — which is
+// what made it unselectable as an ad set's conversion event.
+function signupPage(error = "", values = {}, { leadEventId = "" } = {}) {
   const selectedCountry = values.country || "BD";
   const countryOptions = [
     ["BD", "Bangladesh (+880)"],
@@ -2253,19 +2361,10 @@ function signupPage(error = "", values = {}) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
-    <!-- Google Tag Manager -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-MCR3FD4W');</script>
-    <!-- End Google Tag Manager -->
+    ${gtmHead(leadEventId ? `{event:'tagioo_lead',tagioo_event_id:${JSON.stringify(leadEventId)}}` : "")}
   </head>
   <body class="login-body">
-    <!-- Google Tag Manager (noscript) -->
-    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MCR3FD4W"
-    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-    <!-- End Google Tag Manager (noscript) -->
+    ${gtmNoscript()}
     <div class="login-layout">
 
       <!-- ── Brand panel ── -->
@@ -4083,6 +4182,20 @@ function isWooOrderWebhookAuthorized(req, rawBody, secret) {
   return safeEqual(signature, expected);
 }
 
+// Paddle signs "ts:body" (colon-joined) with the webhook secret, sent as
+// "Paddle-Signature: ts=<unix>;h1=<hex>". https://developer.paddle.com/webhooks/signature-verification
+function isPaddleWebhookAuthorized(req, rawBody) {
+  if (!config.paddleWebhookSecret) return false;
+  const header = String(req.headers["paddle-signature"] || "");
+  const parts = Object.fromEntries(header.split(";").map((kv) => kv.split("=")));
+  const ts = parts.ts;
+  const h1 = parts.h1;
+  if (!ts || !h1) return false;
+  const signedPayload = `${ts}:${rawBody.toString("utf8")}`;
+  const expected = createHmac("sha256", config.paddleWebhookSecret).update(signedPayload).digest("hex");
+  return safeEqual(h1, expected);
+}
+
 // WooCommerce sends date_created_gmt as "2026-06-12T08:00:00" with no timezone
 // marker, so it must be pinned to UTC before Date parses it as local time.
 function wooGmtDate(value) {
@@ -4289,10 +4402,35 @@ function applyTagiooVisitorContext(event, visitor) {
   return event;
 }
 
+// Meta rejects events older than 7 days and any event dated in the future. Backdate to
+// `when` where that's inside the window, else fall back to now — a slightly-off event
+// still lands, whereas a rejected one is lost entirely.
+function capiEventTime(when) {
+  const now = Date.now();
+  const at = Date.parse(when || "");
+  if (!Number.isFinite(at) || at > now || now - at > 7 * 86400000) return Math.floor(now / 1000);
+  return Math.floor(at / 1000);
+}
+
 // Fire one tagioo-own Meta CAPI event. Centralises the pixel/token guard and the
 // throwaway tenant shape sendMetaOfflineConversions expects.
+// Warned at most once per process: a missing token silently drops every self-tracking
+// event while GA4 (no token gate) keeps looking healthy, which reads from the outside as
+// "Meta won't spend our budget" with nothing in the logs to explain it.
+let warnedMissingTagiooCapiToken = false;
+
 async function sendTagiooOwnMetaEvent(event, label) {
-  if (!TAGIOO_OWN_TRACKING.metaPixelId || !TAGIOO_OWN_TRACKING.metaCapiToken) return;
+  if (!TAGIOO_OWN_TRACKING.metaPixelId || !TAGIOO_OWN_TRACKING.metaCapiToken) {
+    if (!warnedMissingTagiooCapiToken) {
+      warnedMissingTagiooCapiToken = true;
+      const missing = [
+        TAGIOO_OWN_TRACKING.metaPixelId ? "" : "TAGIOO_META_PIXEL_ID",
+        TAGIOO_OWN_TRACKING.metaCapiToken ? "" : "TAGIOO_META_CAPI_TOKEN"
+      ].filter(Boolean).join(" + ");
+      console.warn(`[tagioo-self-track] ${missing} not set — dropping ALL tagioo-own Meta CAPI events (first drop: ${label}). Ad optimization is blind until this is fixed; run "pm2 restart tagioo --update-env" after setting it.`);
+    }
+    return;
+  }
   const tagiooOwnTenant = { tracking: { meta: { pixelId: TAGIOO_OWN_TRACKING.metaPixelId, capiToken: TAGIOO_OWN_TRACKING.metaCapiToken } } };
   try {
     const result = await sendMetaOfflineConversions(tagiooOwnTenant, [event], { useTestCode: false });
@@ -4409,7 +4547,11 @@ async function sendTagiooPurchaseToMetaCapi(tenant, payment, eventId) {
   const value = Number(payment.amount);
   const event = applyTagiooVisitorContext({
     event_name: "Purchase",
-    event_time: Math.floor(Date.now() / 1000),
+    // The buyer paid at claim time; this runs whenever the owner gets round to
+    // confirming, which can be a day later. Meta attributes on event_time, so
+    // stamping "now" can push a conversion outside the click window and the ad
+    // that produced it loses credit.
+    event_time: capiEventTime(payment.claimedAt),
     action_source: "website",
     event_id: eventId,
     user_data: userData,
@@ -4421,6 +4563,79 @@ async function sendTagiooPurchaseToMetaCapi(tenant, payment, eventId) {
   }, storedTagiooVisitor(tenant));
   if (!Object.keys(event.user_data).length) return;
   await sendTagiooOwnMetaEvent(event, "purchase");
+}
+
+// Mid-funnel pair between CompleteRegistration and the manually-confirmed Purchase.
+// Without these, Meta sees free signup and then nothing until the owner confirms a bKash
+// payment hours or days later — too sparse and too delayed to optimize on. Both carry the
+// tenant's hashed identifiers plus the signup-time visitor snapshot, and share an event_id
+// with a matching gtag forward so Meta dedupes each to a single event.
+//
+// InitiateCheckout: a paid plan was staged and the payment page shown.
+// AddPaymentInfo:   the buyer submitted a bKash/Nagad transaction ID — the real moment of
+//                   purchase intent, since owner confirmation after it is bookkeeping.
+function tagiooBuyerUserData(tenant) {
+  const { firstName, lastName } = tagiooNameParts(tenant?.fullName);
+  const userData = {};
+  const em = sha256Hex(tenant?.email); if (em) userData.em = [em];
+  const ph = sha256Hex(tenant?.phone, { digitsOnly: true }); if (ph) userData.ph = [ph];
+  const fn = sha256Hex(firstName); if (fn) userData.fn = [fn];
+  const ln = sha256Hex(lastName); if (ln) userData.ln = [ln];
+  const country = sha256Hex(tenant?.country); if (country) userData.country = [country];
+  return userData;
+}
+
+async function sendTagiooFunnelEventToMetaCapi(eventName, tenant, { eventId, plan, amount, orderId, when, visitor } = {}) {
+  const value = Number(amount);
+  const event = applyTagiooVisitorContext({
+    event_name: eventName,
+    event_time: capiEventTime(when),
+    action_source: "website",
+    event_id: eventId,
+    user_data: tagiooBuyerUserData(tenant),
+    custom_data: {
+      currency: "BDT",
+      ...(plan ? { content_name: String(plan) } : {}),
+      ...(orderId ? { order_id: String(orderId) } : {}),
+      ...(Number.isFinite(value) ? { value } : {})
+    }
+  }, visitor || storedTagiooVisitor(tenant));
+  if (!Object.keys(event.user_data).length) return;
+  await sendTagiooOwnMetaEvent(event, eventName);
+}
+
+// Fire one mid-funnel step to BOTH tagioo's own GA4 (via the gtag forward) and Meta CAPI,
+// sharing an event_id so Meta dedupes the pair. Resolves the tenant itself so callers stay
+// one line. Never throws — attribution must not fail a plan change or a payment claim.
+async function trackTagiooCheckoutStep(step, { tenantId, plan, amount, orderId, when, visitor } = {}) {
+  const spec = {
+    initiate_checkout: { ga: "begin_checkout", meta: "InitiateCheckout" },
+    add_payment_info: { ga: "add_payment_info", meta: "AddPaymentInfo" }
+  }[step];
+  if (!spec || !tenantId) return;
+  try {
+    const loaded = await readDatabase();
+    if (!loaded.available) return;
+    const tenant = (loaded.data.tenants || []).find((item) => item.id === tenantId);
+    if (!tenant) return;
+    const eventId = `${step}_${orderId || tenantId}`;
+    const value = Number(amount);
+    await forwardTagiooOwnEvent(spec.ga, {
+      seed: tenantId,
+      visitor: visitor || storedTagiooVisitor(tenant),
+      eventParams: {
+        cu: "BDT",
+        "ep.plan": String(plan || ""),
+        "ep.tenant_id": tenantId,
+        "ep.event_id": eventId,
+        ...(Number.isFinite(value) ? { "epn.value": String(value) } : {}),
+        ...(orderId ? { "ep.transaction_id": String(orderId) } : {})
+      }
+    });
+    await sendTagiooFunnelEventToMetaCapi(spec.meta, tenant, { eventId, plan, amount, orderId, when, visitor });
+  } catch {
+    // Ignored on purpose — see above.
+  }
 }
 
 // Replay a stored signup-time visitor snapshot. IP and user agent are dropped
@@ -4998,6 +5213,10 @@ function validateCustomerAccountInput(input) {
   const tenantName = String(input.tenantName || input.tenant_name || tenantId).trim().slice(0, 120);
   const username = String(input.username || "").trim().toLowerCase();
   const password = String(input.password || "");
+  // A caller may supply an already-computed scrypt hash instead of a plaintext
+  // password (self-signup hashes at POST /signup so the pending record on disk
+  // never holds a credential). Only accept the format hashPassword produces.
+  const passwordHash = /^scrypt:[0-9a-f]+:[0-9a-f]+$/.test(String(input.passwordHash || "")) ? String(input.passwordHash) : "";
   const plan = String(input.plan || input.planName || config.billingPlan || "Starter").trim();
   const domain = String(input.domain || "").trim().toLowerCase();
   const websiteUrl = normalizeWebsiteUrl(input.websiteUrl || input.website_url || "");
@@ -5013,7 +5232,7 @@ function validateCustomerAccountInput(input) {
 
   if (!tenantId) errors.push("Tenant ID is required.");
   if (!/^[a-z0-9][a-z0-9._@-]{2,127}$/i.test(username)) errors.push("Username must be at least 3 characters and use letters, numbers, dot, dash, underscore, or @.");
-  if (password.length < 8) errors.push("Password must be at least 8 characters.");
+  if (!passwordHash && password.length < 8) errors.push("Password must be at least 8 characters.");
   if (domain && !validDomain(domain)) errors.push("Domain must be a valid hostname.");
   if ((input.websiteUrl || input.website_url) && !websiteUrl) errors.push("Website must be a valid URL.");
 
@@ -5024,6 +5243,7 @@ function validateCustomerAccountInput(input) {
       tenantName,
       username,
       password,
+      passwordHash,
       plan,
       domain,
       websiteUrl,
@@ -5070,7 +5290,7 @@ async function addCustomerAccount(input, options = {}) {
     country: validated.value.country,
     phone: validated.value.phone,
     referral: validated.value.referral,
-    passwordHash: hashPassword(validated.value.password),
+    passwordHash: validated.value.passwordHash || hashPassword(validated.value.password),
     status: validated.value.status === "disabled" ? "disabled" : "active",
     createdAt: accountIndex === -1 ? now : data.customerAccounts[accountIndex].createdAt,
     updatedAt: now
@@ -5248,7 +5468,7 @@ async function emailVerificationCode(toEmail, fullName, code) {
       `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Verify your email</p>`,
       `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Hi ${escapeHtml(name)}, enter this code to finish creating your Tagioo account:</p>`,
       `<p style="font-size:34px;font-weight:900;letter-spacing:8px;margin:0 0 18px;color:#0F0A1E;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:12px;padding:18px 0;text-align:center">${escapeHtml(code)}</p>`,
-      `<p style="color:#9BA8C0;font-size:13px;margin:0">This code expires in 15 minutes. If you didn't request it, ignore this email.</p>`
+      `<p style="color:#9BA8C0;font-size:13px;margin:0">This code expires in ${Math.round(SIGNUP_VERIFY_TTL_MS / 60000)} minutes. If you didn't request it, ignore this email.</p>`
     ].join("")
   });
 }
@@ -5265,13 +5485,19 @@ async function addCustomerSignup(input) {
   const phone = String(input.phone || "").trim();
   const password = String(input.password || "");
   const confirmPassword = String(input.confirmPassword || input.confirm_password || "");
+  // Self-signup arrives here after email verification carrying passwordHash instead of
+  // a password: the plaintext was hashed at POST /signup so it never had to be stored
+  // while the code was pending. Owner-created accounts still pass a plaintext password.
+  const passwordHash = String(input.passwordHash || "");
   const errors = [];
 
   if (!fullName) errors.push("Full name is required.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("Enter a valid email address.");
   if (!phone) errors.push("Phone number is required.");
-  if (password.length < 8) errors.push("Password must be at least 8 characters.");
-  if (password !== confirmPassword) errors.push("Passwords do not match.");
+  if (!passwordHash) {
+    if (password.length < 8) errors.push("Password must be at least 8 characters.");
+    if (password !== confirmPassword) errors.push("Passwords do not match.");
+  }
   if (errors.length) return { ok: false, errors };
 
   const username = email;
@@ -5287,6 +5513,7 @@ async function addCustomerSignup(input) {
     email,
     username,
     password,
+    passwordHash,
     phone,
     country: input.country || "BD",
     referral: input.referral || "",
@@ -5332,6 +5559,28 @@ function paymentInstructionsFor(tenant, data) {
     nagadNumber: settings.nagadNumber,
     ownerWhatsApp: settings.ownerWhatsApp,
     instructions: settings.instructions
+  };
+}
+
+// USD monthly price per plan, sold via Paddle (international card checkout).
+// Independent of the BDT bKash/Nagad pricing table — different market, different rail.
+const paddleUsdMonthly = { Starter: 30, Growth: 50, Pro: 100 };
+
+// Card-checkout config for the pending plan, when Paddle is configured for it.
+// bKash/Nagad stays the only option for a plan with no mapped Paddle price
+// (e.g. Enterprise, sold manually) or when PADDLE_CLIENT_TOKEN isn't set.
+function paddleCheckoutConfigFor(tenant) {
+  const planName = tenant.pendingPlan || "";
+  const priceId = config.paddlePriceIds[planName] || "";
+  if (!config.paddleClientToken || !priceId) return { enabled: false };
+  return {
+    enabled: true,
+    clientToken: config.paddleClientToken,
+    env: config.paddleEnv,
+    priceId,
+    planName,
+    tenantId: tenant.id,
+    usdAmount: paddleUsdMonthly[planName] || 0
   };
 }
 
@@ -5799,6 +6048,153 @@ async function confirmPaymentLocked(paymentId, session) {
   const account = (data.customerAccounts || []).find((a) => a.tenantId === payment.tenantId);
   emailCustomerActivated(account?.email || account?.username, payment, renewalDate).catch(() => {});
   return { ok: true, payment, tenant: data.tenants[tenantIndex], container };
+}
+
+// Paddle webhook activation. Mirrors confirmPaymentLocked's tail, but the
+// webhook itself is the authority — no owner click, no pending-claim record.
+// Idempotent on paddleTransactionId: Paddle retries webhook delivery on any
+// non-2xx response, and this must not double-activate or double-fire tracking.
+async function activatePaddleTenant(paddleEvent) {
+  return withDbLock(() => activatePaddleTenantLocked(paddleEvent));
+}
+
+async function activatePaddleTenantLocked({ tenantId, planName, amount, currency, paddleTransactionId, paddleSubscriptionId, paddleCustomerId }) {
+  if (!tenantId) return { ok: false, status: 400, errors: ["Missing tenant id in Paddle custom_data."] };
+  if (!planResourceProfiles[planName] || planName === "Customer" || planName === "Free") {
+    return { ok: false, status: 400, errors: [`Unknown plan "${planName}" in Paddle price mapping.`] };
+  }
+  if (!paddleTransactionId) return { ok: false, status: 400, errors: ["Missing Paddle transaction id."] };
+
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const data = loaded.data;
+  data.payments ||= [];
+
+  // Already processed this exact transaction (webhook retry) — no-op, not an error.
+  const existing = data.payments.find((p) => p.paddleTransactionId === paddleTransactionId);
+  if (existing) return { ok: true, payment: existing, duplicate: true };
+
+  const tenantIndex = (data.tenants || []).findIndex((t) => t.id === tenantId);
+  if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+
+  const now = new Date();
+  const tenant = data.tenants[tenantIndex];
+  const cycleDays = billingCycleConfig.monthly.months * 30;
+  const renewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000).toISOString();
+  const profile = resourceProfileForPlan(planName);
+
+  const payment = {
+    id: `pay_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
+    invoiceNo: tenant.pendingInvoiceNo || nextInvoiceNo(data, tenant.id),
+    tenantId: tenant.id,
+    plan: planName,
+    amount: Number(amount || monthlyAmountForPlan(planName)),
+    currency: currency || "USD",
+    provider: "paddle",
+    method: "paddle",
+    paddleTransactionId,
+    paddleSubscriptionId: paddleSubscriptionId || "",
+    status: "confirmed",
+    claimedAt: now.toISOString(),
+    confirmedBy: "paddle-webhook",
+    confirmedAt: now.toISOString(),
+    note: ""
+  };
+  data.payments.push(payment);
+
+  data.tenants[tenantIndex] = {
+    ...tenant,
+    plan: planName,
+    billingCycle: "monthly",
+    requestLimit: profile.monthlyRequestLimit,
+    containerLimit: profile.containerLimit + Number(tenant.extraContainers || 0),
+    domainLimit: profile.domainLimit,
+    monthlyAmount: monthlyAmountForPlan(planName) + Number(tenant.extraContainers || 0) * EXTRA_CONTAINER_PRICE,
+    resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
+    subscriptionStatus: "active",
+    paymentStatus: "paid",
+    paymentProvider: "paddle",
+    paddleSubscriptionId: paddleSubscriptionId || tenant.paddleSubscriptionId || "",
+    paddleCustomerId: paddleCustomerId || tenant.paddleCustomerId || "",
+    paidAt: now.toISOString(),
+    renewalDate,
+    renewalReminder: 99,
+    overdueAt: "",
+    expiredAt: "",
+    pendingPlan: "",
+    pendingAmount: 0,
+    pendingBillingCycle: "",
+    pendingInvoiceNo: "",
+    scheduledPlan: tenant.scheduledPlan === planName ? "" : (tenant.scheduledPlan || ""),
+    scheduledPlanCycle: tenant.scheduledPlan === planName ? "" : (tenant.scheduledPlanCycle || ""),
+    updatedAt: now.toISOString()
+  };
+
+  await writeDatabase(data);
+
+  const purchaseEventId = `purchase_${payment.id}`;
+  const purchaseVisitor = storedTagiooVisitor(tenant);
+  forwardTagiooOwnEvent("purchase", {
+    seed: payment.id,
+    visitor: purchaseVisitor,
+    eventParams: {
+      cu: payment.currency,
+      "ep.transaction_id": String(payment.id),
+      "epn.value": String(payment.amount),
+      "ep.plan": payment.plan,
+      "ep.tenant_id": payment.tenantId,
+      "ep.event_id": purchaseEventId
+    }
+  }).catch(() => {});
+  sendTagiooPurchaseToMetaCapi(tenant, payment, purchaseEventId).catch(() => {});
+
+  let container = null;
+  const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenant.id && item.containerName);
+  if (request?.containerName) {
+    await controlContainerLifecycle(request.containerName, "start").catch(() => {});
+    container = await resizeContainer(request.containerName, { memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit }).catch(() => null);
+  }
+
+  const account = (data.customerAccounts || []).find((a) => a.tenantId === tenant.id);
+  emailCustomerActivated(account?.email || account?.username, payment, renewalDate).catch(() => {});
+  return { ok: true, payment, tenant: data.tenants[tenantIndex], container };
+}
+
+// Paddle subscription canceled or a renewal payment failed: release the tenant
+// the same way an unpaid manual signup is released — back to Free, keeping
+// whatever's left of their current cycle window. Paddle owns dunning/retries
+// on its side; by the time this fires, Paddle has given up on collecting.
+async function deactivatePaddleTenant(paddleSubscriptionId) {
+  return withDbLock(() => deactivatePaddleTenantLocked(paddleSubscriptionId));
+}
+
+async function deactivatePaddleTenantLocked(paddleSubscriptionId) {
+  if (!paddleSubscriptionId) return { ok: false, status: 400, errors: ["Missing Paddle subscription id."] };
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const data = loaded.data;
+  const tenantIndex = (data.tenants || []).findIndex((t) => t.paddleSubscriptionId === paddleSubscriptionId);
+  if (tenantIndex === -1) return { ok: true, skipped: true };
+
+  const tenant = data.tenants[tenantIndex];
+  const now = new Date();
+  const profile = resourceProfileForPlan("Free");
+  data.tenants[tenantIndex] = {
+    ...tenant,
+    plan: "Free",
+    requestLimit: profile.monthlyRequestLimit,
+    containerLimit: profile.containerLimit,
+    domainLimit: profile.domainLimit,
+    monthlyAmount: 0,
+    subscriptionStatus: "free",
+    paymentStatus: "free",
+    paymentProvider: "",
+    cycleStart: tenant.cycleStart || now.toISOString(),
+    cycleEnd: tenant.cycleEnd || new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString(),
+    updatedAt: now.toISOString()
+  };
+  await writeDatabase(data);
+  return { ok: true, tenant: data.tenants[tenantIndex] };
 }
 
 // Owner rejects a pending payment (wrong / duplicate / unverifiable transaction).
@@ -7712,6 +8108,10 @@ async function enforcePaidRenewals(data) {
   const now = new Date();
   for (const tenant of (data.tenants || [])) {
     if (!tenant?.id) continue;
+    // Paddle owns renewal billing, dunning, and cancellation on its side —
+    // this sweep is the manual bKash/Nagad flow's overdue/expire enforcement
+    // and must not touch a Paddle subscription's status.
+    if (tenant.paymentProvider === "paddle") continue;
 
     // Self-heal legacy corruption from the old plan-change flow, which demoted a
     // paid plan to "pending_payment" and could stage a downgrade as a pending
@@ -9609,18 +10009,26 @@ const server = createServer(async (req, res) => {
       // CompleteRegistration to the same visitor. tg_lead_sent just dedupes
       // reloads/repeat visits within a day so Lead volume stays a real-intent signal.
       const setCookies = [];
-      let visitorId = cookies.tg_vid;
+      // tg_vid is client-supplied, and it now reaches an inline <script> on this page as
+      // well as Meta's hashed external_id and the GA4 client seed. Only accept the shape
+      // this server issues (32 hex chars); anything else is treated as absent and a fresh
+      // id is minted, so a forged cookie can neither inject markup nor poison match keys.
+      let visitorId = /^[0-9a-f]{32}$/.test(String(cookies.tg_vid || "")) ? cookies.tg_vid : "";
       if (!visitorId) {
         visitorId = randomBytes(16).toString("hex");
         setCookies.push(`tg_vid=${visitorId}; Path=/; Max-Age=7776000; SameSite=Lax`);
       }
+      // Declared out here so the rendered page can carry the same id to the browser
+      // pixel. Stays "" on reloads that don't send a Lead, so the browser copy fires
+      // on exactly the requests the server copy does — no unmatched browser Leads.
+      let leadEventId = "";
       if (!cookies.tg_lead_sent) {
         // Snapshot this visitor's IP/UA/_fbp/_fbc before responding — both sends
         // below run server-to-server and would otherwise carry the VPS's own
         // identity. On a first visit tg_vid isn't in the cookie header yet, so
         // seed the snapshot with the id we just minted.
         const leadVisitor = { ...(tagiooVisitorContext(req) || {}), vid: visitorId };
-        const leadEventId = `lead_${visitorId}_${Math.floor(Date.now() / 1000)}`;
+        leadEventId = `lead_${visitorId}_${Math.floor(Date.now() / 1000)}`;
         forwardTagiooOwnEvent("generate_lead", {
           seed: visitorId,
           visitor: leadVisitor,
@@ -9631,7 +10039,7 @@ const server = createServer(async (req, res) => {
         setCookies.push(`tg_lead_sent=1; Path=/; Max-Age=86400; SameSite=Lax`);
       }
       const headers = setCookies.length ? { "set-cookie": setCookies } : {};
-      htmlResponse(res, 200, signupPage("", { email: prefillEmail, plan: selectedPlan, billingCycle: selectedCycle }), headers);
+      htmlResponse(res, 200, signupPage("", { email: prefillEmail, plan: selectedPlan, billingCycle: selectedCycle }, { leadEventId }), headers);
       return;
     }
 
@@ -9647,21 +10055,25 @@ const server = createServer(async (req, res) => {
         htmlResponse(res, 400, signupPage((check.errors || ["Signup failed."]).join(" "), values));
         return;
       }
-      for (const [k, v] of pendingSignups) if (v.expires < Date.now()) pendingSignups.delete(k);
+      pendingSignupStore.sweep();
       const token = randomBytes(32).toString("hex");
       const code = makeVerificationCode();
-      pendingSignups.set(token, {
-        values,
+      // Hash the password NOW. validateSignupInput has already confirmed the two
+      // fields match, so the plaintext has no further use — and this record is
+      // persisted to disk, where a plaintext credential must never land.
+      const { password, confirmPassword, confirm_password: confirmPasswordAlt, ...safeValues } = values;
+      pendingSignupStore.put(token, {
+        values: { ...safeValues, passwordHash: hashPassword(password) },
         email: check.email,
         code,
-        expires: Date.now() + 15 * 60 * 1000,
+        expires: Date.now() + SIGNUP_VERIFY_TTL_MS,
         attempts: 0,
         resendAt: Date.now() + 30 * 1000
       });
       emailVerificationCode(check.email, values.fullName, code).catch(() => {});
       res.writeHead(302, {
         location: "/verify",
-        "set-cookie": `tg_signup=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=900`,
+        "set-cookie": `tg_signup=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SIGNUP_VERIFY_TTL_MS / 1000}`,
         "cache-control": "no-store"
       });
       res.end();
@@ -9671,8 +10083,8 @@ const server = createServer(async (req, res) => {
     if (pathname === "/verify" && req.method === "GET") {
       if (isAuthenticated(req)) { redirect(res, "/"); return; }
       const token = parseCookies(req.headers.cookie).tg_signup || "";
-      const pending = pendingSignups.get(token);
-      if (!token || !pending || pending.expires < Date.now()) {
+      const pending = pendingSignupStore.get(token);
+      if (!token || !pending) {
         redirect(res, "/signup");
         return;
       }
@@ -9682,8 +10094,8 @@ const server = createServer(async (req, res) => {
 
     if (pathname === "/verify/resend" && req.method === "POST") {
       const token = parseCookies(req.headers.cookie).tg_signup || "";
-      const pending = pendingSignups.get(token);
-      if (!token || !pending || pending.expires < Date.now()) {
+      const pending = pendingSignupStore.get(token);
+      if (!token || !pending) {
         redirect(res, "/signup");
         return;
       }
@@ -9692,9 +10104,12 @@ const server = createServer(async (req, res) => {
         return;
       }
       pending.code = makeVerificationCode();
-      pending.expires = Date.now() + 15 * 60 * 1000;
+      pending.expires = Date.now() + SIGNUP_VERIFY_TTL_MS;
       pending.attempts = 0;
       pending.resendAt = Date.now() + 30 * 1000;
+      // The record is a detached copy once it lives in SQLite, so mutations only
+      // take effect when written back.
+      pendingSignupStore.put(token, pending);
       emailVerificationCode(pending.email, pending.values.fullName, pending.code).catch(() => {});
       htmlResponse(res, 200, verifyPage({ email: pending.email, info: "A new code is on its way to your inbox." }));
       return;
@@ -9703,9 +10118,9 @@ const server = createServer(async (req, res) => {
     if (pathname === "/verify" && req.method === "POST") {
       if (!checkRateLimit(req, "verify", 10, 60 * 60 * 1000)) { tooManyRequests(res); return; }
       const token = parseCookies(req.headers.cookie).tg_signup || "";
-      const pending = pendingSignups.get(token);
-      if (!token || !pending || pending.expires < Date.now()) {
-        if (token) pendingSignups.delete(token);
+      const pending = pendingSignupStore.get(token);
+      if (!token || !pending) {
+        if (token) pendingSignupStore.delete(token);
         htmlResponse(res, 400, signupPage("Your verification session expired. Please sign up again."));
         return;
       }
@@ -9713,10 +10128,13 @@ const server = createServer(async (req, res) => {
       const submitted = String(form.get("code") || "").trim();
       pending.attempts += 1;
       if (pending.attempts > 6) {
-        pendingSignups.delete(token);
+        pendingSignupStore.delete(token);
         htmlResponse(res, 400, signupPage("Too many incorrect attempts. Please sign up again."));
         return;
       }
+      // Persist the attempt count before answering, so the brute-force ceiling
+      // survives a restart instead of silently resetting to zero.
+      pendingSignupStore.put(token, pending);
       if (submitted !== pending.code) {
         htmlResponse(res, 400, verifyPage({ email: pending.email, error: "Incorrect code. Check your email and try again." }));
         return;
@@ -9729,7 +10147,7 @@ const server = createServer(async (req, res) => {
         htmlResponse(res, 400, signupPage((result.errors || ["Signup failed."]).join(" "), values));
         return;
       }
-      pendingSignups.delete(token);
+      pendingSignupStore.delete(token);
       invalidateOwnerDashboardCache();
 
       // Self-signup is always plan "Free" (addCustomerSignup hardcodes it) — this
@@ -9770,7 +10188,19 @@ const server = createServer(async (req, res) => {
           { plan: chosenPlan, billingCycle: values.billingCycle || "monthly" },
           { tenantId: result.account.tenantId }
         );
-        if (staged.ok) landing = "/checkout";
+        if (staged.ok) {
+          landing = "/checkout";
+          // Paid plan staged at signup — the SaaS InitiateCheckout. Reuse this
+          // request's own visitor context rather than the stored snapshot; it was
+          // written moments ago and this is the same visit.
+          trackTagiooCheckoutStep("initiate_checkout", {
+            tenantId: result.account.tenantId,
+            plan: chosenPlan,
+            amount: staged.payment?.amount,
+            orderId: staged.payment?.invoiceNo,
+            visitor: signupVisitor
+          }).catch(() => {});
+        }
       }
 
       const account = {
@@ -9798,7 +10228,7 @@ const server = createServer(async (req, res) => {
       const tenant = loaded.available ? (loaded.data.tenants || []).find((t) => t.id === session.tenantId) : null;
       // Nothing to pay for (free, already claimed, or already active) → dashboard.
       if (!tenant || !checkoutRequired(tenant, loaded.data)) { redirect(res, "/"); return; }
-      htmlResponse(res, 200, checkoutPage({ instructions: paymentInstructionsFor(tenant, loaded.data) }));
+      htmlResponse(res, 200, checkoutPage({ instructions: paymentInstructionsFor(tenant, loaded.data), paddle: paddleCheckoutConfigFor(tenant) }));
       return;
     }
 
@@ -9835,6 +10265,7 @@ const server = createServer(async (req, res) => {
       if (!tenant || !checkoutRequired(tenant, loaded.data)) { redirect(res, "/"); return; }
       htmlResponse(res, 400, checkoutPage({
         instructions: paymentInstructionsFor(tenant, loaded.data),
+        paddle: paddleCheckoutConfigFor(tenant),
         error: (result.errors || ["Payment submission failed."]).join(" "),
         values
       }));
@@ -9987,6 +10418,64 @@ const server = createServer(async (req, res) => {
       const inserted = rows.length ? eventStore.insertLines(rows) : 0;
       eventStore.markBatch(batchId, workerId);
       jsonResponse(res, 200, { ok: true, inserted, skipped: lines.length - rows.length });
+      return;
+    }
+
+    // Paddle webhook: card checkout activation for US/international customers,
+    // parallel to the manual bKash/Nagad claim flow. Signed over the raw body
+    // (Paddle-Signature header), so this must stay above the session auth gate.
+    if (pathname === "/api/paddle/webhook" && req.method === "POST") {
+      let rawBody;
+      try {
+        rawBody = await readRawBody(req);
+      } catch (error) {
+        jsonResponse(res, 413, { error: error.message });
+        return;
+      }
+      if (!isPaddleWebhookAuthorized(req, rawBody)) {
+        jsonResponse(res, 401, { error: "Invalid Paddle webhook signature." });
+        return;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        jsonResponse(res, 400, { error: "Invalid JSON payload." });
+        return;
+      }
+
+      const eventType = String(payload.event_type || "");
+      const eventData = payload.data || {};
+
+      if (eventType === "transaction.completed" || eventType === "transaction.paid") {
+        const customData = eventData.custom_data || {};
+        const tenantId = String(customData.tenantId || "").trim();
+        const planName = String(customData.planName || "").trim();
+        const totalMinor = Number(eventData.details?.totals?.total || 0);
+        const result = await activatePaddleTenant({
+          tenantId,
+          planName,
+          amount: totalMinor / 100,
+          currency: eventData.currency_code || "USD",
+          paddleTransactionId: eventData.id,
+          paddleSubscriptionId: eventData.subscription_id || "",
+          paddleCustomerId: eventData.customer_id || ""
+        });
+        if (result.ok) invalidateOwnerDashboardCache();
+        jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { activated: true, duplicate: Boolean(result.duplicate) } : { errors: result.errors });
+        return;
+      }
+
+      if (eventType === "subscription.canceled" || eventType === "subscription.paused") {
+        const result = await deactivatePaddleTenant(eventData.id);
+        if (result.ok) invalidateOwnerDashboardCache();
+        jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { deactivated: true } : { errors: result.errors });
+        return;
+      }
+
+      // Unhandled event types (e.g. subscription.updated): acknowledge so
+      // Paddle doesn't treat it as a failed delivery and keep retrying.
+      jsonResponse(res, 200, { ignored: eventType });
       return;
     }
 
@@ -10163,7 +10652,21 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await selectCustomerPlan(body, session);
-      if (result.ok) invalidateOwnerDashboardCache();
+      if (result.ok) {
+        invalidateOwnerDashboardCache();
+        // An upgrade picked from the billing UI reaches the same payment step as a
+        // paid signup, so it's the same InitiateCheckout. Scheduled downgrades carry
+        // no invoice and aren't a checkout — result.payment gates that.
+        if (result.payment) {
+          trackTagiooCheckoutStep("initiate_checkout", {
+            tenantId: session.tenantId,
+            plan: result.payment.plan,
+            amount: result.payment.amount,
+            orderId: result.payment.invoiceNo,
+            visitor: tagiooVisitorContext(req)
+          }).catch(() => {});
+        }
+      }
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
         ? { tenant: result.tenant, payment: result.payment || null, scheduled: Boolean(result.scheduled), scheduledCancelled: Boolean(result.scheduledCancelled), scheduledPlan: result.scheduledPlan || "", effectiveDate: result.effectiveDate || "" }
         : { errors: result.errors });
@@ -10204,7 +10707,19 @@ const server = createServer(async (req, res) => {
         // Owner confirmation happens later without the buyer's request, so
         // refresh their match snapshot now — this is the closest real visit to
         // the eventual Purchase event.
-        saveTagiooVisitorContext(session.tenantId, tagiooVisitorContext(req)).catch(() => {});
+        const claimVisitor = tagiooVisitorContext(req);
+        saveTagiooVisitorContext(session.tenantId, claimVisitor).catch(() => {});
+        // Transaction ID submitted = the buyer's real moment of purchase intent.
+        // Everything after this is owner bookkeeping, so this is the last funnel
+        // signal Meta gets with the buyer actually present.
+        trackTagiooCheckoutStep("add_payment_info", {
+          tenantId: session.tenantId,
+          plan: result.payment?.plan,
+          amount: result.payment?.amount,
+          orderId: result.payment?.invoiceNo || result.payment?.id,
+          when: result.payment?.claimedAt,
+          visitor: claimVisitor
+        }).catch(() => {});
       }
       jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok ? { payment: result.payment } : { errors: result.errors });
       return;
