@@ -5,6 +5,83 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-09.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-08-12 — Meta ads underdelivery: funnel signal + signup survival
+Ads weren't spending. Events Manager showed the cause: the ad set optimized
+**CompleteRegistration, which had 2 lifetime events** — below the threshold where Meta can
+build an estimated action rate at all, so it never bid. `Lead` had 430 events but was
+**greyed out and unselectable** in the ad-set picker, badged "Conversions API", because it
+was sent server-side only with no browser counterpart. Two more numbers from the same
+screen: `PageView` 275 < `Lead` 430 (inverted — Lead fires on any `GET /signup`, so bots
+and crawlers inflate it), and Lead 430 → CompleteRegistration 2 = a **0.47% signup
+completion rate**. Landed:
+
+- **Browser Lead counterpart.** `signupPage()` takes a third `{ leadEventId }` arg and
+  seeds `dataLayer` with `{event:'tagioo_lead', tagioo_event_id}` *before* the GTM snippet.
+  The id is the one the server already sends to CAPI, so a GTM Meta Pixel tag firing on
+  `tagioo_lead` with that `eventID` dedupes to one Lead and flips the event's integration
+  from "Conversions API" to "Multiple" — making it selectable as a conversion event.
+  `leadEventId` is declared outside the `tg_lead_sent` guard and stays `""` on reloads, so
+  the browser copy fires on exactly the requests the server copy does. **Still needs the
+  GTM-side tag + `tagioo_event_id` dataLayer variable created in `GTM-MCR3FD4W`** — the
+  server half alone does nothing.
+- **GTM on `verifyPage` + `checkoutPage`.** Both rendered without the container, so the two
+  highest-intent pages were invisible and their visitors unretargetable. Extracted
+  `gtmHead(seed)` / `gtmNoscript()` helpers; `loginPage`/`signupPage` now use them too, so
+  exactly one copy of the snippet remains in `server.js`.
+- **`tg_vid` validated as 32-hex.** It's client-supplied and now reaches an inline
+  `<script>` as well as Meta's hashed `external_id` and the GA4 client seed. Anything not
+  matching the shape this server issues is discarded and a fresh id minted. `gtmHead` also
+  escapes `<` in its seed as a second layer.
+- **`pendingSignups` persisted to SQLite** (`pending_signups` table in `db.js`, accessed via
+  a `pendingSignupStore` facade that falls back to the old in-memory Map if the native
+  module didn't load). It was a process Map with a 15-minute TTL, so every deploy, `pm2
+  restart` or watchdog bounce stranded in-flight signups on "Your verification session
+  expired" — the prime suspect for the 430 → 2 collapse. TTL raised to 60 minutes
+  (`SIGNUP_VERIFY_TTL_MS`), cookie `Max-Age` and the verification email copy both derive
+  from it. Attempt counts are written back, so the 6-try brute-force ceiling survives a
+  restart instead of resetting.
+- **Password no longer held in plaintext while a code is pending.** The pending record is
+  now on disk (and swept into `data/backups`), so `POST /signup` strips
+  `password`/`confirmPassword` and stores `hashPassword(password)` instead.
+  `validateCustomerAccountInput` accepts a `passwordHash` that matches the scrypt format
+  and skips the length/match rules when one is supplied; `addCustomerAccount` prefers it
+  over re-hashing. Owner-created accounts still take a plaintext password unchanged.
+
+Verified end to end against a scratch copy of `data/`: signup → **server killed and
+restarted** → the pre-restart code still verified → account created with a scrypt hash →
+login with the original password succeeded. Also confirmed no duplicate browser Lead on
+reload, no plaintext password anywhere in `events.db`, and expired/unknown tokens still
+rejected with 400. Full plan and the Ads Manager playbook:
+`~/.claude/plans/i-m-currently-running-ads-concurrent-chipmunk.md`.
+
+- **Mid-funnel events added.** The funnel was `CompleteRegistration → …hours/days… → Purchase`,
+  with Purchase only firing on manual owner confirmation — too sparse and too delayed for
+  Meta to optimize on. `trackTagiooCheckoutStep()` now fires **InitiateCheckout** when a paid
+  plan is staged (both the paid-signup path and a billing-UI upgrade; skipped for scheduled
+  downgrades, which carry no invoice) and **AddPaymentInfo** when the buyer submits a
+  bKash/Nagad transaction ID. Each sends a gtag forward plus a CAPI event sharing one
+  `event_id` (`<step>_<invoiceNo>`, stable per invoice so repeats dedupe).
+- **Purchase `event_time` backdated** to `payment.claimedAt` via `capiEventTime()`, which
+  clamps to Meta's 7-day window and falls back to now for a missing/stale/future date. A
+  slow confirm was stamping "now" and could push the conversion outside the click window,
+  costing the ad its credit.
+- **Missing-token warning.** `sendTagiooOwnMetaEvent` warned nothing when
+  `TAGIOO_META_CAPI_TOKEN` was unset — it just dropped every event while GA4 kept looking
+  healthy. Now warns once per process, naming the missing var and the `pm2 restart
+  --update-env` fix. (`TAGIOO_META_PIXEL_ID` needs no env entry — it falls back to the
+  hardcoded `1039411801891124`.)
+
+Verified live end to end with a dummy CAPI token: one paid signup dispatched
+`generate_lead → sign_up → InitiateCheckout → AddPaymentInfo`, each exactly once; the
+missing-token warning fired exactly once when the token was absent; `/verify` and
+`/checkout` both render the container (2 refs each).
+
+Still open from that plan: the landing-page fabricated testimonial ("Rafiqul Islam", A/B/C/D
+avatars, unverified +31%/+58%) and the WhatsApp CTA — both need owner-supplied real content.
+**Also still required and not doable from this repo:** the GTM-side Meta Pixel `Lead` tag on
+a `tagioo_lead` trigger reading a `tagioo_event_id` dataLayer variable. Until that exists in
+`GTM-MCR3FD4W`, Lead stays CAPI-only and unselectable as an ad set conversion event.
+
 ## Recently completed
 Recent commits (newest first, Jul 4–7):
 - **Checkout wall is one-time, not a lockout** (working tree, Aug 9): someone who signed up on a paid plan and never paid was bounced to `/checkout` on *every* login, with no way into the product. `releaseUnpaidSignupToFree()` now drops the staged invoice and puts the tenant on Free (15k requests / 30-day cycle, `subscriptionStatus: "free"`) on the next login, and from a new "Not now — continue on the Free plan" button on the checkout page. The pay-first prompt still fires for the signup session itself. Untouched: a tenant with a submitted claim awaiting owner confirmation, and any live paid plan. Existing free cycle window is preserved so releasing can't mint a fresh allowance. Upgrading is a normal plan pick in Account & Billing. Also fixed a write race this exposed: `markCustomerAccountLogin()` (fire-and-forget during login) did an unlocked read-modify-write and could collide with the release write — same-millisecond `writeDatabase()` calls shared one temp path and renamed a **corrupted history.json** into place. Login telemetry now runs under `withDbLock`, and the temp filename carries a random suffix.

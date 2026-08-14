@@ -15,6 +15,10 @@
 //   ingested_batches — batch ids already accepted from worker agents, so at-least-once
 //                      delivery from workers never double-counts events.
 //   daily_summaries  — cached snapshot JSON for closed days (computed once, reused).
+//   pending_signups  — in-flight email verifications. Lives here rather than in a
+//                      process Map so a deploy/restart mid-signup doesn't strand the
+//                      visitor on "your verification session expired". Holds the
+//                      already-hashed password only — never a plaintext credential.
 
 import Database from "better-sqlite3";
 import { join } from "node:path";
@@ -53,6 +57,18 @@ CREATE TABLE IF NOT EXISTS daily_summaries (
   computed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   PRIMARY KEY (tenant_id, date_key)
 );
+
+CREATE TABLE IF NOT EXISTS pending_signups (
+  token TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  code TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  expires_at INTEGER NOT NULL,
+  resend_at INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pending_signups_expires ON pending_signups (expires_at);
 
 CREATE TABLE IF NOT EXISTS error_logs (
   id INTEGER PRIMARY KEY,
@@ -110,6 +126,17 @@ export function openEventStore(dataDir) {
     VALUES (?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
     ON CONFLICT(tenant_id, date_key) DO UPDATE SET payload = excluded.payload, computed_at = excluded.computed_at
   `);
+
+  const putPendingSignupStmt = db.prepare(`
+    INSERT INTO pending_signups (token, email, code, payload, attempts, expires_at, resend_at)
+    VALUES (@token, @email, @code, @payload, @attempts, @expiresAt, @resendAt)
+    ON CONFLICT(token) DO UPDATE SET
+      code = excluded.code, payload = excluded.payload, attempts = excluded.attempts,
+      expires_at = excluded.expires_at, resend_at = excluded.resend_at
+  `);
+  const getPendingSignupStmt = db.prepare("SELECT * FROM pending_signups WHERE token = ?");
+  const deletePendingSignupStmt = db.prepare("DELETE FROM pending_signups WHERE token = ?");
+  const expirePendingSignupsStmt = db.prepare("DELETE FROM pending_signups WHERE expires_at < ?");
 
   const insertErrorLogStmt = db.prepare(
     "INSERT INTO error_logs (source, message, stack, context) VALUES (@source, @message, @stack, @context)"
@@ -203,6 +230,54 @@ export function openEventStore(dataDir) {
       setSummaryStmt.run(tenantId || "", dateKey, JSON.stringify(snapshot));
     },
 
+    // In-flight email verification for a signup that hasn't created an account yet.
+    // `record.values` must already carry passwordHash rather than a plaintext password —
+    // this row is written to disk and swept into data/backups.
+    putPendingSignup(token, record) {
+      putPendingSignupStmt.run({
+        token: String(token),
+        email: String(record.email || ""),
+        code: String(record.code || ""),
+        payload: JSON.stringify(record.values || {}),
+        attempts: Number(record.attempts) || 0,
+        expiresAt: Number(record.expires) || 0,
+        resendAt: Number(record.resendAt) || 0
+      });
+    },
+
+    // Returns null for an unknown OR expired token, so callers get one uniform
+    // "start again" path and an expired row can never be redeemed.
+    getPendingSignup(token) {
+      const row = getPendingSignupStmt.get(String(token || ""));
+      if (!row) return null;
+      if (row.expires_at < Date.now()) {
+        deletePendingSignupStmt.run(row.token);
+        return null;
+      }
+      let values = {};
+      try {
+        values = JSON.parse(row.payload);
+      } catch {
+        return null;
+      }
+      return {
+        values,
+        email: row.email,
+        code: row.code,
+        attempts: row.attempts,
+        expires: row.expires_at,
+        resendAt: row.resend_at
+      };
+    },
+
+    deletePendingSignup(token) {
+      deletePendingSignupStmt.run(String(token || ""));
+    },
+
+    expirePendingSignups(now = Date.now()) {
+      return expirePendingSignupsStmt.run(Number(now)).changes;
+    },
+
     // Owner-facing error log (server exceptions + reported client-side JS errors).
     // Capped at insert time so a repeating bug can't grow this table unbounded.
     insertErrorLog({ source, message, stack, context }, keepMax = 500) {
@@ -233,7 +308,8 @@ export function openEventStore(dataDir) {
       const summaries = db.prepare("DELETE FROM daily_summaries WHERE date_key < ?").run(cutoff).changes;
       const batchCutoff = new Date(Date.now() - batchRetentionDays * 86400000).toISOString();
       const batches = db.prepare("DELETE FROM ingested_batches WHERE received_at < ?").run(batchCutoff).changes;
-      return { cutoff, lines, summaries, batches };
+      const signups = expirePendingSignupsStmt.run(Date.now()).changes;
+      return { cutoff, lines, summaries, batches, signups };
     },
 
     stats() {
