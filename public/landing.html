@@ -628,7 +628,7 @@
               </tr>
               <tr>
                 <td>Starting price</td>
-                <td class="col-tagioo price-cell">৳1,200/mo</td>
+                <td class="col-tagioo price-cell" data-table-price data-usd="30">৳1,200/mo</td>
                 <td class="price-cell">$15+/mo</td>
                 <td class="price-cell">৳2,000+/mo</td>
               </tr>
@@ -713,8 +713,9 @@
           <h2>Plans for every store size.</h2>
           <p class="section-sub">Every plan includes the Custom Loader that loads <strong>gtm.js and gtag.js first-party</strong> — so Brave and ad-blockers can't strip your tracking. Plus dedicated sGTM container, first-party domain, SSL, server-side Meta CAPI, and real-time analytics.</p>
         </div>
+        <div id="pricingCurrencySwitch" style="text-align:center;margin:0 0 8px;font-size:13px"></div>
 
-        <div class="billing-toggle" role="tablist" aria-label="Billing cycle">
+        <div class="billing-toggle" id="billingToggle" role="tablist" aria-label="Billing cycle">
           <button class="billing-tab is-active" type="button" data-cycle="1" role="tab" aria-selected="true">Monthly</button>
           <button class="billing-tab" type="button" data-cycle="3" role="tab" aria-selected="false">3 Months <span class="billing-save">Save 10% + free setup</span></button>
           <button class="billing-tab" type="button" data-cycle="6" role="tab" aria-selected="false">6 Months <span class="billing-save">Save 20%</span></button>
@@ -726,7 +727,7 @@
           <article class="pricing-card" data-reveal>
             <div class="plan-tier-badge" style="--tb:#5B21B6">Free</div>
             <div class="plan-header">
-              <div class="plan-price"><strong>৳0</strong><span>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="0">৳0</strong><span data-price-unit>/month</span></div>
               <p>Test with real events. No credit card required.</p>
             </div>
             <ul class="plan-features">
@@ -744,7 +745,7 @@
           <article class="pricing-card" data-reveal data-monthly="1200">
             <div class="plan-tier-badge" style="--tb:#059669">Starter</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display>৳1,200</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="30">৳1,200</strong><span data-price-unit>/month</span></div>
               <p class="plan-cycle-note" data-cycle-note></p>
               <p>For stores starting with server-side tracking.</p>
             </div>
@@ -764,7 +765,7 @@
             <div class="plan-popular-tag">Most popular</div>
             <div class="plan-tier-badge" style="--tb:#F97316">Pro</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display>৳2,900</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="50">৳2,900</strong><span data-price-unit>/month</span></div>
               <p class="plan-cycle-note" data-cycle-note></p>
               <p>For stores running serious ad campaigns.</p>
             </div>
@@ -783,7 +784,7 @@
           <article class="pricing-card" data-reveal data-monthly="5900">
             <div class="plan-tier-badge" style="--tb:#D97706">Enterprise</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display>৳5,900</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="100">৳5,900</strong><span data-price-unit>/month</span></div>
               <p class="plan-cycle-note" data-cycle-note></p>
               <p>For agencies and high-volume stores.</p>
             </div>
@@ -801,8 +802,8 @@
 
         </div>
         <div class="pricing-footer">
-          <p>Pay monthly via <strong>bKash</strong> or <strong>Nagad</strong>. After you pick a plan, send the payment and enter your transaction ID — we verify and activate within hours. Cancel anytime.</p>
-          <p>Prices above are monthly — <a href="/pricing">save up to 20% with 3 or 6-month billing →</a></p>
+          <p id="pricingFooterNote">Pay monthly via <strong>bKash</strong> or <strong>Nagad</strong>. After you pick a plan, send the payment and enter your transaction ID — we verify and activate within hours. Cancel anytime.</p>
+          <p id="pricingCycleNote">Prices above are monthly — <a href="/pricing">save up to 20% with 3 or 6-month billing →</a></p>
           <p><a href="/pricing">Full plan details &amp; billing FAQ →</a> &nbsp;·&nbsp; Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
         </div>
       </section>
@@ -820,7 +821,7 @@
           </details>
           <details class="faq-item">
             <summary>How is Tagioo different from Stape.io or a DIY VPS?</summary>
-            <p>Stape.io is a solid international sGTM host, but it's priced in USD, has no BDIX peering for Bangladesh traffic, and doesn't take bKash/Nagad. A DIY VPS means you own the container runtime, Nginx, and SSL yourself. Tagioo is BDIX-hosted for Bangladesh speed, billed in taka via bKash/Nagad, and adds purchase gap alerts, revenue tracking, offline conversions to Meta, and a GTM template generator built specifically for GA4, Meta CAPI, Google Ads, and TikTok.</p>
+            <p>Stape.io is a solid international sGTM host, but it has no BDIX peering for Bangladesh traffic and only takes cards. A DIY VPS means you own the container runtime, Nginx, and SSL yourself. Tagioo is BDIX-hosted for Bangladesh speed, takes both bKash/Nagad (BDT) and card (USD), and adds purchase gap alerts, revenue tracking, offline conversions to Meta, and a GTM template generator built specifically for GA4, Meta CAPI, Google Ads, and TikTok.</p>
           </details>
           <details class="faq-item">
             <summary>What is the purchase gap alert?</summary>
@@ -840,7 +841,7 @@
           </details>
           <details class="faq-item">
             <summary>How do I pay?</summary>
-            <p>We accept bKash, Nagad, bank transfer (all Bangladeshi banks), and international cards (Visa/Mastercard). After signup, contact us on WhatsApp or email to complete payment and activate your plan.</p>
+            <p>Pick a plan and sign up. In Bangladesh, pay via bKash or Nagad — submit your transaction ID in the dashboard and we activate your plan within a few hours. Everywhere else, pay by card (Visa, Mastercard, and more) via Paddle — your plan activates instantly.</p>
           </details>
           <details class="faq-item">
             <summary>Is my tracking data safe and private?</summary>
@@ -1047,6 +1048,40 @@
           });
         });
       });
+
+      // International visitors (anyone not detected as Bangladesh) see USD
+      // pricing — Paddle card checkout, monthly-only, so the multi-cycle
+      // billing toggle (BDT/bKash-Nagad only) is hidden here too.
+      fetch("/api/geo").then(r => r.json()).then(({ currency }) => {
+        const switchEl = document.getElementById("pricingCurrencySwitch");
+        if (switchEl) {
+          switchEl.innerHTML = currency === "USD"
+            ? '🇧🇩 In Bangladesh? <a href="/bd?next=/#pricing">See BDT pricing →</a>'
+            : '🌍 Outside Bangladesh? <a href="/global?next=/#pricing">See USD pricing →</a>';
+        }
+        if (currency !== "USD") return;
+        const toggle = document.getElementById("billingToggle");
+        if (toggle) toggle.style.display = "none";
+        const footerNote = document.getElementById("pricingFooterNote");
+        if (footerNote) footerNote.innerHTML = "Pay by <strong>card</strong> — Visa, Mastercard, and more, billed in USD via Paddle. Pick a plan, checkout, and your account activates instantly.";
+        const cycleNote = document.getElementById("pricingCycleNote");
+        if (cycleNote) cycleNote.style.display = "none";
+        document.querySelectorAll("[data-usd]").forEach(el => {
+          const usd = el.dataset.usd;
+          if (el.hasAttribute("data-table-price")) {
+            el.textContent = "$" + usd + "/mo";
+          } else {
+            el.textContent = "$" + usd;
+            const unitEl = el.closest(".plan-price")?.querySelector("[data-price-unit]");
+            if (unitEl) unitEl.textContent = "/month";
+          }
+        });
+        document.querySelectorAll("[data-plan-cta]").forEach(cta => {
+          const u = new URL(cta.getAttribute("href"), window.location.origin);
+          u.searchParams.set("cycle", "monthly");
+          cta.setAttribute("href", u.pathname + u.search);
+        });
+      }).catch(() => {});
     </script>
   </body>
 </html>

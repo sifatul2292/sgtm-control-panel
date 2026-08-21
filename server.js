@@ -128,14 +128,21 @@ const config = {
   sslDomain: process.env.SSL_DOMAIN || "",
   sslPort: Number(process.env.SSL_PORT || 443),
   nginxConfdDir: process.env.NGINX_CONF_D_DIR || "/etc/nginx/conf.d",
-  paddleApiKey: process.env.PADDLE_API_KEY || "",
+  // Picked by PADDLE_ENV so the right key is live regardless of which one
+  // is also set — matches the naming Paddle's own Claude Code plugin expects.
+  paddleApiKey: (process.env.PADDLE_ENV || "sandbox") === "production"
+    ? (process.env.PADDLE_LIVE_API_KEY || "")
+    : (process.env.PADDLE_SANDBOX_API_KEY || ""),
   paddleWebhookSecret: process.env.PADDLE_WEBHOOK_SECRET || "",
   paddleEnv: process.env.PADDLE_ENV || "sandbox",
+  paddleApiBase: (process.env.PADDLE_ENV || "sandbox") === "production"
+    ? "https://api.paddle.com"
+    : "https://sandbox-api.paddle.com",
   paddleClientToken: process.env.PADDLE_CLIENT_TOKEN || "",
   paddlePriceIds: {
     Starter: process.env.PADDLE_PRICE_ID_STARTER || "",
-    Growth: process.env.PADDLE_PRICE_ID_GROWTH || "",
-    Pro: process.env.PADDLE_PRICE_ID_PRO || ""
+    Pro: process.env.PADDLE_PRICE_ID_PRO || "",
+    Enterprise: process.env.PADDLE_PRICE_ID_ENTERPRISE || ""
   }
 };
 
@@ -1427,6 +1434,53 @@ function tiktokPixelEventScript(tiktokEventName) {
   return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + "var items=ec.items||[];var contents=items.map(function(it){return {content_id:String(it.item_id||it.id||''),content_name:it.item_name,quantity:it.quantity||1,price:it.price};});var p={contents:contents,content_type:'product'};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;if(window.ttq)ttq.track('" + tiktokEventName + "',p,eid?{event_id:String(eid)}:{});})();</script>";
 }
 
+function cleanLaravelTrackerConfig(input) {
+  const clean = (value, limit = 300) => String(value || "").trim().slice(0, limit);
+  return {
+    currency: clean(input.currency || "BDT", 12).toUpperCase(),
+    productPattern: clean(input.laravelProductPattern),
+    checkoutPattern: clean(input.laravelCheckoutPattern),
+    purchasePattern: clean(input.laravelPurchasePattern),
+    addToCartSelector: clean(input.laravelAddToCartSelector),
+    orderIdSelector: clean(input.laravelOrderIdSelector),
+    orderTotalSelector: clean(input.laravelOrderTotalSelector)
+  };
+}
+
+// Browser-only storefront adapter for Laravel/custom shops. Laravel has no
+// standard ecommerce DOM, so this deliberately prefers structured Product/Order
+// JSON-LD and lets the no-code assistant supply URL/selector overrides. Purchase
+// is never fabricated: both a real order id and a positive total are required.
+function laravelAutoTrackerScript(input) {
+  const configJson = JSON.stringify(cleanLaravelTrackerConfig(input)).replace(/</g, "\\u003c");
+  return `<script>(function(){
+if(window.__tagiooLaravelTracker)return;window.__tagiooLaravelTracker=true;
+var cfg=${configJson},seen={},dl=window.dataLayer=window.dataLayer||[];
+function text(sel){if(!sel)return'';try{var el=document.querySelector(sel);return el?String(el.getAttribute('content')||el.getAttribute('data-value')||el.textContent||'').trim():'';}catch(e){return'';}}
+function meta(name){var el=document.querySelector('meta[property="'+name+'"],meta[name="'+name+'"]');return el?String(el.content||'').trim():'';}
+function number(v){var s=String(v==null?'':v).replace(/[^0-9,.-]/g,'');if(s.indexOf(',')>-1&&s.indexOf('.')<0)s=s.replace(',','.');else s=s.replace(/,/g,'');var n=Number(s);return isFinite(n)?n:0;}
+function id(){if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();return'tagioo-'+Date.now()+'-'+Math.random().toString(36).slice(2,10);}
+function typeIs(node,type){var t=node&&node['@type'];return Array.isArray(t)?t.indexOf(type)>-1:String(t||'').toLowerCase()===type.toLowerCase();}
+function findType(node,type){if(!node||typeof node!=='object')return null;if(typeIs(node,type))return node;if(Array.isArray(node)){for(var i=0;i<node.length;i++){var a=findType(node[i],type);if(a)return a;}}else{for(var k in node){if(Object.prototype.hasOwnProperty.call(node,k)){var b=findType(node[k],type);if(b)return b;}}}return null;}
+function schema(type){var nodes=document.querySelectorAll('script[type="application/ld+json"]');for(var i=0;i<nodes.length;i++){try{var found=findType(JSON.parse(nodes[i].textContent),type);if(found)return found;}catch(e){}}return null;}
+function wildcard(pattern,value){if(!pattern)return false;var raw=String(pattern),escaped='';for(var i=0;i<raw.length;i++){var ch=raw.charAt(i);if(ch==='*'){escaped+='.*';continue;}if('^$+?.()|{}[]'.indexOf(ch)>-1)escaped+='\\\\';escaped+=ch;}try{return new RegExp('^'+escaped+'$','i').test(value);}catch(e){return false;}}
+function matches(pattern){return wildcard(pattern,location.pathname)||wildcard(pattern,location.pathname+location.search)||wildcard(pattern,location.href);}
+function offer(product){var o=product&&(Array.isArray(product.offers)?product.offers[0]:product.offers);return o||{};}
+function product(){var p=schema('Product'),o=offer(p);if(!p&&!cfg.productPattern)return null;if(cfg.productPattern&&!matches(cfg.productPattern)&&!p)return null;var price=number(o.price||o.lowPrice||meta('product:price:amount')||text('[itemprop="price"]'));var itemId=String((p&&(p.sku||p.productID||p.mpn))||meta('product:retailer_item_id')||text('[data-product-id]')||'').trim();var name=String((p&&p.name)||meta('og:title')||text('h1')||document.title||'').trim();if(!itemId)itemId=location.pathname.replace(/^\\/+|\\/+$/g,'').split('/').pop()||name;return{currency:String(o.priceCurrency||meta('product:price:currency')||cfg.currency||'BDT').toUpperCase(),value:price,items:[{item_id:itemId,item_name:name,price:price,quantity:1}]};}
+function push(event,ecommerce,eventId){dl.push({ecommerce:null});dl.push({event:event,event_id:eventId||id(),ecommerce:ecommerce});}
+function cartSave(ec){try{sessionStorage.setItem('tagioo_laravel_cart',JSON.stringify(ec));}catch(e){}}
+function cartLoad(){try{return JSON.parse(sessionStorage.getItem('tagioo_laravel_cart')||'null');}catch(e){return null;}}
+function fireView(){var key='view:'+location.href;if(seen[key])return;var ec=product();if(!ec)return;seen[key]=1;push('view_item',ec);}
+function fireCheckout(){var key='checkout:'+location.href;if(seen[key])return;var ec=cartLoad()||product();if(!ec)return;seen[key]=1;push('begin_checkout',ec);}
+function orderItems(order){var rows=order&&(order.orderedItem||order.acceptedOffer);if(!rows)return(cartLoad()||{}).items||[];if(!Array.isArray(rows))rows=[rows];return rows.map(function(row){var item=row.itemOffered||row.item||row;var price=number(row.price||item.price);return{item_id:String(item.sku||item.productID||item.identifier||item.name||''),item_name:String(item.name||''),price:price,quantity:number(row.orderQuantity||row.quantity)||1};});}
+function firePurchase(){var order=schema('Order');if(!order&&!cfg.purchasePattern)return;if(cfg.purchasePattern&&!matches(cfg.purchasePattern)&&!order)return;var orderId=String(text(cfg.orderIdSelector)||(order&&(order.orderNumber||order.orderId||order.identifier))||'').trim();var total=number(text(cfg.orderTotalSelector)||(order&&(order.price||order.totalPrice||(order.priceSpecification&&order.priceSpecification.price))));if(!orderId||total<=0)return;var storageKey='tagioo_purchase_'+orderId;try{if(localStorage.getItem(storageKey))return;localStorage.setItem(storageKey,'1');}catch(e){if(seen[storageKey])return;seen[storageKey]=1;}var currency=String((order&&(order.priceCurrency||(order.priceSpecification&&order.priceSpecification.priceCurrency)))||cfg.currency||'BDT').toUpperCase();push('purchase',{transaction_id:orderId,value:total,currency:currency,items:orderItems(order)},orderId);}
+function scan(){fireView();if(matches(cfg.checkoutPattern))fireCheckout();firePurchase();}
+document.addEventListener('click',function(ev){var el=ev.target&&ev.target.closest?ev.target.closest('a,button,input[type="submit"],[role="button"]'):null;if(!el)return;var label=String(el.textContent||el.value||el.getAttribute('aria-label')||'').trim();var href=String(el.getAttribute('href')||''),hrefLower=href.toLowerCase();var isCart=false;if(cfg.addToCartSelector){try{isCart=!!ev.target.closest(cfg.addToCartSelector);}catch(e){}}if(!isCart)isCart=/add.{0,5}(to)?.{0,5}(cart|bag)|buy now/i.test(label)||hrefLower.indexOf('cart/add')>-1||hrefLower.indexOf('add-to-cart')>-1;if(isCart){var ec=product();if(ec){cartSave(ec);push('add_to_cart',ec);}return;}if(/checkout|proceed.{0,6}(order|payment)|place order/i.test(label+' '+href)){setTimeout(fireCheckout,0);}},true);
+var oldPush=history.pushState,oldReplace=history.replaceState;function route(fn){return function(){var result=fn.apply(this,arguments);setTimeout(scan,0);return result;};}history.pushState=route(oldPush);history.replaceState=route(oldReplace);window.addEventListener('popstate',function(){setTimeout(scan,0);});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scan);else scan();
+})(window);</script>`;
+}
+
 function buildWebGtmTemplate(input) {
   const destinations = selectedDestinations(input);
   const payload = {
@@ -1510,6 +1564,11 @@ function buildWebGtmTemplate(input) {
     gtmTrigger(8, "Tagioo - view_item_list", "view_item_list")
   ];
   const tags = [];
+  if (payload.businessType === "ecommerce" && payload.platform === "laravel") {
+    tags.push(gtmTag(900, "Tagioo - Laravel Auto Tracker", "html", [
+      gtmTemplateParam("html", laravelAutoTrackerScript(input))
+    ], ["2147479553"], "2"));
+  }
   if (destinations.includes("ga4")) {
     tags.push(gtmTag(1, "Tagioo GA4 - Config", "googtag", [
       gtmTemplateParam("tagId", "{{Tagioo - ga4_measurement_id}}"),
@@ -1561,7 +1620,6 @@ function buildWebGtmTemplate(input) {
           { parameter: "tax", parameterValue: "{{dlv - ecommerce.tax}}" }
         );
       }
-      const isFiringOnce = true;
       const tagObj = gtmTag(tags.length + 1, `Tagioo GA4 - ${eventName}`, "gaawe", [
         gtmBooleanParam("sendEcommerceData", false),
         gtmBooleanParam("enhancedUserId", false),
@@ -1570,7 +1628,10 @@ function buildWebGtmTemplate(input) {
         gtmTemplateParam("eventSettingsVariable", "{{Tagioo - ga4 event settings}}"),
         gtmListParam("eventSettingsTable", eventSettingsRows)
       ], [triggerId], "3");
-      if (isFiringOnce) tagObj.tagFiringOption = "ONCE_PER_LOAD";
+      // A Livewire/Inertia storefront can legitimately push the same event type
+      // several times without a page load. Keep legacy templates unchanged, but
+      // let Laravel tags fire once for each dataLayer event.
+      if (payload.platform !== "laravel") tagObj.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tagObj);
     }
   }
@@ -1590,7 +1651,7 @@ function buildWebGtmTemplate(input) {
       const metaTag = gtmTag(tags.length + 1, `Tagioo Meta - ${metaEventName}`, "html", [
         gtmTemplateParam("html", metaPixelEventScript(metaEventName))
       ], [triggerId], "4");
-      metaTag.tagFiringOption = "ONCE_PER_LOAD";
+      if (payload.platform !== "laravel") metaTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(metaTag);
     }
   }
@@ -1610,7 +1671,7 @@ function buildWebGtmTemplate(input) {
       const tiktokTag = gtmTag(tags.length + 1, `Tagioo TikTok - ${tiktokEventName}`, "html", [
         gtmTemplateParam("html", tiktokPixelEventScript(tiktokEventName))
       ], [triggerId], "6");
-      tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
+      if (payload.platform !== "laravel") tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tiktokTag);
     }
   }
@@ -1794,6 +1855,9 @@ function buildSetupAssistantTemplates(input) {
   }
   if (destinations.includes("meta")) {
     warnings.push("Meta CAPI is now included in server.json. Import, preview Server GTM, confirm the Meta tag returns 2xx, then publish.");
+  }
+  if (String(input.platform || "") === "laravel") {
+    warnings.push("Laravel no-code tracking is enabled in web.json. Run product, cart, checkout, and test-order checks before publishing; Purchase only fires when Tagioo finds a real order ID and positive total.");
   }
   return {
     fileNames: {
@@ -2223,7 +2287,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
         </a>
         <div class="lb-hero">
           <h2>One last step.<br>Activate your plan.</h2>
-          <p>Send the amount via bKash or Nagad, then enter your transaction ID. We verify it and activate your plan — usually within a few hours.</p>
+          <p>${paddle.enabled ? "Pay by card — Visa, Mastercard, and more. Your plan activates instantly." : "Send the amount via bKash or Nagad, then enter your transaction ID. We verify it and activate your plan — usually within a few hours."}</p>
         </div>
         <div class="su-steps">
           <div class="su-step su-step--done"><span class="su-step-num">1</span>Create your account</div>
@@ -2244,7 +2308,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           <div class="co-summary su-anim" style="--d:60ms">
             <div class="co-plan">
               <strong>${escapeHtml(instructions.plan)}</strong>
-              <span class="co-amount">${money(instructions.amount)}<small>${cycleLabel}</small></span>
+              <span class="co-amount">${paddle.enabled ? `$${paddle.usdAmount}` : money(instructions.amount)}<small>${paddle.enabled ? "per month" : cycleLabel}</small></span>
             </div>
             <p class="co-invoice">Invoice ${escapeHtml(instructions.invoiceNo)}</p>
           </div>
@@ -2252,8 +2316,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           ${paddle.enabled ? `
           <button type="button" id="coPayCard" class="co-card-btn su-anim" style="--d:70ms">Pay with card — $${paddle.usdAmount}/mo</button>
           <p class="co-card-note su-anim" style="--d:75ms">Instant activation. Visa, Mastercard, and more — billed in USD via Paddle.</p>
-          <div class="co-divider su-anim" style="--d:78ms">or pay with bKash / Nagad</div>
-          ` : ""}
+          ` : `
 
           ${numbers ? `<div class="co-numbers su-anim" style="--d:80ms">${numbers}</div>` : ""}
 
@@ -2279,6 +2342,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
             <button type="submit" class="button button-primary full-width su-anim" style="--d:190ms">Submit payment &amp; continue</button>
           </form>
           <p class="lf-subtitle su-anim" style="--d:220ms;margin-top:14px;text-align:center">${instructions.ownerWhatsApp ? `Trouble paying? <a class="su-signin-link" href="https://wa.me/${escapeHtml(instructions.ownerWhatsApp.replace(/[^0-9]/g, ""))}" target="_blank" rel="noopener">Message us on WhatsApp →</a>` : ""}</p>
+          `}
           <form method="post" action="/checkout/skip" class="co-skip su-anim" style="--d:240ms">
             <button type="submit">Not now — continue on the Free plan</button>
             <small>15,000 events every 30 days. Upgrade any time from Account &amp; Billing.</small>
@@ -5564,12 +5628,26 @@ function paymentInstructionsFor(tenant, data) {
 
 // USD monthly price per plan, sold via Paddle (international card checkout).
 // Independent of the BDT bKash/Nagad pricing table — different market, different rail.
-const paddleUsdMonthly = { Starter: 30, Growth: 50, Pro: 100 };
+const paddleUsdMonthly = { Starter: 30, Pro: 50, Enterprise: 100 };
 
-// Card-checkout config for the pending plan, when Paddle is configured for it.
-// bKash/Nagad stays the only option for a plan with no mapped Paddle price
-// (e.g. Enterprise, sold manually) or when PADDLE_CLIENT_TOKEN isn't set.
+// X-Tagioo-Country is Cloudflare's CF-IPCountry header, passed through by
+// tagioo.com's own Nginx vhost (same pattern already used for customer sGTM
+// domains). Missing/unrecognized → "" so currencyForCountry defaults safely.
+function detectCountryCode(req) {
+  return String(req.headers["x-tagioo-country"] || "").trim().toUpperCase().slice(0, 2);
+}
+
+// BD sees BDT/bKash-Nagad; everywhere else (including an undetected visitor,
+// e.g. local dev or Cloudflare not yet wired) defaults to USD/Paddle.
+function currencyForCountry(countryCode) {
+  return countryCode === "BD" ? "BDT" : "USD";
+}
+
+// Card-checkout config for the pending plan, shown only to a non-BD tenant
+// (currencyForCountry) with a mapped Paddle price and PADDLE_CLIENT_TOKEN set.
+// A BD tenant never sees this — bKash/Nagad is the only rail for BDT.
 function paddleCheckoutConfigFor(tenant) {
+  if (currencyForCountry(tenant.country) !== "USD") return { enabled: false };
   const planName = tenant.pendingPlan || "";
   const priceId = config.paddlePriceIds[planName] || "";
   if (!config.paddleClientToken || !priceId) return { enabled: false };
@@ -6194,6 +6272,109 @@ async function deactivatePaddleTenantLocked(paddleSubscriptionId) {
     updatedAt: now.toISOString()
   };
   await writeDatabase(data);
+  return { ok: true, tenant: data.tenants[tenantIndex] };
+}
+
+// Reverse of config.paddlePriceIds — maps a Paddle price id back to our plan
+// name. Used to interpret subscription.updated webhook payloads.
+function planNameForPaddlePriceId(priceId) {
+  return Object.entries(config.paddlePriceIds).find(([, id]) => id && id === priceId)?.[0] || "";
+}
+
+// Bearer-authed call to Paddle's REST API (subscription updates/cancels —
+// distinct from the client-side Checkout used at signup). Never throws;
+// callers check `ok`.
+async function callPaddleApi(path, method, body) {
+  if (!config.paddleApiKey) return { ok: false, status: 500, errors: ["PADDLE_SANDBOX_API_KEY/PADDLE_LIVE_API_KEY is not configured."] };
+  try {
+    const res = await fetch(`${config.paddleApiBase}${path}`, {
+      method,
+      headers: {
+        authorization: `Bearer ${config.paddleApiKey}`,
+        "content-type": "application/json"
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, status: res.status, errors: [json?.error?.detail || `Paddle API ${res.status}`] };
+    return { ok: true, data: json.data };
+  } catch (error) {
+    return { ok: false, status: 502, errors: [error.message] };
+  }
+}
+
+// Customer-initiated plan change for a Paddle (USD) tenant. Mirrors the BDT
+// flow's policy: upgrade charges the prorated difference immediately and
+// applies now; downgrade applies at the next renewal, no charge today. The
+// tenant's plan/limits in our DB are NOT updated here — the subscription.updated
+// webhook is the source of truth, same pattern as activatePaddleTenant.
+async function updatePaddleSubscriptionPlan(tenant, newPlanName) {
+  const priceId = config.paddlePriceIds[newPlanName];
+  if (!priceId) return { ok: false, status: 400, errors: [`No Paddle price configured for "${newPlanName}".`] };
+  if (!tenant.paddleSubscriptionId) return { ok: false, status: 400, errors: ["No active Paddle subscription on this account."] };
+
+  const isUpgrade = planRankFor(newPlanName) > planRankFor(tenant.plan);
+  return callPaddleApi(`/subscriptions/${tenant.paddleSubscriptionId}`, "PATCH", {
+    items: [{ price_id: priceId, quantity: 1 }],
+    proration_billing_mode: isUpgrade ? "prorated_immediately" : "do_not_bill",
+    effective_from: isUpgrade ? "immediately" : "next_billing_period"
+  });
+}
+
+// Downgrade-to-Free for a Paddle tenant is a cancellation, not a price swap.
+// Scheduled at next renewal to match the BDT rail's downgrade policy — no
+// immediate loss of service, no partial-period refund to reason about.
+async function cancelPaddleSubscription(tenant) {
+  if (!tenant.paddleSubscriptionId) return { ok: false, status: 400, errors: ["No active Paddle subscription on this account."] };
+  return callPaddleApi(`/subscriptions/${tenant.paddleSubscriptionId}/cancel`, "POST", {
+    effective_from: "next_billing_period"
+  });
+}
+
+// subscription.updated webhook: sync our plan/limits to whatever Paddle
+// reports as the CURRENT active price on the subscription. Deliberately
+// naive about scheduled-vs-applied — Paddle fires this again when a
+// next_billing_period change actually takes effect, and re-reading "current
+// items" each time is simpler and more robust than trying to interpret
+// Paddle's scheduled_change payload shape.
+async function syncPaddleSubscriptionPlan(paddleSubscriptionId, items) {
+  return withDbLock(() => syncPaddleSubscriptionPlanLocked(paddleSubscriptionId, items));
+}
+
+async function syncPaddleSubscriptionPlanLocked(paddleSubscriptionId, items) {
+  if (!paddleSubscriptionId) return { ok: false, status: 400, errors: ["Missing Paddle subscription id."] };
+  const activePriceId = (items || []).find((item) => item.status !== "inactive")?.price?.id || items?.[0]?.price?.id;
+  const planName = planNameForPaddlePriceId(activePriceId);
+  if (!planName) return { ok: true, skipped: true };
+
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const data = loaded.data;
+  const tenantIndex = (data.tenants || []).findIndex((t) => t.paddleSubscriptionId === paddleSubscriptionId);
+  if (tenantIndex === -1) return { ok: true, skipped: true };
+
+  const tenant = data.tenants[tenantIndex];
+  if (tenant.plan === planName) return { ok: true, unchanged: true };
+
+  const now = new Date();
+  const profile = resourceProfileForPlan(planName);
+  data.tenants[tenantIndex] = {
+    ...tenant,
+    plan: planName,
+    requestLimit: profile.monthlyRequestLimit,
+    containerLimit: profile.containerLimit + Number(tenant.extraContainers || 0),
+    domainLimit: profile.domainLimit,
+    monthlyAmount: paddleUsdMonthly[planName] || 0,
+    resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
+    updatedAt: now.toISOString()
+  };
+  await writeDatabase(data);
+
+  const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenant.id && item.containerName);
+  if (request?.containerName) {
+    await resizeContainer(request.containerName, { memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit }).catch(() => null);
+  }
+
   return { ok: true, tenant: data.tenants[tenantIndex] };
 }
 
@@ -9534,6 +9715,9 @@ async function customerDashboardData(data, session) {
     renewalDate: tenant?.renewalDate || data.usage.renewalDate,
     monthlyAmount: tenant?.monthlyAmount ?? data.usage.monthlyAmount,
     containerLimit: tenant?.containerLimit || data.usage.containerLimit,
+    // Drives which currency "My Subscription" displays — a Paddle tenant sees
+    // USD pricing, everyone else sees the BDT bKash/Nagad catalog.
+    paymentProvider: tenant?.paymentProvider || "",
     requestsToday: todayLiveCount,
     requestsMonth,
     requestLimit,
@@ -10421,6 +10605,37 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Public, unauthenticated — the marketing/pricing pages call this client-side
+    // (before any session exists) to decide which currency to display. A manual
+    // /bd or /global visit (see below) sets tg_currency, which wins over the
+    // Cloudflare-derived guess — handles VPNs and lets a visitor self-correct.
+    if (pathname === "/api/geo" && req.method === "GET") {
+      const forced = parseCookies(req.headers.cookie).tg_currency;
+      if (forced === "BDT" || forced === "USD") {
+        jsonResponse(res, 200, { country: forced === "BDT" ? "BD" : "", currency: forced, forced: true });
+        return;
+      }
+      const country = detectCountryCode(req);
+      jsonResponse(res, 200, { country, currency: currencyForCountry(country) });
+      return;
+    }
+
+    // Manual currency override: /bd forces BDT, /global forces USD, both sticky
+    // for a year via cookie. next must be a same-site relative path — reject
+    // anything that could redirect off tagioo.com (open-redirect guard).
+    if ((pathname === "/bd" || pathname === "/global") && req.method === "GET") {
+      const nextParam = String(reqUrl.searchParams.get("next") || "/");
+      const next = nextParam.startsWith("/") && !nextParam.startsWith("//") && !nextParam.includes("://") ? nextParam : "/";
+      const currency = pathname === "/bd" ? "BDT" : "USD";
+      res.writeHead(302, {
+        location: next,
+        "set-cookie": `tg_currency=${currency}; Path=/; Max-Age=31536000; SameSite=Lax`,
+        "cache-control": "no-store"
+      });
+      res.end();
+      return;
+    }
+
     // Paddle webhook: card checkout activation for US/international customers,
     // parallel to the manual bKash/Nagad claim flow. Signed over the raw body
     // (Paddle-Signature header), so this must stay above the session auth gate.
@@ -10473,8 +10688,18 @@ const server = createServer(async (req, res) => {
         return;
       }
 
-      // Unhandled event types (e.g. subscription.updated): acknowledge so
-      // Paddle doesn't treat it as a failed delivery and keep retrying.
+      // Fires on any subscription change — the customer-initiated plan-change
+      // path (POST /api/customer/subscription/paddle below) only calls
+      // Paddle's API; this webhook is what actually applies the new plan/limits.
+      if (eventType === "subscription.updated") {
+        const result = await syncPaddleSubscriptionPlan(eventData.id, eventData.items);
+        if (result.ok && !result.skipped && !result.unchanged) invalidateOwnerDashboardCache();
+        jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { synced: true } : { errors: result.errors });
+        return;
+      }
+
+      // Unhandled event types: acknowledge so Paddle doesn't treat it as a
+      // failed delivery and keep retrying.
       jsonResponse(res, 200, { ignored: eventType });
       return;
     }
@@ -10670,6 +10895,31 @@ const server = createServer(async (req, res) => {
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
         ? { tenant: result.tenant, payment: result.payment || null, scheduled: Boolean(result.scheduled), scheduledCancelled: Boolean(result.scheduledCancelled), scheduledPlan: result.scheduledPlan || "", effectiveDate: result.effectiveDate || "" }
         : { errors: result.errors });
+      return;
+    }
+
+    // Plan change for a Paddle (USD) tenant — calls Paddle's Subscription API;
+    // does NOT update the tenant's plan/limits itself. The subscription.updated
+    // webhook is what actually applies the change once Paddle confirms it, so
+    // the response here just reports whether the request was accepted.
+    if (pathname === "/api/customer/subscription/paddle" && req.method === "POST") {
+      if (!checkRateLimit(req, "paddle-plan-change", 10, 60 * 60 * 1000)) { tooManyRequests(res); return; }
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const loaded = await readDatabase();
+      const tenant = loaded.available ? (loaded.data.tenants || []).find((t) => t.id === session.tenantId) : null;
+      if (!tenant) { jsonResponse(res, 404, { error: "Customer account was not found." }); return; }
+      if (tenant.paymentProvider !== "paddle") { jsonResponse(res, 400, { error: "This account is not on a card subscription." }); return; }
+
+      const body = await readJson(req);
+      const planName = String(body.planName || "").trim();
+      const result = planName === "Free"
+        ? await cancelPaddleSubscription(tenant)
+        : await updatePaddleSubscriptionPlan(tenant, planName);
+      jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { accepted: true } : { errors: result.errors });
       return;
     }
 

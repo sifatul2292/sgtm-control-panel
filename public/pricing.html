@@ -76,8 +76,8 @@
           <div class="hero-content">
             <div class="hero-copy">
               <p class="eyebrow">Simple pricing</p>
-              <h1>No card. No lock-in.<br>Just server-side tracking.</h1>
-              <p class="section-sub">Start free with 15,000 events a month, forever. Upgrade when you need more volume — pay monthly via bKash or Nagad, cancel anytime.</p>
+              <h1 id="pricingHeadline">No card. No lock-in.<br>Just server-side tracking.</h1>
+              <p class="section-sub" id="pricingSubhead">Start free with 15,000 events a month, forever. Upgrade when you need more volume — pay monthly via bKash or Nagad, cancel anytime.</p>
             </div>
           </div>
         </div>
@@ -86,7 +86,7 @@
       <!-- ── PRICING GRID ───────────────────────────────────────── -->
       <section class="section pricing-section">
 
-        <div class="billing-toggle" role="tablist" aria-label="Billing cycle">
+        <div class="billing-toggle" id="billingToggle" role="tablist" aria-label="Billing cycle">
           <button class="billing-tab is-active" type="button" data-cycle="1" role="tab" aria-selected="true">Monthly</button>
           <button class="billing-tab" type="button" data-cycle="3" role="tab" aria-selected="false">3 Months <span class="billing-save">Save 10% + free setup</span></button>
           <button class="billing-tab" type="button" data-cycle="6" role="tab" aria-selected="false">6 Months <span class="billing-save">Save 20%</span></button>
@@ -97,7 +97,7 @@
           <article class="pricing-card" data-reveal>
             <div class="plan-tier-badge" style="--tb:#5B21B6">Free</div>
             <div class="plan-header">
-              <div class="plan-price"><strong>৳0</strong><span>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="0">৳0</strong><span data-price-unit>/month</span></div>
               <p>Test with real events. No credit card required.</p>
             </div>
             <ul class="plan-features">
@@ -115,7 +115,7 @@
           <article class="pricing-card" data-reveal data-monthly="1200">
             <div class="plan-tier-badge" style="--tb:#059669">Starter</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display>৳1,200</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="30">৳1,200</strong><span data-price-unit>/month</span></div>
               <p class="plan-cycle-note" data-cycle-note></p>
               <p>For stores starting with server-side tracking.</p>
             </div>
@@ -135,7 +135,7 @@
             <div class="plan-popular-tag">Most popular</div>
             <div class="plan-tier-badge" style="--tb:#F97316">Pro</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display>৳2,900</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="50">৳2,900</strong><span data-price-unit>/month</span></div>
               <p class="plan-cycle-note" data-cycle-note></p>
               <p>For stores running serious ad campaigns.</p>
             </div>
@@ -154,7 +154,7 @@
           <article class="pricing-card" data-reveal data-monthly="5900">
             <div class="plan-tier-badge" style="--tb:#D97706">Enterprise</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display>৳5,900</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="100">৳5,900</strong><span data-price-unit>/month</span></div>
               <p class="plan-cycle-note" data-cycle-note></p>
               <p>For agencies and high-volume stores.</p>
             </div>
@@ -172,8 +172,9 @@
 
         </div>
         <div class="pricing-footer">
-          <p>Pay via <strong>bKash</strong> or <strong>Nagad</strong>. After you pick a plan and cycle, send the payment and enter your transaction ID — we verify and activate within hours. Cancel anytime.</p>
+          <p id="pricingFooterNote">Pay via <strong>bKash</strong> or <strong>Nagad</strong>. After you pick a plan and cycle, send the payment and enter your transaction ID — we verify and activate within hours. Cancel anytime.</p>
           <p>Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
+          <p id="pricingCurrencySwitch" style="margin-top:8px;font-size:13px"></p>
         </div>
       </section>
 
@@ -296,10 +297,10 @@
               </tr>
               <tr>
                 <td>Price</td>
-                <td class="price-cell">৳0/mo</td>
-                <td class="price-cell">৳1,200/mo</td>
-                <td class="col-tagioo price-cell">৳2,900/mo</td>
-                <td class="price-cell">৳5,900/mo</td>
+                <td class="price-cell" data-table-price data-usd="0">৳0/mo</td>
+                <td class="price-cell" data-table-price data-usd="30">৳1,200/mo</td>
+                <td class="col-tagioo price-cell" data-table-price data-usd="50">৳2,900/mo</td>
+                <td class="price-cell" data-table-price data-usd="100">৳5,900/mo</td>
               </tr>
             </tbody>
           </table>
@@ -327,7 +328,7 @@
         <div class="faq-grid">
           <details class="faq-item">
             <summary>How do I pay — is there a card option?</summary>
-            <p>No card, no gateway. Pick a plan, then send the amount via <strong>bKash</strong> or <strong>Nagad</strong> "Send Money" to the number shown in your dashboard, and enter the transaction ID. We verify it against the payment and activate your plan — usually within a few hours, always same day.</p>
+            <p>Yes. In Bangladesh, send the amount via <strong>bKash</strong> or <strong>Nagad</strong> "Send Money" to the number shown in your dashboard and enter the transaction ID — we verify it and activate your plan, usually within a few hours, always same day. Everywhere else, pay by card (Visa, Mastercard, and more) via Paddle — your plan activates instantly.</p>
           </details>
           <details class="faq-item">
             <summary>What happens right after I submit a transaction ID?</summary>
@@ -339,11 +340,11 @@
           </details>
           <details class="faq-item">
             <summary>How does renewal work?</summary>
-            <p>Paid plans run for whichever cycle you pick — 30, 90, or 180 days — from the date we confirm your payment. We send reminders before your renewal date. If it lapses, you get a short grace period with tracking still running, then the container pauses until you renew — same bKash/Nagad flow as your first payment.</p>
+            <p>bKash/Nagad plans run for whichever cycle you pick — 30, 90, or 180 days — from the date we confirm your payment. We send reminders before your renewal date; if it lapses, you get a short grace period with tracking still running, then the container pauses until you renew via the same bKash/Nagad flow as your first payment. Card subscriptions via Paddle are monthly and renew automatically — no action needed unless you cancel.</p>
           </details>
           <details class="faq-item">
             <summary>How do the 3-month and 6-month discounts work?</summary>
-            <p>Pick a 3-month cycle and pay 10% less than three separate monthly payments, plus we set your GTM containers up for you free (usually a self-serve step). Pick 6 months and save 20%. Same bKash/Nagad flow, one payment covers the whole cycle.</p>
+            <p>Pick a 3-month cycle and pay 10% less than three separate monthly payments, plus we set your GTM containers up for you free (usually a self-serve step). Pick 6 months and save 20%. Same bKash/Nagad flow, one payment covers the whole cycle. These multi-month cycles apply to bKash/Nagad billing only — card subscriptions via Paddle are monthly.</p>
           </details>
           <details class="faq-item">
             <summary>Can I cancel or downgrade anytime?</summary>
@@ -351,7 +352,7 @@
           </details>
           <details class="faq-item">
             <summary>Do you offer refunds?</summary>
-            <p>Since payment is confirmed manually before activation, message us on WhatsApp if something's wrong with your billing — we handle it case by case, same day.</p>
+            <p>Message us on WhatsApp if something's wrong with your billing — we handle it case by case, same day.</p>
           </details>
         </div>
       </section>
@@ -504,6 +505,43 @@
           });
         });
       });
+
+      // International visitors (anyone not detected as Bangladesh) see USD
+      // pricing — Paddle card checkout, monthly-only, so the multi-month
+      // billing toggle (BDT/bKash-Nagad only) is hidden rather than shown
+      // with a "Save 20%" that Paddle can't actually offer yet.
+      fetch("/api/geo").then(r => r.json()).then(({ currency }) => {
+        const switchEl = document.getElementById("pricingCurrencySwitch");
+        if (switchEl) {
+          switchEl.innerHTML = currency === "USD"
+            ? '🇧🇩 In Bangladesh? <a href="/bd?next=/pricing">See BDT pricing →</a>'
+            : '🌍 Outside Bangladesh? <a href="/global?next=/pricing">See USD pricing →</a>';
+        }
+        if (currency !== "USD") return;
+        const toggle = document.getElementById("billingToggle");
+        if (toggle) toggle.style.display = "none";
+        const headline = document.getElementById("pricingHeadline");
+        if (headline) headline.innerHTML = "Cancel anytime. Instant setup.<br>Just server-side tracking.";
+        const subhead = document.getElementById("pricingSubhead");
+        if (subhead) subhead.textContent = "Start free with 15,000 events a month, forever. Upgrade when you need more volume — pay monthly by card, cancel anytime.";
+        const footerNote = document.getElementById("pricingFooterNote");
+        if (footerNote) footerNote.innerHTML = "Pay by <strong>card</strong> — Visa, Mastercard, and more, billed in USD via Paddle. Pick a plan, checkout, and your account activates instantly.";
+        document.querySelectorAll("[data-usd]").forEach(el => {
+          const usd = el.dataset.usd;
+          if (el.hasAttribute("data-table-price")) {
+            el.textContent = "$" + usd + "/mo";
+          } else {
+            el.textContent = "$" + usd;
+            const unitEl = el.closest(".plan-price")?.querySelector("[data-price-unit]");
+            if (unitEl) unitEl.textContent = "/month";
+          }
+        });
+        document.querySelectorAll("[data-plan-cta]").forEach(cta => {
+          const u = new URL(cta.getAttribute("href"), window.location.origin);
+          u.searchParams.set("cycle", "monthly");
+          cta.setAttribute("href", u.pathname + u.search);
+        });
+      }).catch(() => {});
     </script>
   </body>
 </html>

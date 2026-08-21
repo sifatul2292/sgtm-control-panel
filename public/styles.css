@@ -1087,6 +1087,43 @@ h2 {
   box-shadow: 0 0 0 3px var(--color-accent-wash);
 }
 
+.assistant-laravel-settings {
+  margin: 0 var(--space-lg) var(--space-lg);
+  border: var(--rule-thin) solid color-mix(in oklch, var(--color-accent), transparent 70%);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--color-accent-wash), var(--color-surface) 62%);
+  overflow: hidden;
+}
+
+.assistant-laravel-settings[hidden] {
+  display: none;
+}
+
+.assistant-laravel-intro {
+  padding: var(--space-md) var(--space-lg) 0;
+}
+
+.assistant-laravel-intro h3 {
+  margin: var(--space-xs) 0 var(--space-2xs);
+}
+
+.assistant-laravel-intro p,
+.assistant-laravel-note {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.assistant-form-grid--nested {
+  padding-top: var(--space-md);
+  padding-bottom: var(--space-md);
+}
+
+.assistant-laravel-note {
+  margin: 0;
+  padding: 0 var(--space-lg) var(--space-md);
+}
+
 .label-optional {
   font-weight: 600;
   font-size: 0.75em;

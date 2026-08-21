@@ -108,6 +108,16 @@ Never commit real secrets. `.env` is gitignored.
 - **Payment claim flow:** customer submits txn → owner emailed → customer emailed "verifying" → owner confirms in Admin → Payments → customer emailed "active" (or "rejected").
 - Setup Assistant renders **only for customer session** (owner-view screenshots miss bugs). Watch curly quotes in attrs breaking template parse.
 
+### Paddle (US/international card checkout — parallel rail, not a replacement)
+- **Second payment rail alongside manual bKash/Nagad**, not instead of it. bKash/Nagad stays for BD customers; Paddle is Starter/Growth/Pro ($30/$50/$100 USD monthly) for everyone else. Both write to the same `payments[]`/tenant shape — differentiated by `payment.provider` / `tenant.paymentProvider` (`"manual"` vs `"paddle"`).
+- **No SDK.** Native `fetch` + `node:crypto` only — matches the framework-free rule. Paddle.js loads client-side via `<script src="https://cdn.paddle.com/paddle/v2/paddle.js">` in `checkoutPage()`, not an npm package.
+- **Environment switch is one var:** `PADDLE_ENV` (`sandbox` | `production`) picks `PADDLE_SANDBOX_API_KEY` vs `PADDLE_LIVE_API_KEY` in `config.paddleApiKey`, and gates `Paddle.Environment.set("sandbox")` client-side. Never hardcode which environment — always branch on `config.paddleEnv`.
+- **Webhook verification:** `isPaddleWebhookAuthorized()` — Paddle signs `"{ts}:{rawBody}"` with `PADDLE_WEBHOOK_SECRET` (HMAC-SHA256), sent as `Paddle-Signature: ts=...;h1=...`. Must run against the **raw body bytes** (`readRawBody`, not `readJson`) before any parsing — same pattern as the existing WooCommerce webhook.
+- **Idempotency is mandatory, not optional.** Paddle retries webhook delivery on any non-2xx. `activatePaddleTenant()` dedupes on `paddleTransactionId` against `data.payments[]` before touching tenant state — never activate/charge-side-effect without that check.
+- **Paddle owns renewal/dunning for its tenants.** `enforcePaidRenewals()` explicitly skips `paymentProvider === "paddle"` — don't let the manual-flow overdue/expire sweep touch a Paddle subscription; Paddle's own webhooks (`subscription.canceled`/`.paused`) are the only thing allowed to change a Paddle tenant's status outside a payment event.
+- **Confirm before, don't just build:** switching `PADDLE_ENV` from sandbox to production, rotating `PADDLE_LIVE_API_KEY`/`PADDLE_WEBHOOK_SECRET`, or changing which price ID maps to which plan (`paddleUsdMonthly`, `PADDLE_PRICE_ID_*`) are money-affecting — flag and confirm with the owner before changing, don't silently swap them mid-task.
+- **Real secrets (`PADDLE_*_API_KEY`, `PADDLE_WEBHOOK_SECRET`) go in the VPS `.env`, never in chat, never committed.** `PADDLE_CLIENT_TOKEN` and the price IDs are client-exposed by design, safe to share/commit as placeholders in `.env.example`.
+
 ## UI / design conventions
 - Design tokens in `public/tokens.css`; shared styles `public/styles.css`. Enterprise dark theme, brand purple (`#5B21B6`), BDT `৳` currency.
 - Static HTML pages, inline-styled transactional emails built as HTML strings in `server.js`.

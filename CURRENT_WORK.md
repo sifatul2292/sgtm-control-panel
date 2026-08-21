@@ -5,6 +5,27 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-09.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-08-21 — Laravel / custom ecommerce no-code GTM beta
+
+- Setup Assistant now offers **Laravel / Custom Ecommerce** and collects optional
+  product, checkout, success-page, add-to-cart, order-ID, and order-total rules.
+- Laravel `web.json` exports include a conservative `Tagioo - Laravel Auto Tracker`
+  Custom HTML tag. It reads Product/Order JSON-LD, uses optional URL/selector
+  overrides, watches cart/checkout clicks, retains cart context in session storage,
+  and pushes standard `view_item`, `add_to_cart`, `begin_checkout`, and `purchase`
+  events into the existing GA4/Meta/TikTok pipeline.
+- Purchase requires a real order ID and positive total, uses the order ID for both
+  `event_id` and `transaction_id`, and is suppressed on confirmation-page reloads.
+  This is browser detection, **not backend purchase recovery**; customers must run a
+  test order before publishing. COD/payment-redirect recovery still needs a future
+  per-tenant generic webhook or payment connector.
+- Laravel web tags use GTM's once-per-event firing behavior so Livewire/Inertia and
+  repeated cart actions are not collapsed into one hit per page. Other platforms
+  retain their existing once-per-load behavior.
+- Verification: `npm run check`, `node --check public/app.js`, generated tracker
+  parse test, funnel smoke (`view_item → add_to_cart → begin_checkout`), and purchase
+  smoke (selector extraction + reload dedup) all pass.
+
 ## 2026-08-12 — Meta ads underdelivery: funnel signal + signup survival
 Ads weren't spending. Events Manager showed the cause: the ad set optimized
 **CompleteRegistration, which had 2 lifetime events** — below the threshold where Meta can

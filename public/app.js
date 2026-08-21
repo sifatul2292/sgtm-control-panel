@@ -238,6 +238,7 @@ const subscriptionPlans = [
   {
     name: "Free",
     price: "Free",
+    usdMonthly: 0,
     requests: 15000,
     containers: 1,
     domains: 1,
@@ -248,6 +249,7 @@ const subscriptionPlans = [
   {
     name: "Starter",
     price: "৳1,200",
+    usdMonthly: 30,
     requests: 500000,
     containers: 1,
     domains: 1,
@@ -258,6 +260,7 @@ const subscriptionPlans = [
   {
     name: "Pro",
     price: "৳2,900",
+    usdMonthly: 50,
     requests: 2000000,
     containers: 3,
     domains: 2,
@@ -269,6 +272,7 @@ const subscriptionPlans = [
   {
     name: "Enterprise",
     price: "৳5,900",
+    usdMonthly: 100,
     requests: 5000000,
     containers: 5,
     domains: 3,
@@ -2993,7 +2997,15 @@ function renderSetupAssistant(data) {
   }
   setWooWebhookSecret(data.webhookSecret || "");
   if (data.tracking?.lastVerify) renderVerifyResult(data.tracking.lastVerify);
+  updateLaravelAssistantFields();
   updateSetupAssistantStep();
+}
+
+function updateLaravelAssistantFields() {
+  if (!els.setupAssistantForm) return;
+  const isLaravel = els.setupAssistantForm.elements.platform?.value === "laravel";
+  const settings = els.setupAssistantForm.querySelector("[data-laravel-settings]");
+  if (settings) settings.hidden = !isLaravel;
 }
 
 function setWooWebhookSecret(secret) {
@@ -4485,23 +4497,38 @@ function planFeatureList(features) {
   return `<ul class="subscription-feature-list">${features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join("")}</ul>`;
 }
 
-function formatPlanPrice(plan) {
-  return plan.price === "Free" ? "Free" : plan.price;
+// currency: "USD" for a Paddle tenant, "BDT" (default) for bKash/Nagad.
+// A USD tenant is always monthly (Paddle has no multi-month cycle), so
+// callers pass billingCycles[0] for them regardless of selectedCycle.
+function formatPlanPrice(plan, currency = "BDT") {
+  if (plan.price === "Free") return "Free";
+  return currency === "USD" ? `$${plan.usdMonthly}` : plan.price;
 }
 
-function cyclePrice(plan, cycle) {
+function cyclePrice(plan, cycle, currency = "BDT") {
   if (plan.price === "Free") return { total: 0, monthly: 0, original: 0, saved: 0 };
+  if (currency === "USD") return { total: plan.usdMonthly, monthly: plan.usdMonthly, original: plan.usdMonthly, saved: 0 };
   const monthly = Number(String(plan.price).replace(/[^\d]/g, ""));
   const original = monthly * cycle.months;
   const total = Math.round(original * (1 - cycle.discount));
   return { total, monthly: Math.round(total / cycle.months), original, saved: original - total };
 }
 
-function formatCyclePrice(plan, cycle) {
+function formatCyclePrice(plan, cycle, currency = "BDT") {
   if (plan.price === "Free") return "Free";
-  const { total, monthly } = cyclePrice(plan, cycle);
+  const { total, monthly } = cyclePrice(plan, cycle, currency);
+  if (currency === "USD") return `$${monthly}`;
   if (cycle.months === 1) return `৳${monthly.toLocaleString()}`;
   return `৳${total.toLocaleString()}`;
+}
+
+// A Paddle (USD) tenant's plan-change flow isn't built yet — selectSubscriptionPlan
+// only knows how to stage a BDT bKash/Nagad claim (see /api/customer/subscription),
+// which would show a bKash amount to someone who pays by card. Route them to
+// support instead of a broken/misleading modal until Paddle subscription updates
+// (Paddle's Subscription API, not just re-opening Checkout) are built.
+function isPaddleTenant(data) {
+  return (data.usage || {}).paymentProvider === "paddle";
 }
 
 function renewalText(value) {
@@ -4514,7 +4541,9 @@ function renewalText(value) {
 
 function renderBilling(data) {
   const usage = data.usage || {};
+  const currency = isPaddleTenant(data) ? "USD" : "BDT";
   const activePlanName = usage.plan || "Starter";
+  customerActivePlanName = activePlanName;
   const activePlan = subscriptionPlans.find((plan) => plan.name === activePlanName) || subscriptionPlans[1];
   const requestsMonth = Number(usage.requestsMonth || 0);
   const requestLimit = Number(usage.requestLimit || activePlan.requests || 0);
@@ -4531,7 +4560,7 @@ function renderBilling(data) {
     heroCard.innerHTML = `
       <div class="bhc-left">
         <span class="bhc-badge">${escapeHtml(activePlanName)}</span>
-        <strong class="bhc-price">${formatPlanPrice(activePlan)}<small>/month</small></strong>
+        <strong class="bhc-price">${formatPlanPrice(activePlan, currency)}<small>/month</small></strong>
         <span class="bhc-metric">${activePlan.requests.toLocaleString()} events/month</span>
       </div>
       <div class="bhc-right">
@@ -4560,7 +4589,7 @@ function renderBilling(data) {
   `;
 
   if (els.subscriptionPlans) {
-    renderPlanCards(activePlanName);
+    renderPlanCards(activePlanName, currency);
   }
   const sectionTitle = document.getElementById("planSectionTitle");
   if (sectionTitle) sectionTitle.textContent = activePlanName === "Free" ? "Choose a Plan" : "Change Plan";
@@ -4570,15 +4599,19 @@ function renderBilling(data) {
   loadBillingPayment();
 }
 
-function renderPlanCards(activePlanName) {
+function renderPlanCards(activePlanName, currency = "BDT") {
   const container = els.subscriptionPlans;
   if (!container) return;
   const activeRank = planRank[activePlanName] ?? 0;
-  const cycle = selectedCycle;
+  // Paddle has no multi-month cycle — a USD tenant is always monthly, and the
+  // 3/6/12-month toggle (BDT-only discounts) doesn't apply to them.
+  const cycle = currency === "USD" ? billingCycles[0] : selectedCycle;
   const planGradientClass = { Starter: "card-starter", Pro: "card-pro", Enterprise: "card-enterprise" };
   const cycleLabel = cycle.months === 1 ? "/ month" : `/ ${cycle.months} months`;
 
-  const toggle = `<div class="billing-cycle-toggle">${billingCycles.map((c) => `<button class="bct-btn ${c.id === cycle.id ? "is-active" : ""}" type="button" data-cycle="${c.id}">${escapeHtml(c.label)}${c.discount ? ` <span class="bct-save">-${Math.round(c.discount * 100)}%</span>` : ""}</button>`).join("")}</div>`;
+  const toggle = currency === "USD" ? "" : `<div class="billing-cycle-toggle">${billingCycles.map((c) => `<button class="bct-btn ${c.id === cycle.id ? "is-active" : ""}" type="button" data-cycle="${c.id}">${escapeHtml(c.label)}${c.discount ? ` <span class="bct-save">-${Math.round(c.discount * 100)}%</span>` : ""}</button>`).join("")}</div>`;
+
+  const isPaddle = currency === "USD";
 
   const cards = subscriptionPlans
     .filter((plan) => plan.name !== "Free")
@@ -4586,13 +4619,13 @@ function renderPlanCards(activePlanName) {
       const isCurrent = plan.name === activePlanName;
       const cardRank = planRank[plan.name] ?? 0;
       const btnLabel = isCurrent ? "Active" : cardRank > activeRank ? "Upgrade" : "Downgrade";
-      const cp = cyclePrice(plan, cycle);
-      const priceDisplay = cycle.months === 1
-        ? `৳${cp.monthly.toLocaleString()}`
+      const cp = cyclePrice(plan, cycle, currency);
+      const priceDisplay = currency === "USD" ? `$${cp.monthly}`
+        : cycle.months === 1 ? `৳${cp.monthly.toLocaleString()}`
         : `৳${cp.total.toLocaleString()}`;
-      const perMonthNote = cycle.months > 1
+      const perMonthNote = currency === "BDT" && cycle.months > 1
         ? `<span class="spc-per-month">৳${cp.monthly.toLocaleString()}/mo</span>` : "";
-      const savedNote = cp.saved > 0
+      const savedNote = currency === "BDT" && cp.saved > 0
         ? `<span class="spc-saved">Save ৳${cp.saved.toLocaleString()}</span>` : "";
       return `
       <article class="subscription-plan-card ${planGradientClass[plan.name] || ""} ${isCurrent ? "is-active-plan" : ""}" style="animation-delay:${i * 60}ms">
@@ -4605,9 +4638,9 @@ function renderPlanCards(activePlanName) {
         </div>
         <div class="spc-body">
           ${planFeatureList([`${plan.containers} container${plan.containers === 1 ? "" : "s"}`, `${plan.domains} domain${plan.domains === 1 ? "" : "s"}`, `${plan.receivers} receivers/container`, plan.retention, ...plan.features])}
-          <button class="spc-btn ${isCurrent ? "spc-btn-current" : ""}" type="button" data-plan-select="${escapeHtml(plan.name)}" ${isCurrent ? "disabled" : ""}>
-            ${btnLabel}
-          </button>
+          ${isCurrent
+            ? `<button class="spc-btn spc-btn-current" type="button" disabled>Active</button>`
+            : `<button class="spc-btn" type="button" ${isPaddle ? `data-paddle-plan-select="${escapeHtml(plan.name)}"` : `data-plan-select="${escapeHtml(plan.name)}"`}>${btnLabel}</button>`}
         </div>
       </article>`;
     }).join("");
@@ -4616,10 +4649,13 @@ function renderPlanCards(activePlanName) {
   container.querySelectorAll("[data-plan-select]").forEach((button) => {
     button.addEventListener("click", () => selectSubscriptionPlan(button.dataset.planSelect));
   });
+  container.querySelectorAll("[data-paddle-plan-select]").forEach((button) => {
+    button.addEventListener("click", () => selectPaddleSubscriptionPlan(button.dataset.paddlePlanSelect));
+  });
   container.querySelectorAll("[data-cycle]").forEach((button) => {
     button.addEventListener("click", () => {
       selectedCycle = billingCycles.find((c) => c.id === button.dataset.cycle) || billingCycles[0];
-      renderPlanCards(activePlanName);
+      renderPlanCards(activePlanName, currency);
     });
   });
 }
@@ -4634,6 +4670,9 @@ let customerSubscriptionStatus = "";
 // customer's page flips to "active" the moment the owner confirms — no reload.
 let billingPollTimer = null;
 let lastClaimPending = false;
+// Set by renderBilling each load — read by selectPaddleSubscriptionPlan to
+// decide upgrade (charge now) vs downgrade (scheduled) messaging.
+let customerActivePlanName = "";
 
 // Customer picks a plan. Upgrades/renewals return a payment to pay now (open the
 // modal only once real payment data is back — never flash an empty form).
@@ -4661,6 +4700,32 @@ async function selectSubscriptionPlan(planName) {
     window.alert(error.message);
   } finally {
     document.querySelectorAll(`[data-plan-select], [data-renew-plan]`).forEach((b) => (b.disabled = false));
+  }
+}
+
+// Paddle (USD) tenant plan change. This only asks Paddle to make the change —
+// the subscription.updated webhook applies it, which can take a few seconds,
+// so the billing panel is refreshed but may still show the old plan briefly.
+async function selectPaddleSubscriptionPlan(planName) {
+  const buttons = document.querySelectorAll(`[data-paddle-plan-select]`);
+  buttons.forEach((b) => (b.disabled = true));
+  const isUpgrade = (planRank[planName] ?? 0) > (planRank[customerActivePlanName] ?? 0);
+  try {
+    const response = await fetch("/api/customer/subscription/paddle", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ planName })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Plan update failed."]).join(" "));
+    window.alert(isUpgrade
+      ? "Upgrading — Paddle is charging the prorated difference now. This page will update in a few seconds."
+      : "Downgrade scheduled — takes effect at your next renewal, no charge today.");
+    setTimeout(() => loadDashboard(), 3000);
+  } catch (error) {
+    window.alert(error.message);
+  } finally {
+    document.querySelectorAll(`[data-paddle-plan-select]`).forEach((b) => (b.disabled = false));
   }
 }
 
@@ -5954,6 +6019,7 @@ els.assistantBack?.addEventListener("click", () => {
   setupAssistantStep = Math.max(1, setupAssistantStep - 1);
   updateSetupAssistantStep();
 });
+els.setupAssistantForm?.elements.platform?.addEventListener("change", updateLaravelAssistantFields);
 els.assistantNext?.addEventListener("click", async () => {
   if (setupAssistantStep < 4) {
     setupAssistantStep += 1;

@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=43" />
+    <link rel="stylesheet" href="/styles.css?v=44" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -964,6 +964,7 @@
                       <select name="platform">
                         <option value="shopify">Shopify</option>
                         <option value="woocommerce">WooCommerce</option>
+                        <option value="laravel">Laravel / Custom Ecommerce</option>
                         <option value="custom">Custom / Other</option>
                         <option value="wix">Wix</option>
                         <option value="bigcommerce">BigCommerce</option>
@@ -977,6 +978,42 @@
                       Tracking domain
                       <input name="trackingDomain" placeholder="https://track.example.com" />
                     </label>
+                  </div>
+                  <div class="assistant-laravel-settings" data-laravel-settings hidden>
+                    <div class="assistant-laravel-intro">
+                      <div>
+                        <span class="badge">No-code beta</span>
+                        <h3>Laravel storefront detection</h3>
+                        <p>Tagioo will add a browser tracker to web.json. It reads structured product data, watches cart and checkout actions, and only sends Purchase when it can find a real order ID and total.</p>
+                      </div>
+                    </div>
+                    <div class="assistant-form-grid assistant-form-grid--nested">
+                      <label>
+                        Product page pattern <span class="label-optional">optional</span>
+                        <input name="laravelProductPattern" placeholder="/products/*" />
+                      </label>
+                      <label>
+                        Checkout page pattern <span class="label-optional">optional</span>
+                        <input name="laravelCheckoutPattern" placeholder="/checkout*" />
+                      </label>
+                      <label>
+                        Order-success pattern
+                        <input name="laravelPurchasePattern" placeholder="/orders/*/success" />
+                      </label>
+                      <label>
+                        Add-to-cart button selector <span class="label-optional">optional</span>
+                        <input name="laravelAddToCartSelector" placeholder="[data-add-to-cart]" />
+                      </label>
+                      <label>
+                        Order ID selector <span class="label-optional">recommended</span>
+                        <input name="laravelOrderIdSelector" placeholder="[data-order-id]" />
+                      </label>
+                      <label>
+                        Order total selector <span class="label-optional">recommended</span>
+                        <input name="laravelOrderTotalSelector" placeholder="[data-order-total]" />
+                      </label>
+                    </div>
+                    <p class="assistant-laravel-note">Patterns match the URL path and support <code>*</code>. Leave optional fields blank to use automatic JSON-LD and page detection. You must run one test order before relying on Purchase.</p>
                   </div>
                 </div>
 
@@ -2484,6 +2521,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=62" type="module"></script>
+    <script src="/app.js?v=65" type="module"></script>
   </body>
 </html>
