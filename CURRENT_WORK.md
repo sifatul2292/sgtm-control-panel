@@ -88,6 +88,12 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-23.
   while still requiring the customer to save and reactivate before the bridge
   changes behavior. This makes the dedup correction discoverable without
   silently changing a live store or resending orders under a new identifier.
+- Expanded the public `/docs` Laravel section and
+  `docs/laravel-customer-setup.md` into a complete **Laravel Setup** guide. It
+  now covers destination-aware GTM imports, cPanel ZIP/Cron installation,
+  automatic detection, public invoice-ID mapping, COD statuses, activation,
+  Tagioo/Meta test-order verification, browser/server deduplication, conflicting
+  `fbq()`/`ttq()` senders, safe removal, security, and observed bridge errors.
 
 ## 2026-08-22 — Laravel Bridge foundation
 
