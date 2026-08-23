@@ -3016,13 +3016,21 @@ function setLaravelSelectOptions(element, values, selected = "", blankLabel = "N
   ).join("")}`;
 }
 
+function preferredLaravelOrderId(columns, saved = "", detected = "") {
+  const available = new Set(columns || []);
+  if (saved && saved !== "id" && available.has(saved)) return saved;
+  const publicId = ["order_number", "order_no", "invoice_number", "invoice_no", "invoice_id", "invoice", "order_code", "order_id"]
+    .find((name) => available.has(name));
+  return publicId || (saved && available.has(saved) ? saved : detected);
+}
+
 function renderLaravelMapping(report, mapping = {}) {
   const detected = report?.orders?.detected || {};
   const itemDetected = report?.items?.detected || {};
   const columns = mapping.columns || {};
   const itemColumns = mapping.item_columns || {};
   setLaravelSelectOptions(document.querySelector("#laravelMapOrdersTable"), report?.tables || [], mapping.orders_table || report?.orders?.table || "", "Choose table");
-  setLaravelSelectOptions(document.querySelector("#laravelMapOrderId"), report?.orders?.columns || [], columns.id || detected.id || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapOrderId"), report?.orders?.columns || [], preferredLaravelOrderId(report?.orders?.columns, columns.id, detected.id), "Choose column");
   setLaravelSelectOptions(document.querySelector("#laravelMapTotal"), report?.orders?.columns || [], columns.total || detected.total || "", "Choose column");
   setLaravelSelectOptions(document.querySelector("#laravelMapStatus"), report?.orders?.columns || [], columns.status || detected.status || "", "Choose column");
   setLaravelSelectOptions(document.querySelector("#laravelMapCreated"), report?.orders?.columns || [], columns.created || detected.created || "", "Choose column");
@@ -3095,8 +3103,8 @@ function renderLaravelSelfService(setup, runtimeConfig = latestData?.config) {
   }
 
   const mapping = document.querySelector("#laravelAdvancedMapping");
-  if (mapping) mapping.hidden = !connected || detected || active;
-  if (connected && !detected && !active) renderLaravelMapping(report, setup.mapping || {});
+  if (mapping) mapping.hidden = !connected || active;
+  if (connected && !active) renderLaravelMapping(report, setup.mapping || {});
 
   const activate = document.querySelector("#activateLaravelTracking");
   const verify = document.querySelector("#verifyLaravelTestOrder");

@@ -82,6 +82,12 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-23.
   empty destination array as all four platforms, and rejects generation when no
   destination is selected. Consequently, newly generated web/server JSON files
   contain destination tags only for the checked platforms.
+- Laravel mapping is now reviewable whenever the bridge is connected but
+  paused, including after a store previously reached Live. The Order ID dropdown
+  preselects a recognized public order/invoice column ahead of an internal `id`,
+  while still requiring the customer to save and reactivate before the bridge
+  changes behavior. This makes the dedup correction discoverable without
+  silently changing a live store or resending orders under a new identifier.
 
 ## 2026-08-22 — Laravel Bridge foundation
 

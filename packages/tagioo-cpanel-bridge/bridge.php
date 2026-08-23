@@ -149,7 +149,7 @@ function tagioo_discovery_report(array $config): array
     $overrides = (array) ($config['columns'] ?? []);
     $configured = static fn (string $key): array => isset($overrides[$key]) ? [(string) $overrides[$key]] : [];
     $detected = [
-        'id' => tagioo_detect_column($columns, $configured('id'), ['order_number', 'order_no', 'invoice_number', 'invoice_no', 'invoice_id', 'order_code', 'order_id', 'id']),
+        'id' => tagioo_detect_column($columns, $configured('id'), ['order_number', 'order_no', 'invoice_number', 'invoice_no', 'invoice_id', 'invoice', 'order_code', 'order_id', 'id']),
         'primary' => tagioo_detect_column($columns, $configured('primary'), ['id']),
         'total' => tagioo_detect_column($columns, $configured('total'), ['total', 'grand_total', 'total_amount', 'payable_amount', 'amount']),
         'created' => tagioo_detect_column($columns, $configured('created'), ['created_at', 'ordered_at', 'order_date']),
@@ -233,7 +233,7 @@ function tagioo_schema(array $config): array
     if (!$status && ($config['assume_new_orders_paid'] ?? false) !== true) {
         tagioo_fail('Could not safely detect an order status column. No data was sent; open Advanced mapping in Tagioo and select the status field.');
     }
-    $orderId = tagioo_pick_column($columns, $configured('id'), ['order_number', 'order_no', 'invoice_number', 'invoice_no', 'invoice_id', 'order_code', 'order_id', 'id'], true, 'order ID');
+    $orderId = tagioo_pick_column($columns, $configured('id'), ['order_number', 'order_no', 'invoice_number', 'invoice_no', 'invoice_id', 'invoice', 'order_code', 'order_id', 'id'], true, 'order ID');
     $primary = tagioo_pick_column($columns, $configured('primary'), ['id'], false, 'order primary key') ?: $orderId;
     $schema = [
         'id' => $orderId,
