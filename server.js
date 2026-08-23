@@ -911,8 +911,7 @@ function cleanTemplateValue(value, fallback = "YOUR_VALUE_HERE") {
 function selectedDestinations(input) {
   const allowed = new Set(["ga4", "meta", "googleAds", "tiktok"]);
   const destinations = Array.isArray(input.destinations) ? input.destinations : String(input.destinations || "").split(",");
-  const selected = destinations.map((item) => String(item).trim()).filter((item) => allowed.has(item));
-  return selected.length ? selected : ["ga4", "meta", "googleAds", "tiktok"];
+  return destinations.map((item) => String(item).trim()).filter((item) => allowed.has(item));
 }
 
 function gtmTemplateParam(key, value) {
@@ -11542,6 +11541,10 @@ const server = createServer(async (req, res) => {
         return;
       }
       const body = await readJson(req);
+      if (selectedDestinations(body).length === 0) {
+        jsonResponse(res, 400, { error: "Select at least one tracking destination." });
+        return;
+      }
       const templates = buildSetupAssistantTemplates(body);
       // Persist GA4 creds + tracking origin so the order webhook can forward
       // server-side purchase recovery events to this tenant's sGTM.

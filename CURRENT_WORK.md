@@ -76,6 +76,12 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-23.
   detection improvement. This is required for browser/backend Purchase
   deduplication when a store exposes a customer invoice such as `69188` but its
   database row key is a different value such as `1282`.
+- Setup Assistant destination selection now behaves as explicit opt-in. GA4 and
+  Meta remain the visible initial defaults; Google Ads and TikTok are unchecked
+  until the customer selects them. The backend no longer interprets a missing or
+  empty destination array as all four platforms, and rejects generation when no
+  destination is selected. Consequently, newly generated web/server JSON files
+  contain destination tags only for the checked platforms.
 
 ## 2026-08-22 — Laravel Bridge foundation
 
