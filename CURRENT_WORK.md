@@ -54,6 +54,13 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-23.
   table/status mapping, and Advanced mapping restores those values after save,
   polling, or page reload. This lets COD stores persist custom Purchase statuses
   such as `pending` instead of the form reverting to its default list.
+- Pilot acceptance-state fix: Laravel purchases and bridge heartbeats now share
+  the database write lock. The live pilot proved orders reached
+  `/api/orders/laravel` (`Purchase accepted`) while a concurrent heartbeat could
+  overwrite the tenant's `lastOrder` verification marker. Verification also
+  repairs earlier pilot state from the newest tenant-scoped accepted cPanel
+  order, so customers are no longer asked to repeat a successfully received
+  test solely because the marker was lost.
 
 ## 2026-08-22 — Laravel Bridge foundation
 

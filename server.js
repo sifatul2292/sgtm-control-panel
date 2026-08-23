@@ -4364,10 +4364,15 @@ function normalizeWooOrderPayload(body, tenantId) {
 }
 
 async function addOrderWebhook(body) {
+  return withDbLock(() => addOrderWebhookLocked(body));
+}
+
+async function addOrderWebhookLocked(body) {
   const loaded = await readDatabase();
   if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
 
-  const order = normalizeOrderPayload(body);
+  const acceptedAt = new Date().toISOString();
+  const order = { ...normalizeOrderPayload(body), receivedAt: acceptedAt };
   if (!order.id) return { ok: false, errors: ["Order id is required."] };
 
   const data = loaded.data;
@@ -4376,7 +4381,7 @@ async function addOrderWebhook(body) {
   // both have order "1", so panel-level idempotency must include the tenant.
   const index = data.orders.findIndex((item) => item.id === order.id && item.tenantId === order.tenantId);
   if (index === -1) data.orders.push(order);
-  else data.orders[index] = { ...data.orders[index], ...order, updatedAt: new Date().toISOString() };
+  else data.orders[index] = { ...data.orders[index], ...order, updatedAt: acceptedAt };
 
   // Server-side purchase recovery: a real order arrived, so forward it to the
   // tenant's own sGTM as a GA4 Measurement Protocol purchase. GA4 dedupes by
@@ -4387,7 +4392,6 @@ async function addOrderWebhook(body) {
   const tenant = (data.tenants || []).find((item) => item.id === order.tenantId);
   const tracking = tenant?.tracking || null;
   if (tenant && order.source === "tagioo-cpanel-bridge" && tracking?.laravelSelfService?.active) {
-    const receivedAt = new Date().toISOString();
     tenant.tracking = {
       ...tracking,
       laravelSelfService: {
@@ -4397,9 +4401,9 @@ async function addOrderWebhook(body) {
           id: order.id,
           amount: order.amount,
           currency: order.currency,
-          receivedAt
+          receivedAt: acceptedAt
         },
-        updatedAt: receivedAt
+        updatedAt: acceptedAt
       }
     };
   }
@@ -6984,9 +6988,23 @@ async function verifyLaravelSelfService(session) {
   const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
   const setup = tenant?.tracking?.laravelSelfService;
   if (!tenant || !setup?.active) return { ok: false, status: 409, errors: ["Activate the cPanel Bridge before testing an order."] };
+  // Older Bridge purchases could be accepted into data.orders while a
+  // simultaneous heartbeat overwrote only the tenant verification marker.
+  // Recover from that state using the newest accepted cPanel order. New writes
+  // are serialized under withDbLock, so this is also a safe migration path for
+  // customers already piloting the bridge.
+  const fallbackOrder = (loaded.data.orders || []).slice().reverse().find((order) =>
+    order.tenantId === session.tenantId && order.source === "tagioo-cpanel-bridge"
+  );
+  const lastOrder = setup.lastOrder || (fallbackOrder ? {
+    id: fallbackOrder.id,
+    amount: fallbackOrder.amount,
+    currency: fallbackOrder.currency,
+    receivedAt: fallbackOrder.receivedAt || fallbackOrder.updatedAt || fallbackOrder.createdAt
+  } : null);
   const activatedAt = Date.parse(setup.activatedAt || "");
-  const receivedAt = Date.parse(setup.lastOrder?.receivedAt || "");
-  if (!setup.lastOrder || !Number.isFinite(receivedAt) || receivedAt < activatedAt) {
+  const receivedAt = Date.parse(lastOrder?.receivedAt || "");
+  if (!lastOrder || !Number.isFinite(receivedAt) || receivedAt < activatedAt) {
     return { ok: false, status: 409, errors: ["No new paid test order has reached Tagioo yet. Place one order after activation and try again."] };
   }
   const trackingResult = await verifyTenantTracking(tenant);
@@ -6997,7 +7015,7 @@ async function verifyLaravelSelfService(session) {
     ok: bridgeOk && containerOk,
     at: now,
     checks: {
-      bridge: { ok: true, detail: `Order ${setup.lastOrder.id} reached Tagioo with value ${setup.lastOrder.amount} ${setup.lastOrder.currency}.` },
+      bridge: { ok: true, detail: `Order ${lastOrder.id} reached Tagioo with value ${lastOrder.amount} ${lastOrder.currency}.` },
       ...trackingResult.checks
     }
   };
@@ -7009,6 +7027,7 @@ async function verifyLaravelSelfService(session) {
     freshTenant.tracking.laravelSelfService = {
       ...freshTenant.tracking.laravelSelfService,
       status: verification.ok ? "live" : "verification_failed",
+      lastOrder,
       liveAt: verification.ok ? now : freshTenant.tracking.laravelSelfService.liveAt || "",
       verification,
       updatedAt: now
