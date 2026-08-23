@@ -5190,6 +5190,7 @@ function publicLaravelSelfService(state = {}) {
     liveAt: state.liveAt || "",
     bridgeVersion: String(state.bridgeVersion || ""),
     report: state.report || null,
+    mapping: sanitizeLaravelBridgeMapping(state.mapping || {}),
     lastOrder: state.lastOrder ? {
       id: String(state.lastOrder.id || ""),
       amount: Number(state.lastOrder.amount || 0),

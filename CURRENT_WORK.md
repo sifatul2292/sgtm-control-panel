@@ -50,6 +50,10 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-23.
   `server.json` into Server GTM with Merge, keep both in Preview, install and
   activate the cPanel Bridge, complete one paid test order, verify all selected
   destinations, and only then publish both containers.
+- Pilot fix: customer-safe Laravel state now includes the sanitized saved
+  table/status mapping, and Advanced mapping restores those values after save,
+  polling, or page reload. This lets COD stores persist custom Purchase statuses
+  such as `pending` instead of the form reverting to its default list.
 
 ## 2026-08-22 — Laravel Bridge foundation
 

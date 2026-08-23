@@ -3016,21 +3016,25 @@ function setLaravelSelectOptions(element, values, selected = "", blankLabel = "N
   ).join("")}`;
 }
 
-function renderLaravelMapping(report) {
+function renderLaravelMapping(report, mapping = {}) {
   const detected = report?.orders?.detected || {};
   const itemDetected = report?.items?.detected || {};
-  setLaravelSelectOptions(document.querySelector("#laravelMapOrdersTable"), report?.tables || [], report?.orders?.table || "", "Choose table");
-  setLaravelSelectOptions(document.querySelector("#laravelMapOrderId"), report?.orders?.columns || [], detected.id || "", "Choose column");
-  setLaravelSelectOptions(document.querySelector("#laravelMapTotal"), report?.orders?.columns || [], detected.total || "", "Choose column");
-  setLaravelSelectOptions(document.querySelector("#laravelMapStatus"), report?.orders?.columns || [], detected.status || "", "Choose column");
-  setLaravelSelectOptions(document.querySelector("#laravelMapCreated"), report?.orders?.columns || [], detected.created || "", "Choose column");
-  setLaravelSelectOptions(document.querySelector("#laravelMapUpdated"), report?.orders?.columns || [], detected.updated || "", "Optional");
-  setLaravelSelectOptions(document.querySelector("#laravelMapItemsTable"), report?.tables || [], report?.items?.table || "", "Optional");
-  setLaravelSelectOptions(document.querySelector("#laravelMapItemOrderId"), report?.items?.columns || [], itemDetected.order_id || "", "Choose column");
-  setLaravelSelectOptions(document.querySelector("#laravelMapItemId"), report?.items?.columns || [], itemDetected.item_id || "", "Optional");
-  setLaravelSelectOptions(document.querySelector("#laravelMapItemName"), report?.items?.columns || [], itemDetected.name || "", "Optional");
-  setLaravelSelectOptions(document.querySelector("#laravelMapItemPrice"), report?.items?.columns || [], itemDetected.price || "", "Optional");
-  setLaravelSelectOptions(document.querySelector("#laravelMapItemQuantity"), report?.items?.columns || [], itemDetected.quantity || "", "Optional");
+  const columns = mapping.columns || {};
+  const itemColumns = mapping.item_columns || {};
+  setLaravelSelectOptions(document.querySelector("#laravelMapOrdersTable"), report?.tables || [], mapping.orders_table || report?.orders?.table || "", "Choose table");
+  setLaravelSelectOptions(document.querySelector("#laravelMapOrderId"), report?.orders?.columns || [], columns.id || detected.id || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapTotal"), report?.orders?.columns || [], columns.total || detected.total || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapStatus"), report?.orders?.columns || [], columns.status || detected.status || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapCreated"), report?.orders?.columns || [], columns.created || detected.created || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapUpdated"), report?.orders?.columns || [], columns.updated || detected.updated || "", "Optional");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemsTable"), report?.tables || [], mapping.items_table || report?.items?.table || "", "Optional");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemOrderId"), report?.items?.columns || [], itemColumns.order_id || itemDetected.order_id || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemId"), report?.items?.columns || [], itemColumns.item_id || itemDetected.item_id || "", "Optional");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemName"), report?.items?.columns || [], itemColumns.name || itemDetected.name || "", "Optional");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemPrice"), report?.items?.columns || [], itemColumns.price || itemDetected.price || "", "Optional");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemQuantity"), report?.items?.columns || [], itemColumns.quantity || itemDetected.quantity || "", "Optional");
+  const paidStatuses = document.querySelector("#laravelMapPaidStatuses");
+  if (paidStatuses && mapping.paid_statuses?.length) paidStatuses.value = mapping.paid_statuses.join(", ");
 }
 
 function renderLaravelSelfService(setup, runtimeConfig = latestData?.config) {
@@ -3092,7 +3096,7 @@ function renderLaravelSelfService(setup, runtimeConfig = latestData?.config) {
 
   const mapping = document.querySelector("#laravelAdvancedMapping");
   if (mapping) mapping.hidden = !connected || detected || active;
-  if (connected && !detected && !active) renderLaravelMapping(report);
+  if (connected && !detected && !active) renderLaravelMapping(report, setup.mapping || {});
 
   const activate = document.querySelector("#activateLaravelTracking");
   const verify = document.querySelector("#verifyLaravelTestOrder");
