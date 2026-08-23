@@ -61,6 +61,21 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-23.
   repairs earlier pilot state from the newest tenant-scoped accepted cPanel
   order, so customers are no longer asked to repeat a successfully received
   test solely because the marker was lost.
+- Laravel coexistence/dedup hardening: the generated browser fallback now waits
+  for and respects ecommerce events already emitted by a custom storefront,
+  rather than adding a second `view_item`, `add_to_cart`, `begin_checkout`, or
+  `purchase`. Generated Meta tags also suppress a repeated send for the same
+  pixel/event/event-ID, and custom ecommerce pushes without their own ID use
+  GTM's Unique Event ID so each real action remains distinct while its browser
+  and server copies share one key. PageView retains one per-URL key because its
+  Pixel Base and GA4 tags run during different GTM lifecycle events.
+- The cPanel Bridge now prefers public invoice/order-number columns including
+  `invoice_number`, `invoice_id`, and `order_code` before an internal database
+  `id`. Existing installed bridges must either map the public invoice field in
+  Advanced mapping or be replaced with a newly downloaded bridge for that
+  detection improvement. This is required for browser/backend Purchase
+  deduplication when a store exposes a customer invoice such as `69188` but its
+  database row key is a different value such as `1282`.
 
 ## 2026-08-22 — Laravel Bridge foundation
 

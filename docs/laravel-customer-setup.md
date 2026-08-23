@@ -112,6 +112,21 @@ Manager, or disable the Cron Job.
 Removing the `tagioo-bridge` folder and Cron Job removes the bridge. It does not
 change the Laravel website.
 
+## If the store already has Meta or TikTok tracking
+
+Use one browser-event owner. Keep the store's standard ecommerce `dataLayer`
+pushes, but disable older tags or hard-coded `fbq()` / `ttq()` calls that send the
+same Meta or TikTok events directly. The generated Tagioo Web GTM template reads
+those existing `dataLayer` events and will not create a second storefront event.
+Tagioo then sends the browser and server copies with one matching event ID so the
+destination can deduplicate them.
+
+Seeing both **Browser** and **Server** in Meta Test Events is expected. They
+represent one logical event only when the event name and Event ID match; Meta may
+display one copy as **Deduplicated**. A third browser row with a different Event
+ID means an older pixel integration is still sending independently and must be
+disabled before publishing Tagioo.
+
 ## Browser events and backend Purchase
 
 `web.json` detects common product views, cart actions, and checkout activity in

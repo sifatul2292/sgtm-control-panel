@@ -1472,7 +1472,7 @@ const PIXEL_CONTEXT_SCRIPT =
 // exists, to avoid sending the literal string "undefined".
 function metaPixelEventScript(metaEventName) {
   const orderId = metaEventName === "Purchase" ? "if(ec.transaction_id)p.order_id=ec.transaction_id;" : "";
-  return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + "var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;" + orderId + "if(window.fbq)fbq('track','" + metaEventName + "',p,eid?{eventID:String(eid)}:{});})();</script>";
+  return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + "var pixel='{{Tagioo - meta_pixel_id}}';var sent=window.__tagiooMetaSent=window.__tagiooMetaSent||{};var key=pixel+'|" + metaEventName + "|'+(eid||location.href);if(sent[key])return;sent[key]=1;var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;" + orderId + "if(window.fbq)fbq('track','" + metaEventName + "',p,eid?{eventID:String(eid)}:{});})();</script>";
 }
 
 // Browser-side TikTok Pixel event tag. Same message-anchored id + fallback.
@@ -1514,17 +1514,18 @@ function wildcard(pattern,value){if(!pattern)return false;var raw=String(pattern
 function matches(pattern){return wildcard(pattern,location.pathname)||wildcard(pattern,location.pathname+location.search)||wildcard(pattern,location.href);}
 function offer(product){var o=product&&(Array.isArray(product.offers)?product.offers[0]:product.offers);return o||{};}
 function product(root,strict){root=root||document;var p=schema('Product'),o=offer(p);var productSignal=within(root,'input[name="product_id"],[data-product-id],form[action*="cart/add"]');var detailSignal=within(document,'.product-title,h1[itemprop="name"],form.add-to-cart-detail');if(!p&&!cfg.productPattern&&!productSignal)return null;if(strict&&!p&&!cfg.productPattern&&!detailSignal)return null;if(cfg.productPattern&&!matches(cfg.productPattern)&&!p&&strict)return null;var price=number(o.price||o.lowPrice||meta('product:price:amount')||within(root,'[itemprop="price"],[data-price],.new-price,.sale-price,.product-price,.price'));var itemId=String((p&&(p.sku||p.productID||p.mpn))||meta('product:retailer_item_id')||within(root,'input[name="product_id"],[data-product-id],input[name="id"],input[name="product"]')||'').trim();var name=String((p&&p.name)||within(root,'.product-title,.product-name,[itemprop="name"],h1,h2,h3')||meta('og:title')||document.title||'').trim();var quantity=number(within(root,'input[name="quantity"],input[name="qty"],#qtyInput'))||1;if(!itemId)itemId=location.pathname.replace(/^\\/+|\\/+$/g,'').split('/').pop()||name;return{currency:String(o.priceCurrency||meta('product:price:currency')||cfg.currency||'BDT').toUpperCase(),value:price*quantity,items:[{item_id:itemId,item_name:name,price:price,quantity:quantity}]};}
-function push(event,ecommerce,eventId){dl.push({ecommerce:null});dl.push({event:event,event_id:eventId||id(),ecommerce:ecommerce});}
+function layerHas(event,from,externalOnly){for(var i=Math.max(0,from||0);i<dl.length;i++){var row=dl[i];if(row&&row.event===event&&(!externalOnly||!row.tagioo_auto))return true;}return false;}
+function push(event,ecommerce,eventId){dl.push({ecommerce:null});dl.push({event:event,event_id:eventId||id(),ecommerce:ecommerce,tagioo_auto:true});}
 function cartSave(ec){try{sessionStorage.setItem('tagioo_laravel_cart',JSON.stringify(ec));}catch(e){}}
 function cartLoad(){try{return JSON.parse(sessionStorage.getItem('tagioo_laravel_cart')||'null');}catch(e){return null;}}
-function fireView(){var key='view:'+location.href;if(seen[key])return;var ec=product(document,true);if(!ec)return;seen[key]=1;push('view_item',ec);}
-function fireCheckout(){var key='checkout:'+location.href;if(seen[key])return;var ec=cartLoad()||product(document,true);if(!ec)return;seen[key]=1;push('begin_checkout',ec);}
+function fireView(from){var key='view:'+location.href;if(seen[key])return;if(layerHas('view_item',from||0,true)){seen[key]=1;return;}var ec=product(document,true);if(!ec)return;seen[key]=1;push('view_item',ec);}
+function fireCheckout(from){var key='checkout:'+location.href;if(seen[key])return;if(layerHas('begin_checkout',from||0,true)){seen[key]=1;return;}var ec=cartLoad()||product(document,true);if(!ec)return;seen[key]=1;push('begin_checkout',ec);}
 function orderItems(order){var rows=order&&(order.orderedItem||order.acceptedOffer);if(!rows)return(cartLoad()||{}).items||[];if(!Array.isArray(rows))rows=[rows];return rows.map(function(row){var item=row.itemOffered||row.item||row;var price=number(row.price||item.price);return{item_id:String(item.sku||item.productID||item.identifier||item.name||''),item_name:String(item.name||''),price:price,quantity:number(row.orderQuantity||row.quantity)||1};});}
-function firePurchase(){var order=schema('Order');if(!order&&!cfg.purchasePattern)return;if(cfg.purchasePattern&&!matches(cfg.purchasePattern)&&!order)return;var orderId=String(text(cfg.orderIdSelector)||(order&&(order.orderNumber||order.orderId||order.identifier))||'').trim().replace(/^#+\s*/,'');var total=number(text(cfg.orderTotalSelector)||(order&&(order.price||order.totalPrice||(order.priceSpecification&&order.priceSpecification.price))));if(!orderId||total<=0)return;var storageKey='tagioo_purchase_'+orderId;try{if(localStorage.getItem(storageKey))return;localStorage.setItem(storageKey,'1');}catch(e){if(seen[storageKey])return;seen[storageKey]=1;}var currency=String((order&&(order.priceCurrency||(order.priceSpecification&&order.priceSpecification.priceCurrency)))||cfg.currency||'BDT').toUpperCase();push('purchase',{transaction_id:orderId,value:total,currency:currency,items:orderItems(order)},orderId);}
-function scan(){fireView();if(matches(cfg.checkoutPattern))fireCheckout();firePurchase();}
-document.addEventListener('click',function(ev){var el=ev.target&&ev.target.closest?ev.target.closest('a,button,input[type="submit"],[role="button"]'):null;if(!el)return;var label=String(el.textContent||el.value||el.getAttribute('aria-label')||'').trim();var href=String(el.getAttribute('href')||''),hrefLower=href.toLowerCase();var isCart=false;if(cfg.addToCartSelector){try{isCart=!!ev.target.closest(cfg.addToCartSelector);}catch(e){}}if(!isCart)isCart=/add.{0,5}(to)?.{0,5}(cart|bag)|buy now|কার্ট|অর্ডার করুন/i.test(label)||hrefLower.indexOf('cart/add')>-1||hrefLower.indexOf('add-to-cart')>-1;if(isCart){var root=el.closest('form,.product-card,[data-product],article')||document;var ec=product(root,false);if(ec){cartSave(ec);push('add_to_cart',ec);}return;}if(/checkout|proceed.{0,6}(order|payment)|place order|চেকআউট|অর্ডার/i.test(label+' '+href)){setTimeout(fireCheckout,0);}},true);
-var oldPush=history.pushState,oldReplace=history.replaceState;function route(fn){return function(){var result=fn.apply(this,arguments);setTimeout(scan,0);return result;};}history.pushState=route(oldPush);history.replaceState=route(oldReplace);window.addEventListener('popstate',function(){setTimeout(scan,0);});
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scan);else scan();
+function firePurchase(from){if(layerHas('purchase',from||0,true))return;var order=schema('Order');if(!order&&!cfg.purchasePattern)return;if(cfg.purchasePattern&&!matches(cfg.purchasePattern)&&!order)return;var orderId=String(text(cfg.orderIdSelector)||(order&&(order.orderNumber||order.orderId||order.identifier))||'').trim().replace(/^#+\s*/,'');var total=number(text(cfg.orderTotalSelector)||(order&&(order.price||order.totalPrice||(order.priceSpecification&&order.priceSpecification.price))));if(!orderId||total<=0)return;var storageKey='tagioo_purchase_'+orderId;try{if(localStorage.getItem(storageKey))return;localStorage.setItem(storageKey,'1');}catch(e){if(seen[storageKey])return;seen[storageKey]=1;}var currency=String((order&&(order.priceCurrency||(order.priceSpecification&&order.priceSpecification.priceCurrency)))||cfg.currency||'BDT').toUpperCase();push('purchase',{transaction_id:orderId,value:total,currency:currency,items:orderItems(order)},orderId);}
+function scan(from){fireView(from);if(matches(cfg.checkoutPattern))fireCheckout(from);firePurchase(from);}
+document.addEventListener('click',function(ev){var el=ev.target&&ev.target.closest?ev.target.closest('a,button,input[type="submit"],[role="button"]'):null;if(!el)return;var label=String(el.textContent||el.value||el.getAttribute('aria-label')||'').trim();var href=String(el.getAttribute('href')||''),hrefLower=href.toLowerCase();var isCart=false;if(cfg.addToCartSelector){try{isCart=!!ev.target.closest(cfg.addToCartSelector);}catch(e){}}if(!isCart)isCart=/add.{0,5}(to)?.{0,5}(cart|bag)|buy now|কার্ট|অর্ডার করুন/i.test(label)||hrefLower.indexOf('cart/add')>-1||hrefLower.indexOf('add-to-cart')>-1;if(isCart){if(layerHas('add_to_cart',0,true))return;var root=el.closest('form,.product-card,[data-product],article')||document;var ec=product(root,false),start=dl.length;if(ec)setTimeout(function(){if(layerHas('add_to_cart',start,true))return;cartSave(ec);push('add_to_cart',ec);},150);return;}if(/checkout|proceed.{0,6}(order|payment)|place order|চেকআউট|অর্ডার/i.test(label+' '+href)){var start=dl.length;if(!layerHas('begin_checkout',0,true))setTimeout(function(){fireCheckout(start);},150);}},false);
+var oldPush=history.pushState,oldReplace=history.replaceState;function route(fn){return function(){var start=dl.length,result=fn.apply(this,arguments);setTimeout(function(){scan(start);},150);return result;};}history.pushState=route(oldPush);history.replaceState=route(oldReplace);window.addEventListener('popstate',function(){var start=dl.length;setTimeout(function(){scan(start);},150);});
+function initialScan(){setTimeout(function(){scan(0);},150);}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialScan);else initialScan();
 })(window);</script>`;
 }
 
@@ -1553,6 +1554,7 @@ function buildWebGtmTemplate(input) {
     gtmDataLayerVariable(23, "dlv - ecommerce.coupon", "ecommerce.coupon"),
     gtmDataLayerVariable(24, "dlv - ecommerce.shipping", "ecommerce.shipping"),
     gtmDataLayerVariable(25, "dlv - ecommerce.tax", "ecommerce.tax"),
+    gtmDataLayerVariable(33, "dlv - gtm.uniqueEventId", "gtm.uniqueEventId"),
     gtmDataLayerVariable(14, "dlv - user_data.email_address", "user_data.email_address"),
     gtmDataLayerVariable(15, "dlv - user_data.phone_number", "user_data.phone_number"),
     gtmDataLayerVariable(16, "dlv - user_data.first_name", "user_data.first_name"),
@@ -1582,12 +1584,11 @@ function buildWebGtmTemplate(input) {
     },
     // Single dedup key for every destination. Resolves, in order: the event_id
     // the storefront pushed with THIS dataLayer message, the transaction_id, then
-    // a generated per-URL id. The last case is what makes browser PageView dedupe
-    // against the server-side CAPI PageView — storefronts push no event_id on a
-    // plain page view, so without it both sides sent no key and Meta counted the
-    // visit twice. Keyed on location.href, not just page load, so an SPA route
-    // change mints a fresh id instead of collapsing a whole session into one
-    // PageView.
+    // GTM's Unique Event ID for a custom ecommerce event. That last value is
+    // stable across every tag fired by one dataLayer push but changes for the
+    // next real add-to-cart/view/checkout action. Plain page lifecycle events use
+    // a generated per-URL id so the Pixel Base and DOM Ready GA4 PageView still
+    // share one key even though GTM fires them during different lifecycle events.
     //
     // The result is inlined (quoted) into custom HTML tags, so it is restricted
     // to characters that cannot terminate the string literal or inject script.
@@ -1596,7 +1597,7 @@ function buildWebGtmTemplate(input) {
     {
       accountId: "0", containerId: "0", variableId: "32",
       name: "Tagioo - event_id", type: "jsm",
-      parameter: [gtmTemplateParam("javascript", "function(){function s(v){return String(v).replace(/[^A-Za-z0-9_.:@-]/g,'').substring(0,120);}var e={{dlv - event_id}};if(e)return s(e);var t={{dlv - ecommerce.transaction_id}};if(t)return s(t);var k=location.href;var c=window.__tagiooPageEventId;if(!c||c.k!==k){c={k:k,v:'tagioo-pv-'+(new Date()).getTime()+'-'+Math.random().toString(36).substring(2,10)};window.__tagiooPageEventId=c;}return c.v;}")],
+      parameter: [gtmTemplateParam("javascript", "function(){function s(v){return String(v).replace(/[^A-Za-z0-9_.:@-]/g,'').substring(0,120);}var e={{dlv - event_id}};if(e)return s(e);var t={{dlv - ecommerce.transaction_id}};if(t)return s(t);var n='{{Event}}';if(n&&n.indexOf('gtm.')!==0){var u={{dlv - gtm.uniqueEventId}};if(u)return s('tagioo-event-'+u);}var k=location.href;var c=window.__tagiooPageEventId;if(!c||c.k!==k){c={k:k,v:'tagioo-pv-'+(new Date()).getTime()+'-'+Math.random().toString(36).substring(2,10)};window.__tagiooPageEventId=c;}return c.v;}")],
       fingerprint: String(Date.now()), parentFolderId: "2"
     }
   ];
@@ -1684,7 +1685,7 @@ function buildWebGtmTemplate(input) {
   }
   if (destinations.includes("meta")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo Meta - Pixel Base", "html", [
-      gtmTemplateParam("html", "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','{{Tagioo - meta_pixel_id}}');(function(){var eid='{{Tagioo - event_id}}';if(eid==='undefined')eid='';fbq('track','PageView',{},eid?{eventID:String(eid)}:{});})();</script>")
+      gtmTemplateParam("html", "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');(function(){var pixel='{{Tagioo - meta_pixel_id}}',init=window.__tagiooMetaInit=window.__tagiooMetaInit||{};if(!init[pixel]){fbq('init',pixel);init[pixel]=1;}var eid='{{Tagioo - event_id}}';if(eid==='undefined')eid='';var sent=window.__tagiooMetaSent=window.__tagiooMetaSent||{},key=pixel+'|PageView|'+(eid||location.href);if(sent[key])return;sent[key]=1;fbq('track','PageView',{},eid?{eventID:String(eid)}:{});})();</script>")
     ], ["2147479553"], "4"));
     // Browser pixel events, deduped with server CAPI via event_id.
     const metaEventMap = [
