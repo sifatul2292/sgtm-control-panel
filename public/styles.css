@@ -1114,6 +1114,323 @@ h2 {
   line-height: 1.55;
 }
 
+.laravel-setup-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.laravel-setup-option {
+  padding: var(--space-md);
+  border: var(--rule-thin) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.laravel-setup-option--recommended {
+  border-color: color-mix(in oklch, var(--color-accent), transparent 45%);
+  box-shadow: 0 10px 30px color-mix(in oklch, var(--color-accent), transparent 91%);
+}
+
+.laravel-option-kicker {
+  color: var(--color-accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.laravel-setup-option h4 {
+  margin: var(--space-xs) 0;
+  font-size: var(--text-md);
+}
+
+.laravel-setup-option p {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.laravel-setup-option label {
+  display: grid;
+  gap: var(--space-2xs);
+  margin: var(--space-md) 0 var(--space-sm);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.laravel-setup-option input {
+  width: 100%;
+  box-sizing: border-box;
+  border: var(--rule-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem;
+  font: inherit;
+  font-weight: 500;
+}
+
+.laravel-option-status {
+  display: inline-block;
+  margin-top: var(--space-sm);
+  color: var(--color-ok);
+  font-size: var(--text-xs);
+  font-weight: 750;
+}
+
+.laravel-managed-status {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  margin: 0 var(--space-lg) var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--color-ok), transparent 91%);
+}
+
+.laravel-managed-status[hidden] {
+  display: none;
+}
+
+.laravel-managed-status .status-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  flex: 0 0 auto;
+  margin-top: 0.3rem;
+  border-radius: 50%;
+  background: var(--color-ok);
+}
+
+.laravel-managed-status p {
+  margin: var(--space-2xs) 0 0;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+}
+
+.laravel-cpanel-bridge {
+  margin: 0 var(--space-lg) var(--space-md);
+  padding: var(--space-md);
+  border: var(--rule-thin) solid color-mix(in oklch, var(--color-accent), transparent 55%);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.laravel-cpanel-bridge[hidden] {
+  display: none;
+}
+
+.laravel-cpanel-bridge h4 {
+  margin: var(--space-xs) 0;
+}
+
+.laravel-cpanel-bridge p,
+.laravel-cpanel-bridge ol {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.laravel-self-wizard {
+  margin: 0 var(--space-lg) var(--space-md);
+  border: var(--rule-thin) solid color-mix(in oklch, var(--color-accent), transparent 55%);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.laravel-self-wizard[hidden],
+#laravelSelfServiceStart[hidden] {
+  display: none;
+}
+
+.laravel-self-progress {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: var(--rule-thin) solid var(--color-border);
+  background: color-mix(in oklch, var(--color-accent-wash), var(--color-surface) 70%);
+}
+
+.laravel-self-progress span {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 750;
+}
+
+.laravel-self-progress b {
+  display: grid;
+  width: 1.45rem;
+  height: 1.45rem;
+  place-items: center;
+  border: var(--rule-thin) solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  font-size: 0.72rem;
+}
+
+.laravel-self-progress span.is-active,
+.laravel-self-progress span.is-complete {
+  color: var(--color-accent);
+}
+
+.laravel-self-progress span.is-complete b {
+  border-color: var(--color-ok);
+  background: var(--color-ok);
+  color: white;
+}
+
+.laravel-self-stage {
+  padding: var(--space-md);
+  border-bottom: var(--rule-thin) solid var(--color-border);
+}
+
+.laravel-self-stage:last-of-type {
+  border-bottom: 0;
+}
+
+.laravel-self-stage h4 {
+  margin: var(--space-2xs) 0;
+}
+
+.laravel-self-stage p,
+.laravel-self-stage ol {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.laravel-self-stage ol {
+  margin: var(--space-sm) 0 var(--space-md);
+  padding-left: 1.2rem;
+}
+
+.laravel-self-stage-header,
+.laravel-self-actions {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.laravel-self-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: var(--space-sm);
+}
+
+.laravel-detected-schema,
+.laravel-last-order {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.laravel-detected-schema[hidden],
+.laravel-last-order[hidden],
+.laravel-advanced-mapping[hidden] {
+  display: none;
+}
+
+.laravel-detected-schema span,
+.laravel-last-order span {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+  font-size: 0.72rem;
+}
+
+.laravel-detected-schema strong,
+.laravel-last-order strong {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.laravel-advanced-mapping {
+  margin-top: var(--space-md);
+  padding: var(--space-sm);
+  border: var(--rule-thin) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.laravel-advanced-mapping summary {
+  cursor: pointer;
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.laravel-mapping-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+.laravel-mapping-grid label {
+  display: grid;
+  gap: var(--space-2xs);
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.laravel-mapping-grid select,
+.laravel-mapping-grid input {
+  width: 100%;
+  box-sizing: border-box;
+  border: var(--rule-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.laravel-mapping-wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 760px) {
+  .laravel-self-progress,
+  .laravel-detected-schema,
+  .laravel-last-order,
+  .laravel-mapping-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .laravel-self-progress span {
+    justify-content: flex-start;
+  }
+
+  .laravel-self-stage-header {
+    display: grid;
+  }
+
+  .laravel-mapping-wide {
+    grid-column: auto;
+  }
+}
+
+.laravel-cpanel-bridge ol {
+  margin: var(--space-sm) 0 var(--space-md);
+  padding-left: 1.2rem;
+}
+
+@media (max-width: 760px) {
+  .laravel-setup-options {
+    grid-template-columns: 1fr;
+  }
+}
+
 .assistant-form-grid--nested {
   padding-top: var(--space-md);
   padding-bottom: var(--space-md);

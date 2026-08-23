@@ -2977,6 +2977,9 @@ async function renderPowerUps(data) {
 
 function renderSetupAssistant(data) {
   if (!els.setupAssistantForm) return;
+  const tenantTracking = data.tracking || data.customers?.tenants?.[0]?.tracking || {};
+  // Keep action handlers and polling on the same tenant-scoped view used here.
+  data.tracking = tenantTracking;
   const latest = (data.customerSetup?.requests || [])
     .filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()))
     .at(0);
@@ -2996,9 +2999,159 @@ function renderSetupAssistant(data) {
     wooDomainEl.textContent = domain;
   }
   setWooWebhookSecret(data.webhookSecret || "");
-  if (data.tracking?.lastVerify) renderVerifyResult(data.tracking.lastVerify);
+  renderLaravelSelfService(tenantTracking.laravelSelfService || null, data.config);
+  if (tenantTracking.lastVerify) renderVerifyResult(tenantTracking.lastVerify);
   updateLaravelAssistantFields();
   updateSetupAssistantStep();
+}
+
+let laravelSelfServicePoll = null;
+let laravelRefreshInFlight = false;
+
+function setLaravelSelectOptions(element, values, selected = "", blankLabel = "Not selected") {
+  if (!element) return;
+  const options = [...new Set((values || []).filter(Boolean))];
+  element.innerHTML = `<option value="">${escapeHtml(blankLabel)}</option>${options.map((value) =>
+    `<option value="${escapeHtml(value)}"${value === selected ? " selected" : ""}>${escapeHtml(value)}</option>`
+  ).join("")}`;
+}
+
+function renderLaravelMapping(report) {
+  const detected = report?.orders?.detected || {};
+  const itemDetected = report?.items?.detected || {};
+  setLaravelSelectOptions(document.querySelector("#laravelMapOrdersTable"), report?.tables || [], report?.orders?.table || "", "Choose table");
+  setLaravelSelectOptions(document.querySelector("#laravelMapOrderId"), report?.orders?.columns || [], detected.id || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapTotal"), report?.orders?.columns || [], detected.total || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapStatus"), report?.orders?.columns || [], detected.status || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapCreated"), report?.orders?.columns || [], detected.created || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapUpdated"), report?.orders?.columns || [], detected.updated || "", "Optional");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemsTable"), report?.tables || [], report?.items?.table || "", "Optional");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemOrderId"), report?.items?.columns || [], itemDetected.order_id || "", "Choose column");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemId"), report?.items?.columns || [], itemDetected.item_id || "", "Optional");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemName"), report?.items?.columns || [], itemDetected.name || "", "Optional");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemPrice"), report?.items?.columns || [], itemDetected.price || "", "Optional");
+  setLaravelSelectOptions(document.querySelector("#laravelMapItemQuantity"), report?.items?.columns || [], itemDetected.quantity || "", "Optional");
+}
+
+function renderLaravelSelfService(setup, runtimeConfig = latestData?.config) {
+  const available = Boolean(runtimeConfig?.cpanelBridgeEnabled);
+  const startCard = document.querySelector("#laravelSelfServiceStart");
+  const wizard = document.querySelector("#laravelSelfServiceWizard");
+  const unavailable = document.querySelector("#laravelSelfServiceUnavailable");
+  const storeUrl = document.querySelector("#laravelManagedStoreUrl");
+  if (startCard) startCard.hidden = !available || Boolean(setup);
+  if (wizard) wizard.hidden = !available || !setup;
+  if (unavailable) unavailable.hidden = available;
+  if (storeUrl && setup?.storeUrl && !storeUrl.value) storeUrl.value = setup.storeUrl;
+
+  if (!available || !setup) {
+    updateLaravelSelfServicePolling(false);
+    return;
+  }
+
+  const report = setup.report || null;
+  const lastSeenMs = Date.parse(setup.lastSeenAt || "");
+  const connected = Number.isFinite(lastSeenMs) && Date.now() - lastSeenMs < 10 * 60 * 1000;
+  const detected = Boolean(report?.orders?.ready);
+  const active = Boolean(setup.active);
+  const live = setup.status === "live";
+  const hasOrder = Boolean(setup.lastOrder);
+
+  document.querySelectorAll("[data-laravel-progress]").forEach((item) => {
+    const key = item.dataset.laravelProgress;
+    const complete = key === "install" ? connected : key === "connect" ? active : live;
+    const current = !connected ? key === "install" : !active ? key === "connect" : key === "test";
+    item.classList.toggle("is-complete", complete);
+    item.classList.toggle("is-active", current && !complete);
+  });
+
+  const badge = document.querySelector("#laravelConnectionBadge");
+  const detail = document.querySelector("#laravelConnectionDetail");
+  if (badge) badge.textContent = live ? "Live" : active ? "Active" : detected && connected ? "Detected" : connected ? "Needs mapping" : "Not connected";
+  if (detail) detail.textContent = live
+    ? "Laravel Purchase tracking is connected and verified."
+    : !connected
+      ? "Waiting for the first Cron run. This normally takes up to one minute."
+      : detected
+        ? `Connected${setup.lastSeenAt ? ` · last check ${new Date(setup.lastSeenAt).toLocaleString()}` : ""}. Required order fields were detected.`
+        : "The bridge is connected, but some required order fields need mapping below.";
+
+  const schema = document.querySelector("#laravelDetectedSchema");
+  if (schema) {
+    schema.hidden = !report?.orders?.table;
+    if (!schema.hidden) schema.innerHTML = [
+      ["Orders table", report.orders.table],
+      ["Order ID", report.orders.detected?.id || "Not detected"],
+      ["Total", report.orders.detected?.total || "Not detected"],
+      ["Status", report.orders.detected?.status || "Not detected"],
+      ["Status values", report.orders.statusValues?.join(", ") || "No existing orders"],
+      ["Checkpoint", report.orders.detected?.updated || report.orders.detected?.created || "Not detected"],
+      ["Products", report.items?.ready ? report.items.table : "Optional mapping needed"]
+    ].map(([label, value]) => `<span>${escapeHtml(label)}<strong>${escapeHtml(value)}</strong></span>`).join("");
+  }
+
+  const mapping = document.querySelector("#laravelAdvancedMapping");
+  if (mapping) mapping.hidden = !connected || detected || active;
+  if (connected && !detected && !active) renderLaravelMapping(report);
+
+  const activate = document.querySelector("#activateLaravelTracking");
+  const verify = document.querySelector("#verifyLaravelTestOrder");
+  const pause = document.querySelector("#pauseLaravelTracking");
+  if (activate) activate.hidden = !(connected && detected && !active);
+  if (verify) verify.hidden = !active || live;
+  if (pause) pause.hidden = !active;
+
+  const testDetail = document.querySelector("#laravelTestDetail");
+  const failedVerification = setup.verification && !setup.verification.ok
+    ? Object.values(setup.verification.checks || {}).find((check) => !check?.ok)
+    : null;
+  if (testDetail) testDetail.textContent = live
+    ? "Test order passed. Reliable backend Purchase tracking is live."
+    : failedVerification
+      ? `The order arrived, but verification needs attention: ${failedVerification.detail || "publish both GTM containers and try again."}`
+      : !active
+        ? "Confirm the detected store configuration and activate tracking first."
+        : hasOrder
+          ? "A new paid order reached Tagioo. Click Verify test order to check the complete path."
+          : "Place one new paid order now. Tagioo will detect it automatically.";
+  const lastOrder = document.querySelector("#laravelLastOrder");
+  if (lastOrder) {
+    lastOrder.hidden = !hasOrder;
+    if (hasOrder) lastOrder.innerHTML = [
+      ["Order", setup.lastOrder.id],
+      ["Value", `${setup.lastOrder.amount} ${setup.lastOrder.currency}`],
+      ["Received", setup.lastOrder.receivedAt ? new Date(setup.lastOrder.receivedAt).toLocaleString() : "Now"]
+    ].map(([label, value]) => `<span>${escapeHtml(label)}<strong>${escapeHtml(value)}</strong></span>`).join("");
+  }
+
+  updateLaravelSelfServicePolling(!live);
+}
+
+function updateLaravelSelfServicePolling(enabled) {
+  if (!enabled) {
+    if (laravelSelfServicePoll) clearInterval(laravelSelfServicePoll);
+    laravelSelfServicePoll = null;
+    return;
+  }
+  if (!laravelSelfServicePoll) laravelSelfServicePoll = setInterval(() => refreshLaravelSelfService(false), 15000);
+}
+
+async function refreshLaravelSelfService(showMessage = true) {
+  if (laravelRefreshInFlight) return;
+  laravelRefreshInFlight = true;
+  const message = document.querySelector("#cpanelBridgeMessage");
+  try {
+    const response = await fetch("/api/customer/laravel-self-service");
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not check the Laravel connection.");
+    if (latestData?.tracking) latestData.tracking.laravelSelfService = result.setup;
+    renderLaravelSelfService(result.setup, { ...(latestData?.config || {}), cpanelBridgeEnabled: result.available });
+    if (message && showMessage) message.textContent = result.setup?.lastSeenAt ? "Connection status refreshed." : "Still waiting for the first Cron run.";
+  } catch (error) {
+    if (message && showMessage) message.textContent = error.message;
+  } finally {
+    laravelRefreshInFlight = false;
+  }
 }
 
 function updateLaravelAssistantFields() {
@@ -3006,6 +3159,7 @@ function updateLaravelAssistantFields() {
   const isLaravel = els.setupAssistantForm.elements.platform?.value === "laravel";
   const settings = els.setupAssistantForm.querySelector("[data-laravel-settings]");
   if (settings) settings.hidden = !isLaravel;
+  if (!isLaravel) updateLaravelSelfServicePolling(false);
 }
 
 function setWooWebhookSecret(secret) {
@@ -6020,6 +6174,158 @@ els.assistantBack?.addEventListener("click", () => {
   updateSetupAssistantStep();
 });
 els.setupAssistantForm?.elements.platform?.addEventListener("change", updateLaravelAssistantFields);
+document.querySelector("#laravelMapOrdersTable")?.addEventListener("change", (event) => {
+  const reportTable = latestData?.tracking?.laravelSelfService?.report?.orders?.table || "";
+  if (event.currentTarget.value === reportTable) return;
+  ["#laravelMapOrderId", "#laravelMapTotal", "#laravelMapStatus", "#laravelMapCreated", "#laravelMapUpdated"]
+    .forEach((selector) => { const field = document.querySelector(selector); if (field) field.value = ""; });
+});
+document.querySelector("#laravelMapItemsTable")?.addEventListener("change", (event) => {
+  const reportTable = latestData?.tracking?.laravelSelfService?.report?.items?.table || "";
+  if (event.currentTarget.value === reportTable) return;
+  ["#laravelMapItemOrderId", "#laravelMapItemId", "#laravelMapItemName", "#laravelMapItemPrice", "#laravelMapItemQuantity"]
+    .forEach((selector) => { const field = document.querySelector(selector); if (field) field.value = ""; });
+});
+document.querySelector("#startLaravelSelfService")?.addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  const storeUrl = document.querySelector("#laravelManagedStoreUrl")?.value.trim() || "";
+  const currency = els.setupAssistantForm?.elements.currency?.value.trim() || "BDT";
+  const message = document.querySelector("#laravelManagedSetupMessage");
+  button.disabled = true;
+  button.textContent = "Creating package…";
+  if (message) message.textContent = "";
+  try {
+    const response = await fetch("/api/customer/laravel-self-service/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ storeUrl, currency })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Could not create the installation package."]).join(" "));
+    if (latestData?.tracking) latestData.tracking.laravelSelfService = result.setup;
+    renderLaravelSelfService(result.setup);
+    if (message) message.textContent = "Package created. Download it and follow the three installation steps.";
+  } catch (error) {
+    if (message) message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Create my package";
+  }
+});
+document.querySelector("#downloadCpanelBridge")?.addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  const message = document.querySelector("#cpanelBridgeMessage");
+  const previous = button.textContent;
+  button.disabled = true;
+  button.textContent = "Preparing private ZIP…";
+  if (message) message.textContent = "";
+  try {
+    const response = await fetch("/api/customer/setup-assistant/cpanel-bridge.zip");
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || "Could not prepare the cPanel Bridge.");
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "tagioo-cpanel-bridge.zip";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    if (message) message.textContent = "Downloaded. Upload it through cPanel File Manager, then add the Cron Job from README.txt.";
+  } catch (error) {
+    if (message) message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = previous;
+  }
+});
+document.querySelector("#checkLaravelConnection")?.addEventListener("click", () => refreshLaravelSelfService(true));
+
+async function runLaravelSelfServiceAction(button, path, { body, busyText, successText } = {}) {
+  const message = document.querySelector("#cpanelBridgeMessage");
+  const previous = button.textContent;
+  button.disabled = true;
+  button.textContent = busyText || "Saving…";
+  if (message) message.textContent = "";
+  try {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: body ? { "content-type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "The action could not be completed."]).join(" "));
+    if (result.setup) {
+      if (latestData?.tracking) latestData.tracking.laravelSelfService = result.setup;
+      renderLaravelSelfService(result.setup);
+    } else {
+      await refreshLaravelSelfService(false);
+    }
+    if (message) message.textContent = successText || (result.verified === true
+      ? "Laravel tracking is live."
+      : result.verified === false
+        ? "The order arrived, but the sGTM verification needs attention. Review your imported and published templates."
+        : "Saved.");
+    return result;
+  } catch (error) {
+    if (message) message.textContent = error.message;
+    return null;
+  } finally {
+    button.disabled = false;
+    button.textContent = previous;
+  }
+}
+
+document.querySelector("#activateLaravelTracking")?.addEventListener("click", (event) => runLaravelSelfServiceAction(
+  event.currentTarget,
+  "/api/customer/laravel-self-service/activate",
+  { busyText: "Activating…", successText: "Activated. Place one new paid test order now." }
+));
+
+document.querySelector("#verifyLaravelTestOrder")?.addEventListener("click", (event) => runLaravelSelfServiceAction(
+  event.currentTarget,
+  "/api/customer/laravel-self-service/verify",
+  { busyText: "Verifying…" }
+));
+
+document.querySelector("#pauseLaravelTracking")?.addEventListener("click", (event) => {
+  if (!window.confirm("Pause Laravel backend Purchase tracking? Browser GTM tracking will continue.")) return;
+  runLaravelSelfServiceAction(event.currentTarget, "/api/customer/laravel-self-service/deactivate", {
+    busyText: "Pausing…",
+    successText: "Backend Purchase tracking is paused."
+  });
+});
+
+document.querySelector("#saveLaravelMapping")?.addEventListener("click", (event) => {
+  const value = (selector) => document.querySelector(selector)?.value || "";
+  const body = {
+    orders_table: value("#laravelMapOrdersTable"),
+    items_table: value("#laravelMapItemsTable"),
+    columns: {
+      id: value("#laravelMapOrderId"),
+      total: value("#laravelMapTotal"),
+      status: value("#laravelMapStatus"),
+      created: value("#laravelMapCreated"),
+      updated: value("#laravelMapUpdated")
+    },
+    item_columns: {
+      order_id: value("#laravelMapItemOrderId"),
+      item_id: value("#laravelMapItemId"),
+      name: value("#laravelMapItemName"),
+      price: value("#laravelMapItemPrice"),
+      quantity: value("#laravelMapItemQuantity")
+    },
+    paid_statuses: value("#laravelMapPaidStatuses").split(",").map((item) => item.trim()).filter(Boolean)
+  };
+  runLaravelSelfServiceAction(event.currentTarget, "/api/customer/laravel-self-service/mapping", {
+    body,
+    busyText: "Saving mapping…",
+    successText: "Mapping saved. The next Cron run will detect the selected fields automatically."
+  });
+});
 els.assistantNext?.addEventListener("click", async () => {
   if (setupAssistantStep < 4) {
     setupAssistantStep += 1;

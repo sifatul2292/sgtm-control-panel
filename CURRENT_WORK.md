@@ -1,9 +1,96 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-08-09.
+Living status doc. Update after meaningful progress. Last updated: 2026-08-23.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
+
+## 2026-08-23 — Self-service cPanel Laravel Bridge
+
+- Added `packages/tagioo-cpanel-bridge`, a self-contained PHP 8.1+ relay for
+  shared cPanel hosting. It needs no Terminal, Composer, migration, Laravel code
+  edit, or checkout hook: File Manager installs the ZIP and cPanel Cron runs it.
+- The bridge boots the store's existing Laravel app and performs SELECT-only
+  reads. It reports schema metadata (not order rows) to a new signed heartbeat
+  endpoint, automatically detects common order/item layouts, and returns safe
+  table/column dropdowns when the customer must map a custom layout.
+- First run checkpoints and skips historical orders. `updated_at` is preferred
+  so pending/COD orders can be seen after becoming paid. A non-overlap lock,
+  atomic local outbox/checkpoint, exponential retry, HMAC request signing, and
+  tenant+order idempotency cover Cron overlap, outages, and retry duplicates.
+- Laravel now has its own tenant signing secret, separate from WooCommerce.
+  Installing or rotating Laravel cannot invalidate a live Woo webhook. The
+  Laravel secret was explicitly stripped from normal customer dashboard JSON
+  after an isolated regression check caught the raw tenant field.
+- Added a complete customer wizard: enter the store URL, download a private ZIP,
+  install it with cPanel File Manager + Cron Jobs, check detection, optionally
+  map detected fields, activate, run one test order, verify, or pause. No
+  Tagioo-team installation step, hosting password, Terminal, VPS, Composer, or
+  Laravel code edit is required.
+- Activation is fail-closed until the signed bridge reports a ready schema.
+  Pausing in Tagioo rejects bridge purchases immediately, unchanged heartbeats
+  are write-throttled, mapping is locked while live, and the first active run
+  skips historical orders.
+- The whole download/UI remains gated by `CPANEL_BRIDGE_ENABLED=false` plus the
+  explicit `CPANEL_BRIDGE_TENANTS` allowlist; existing production tracking,
+  other platforms, GTM templates, Nginx, and container lifecycle are untouched
+  until an operator enables one pilot tenant.
+- Added `docs/cpanel-bridge-rollout.md` with the required throwaway-tenant,
+  first-run, paid-order, dedup, retry, and COD-transition test sequence plus
+  emergency-stop paths. Do not enable this in production until that sequence is
+  completed against PHP/Laravel on a staging cPanel account.
+- Local isolated checks passed against a throwaway data directory: Node syntax,
+  ZIP integrity/config generation, signed incomplete → mapped → ready heartbeat,
+  heartbeat write throttling, activation, valid/invalid HMAC, duplicate-order
+  idempotency, test-order state, verification diagnostics, pause, paused-order
+  rejection, and dashboard secret redaction. PHP is not installed on this Mac,
+  so `php -l`, real Laravel boot/schema detection, cPanel Cron, and one staging
+  order through GTM destinations remain mandatory pilot gates.
+- Customer deployment order: import the generated `web.json` into Web GTM and
+  `server.json` into Server GTM with Merge, keep both in Preview, install and
+  activate the cPanel Bridge, complete one paid test order, verify all selected
+  destinations, and only then publish both containers.
+
+## 2026-08-22 — Laravel Bridge foundation
+
+- Added an in-repo `tagioo/laravel` Composer package foundation for Laravel
+  10–12. `Tagioo::purchase($order)` writes to an isolated `tagioo_events`
+  outbox, deduplicates by order ID, dispatches only after the HTTP response, and
+  catches tracking failures so checkout cannot fail because of Tagioo.
+- Pending events use Laravel queue retries with backoff and a scheduled
+  `tagioo:flush` recovery command. `tagioo:doctor` checks configuration and the
+  migration. The package is source-ready but must still be published to a
+  dedicated Git repository/Packagist before customers can run the public
+  `composer require tagioo/laravel` command.
+- Added `POST /api/orders/laravel`, authenticated with a five-minute per-tenant
+  HMAC timestamp/signature. Accepted purchases reuse the existing order
+  deduplication and sGTM/Meta recovery path rather than adding another live
+  tracking pipeline. Backend recovery now carries Laravel item rows plus the
+  buyer's IP, user agent, `_fbp`, and `_fbc` when available; GA4 receives item
+  parameters and Meta receives contents/content IDs for catalog matching.
+- The customer Setup Assistant can prepare Bridge endpoint/tenant/secret values
+  and download the package source. Laravel selector fields are now under an
+  Advanced browser-fallback disclosure; Web GTM remains responsible for browser
+  funnel activity while the Bridge is the authoritative Purchase source.
+- Normalized leading `#` from browser-detected order IDs so `#OP-000023` and
+  backend `OP-000023` deduplicate as the same purchase.
+- Remaining before public release: publish the Composer package, pilot it on a
+  staging copy of Masterpiece Gallery, map that store's order-completed hook,
+  and verify outage/retry plus browser/server deduplication with a test order.
+- Customer UX was simplified after review: ordinary Laravel customers now see
+  only **Quick browser setup** and **Complete managed setup**. Composer commands,
+  secrets, migrations, queues and CSS selectors are no longer exposed in the
+  Setup Assistant. A managed request stores a tenant-scoped status and emails
+  support; credentials are explicitly not collected in the form.
+- Quick setup now detects common custom-Laravel product forms/cards contextually
+  (product ID inputs, common price/name/quantity classes and Bengali cart or
+  checkout labels), including Masterpiece Gallery's observed markup. It remains
+  a browser funnel fallback; managed Bridge installation is required for the
+  authoritative backend Purchase.
+- Added a customer-facing Laravel guide at
+  `docs/laravel-customer-setup.md` and a public **Laravel Stores** section on
+  `/docs`. Both match the simplified managed flow and explicitly exclude code,
+  Composer, selectors, secrets and credential submission from customer steps.
 
 ## 2026-08-21 — Laravel / custom ecommerce no-code GTM beta
 

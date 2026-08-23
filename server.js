@@ -9,7 +9,8 @@ import { promisify } from "node:util";
 
 const gzipAsync = promisify(gzip);
 
-// Minimal ZIP builder (no extra deps). Creates a valid ZIP with one entry.
+// Minimal ZIP builder (no extra deps). Used for the WooCommerce plugin and the
+// multi-file Laravel Bridge source bundle.
 function crc32(buf) {
   let crc = 0xFFFFFFFF;
   for (let i = 0; i < buf.length; i++) {
@@ -18,35 +19,55 @@ function crc32(buf) {
   }
   return (crc ^ 0xFFFFFFFF) >>> 0;
 }
-function buildSingleFileZip(filename, content) {
-  const nameBuf = Buffer.from(filename);
-  const data    = Buffer.isBuffer(content) ? content : Buffer.from(content);
-  const crc     = crc32(data);
-  const deflated = deflateRawSync(data, { level: 9 });
+function buildZip(entries) {
   const now = new Date();
   const dosDate = (((now.getFullYear() - 1980) & 0x7F) << 9) | (((now.getMonth() + 1) & 0xF) << 5) | (now.getDate() & 0x1F);
   const dosTime = ((now.getHours() & 0x1F) << 11) | ((now.getMinutes() & 0x3F) << 5) | (Math.floor(now.getSeconds() / 2) & 0x1F);
-  // Local file header (30 bytes + name)
-  const lh = Buffer.alloc(30 + nameBuf.length);
-  lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6);
-  lh.writeUInt16LE(8, 8); lh.writeUInt16LE(dosTime, 10); lh.writeUInt16LE(dosDate, 12);
-  lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(deflated.length, 18); lh.writeUInt32LE(data.length, 22);
-  lh.writeUInt16LE(nameBuf.length, 26); lh.writeUInt16LE(0, 28); nameBuf.copy(lh, 30);
-  // Central directory (46 bytes + name)
-  const cdOffset = lh.length + deflated.length;
-  const cd = Buffer.alloc(46 + nameBuf.length);
-  cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6); cd.writeUInt16LE(0, 8);
-  cd.writeUInt16LE(8, 10); cd.writeUInt16LE(dosTime, 12); cd.writeUInt16LE(dosDate, 14);
-  cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(deflated.length, 20); cd.writeUInt32LE(data.length, 24);
-  cd.writeUInt16LE(nameBuf.length, 28); cd.writeUInt16LE(0, 30); cd.writeUInt16LE(0, 32);
-  cd.writeUInt16LE(0, 34); cd.writeUInt16LE(0, 36); cd.writeUInt32LE(0, 38); cd.writeUInt32LE(0, 42);
-  nameBuf.copy(cd, 46);
-  // End of central directory
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const nameBuf = Buffer.from(String(entry.name).replace(/^\/+/, ""));
+    const data = Buffer.isBuffer(entry.content) ? entry.content : Buffer.from(entry.content);
+    const crc = crc32(data);
+    const deflated = deflateRawSync(data, { level: 9 });
+    const local = Buffer.alloc(30 + nameBuf.length);
+    local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(0, 6);
+    local.writeUInt16LE(8, 8); local.writeUInt16LE(dosTime, 10); local.writeUInt16LE(dosDate, 12);
+    local.writeUInt32LE(crc, 14); local.writeUInt32LE(deflated.length, 18); local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(nameBuf.length, 26); local.writeUInt16LE(0, 28); nameBuf.copy(local, 30);
+    localParts.push(local, deflated);
+
+    const central = Buffer.alloc(46 + nameBuf.length);
+    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(0, 8);
+    central.writeUInt16LE(8, 10); central.writeUInt16LE(dosTime, 12); central.writeUInt16LE(dosDate, 14);
+    central.writeUInt32LE(crc, 16); central.writeUInt32LE(deflated.length, 20); central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(nameBuf.length, 28); central.writeUInt16LE(0, 30); central.writeUInt16LE(0, 32);
+    central.writeUInt16LE(0, 34); central.writeUInt16LE(0, 36); central.writeUInt32LE(0, 38); central.writeUInt32LE(offset, 42);
+    nameBuf.copy(central, 46);
+    centralParts.push(central);
+    offset += local.length + deflated.length;
+  }
+  const centralDirectory = Buffer.concat(centralParts);
   const eocd = Buffer.alloc(22);
   eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(0, 4); eocd.writeUInt16LE(0, 6);
-  eocd.writeUInt16LE(1, 8); eocd.writeUInt16LE(1, 10); eocd.writeUInt32LE(cd.length, 12);
-  eocd.writeUInt32LE(cdOffset, 16); eocd.writeUInt16LE(0, 20);
-  return Buffer.concat([lh, deflated, cd, eocd]);
+  eocd.writeUInt16LE(entries.length, 8); eocd.writeUInt16LE(entries.length, 10); eocd.writeUInt32LE(centralDirectory.length, 12);
+  eocd.writeUInt32LE(offset, 16); eocd.writeUInt16LE(0, 20);
+  return Buffer.concat([...localParts, centralDirectory, eocd]);
+}
+function buildSingleFileZip(filename, content) {
+  return buildZip([{ name: filename, content }]);
+}
+
+async function filesForZip(directory, prefix = "") {
+  const entries = [];
+  for (const item of await readdir(directory, { withFileTypes: true })) {
+    const relative = prefix ? `${prefix}/${item.name}` : item.name;
+    const absolute = join(directory, item.name);
+    if (item.isDirectory()) entries.push(...await filesForZip(absolute, relative));
+    else if (item.isFile()) entries.push({ name: relative, content: await readFile(absolute) });
+  }
+  return entries;
 }
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
@@ -121,6 +142,10 @@ const config = {
   monthlyRequestLimit: Number(process.env.MONTHLY_REQUEST_LIMIT || 500000),
   monthlyContainerLimit: Number(process.env.MONTHLY_CONTAINER_LIMIT || 1),
   customerSupportEmail: process.env.CUSTOMER_SUPPORT_EMAIL || "",
+  // The standalone cPanel bridge is a staged pilot. Keep it off in production
+  // until a throwaway Laravel tenant has completed doctor + test-order checks.
+  cpanelBridgeEnabled: process.env.CPANEL_BRIDGE_ENABLED === "true",
+  cpanelBridgeTenants: parseCsv(process.env.CPANEL_BRIDGE_TENANTS || ""),
   brevoApiKey: process.env.BREVO_API_KEY || "",
   resendApiKey: process.env.RESEND_API_KEY || "",
   appUrl: process.env.APP_URL || `http://localhost:${process.env.PORT || 3100}`,
@@ -480,6 +505,27 @@ async function sendEmail({ to, subject, bodyHtml }) {
     console.error(`[email] send error for "${subject}":`, e.message);
     return { ok: false };
   }
+}
+
+async function notifyOwnerLaravelManagedSetup(tenant, setup) {
+  const to = config.customerSupportEmail;
+  if (!to || !tenant || !setup) return { ok: false };
+  return sendEmail({
+    to,
+    subject: `Laravel setup requested — ${tenant.id}`,
+    bodyHtml: [
+      `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Laravel managed setup requested</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">A customer requested complete Laravel purchase tracking. Contact them before asking for any temporary, limited website access.</p>`,
+      `<table style="width:100%;border-collapse:collapse;font-size:14px;color:#0F0A1E">`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Tenant</td><td style="padding:6px 0;font-weight:700">${escapeHtml(tenant.id)}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Customer</td><td style="padding:6px 0;font-weight:700">${escapeHtml(tenant.fullName || tenant.name || "")}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Email</td><td style="padding:6px 0;font-weight:700">${escapeHtml(tenant.email || tenant.username || "")}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Phone</td><td style="padding:6px 0;font-weight:700">${escapeHtml(tenant.phone || "")}</td></tr>`,
+      `<tr><td style="padding:6px 0;color:#5B6B8A">Store</td><td style="padding:6px 0;font-weight:700">${escapeHtml(setup.storeUrl)}</td></tr>`,
+      `</table>`,
+      `<a href="${escapeHtml(config.appUrl)}/#customers" style="display:inline-block;margin:22px 0 0;background:#5B21B6;color:#fff;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:10px">Open customer dashboard →</a>`
+    ].join("")
+  });
 }
 
 async function emailWelcome(toEmail, fullName) {
@@ -1457,6 +1503,7 @@ function laravelAutoTrackerScript(input) {
 if(window.__tagiooLaravelTracker)return;window.__tagiooLaravelTracker=true;
 var cfg=${configJson},seen={},dl=window.dataLayer=window.dataLayer||[];
 function text(sel){if(!sel)return'';try{var el=document.querySelector(sel);return el?String(el.getAttribute('content')||el.getAttribute('data-value')||el.textContent||'').trim():'';}catch(e){return'';}}
+function within(root,sel){if(!sel)return'';try{var el=(root||document).querySelector(sel);return el?String(el.value||el.getAttribute('content')||el.getAttribute('data-value')||el.getAttribute('data-price')||el.textContent||'').trim():'';}catch(e){return'';}}
 function meta(name){var el=document.querySelector('meta[property="'+name+'"],meta[name="'+name+'"]');return el?String(el.content||'').trim():'';}
 function number(v){var s=String(v==null?'':v).replace(/[^0-9,.-]/g,'');if(s.indexOf(',')>-1&&s.indexOf('.')<0)s=s.replace(',','.');else s=s.replace(/,/g,'');var n=Number(s);return isFinite(n)?n:0;}
 function id(){if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();return'tagioo-'+Date.now()+'-'+Math.random().toString(36).slice(2,10);}
@@ -1466,16 +1513,16 @@ function schema(type){var nodes=document.querySelectorAll('script[type="applicat
 function wildcard(pattern,value){if(!pattern)return false;var raw=String(pattern),escaped='';for(var i=0;i<raw.length;i++){var ch=raw.charAt(i);if(ch==='*'){escaped+='.*';continue;}if('^$+?.()|{}[]'.indexOf(ch)>-1)escaped+='\\\\';escaped+=ch;}try{return new RegExp('^'+escaped+'$','i').test(value);}catch(e){return false;}}
 function matches(pattern){return wildcard(pattern,location.pathname)||wildcard(pattern,location.pathname+location.search)||wildcard(pattern,location.href);}
 function offer(product){var o=product&&(Array.isArray(product.offers)?product.offers[0]:product.offers);return o||{};}
-function product(){var p=schema('Product'),o=offer(p);if(!p&&!cfg.productPattern)return null;if(cfg.productPattern&&!matches(cfg.productPattern)&&!p)return null;var price=number(o.price||o.lowPrice||meta('product:price:amount')||text('[itemprop="price"]'));var itemId=String((p&&(p.sku||p.productID||p.mpn))||meta('product:retailer_item_id')||text('[data-product-id]')||'').trim();var name=String((p&&p.name)||meta('og:title')||text('h1')||document.title||'').trim();if(!itemId)itemId=location.pathname.replace(/^\\/+|\\/+$/g,'').split('/').pop()||name;return{currency:String(o.priceCurrency||meta('product:price:currency')||cfg.currency||'BDT').toUpperCase(),value:price,items:[{item_id:itemId,item_name:name,price:price,quantity:1}]};}
+function product(root,strict){root=root||document;var p=schema('Product'),o=offer(p);var productSignal=within(root,'input[name="product_id"],[data-product-id],form[action*="cart/add"]');var detailSignal=within(document,'.product-title,h1[itemprop="name"],form.add-to-cart-detail');if(!p&&!cfg.productPattern&&!productSignal)return null;if(strict&&!p&&!cfg.productPattern&&!detailSignal)return null;if(cfg.productPattern&&!matches(cfg.productPattern)&&!p&&strict)return null;var price=number(o.price||o.lowPrice||meta('product:price:amount')||within(root,'[itemprop="price"],[data-price],.new-price,.sale-price,.product-price,.price'));var itemId=String((p&&(p.sku||p.productID||p.mpn))||meta('product:retailer_item_id')||within(root,'input[name="product_id"],[data-product-id],input[name="id"],input[name="product"]')||'').trim();var name=String((p&&p.name)||within(root,'.product-title,.product-name,[itemprop="name"],h1,h2,h3')||meta('og:title')||document.title||'').trim();var quantity=number(within(root,'input[name="quantity"],input[name="qty"],#qtyInput'))||1;if(!itemId)itemId=location.pathname.replace(/^\\/+|\\/+$/g,'').split('/').pop()||name;return{currency:String(o.priceCurrency||meta('product:price:currency')||cfg.currency||'BDT').toUpperCase(),value:price*quantity,items:[{item_id:itemId,item_name:name,price:price,quantity:quantity}]};}
 function push(event,ecommerce,eventId){dl.push({ecommerce:null});dl.push({event:event,event_id:eventId||id(),ecommerce:ecommerce});}
 function cartSave(ec){try{sessionStorage.setItem('tagioo_laravel_cart',JSON.stringify(ec));}catch(e){}}
 function cartLoad(){try{return JSON.parse(sessionStorage.getItem('tagioo_laravel_cart')||'null');}catch(e){return null;}}
-function fireView(){var key='view:'+location.href;if(seen[key])return;var ec=product();if(!ec)return;seen[key]=1;push('view_item',ec);}
-function fireCheckout(){var key='checkout:'+location.href;if(seen[key])return;var ec=cartLoad()||product();if(!ec)return;seen[key]=1;push('begin_checkout',ec);}
+function fireView(){var key='view:'+location.href;if(seen[key])return;var ec=product(document,true);if(!ec)return;seen[key]=1;push('view_item',ec);}
+function fireCheckout(){var key='checkout:'+location.href;if(seen[key])return;var ec=cartLoad()||product(document,true);if(!ec)return;seen[key]=1;push('begin_checkout',ec);}
 function orderItems(order){var rows=order&&(order.orderedItem||order.acceptedOffer);if(!rows)return(cartLoad()||{}).items||[];if(!Array.isArray(rows))rows=[rows];return rows.map(function(row){var item=row.itemOffered||row.item||row;var price=number(row.price||item.price);return{item_id:String(item.sku||item.productID||item.identifier||item.name||''),item_name:String(item.name||''),price:price,quantity:number(row.orderQuantity||row.quantity)||1};});}
-function firePurchase(){var order=schema('Order');if(!order&&!cfg.purchasePattern)return;if(cfg.purchasePattern&&!matches(cfg.purchasePattern)&&!order)return;var orderId=String(text(cfg.orderIdSelector)||(order&&(order.orderNumber||order.orderId||order.identifier))||'').trim();var total=number(text(cfg.orderTotalSelector)||(order&&(order.price||order.totalPrice||(order.priceSpecification&&order.priceSpecification.price))));if(!orderId||total<=0)return;var storageKey='tagioo_purchase_'+orderId;try{if(localStorage.getItem(storageKey))return;localStorage.setItem(storageKey,'1');}catch(e){if(seen[storageKey])return;seen[storageKey]=1;}var currency=String((order&&(order.priceCurrency||(order.priceSpecification&&order.priceSpecification.priceCurrency)))||cfg.currency||'BDT').toUpperCase();push('purchase',{transaction_id:orderId,value:total,currency:currency,items:orderItems(order)},orderId);}
+function firePurchase(){var order=schema('Order');if(!order&&!cfg.purchasePattern)return;if(cfg.purchasePattern&&!matches(cfg.purchasePattern)&&!order)return;var orderId=String(text(cfg.orderIdSelector)||(order&&(order.orderNumber||order.orderId||order.identifier))||'').trim().replace(/^#+\s*/,'');var total=number(text(cfg.orderTotalSelector)||(order&&(order.price||order.totalPrice||(order.priceSpecification&&order.priceSpecification.price))));if(!orderId||total<=0)return;var storageKey='tagioo_purchase_'+orderId;try{if(localStorage.getItem(storageKey))return;localStorage.setItem(storageKey,'1');}catch(e){if(seen[storageKey])return;seen[storageKey]=1;}var currency=String((order&&(order.priceCurrency||(order.priceSpecification&&order.priceSpecification.priceCurrency)))||cfg.currency||'BDT').toUpperCase();push('purchase',{transaction_id:orderId,value:total,currency:currency,items:orderItems(order)},orderId);}
 function scan(){fireView();if(matches(cfg.checkoutPattern))fireCheckout();firePurchase();}
-document.addEventListener('click',function(ev){var el=ev.target&&ev.target.closest?ev.target.closest('a,button,input[type="submit"],[role="button"]'):null;if(!el)return;var label=String(el.textContent||el.value||el.getAttribute('aria-label')||'').trim();var href=String(el.getAttribute('href')||''),hrefLower=href.toLowerCase();var isCart=false;if(cfg.addToCartSelector){try{isCart=!!ev.target.closest(cfg.addToCartSelector);}catch(e){}}if(!isCart)isCart=/add.{0,5}(to)?.{0,5}(cart|bag)|buy now/i.test(label)||hrefLower.indexOf('cart/add')>-1||hrefLower.indexOf('add-to-cart')>-1;if(isCart){var ec=product();if(ec){cartSave(ec);push('add_to_cart',ec);}return;}if(/checkout|proceed.{0,6}(order|payment)|place order/i.test(label+' '+href)){setTimeout(fireCheckout,0);}},true);
+document.addEventListener('click',function(ev){var el=ev.target&&ev.target.closest?ev.target.closest('a,button,input[type="submit"],[role="button"]'):null;if(!el)return;var label=String(el.textContent||el.value||el.getAttribute('aria-label')||'').trim();var href=String(el.getAttribute('href')||''),hrefLower=href.toLowerCase();var isCart=false;if(cfg.addToCartSelector){try{isCart=!!ev.target.closest(cfg.addToCartSelector);}catch(e){}}if(!isCart)isCart=/add.{0,5}(to)?.{0,5}(cart|bag)|buy now|কার্ট|অর্ডার করুন/i.test(label)||hrefLower.indexOf('cart/add')>-1||hrefLower.indexOf('add-to-cart')>-1;if(isCart){var root=el.closest('form,.product-card,[data-product],article')||document;var ec=product(root,false);if(ec){cartSave(ec);push('add_to_cart',ec);}return;}if(/checkout|proceed.{0,6}(order|payment)|place order|চেকআউট|অর্ডার/i.test(label+' '+href)){setTimeout(fireCheckout,0);}},true);
 var oldPush=history.pushState,oldReplace=history.replaceState;function route(fn){return function(){var result=fn.apply(this,arguments);setTimeout(scan,0);return result;};}history.pushState=route(oldPush);history.replaceState=route(oldReplace);window.addEventListener('popstate',function(){setTimeout(scan,0);});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scan);else scan();
 })(window);</script>`;
@@ -1857,7 +1904,7 @@ function buildSetupAssistantTemplates(input) {
     warnings.push("Meta CAPI is now included in server.json. Import, preview Server GTM, confirm the Meta tag returns 2xx, then publish.");
   }
   if (String(input.platform || "") === "laravel") {
-    warnings.push("Laravel no-code tracking is enabled in web.json. Run product, cart, checkout, and test-order checks before publishing; Purchase only fires when Tagioo finds a real order ID and positive total.");
+    warnings.push("Laravel browser funnel tracking is included in web.json. Request Complete Managed Setup in Tagioo for reliable backend Purchase tracking, then verify one test order before publishing.");
   }
   return {
     fileNames: {
@@ -4205,6 +4252,12 @@ function normalizeOrderPayload(body) {
   const createdAt = orderDate(firstValue(body, ["created_at", "createdAt", "ordered_at", "orderedAt", "date", "time"]));
   const tenantId = sanitizeId(firstValue(body, ["tenant_id", "tenantId", "customer_id", "customerId"]) || config.tenantId);
   const orderType = sanitizeId(firstValue(body, ["order_type", "orderType", "channel", "source_type"]) || "store");
+  const items = (Array.isArray(body.items) ? body.items : []).slice(0, 100).map((item) => ({
+    item_id: String(firstValue(item, ["item_id", "product_id", "id", "sku"]) || "").trim().slice(0, 200),
+    item_name: String(firstValue(item, ["item_name", "product_name", "name", "title"]) || "").trim().slice(0, 500),
+    price: parseMoney(firstValue(item, ["price", "unit_price", "amount"])),
+    quantity: Math.max(1, Number(firstValue(item, ["quantity", "qty"]) || 1))
+  })).filter((item) => item.item_id || item.item_name);
 
   return {
     id,
@@ -4226,7 +4279,11 @@ function normalizeOrderPayload(body) {
     postalCode: String(firstValue(body, ["postal_code", "postcode", "billing_postcode"]) || "").trim(),
     country: String(firstValue(body, ["country", "billing_country"]) || "").trim(),
     customerIp: String(firstValue(body, ["customer_ip", "customer_ip_address", "ip"]) || "").trim(),
+    customerUserAgent: String(firstValue(body, ["customer_user_agent", "user_agent"]) || "").trim(),
+    fbp: String(firstValue(body, ["fbp", "_fbp"]) || "").trim(),
+    fbc: String(firstValue(body, ["fbc", "_fbc"]) || "").trim(),
     pageLocation: String(firstValue(body, ["page_location", "order_url", "url"]) || "").trim(),
+    items,
     raw: body
   };
 }
@@ -4243,6 +4300,19 @@ function isWooOrderWebhookAuthorized(req, rawBody, secret) {
   const signature = String(req.headers["x-wc-webhook-signature"] || "");
   if (!signature) return false;
   const expected = createHmac("sha256", secret).update(rawBody).digest("base64");
+  return safeEqual(signature, expected);
+}
+
+// Laravel Bridge requests are signed over the exact raw body and a short-lived
+// timestamp. This prevents payload tampering and rejects captured-request replay.
+function isLaravelBridgeAuthorized(req, rawBody, secret) {
+  if (!secret) return false;
+  const timestamp = String(req.headers["x-tagioo-timestamp"] || "");
+  const signature = String(req.headers["x-tagioo-signature"] || "");
+  const seconds = Number(timestamp);
+  if (!/^\d{10}$/.test(timestamp) || !Number.isFinite(seconds)) return false;
+  if (Math.abs(Math.floor(Date.now() / 1000) - seconds) > 300) return false;
+  const expected = createHmac("sha256", secret).update(`${timestamp}.${rawBody.toString("utf8")}`).digest("hex");
   return safeEqual(signature, expected);
 }
 
@@ -4302,7 +4372,9 @@ async function addOrderWebhook(body) {
 
   const data = loaded.data;
   data.orders = data.orders || [];
-  const index = data.orders.findIndex((item) => item.id === order.id);
+  // Order numbers are only unique inside a store. Two Laravel/Woo tenants can
+  // both have order "1", so panel-level idempotency must include the tenant.
+  const index = data.orders.findIndex((item) => item.id === order.id && item.tenantId === order.tenantId);
   if (index === -1) data.orders.push(order);
   else data.orders[index] = { ...data.orders[index], ...order, updatedAt: new Date().toISOString() };
 
@@ -4314,6 +4386,23 @@ async function addOrderWebhook(body) {
   // or fails the webhook response.
   const tenant = (data.tenants || []).find((item) => item.id === order.tenantId);
   const tracking = tenant?.tracking || null;
+  if (tenant && order.source === "tagioo-cpanel-bridge" && tracking?.laravelSelfService?.active) {
+    const receivedAt = new Date().toISOString();
+    tenant.tracking = {
+      ...tracking,
+      laravelSelfService: {
+        ...tracking.laravelSelfService,
+        status: tracking.laravelSelfService.status === "live" ? "live" : "test_received",
+        lastOrder: {
+          id: order.id,
+          amount: order.amount,
+          currency: order.currency,
+          receivedAt
+        },
+        updatedAt: receivedAt
+      }
+    };
+  }
   const alreadyForwarded = index !== -1 && data.orders[index].forwardedToSgtmAt;
   // Recovery forwards via the gtag /g/collect path, which needs no api_secret —
   // only the measurement id + sGTM domain. (apiSecret was required here when the
@@ -4328,7 +4417,7 @@ async function addOrderWebhook(body) {
     tracking.measurementId &&
     tracking.domain;
   if (shouldForward) {
-    const stored = data.orders.find((item) => item.id === order.id);
+    const stored = data.orders.find((item) => item.id === order.id && item.tenantId === order.tenantId);
     if (stored) stored.forwardedToSgtmAt = new Date().toISOString();
   }
 
@@ -4382,6 +4471,14 @@ async function forwardOrderToSgtm(order, tracking) {
   });
   // event_source_url for Meta attribution, if the order carried one.
   if (order.pageLocation) params.set("dl", order.pageLocation);
+  order.items.slice(0, 20).forEach((item, index) => {
+    const fields = [];
+    if (item.item_id) fields.push(`id${String(item.item_id).replace(/~/g, "")}`);
+    if (item.item_name) fields.push(`nm${String(item.item_name).replace(/~/g, "")}`);
+    if (item.price > 0) fields.push(`pr${item.price}`);
+    if (item.quantity > 0) fields.push(`qt${item.quantity}`);
+    if (fields.length) params.set(`pr${index + 1}`, fields.join("~"));
+  });
   const endpoint = `${tracking.domain}/g/collect?${params.toString()}`;
   // Match quality: this fetch originates from the panel server, so without this
   // header Meta CAPI would record the panel's IP as the buyer's. Forward the real
@@ -4389,6 +4486,11 @@ async function forwardOrderToSgtm(order, tracking) {
   // client_ip_address. Best-effort: if the tenant's nginx overwrites it, no harm.
   const headers = { "content-type": "text/plain;charset=UTF-8" };
   if (order.customerIp) headers["X-Forwarded-For"] = order.customerIp;
+  if (order.customerUserAgent) headers["User-Agent"] = order.customerUserAgent;
+  const forwardedCookies = [];
+  if (order.fbp) forwardedCookies.push(`_fbp=${order.fbp}`);
+  if (order.fbc) forwardedCookies.push(`_fbc=${order.fbc}`);
+  if (forwardedCookies.length) headers.Cookie = forwardedCookies.join("; ");
   try {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -4765,12 +4867,25 @@ async function sendOrderToMetaCapi(tenant, order) {
   const zp = sha256Hex(order.postalCode); if (zp) userData.zp = [zp];
   const country = sha256Hex(order.country); if (country) userData.country = [country];
   if (order.customerIp) userData.client_ip_address = order.customerIp;
+  if (order.customerUserAgent) userData.client_user_agent = order.customerUserAgent;
+  if (order.fbp) userData.fbp = order.fbp;
+  if (order.fbc) userData.fbc = order.fbc;
   // Meta needs at least one user-data key to match the event to a person.
   if (!Object.keys(userData).length) return;
 
   const customData = { currency: order.currency || "BDT", order_id: String(order.id) };
   const value = Number(order.amount);
   if (Number.isFinite(value)) customData.value = value;
+  if (order.items.length) {
+    customData.content_type = "product";
+    customData.content_ids = order.items.map((item) => String(item.item_id || "")).filter(Boolean);
+    customData.contents = order.items.map((item) => ({
+      id: String(item.item_id || ""),
+      quantity: item.quantity || 1,
+      item_price: item.price || 0
+    })).filter((item) => item.id);
+    customData.num_items = order.items.reduce((total, item) => total + Number(item.quantity || 1), 0);
+  }
 
   const event = {
     event_name: "Purchase",
@@ -4958,6 +5073,8 @@ function publicTenantTracking(tenant) {
   const tracking = (tenant && tenant.tracking) || {};
   const meta = tracking.meta || {};
   const cookieExtension = tracking.cookieExtension || {};
+  const laravelManagedSetup = tracking.laravelManagedSetup || {};
+  const laravelSelfService = tracking.laravelSelfService || {};
   return {
     domain: tracking.domain || "",
     measurementId: tracking.measurementId || "",
@@ -4970,10 +5087,133 @@ function publicTenantTracking(tenant) {
       enabled: Boolean(cookieExtension.enabled),
       days: clampCookieDays(cookieExtension.days)
     },
+    laravelManagedSetup: laravelManagedSetup.status ? {
+      status: String(laravelManagedSetup.status),
+      storeUrl: String(laravelManagedSetup.storeUrl || ""),
+      currency: String(laravelManagedSetup.currency || "BDT"),
+      requestedAt: laravelManagedSetup.requestedAt || "",
+      updatedAt: laravelManagedSetup.updatedAt || ""
+    } : null,
+    laravelSelfService: publicLaravelSelfService(laravelSelfService),
     offlineUploads: Array.isArray(tracking.offlineUploads) ? tracking.offlineUploads.slice(0, 20) : [],
     lastVerify: tracking.lastVerify || null,
     updatedAt: tracking.updatedAt || ""
   };
+}
+
+function bridgeIdentifier(value) {
+  const text = String(value || "").trim();
+  return /^[A-Za-z0-9_]+$/.test(text) ? text : "";
+}
+
+function bridgeStringList(value, limit = 120) {
+  return [...new Set((Array.isArray(value) ? value : [])
+    .map((item) => bridgeIdentifier(item))
+    .filter(Boolean))].slice(0, limit);
+}
+
+function sanitizeLaravelBridgeMapping(input = {}) {
+  const columnsInput = input.columns && typeof input.columns === "object" ? input.columns : {};
+  const itemColumnsInput = input.item_columns && typeof input.item_columns === "object" ? input.item_columns : {};
+  const allowedColumns = ["id", "primary", "total", "created", "updated", "currency", "status", "email", "phone", "first_name", "last_name", "city", "state", "postcode", "country", "ip", "user_agent"];
+  const allowedItemColumns = ["order_id", "item_id", "name", "price", "quantity"];
+  const columns = Object.fromEntries(allowedColumns
+    .map((key) => [key, bridgeIdentifier(columnsInput[key])])
+    .filter(([, value]) => value));
+  const itemColumns = Object.fromEntries(allowedItemColumns
+    .map((key) => [key, bridgeIdentifier(itemColumnsInput[key])])
+    .filter(([, value]) => value));
+  const paidStatuses = [...new Set((Array.isArray(input.paid_statuses) ? input.paid_statuses : [])
+    .map((item) => String(item || "").trim().toLowerCase().slice(0, 40))
+    .filter((item) => /^[a-z0-9 _-]+$/.test(item)))].slice(0, 20);
+  return {
+    orders_table: bridgeIdentifier(input.orders_table),
+    items_table: bridgeIdentifier(input.items_table),
+    columns,
+    item_columns: itemColumns,
+    paid_statuses: paidStatuses
+  };
+}
+
+function sanitizeLaravelBridgeReport(input = {}) {
+  const ordersInput = input.orders && typeof input.orders === "object" ? input.orders : {};
+  const itemsInput = input.items && typeof input.items === "object" ? input.items : {};
+  const detectedInput = ordersInput.detected && typeof ordersInput.detected === "object" ? ordersInput.detected : {};
+  const itemDetectedInput = itemsInput.detected && typeof itemsInput.detected === "object" ? itemsInput.detected : {};
+  const detected = Object.fromEntries(Object.entries(detectedInput)
+    .slice(0, 30)
+    .map(([key, value]) => [bridgeIdentifier(key), bridgeIdentifier(value)])
+    .filter(([key, value]) => key && value));
+  const itemDetected = Object.fromEntries(Object.entries(itemDetectedInput)
+    .slice(0, 15)
+    .map(([key, value]) => [bridgeIdentifier(key), bridgeIdentifier(value)])
+    .filter(([key, value]) => key && value));
+  return {
+    phpVersion: String(input.php_version || "").slice(0, 30),
+    laravelVersion: String(input.laravel_version || "").slice(0, 30),
+    databaseDriver: String(input.database_driver || "").slice(0, 30),
+    tables: bridgeStringList(input.tables, 200),
+    orders: {
+      table: bridgeIdentifier(ordersInput.table),
+      columns: bridgeStringList(ordersInput.columns, 160),
+      detected,
+      statusValues: (Array.isArray(ordersInput.status_values) ? ordersInput.status_values : [])
+        .map((item) => String(item || "").trim().toLowerCase().slice(0, 40))
+        .filter((item) => /^[a-z0-9 _-]+$/.test(item))
+        .slice(0, 30),
+      ready: Boolean(ordersInput.ready),
+      confidence: Math.max(0, Math.min(100, Number(ordersInput.confidence || 0)))
+    },
+    items: {
+      table: bridgeIdentifier(itemsInput.table),
+      columns: bridgeStringList(itemsInput.columns, 160),
+      detected: itemDetected,
+      ready: Boolean(itemsInput.ready)
+    },
+    warnings: (Array.isArray(input.warnings) ? input.warnings : [])
+      .map((item) => String(item || "").slice(0, 180))
+      .filter(Boolean)
+      .slice(0, 12)
+  };
+}
+
+function publicLaravelSelfService(state = {}) {
+  if (!state.status) return null;
+  return {
+    status: String(state.status),
+    active: Boolean(state.active),
+    storeUrl: String(state.storeUrl || ""),
+    currency: String(state.currency || "BDT"),
+    startedAt: state.startedAt || "",
+    lastSeenAt: state.lastSeenAt || "",
+    activatedAt: state.activatedAt || "",
+    liveAt: state.liveAt || "",
+    bridgeVersion: String(state.bridgeVersion || ""),
+    report: state.report || null,
+    lastOrder: state.lastOrder ? {
+      id: String(state.lastOrder.id || ""),
+      amount: Number(state.lastOrder.amount || 0),
+      currency: String(state.lastOrder.currency || ""),
+      receivedAt: state.lastOrder.receivedAt || ""
+    } : null,
+    verification: state.verification || null,
+    updatedAt: state.updatedAt || ""
+  };
+}
+
+function publicTenantForCustomer(tenant) {
+  if (!tenant) return null;
+  // Secrets are exposed only through their purpose-built authenticated setup
+  // endpoints. A raw tenant object must never carry them into /api/dashboard.
+  const {
+    webhookSecret: _webhookSecret,
+    laravelBridgeSecret: _laravelBridgeSecret,
+    webhookSecretUpdatedAt: _webhookSecretUpdatedAt,
+    laravelBridgeSecretUpdatedAt: _laravelBridgeSecretUpdatedAt,
+    tracking: _tracking,
+    ...safeTenant
+  } = tenant;
+  return { ...safeTenant, tracking: publicTenantTracking(tenant) };
 }
 
 // Reduce a tracking-domain input to a clean origin ("https://host"), no path.
@@ -6501,9 +6741,340 @@ async function rotateCustomerWebhookSecret(session) {
   return { ok: true, webhookSecret };
 }
 
+async function requestLaravelManagedSetup(input, session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  const storeUrl = normalizeWebsiteUrl(input.storeUrl);
+  if (!storeUrl) return { ok: false, status: 400, errors: ["Enter a valid Laravel store website URL."] };
+  const currency = String(input.currency || "BDT").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) return { ok: false, status: 400, errors: ["Currency must be a 3-letter code such as BDT or USD."] };
+
+  let savedSetup = null;
+  let savedTenant = null;
+  try {
+    await withDbLock(async () => {
+      const loaded = await readDatabase();
+      if (!loaded.available) throw new Error(loaded.detail || loaded.message || "Database unavailable.");
+      const data = loaded.data;
+      const index = (data.tenants || []).findIndex((tenant) => tenant.id === session.tenantId);
+      if (index === -1) throw new Error("Customer account was not found.");
+      const tenant = data.tenants[index];
+      const tracking = { ...(tenant.tracking || {}) };
+      const previous = tracking.laravelManagedSetup || {};
+      const now = new Date().toISOString();
+      savedSetup = {
+        status: previous.status === "live" ? "live" : "requested",
+        storeUrl,
+        currency,
+        requestedAt: previous.requestedAt || now,
+        updatedAt: now
+      };
+      tracking.laravelManagedSetup = savedSetup;
+      data.tenants[index] = {
+        ...tenant,
+        tracking,
+        // Created silently for the tenant-scoped bridge package. It is never
+        // returned by the managed-setup API or exposed in dashboard payloads.
+        laravelBridgeSecret: tenant.laravelBridgeSecret || randomBytes(24).toString("hex"),
+        laravelBridgeSecretUpdatedAt: tenant.laravelBridgeSecretUpdatedAt || now
+      };
+      savedTenant = data.tenants[index];
+      await writeDatabase(data);
+    });
+  } catch (error) {
+    return { ok: false, status: 500, errors: [error.message || "Could not save the setup request."] };
+  }
+
+  notifyOwnerLaravelManagedSetup(savedTenant, savedSetup).catch(() => {});
+  return { ok: true, setup: savedSetup };
+}
+
+async function startLaravelSelfService(input, session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  if (!cpanelBridgeAvailableFor(session.tenantId)) return { ok: false, status: 404, errors: ["Laravel self-service is not enabled for this account."] };
+  const storeUrl = normalizeWebsiteUrl(input.storeUrl);
+  const currency = String(input.currency || "BDT").trim().toUpperCase();
+  if (!storeUrl) return { ok: false, status: 400, errors: ["Enter a valid Laravel store website URL."] };
+  if (!/^[A-Z]{3}$/.test(currency)) return { ok: false, status: 400, errors: ["Currency must be a 3-letter code such as BDT or USD."] };
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+    const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
+    if (!tenant) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+    const now = new Date().toISOString();
+    const tracking = { ...(tenant.tracking || {}) };
+    const previous = tracking.laravelSelfService || {};
+    const sameStore = previous.storeUrl === storeUrl && previous.currency === currency;
+    tracking.laravelSelfService = {
+      ...(sameStore ? previous : {}),
+      status: sameStore && previous.status === "live" ? "live" : "package_ready",
+      active: sameStore ? Boolean(previous.active) : false,
+      storeUrl,
+      currency,
+      startedAt: sameStore ? previous.startedAt || now : now,
+      updatedAt: now
+    };
+    tenant.tracking = tracking;
+    if (!tenant.laravelBridgeSecret) {
+      tenant.laravelBridgeSecret = randomBytes(24).toString("hex");
+      tenant.laravelBridgeSecretUpdatedAt = now;
+    }
+    await writeDatabase(loaded.data);
+    return { ok: true, setup: publicLaravelSelfService(tracking.laravelSelfService) };
+  });
+}
+
+async function recordLaravelBridgeHeartbeat(input, tenantId, snapshotTenant) {
+  const previous = snapshotTenant?.tracking?.laravelSelfService || {};
+  if (!previous.status) return { ok: false, status: 409, errors: ["Start Laravel self-service from the Tagioo dashboard first."] };
+  const report = sanitizeLaravelBridgeReport(input.report || {});
+  const version = String(input.bridge_version || "").slice(0, 20);
+  const ready = Boolean(report.orders.ready);
+  const status = previous.status === "live"
+    ? "live"
+    : previous.status === "paused" && !previous.active
+      ? "paused"
+    : previous.active
+      ? (previous.lastOrder ? "test_received" : "waiting_test")
+      : ready ? "detected" : "needs_mapping";
+  const lastSeenMs = Date.parse(previous.lastSeenAt || "");
+  const unchanged = status === previous.status && version === String(previous.bridgeVersion || "") &&
+    JSON.stringify(report) === JSON.stringify(previous.report || null);
+  const shouldPersist = !unchanged || !Number.isFinite(lastSeenMs) || Date.now() - lastSeenMs >= 5 * 60 * 1000;
+  let current = previous;
+  if (shouldPersist) {
+    const persisted = await withDbLock(async () => {
+      const loaded = await readDatabase();
+      if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+      const tenant = (loaded.data.tenants || []).find((item) => item.id === tenantId);
+      if (!tenant?.tracking?.laravelSelfService) return { ok: false, status: 409, errors: ["Start Laravel self-service first."] };
+      const now = new Date().toISOString();
+      const freshState = tenant.tracking.laravelSelfService;
+      const freshStatus = freshState.status === "live"
+        ? "live"
+        : freshState.status === "paused" && !freshState.active
+          ? "paused"
+        : freshState.active
+          ? (freshState.lastOrder ? "test_received" : "waiting_test")
+          : ready ? "detected" : "needs_mapping";
+      tenant.tracking.laravelSelfService = {
+        ...freshState,
+        status: freshStatus,
+        report,
+        bridgeVersion: version,
+        lastSeenAt: now,
+        updatedAt: now
+      };
+      await writeDatabase(loaded.data);
+      return { ok: true, state: tenant.tracking.laravelSelfService };
+    });
+    if (!persisted.ok) return persisted;
+    current = persisted.state;
+  }
+  return {
+    ok: true,
+    active: Boolean(current.active),
+    status: current.status || status,
+    mapping: sanitizeLaravelBridgeMapping(current.mapping || {}),
+    heartbeatInterval: 300
+  };
+}
+
+async function saveLaravelSelfServiceMapping(input, session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  if (!cpanelBridgeAvailableFor(session.tenantId)) return { ok: false, status: 404, errors: ["Laravel self-service is not enabled for this account."] };
+  const mapping = sanitizeLaravelBridgeMapping(input || {});
+  if (!mapping.orders_table) return { ok: false, status: 400, errors: ["Choose the Laravel orders table."] };
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+    const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
+    const setup = tenant?.tracking?.laravelSelfService;
+    if (!tenant || !setup) return { ok: false, status: 409, errors: ["Start Laravel self-service first."] };
+    if (setup.active || setup.status === "live") return { ok: false, status: 409, errors: ["Mapping cannot be changed while Laravel tracking is active."] };
+    const report = setup.report || {};
+    if (!(report.tables || []).includes(mapping.orders_table)) {
+      return { ok: false, status: 400, errors: ["Choose an orders table reported by your connected Laravel Bridge."] };
+    }
+    if (mapping.items_table && !(report.tables || []).includes(mapping.items_table)) {
+      return { ok: false, status: 400, errors: ["Choose an items table reported by your connected Laravel Bridge."] };
+    }
+    const validateReportedColumns = (values, selectedTable, reportedSection, label) => {
+      const selected = Object.values(values || {});
+      if (!selected.length) return "";
+      if (reportedSection?.table !== selectedTable) return `Save the ${label} table first, wait for the next Cron check, then select its fields.`;
+      const allowed = new Set(reportedSection.columns || []);
+      return selected.find((value) => !allowed.has(value)) ? `Choose ${label} fields reported by your connected Laravel Bridge.` : "";
+    };
+    const columnError = validateReportedColumns(mapping.columns, mapping.orders_table, report.orders, "order");
+    const itemColumnError = mapping.items_table
+      ? validateReportedColumns(mapping.item_columns, mapping.items_table, report.items, "item")
+      : "";
+    if (columnError || itemColumnError) return { ok: false, status: 400, errors: [columnError || itemColumnError] };
+    const now = new Date().toISOString();
+    tenant.tracking = {
+      ...(tenant.tracking || {}),
+      laravelSelfService: {
+        ...setup,
+        mapping,
+        active: false,
+        status: "mapping_pending",
+        updatedAt: now
+      }
+    };
+    await writeDatabase(loaded.data);
+    return { ok: true, setup: publicLaravelSelfService(tenant.tracking.laravelSelfService) };
+  });
+}
+
+async function activateLaravelSelfService(session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  if (!cpanelBridgeAvailableFor(session.tenantId)) return { ok: false, status: 404, errors: ["Laravel self-service is not enabled for this account."] };
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+    const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
+    const setup = tenant?.tracking?.laravelSelfService;
+    if (!tenant || !setup) return { ok: false, status: 409, errors: ["Start Laravel self-service first."] };
+    const lastSeen = Date.parse(setup.lastSeenAt || "");
+    if (!Number.isFinite(lastSeen) || Date.now() - lastSeen > 10 * 60 * 1000) {
+      return { ok: false, status: 409, errors: ["The cPanel Bridge is not connected. Check the Cron Job and try again."] };
+    }
+    if (!setup.report?.orders?.ready) {
+      return { ok: false, status: 409, errors: ["Required order fields have not been detected yet. Complete the advanced mapping first."] };
+    }
+    const now = new Date().toISOString();
+    tenant.tracking = {
+      ...(tenant.tracking || {}),
+      laravelSelfService: {
+        ...setup,
+        active: true,
+        status: "waiting_test",
+        activatedAt: now,
+        lastOrder: null,
+        verification: null,
+        updatedAt: now
+      }
+    };
+    await writeDatabase(loaded.data);
+    return { ok: true, setup: publicLaravelSelfService(tenant.tracking.laravelSelfService) };
+  });
+}
+
+async function deactivateLaravelSelfService(session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+    const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
+    const setup = tenant?.tracking?.laravelSelfService;
+    if (!tenant || !setup) return { ok: false, status: 409, errors: ["Laravel self-service has not been started."] };
+    const now = new Date().toISOString();
+    tenant.tracking.laravelSelfService = { ...setup, active: false, status: "paused", updatedAt: now };
+    await writeDatabase(loaded.data);
+    return { ok: true, setup: publicLaravelSelfService(tenant.tracking.laravelSelfService) };
+  });
+}
+
+async function verifyLaravelSelfService(session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  if (!cpanelBridgeAvailableFor(session.tenantId)) return { ok: false, status: 404, errors: ["Laravel self-service is not enabled for this account."] };
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+  const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
+  const setup = tenant?.tracking?.laravelSelfService;
+  if (!tenant || !setup?.active) return { ok: false, status: 409, errors: ["Activate the cPanel Bridge before testing an order."] };
+  const activatedAt = Date.parse(setup.activatedAt || "");
+  const receivedAt = Date.parse(setup.lastOrder?.receivedAt || "");
+  if (!setup.lastOrder || !Number.isFinite(receivedAt) || receivedAt < activatedAt) {
+    return { ok: false, status: 409, errors: ["No new paid test order has reached Tagioo yet. Place one order after activation and try again."] };
+  }
+  const trackingResult = await verifyTenantTracking(tenant);
+  const bridgeOk = true;
+  const containerOk = Boolean(trackingResult.checks?.container?.ok);
+  const now = new Date().toISOString();
+  const verification = {
+    ok: bridgeOk && containerOk,
+    at: now,
+    checks: {
+      bridge: { ok: true, detail: `Order ${setup.lastOrder.id} reached Tagioo with value ${setup.lastOrder.amount} ${setup.lastOrder.currency}.` },
+      ...trackingResult.checks
+    }
+  };
+  await withDbLock(async () => {
+    const fresh = await readDatabase();
+    if (!fresh.available) return;
+    const freshTenant = (fresh.data.tenants || []).find((item) => item.id === session.tenantId);
+    if (!freshTenant?.tracking?.laravelSelfService) return;
+    freshTenant.tracking.laravelSelfService = {
+      ...freshTenant.tracking.laravelSelfService,
+      status: verification.ok ? "live" : "verification_failed",
+      liveAt: verification.ok ? now : freshTenant.tracking.laravelSelfService.liveAt || "",
+      verification,
+      updatedAt: now
+    };
+    freshTenant.tracking.lastVerify = trackingResult;
+    await writeDatabase(fresh.data);
+  });
+  return { ok: true, verified: verification.ok, verification };
+}
+
 function tenantWebhookSecret(data, tenantId) {
   if (!tenantId) return "";
   return (data.tenants || []).find((tenant) => tenant.id === tenantId)?.webhookSecret || "";
+}
+
+function tenantLaravelBridgeSecret(data, tenantId) {
+  if (!tenantId) return "";
+  return (data.tenants || []).find((tenant) => tenant.id === tenantId)?.laravelBridgeSecret || "";
+}
+
+async function ensureCustomerLaravelBridgeSecret(session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+    const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
+    if (!tenant) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+    if (!tenant.laravelBridgeSecret) {
+      tenant.laravelBridgeSecret = randomBytes(24).toString("hex");
+      tenant.laravelBridgeSecretUpdatedAt = new Date().toISOString();
+      await writeDatabase(loaded.data);
+    }
+    return { ok: true, secret: tenant.laravelBridgeSecret };
+  });
+}
+
+function phpSingleQuoted(value) {
+  return `'${String(value ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+}
+
+function buildCpanelBridgeConfig({ endpoint, heartbeatEndpoint, tenantId, webhookSecret, storeUrl, currency }) {
+  return `<?php
+
+return [
+    'enabled' => true,
+    'endpoint' => ${phpSingleQuoted(endpoint)},
+    'heartbeat_endpoint' => ${phpSingleQuoted(heartbeatEndpoint)},
+    'tenant' => ${phpSingleQuoted(tenantId)},
+    'secret' => ${phpSingleQuoted(webhookSecret)},
+    'store_url' => ${phpSingleQuoted(storeUrl)},
+    'laravel_root' => '',
+    'orders_table' => 'orders',
+    'items_table' => '',
+    'currency' => ${phpSingleQuoted(currency || "BDT")},
+    'paid_statuses' => ['processing', 'completed', 'paid', 'success', 'confirmed', 'delivered'],
+    'assume_new_orders_paid' => false,
+    'batch_size' => 25,
+    'timeout' => 5,
+    'columns' => [],
+    'item_columns' => [],
+];
+`;
+}
+
+function cpanelBridgeAvailableFor(tenantId) {
+  if (!config.cpanelBridgeEnabled || !tenantId) return false;
+  return config.cpanelBridgeTenants.includes("*") || config.cpanelBridgeTenants.includes(String(tenantId));
 }
 
 async function markCustomerAccountLogin(id) {
@@ -9060,6 +9631,7 @@ function publicRuntimeConfig() {
     monthlyRequestLimit: config.monthlyRequestLimit,
     monthlyContainerLimit: config.monthlyContainerLimit,
     customerSupportEmail: config.customerSupportEmail,
+    cpanelBridgeEnabled: config.cpanelBridgeEnabled,
     host: config.host,
     port: config.port,
     accessLog: config.accessLog,
@@ -9253,6 +9825,7 @@ function publicCustomerConfig(data) {
     monthlyRequestLimit: data.config.monthlyRequestLimit,
     monthlyContainerLimit: data.config.monthlyContainerLimit,
     customerSupportEmail: data.config.customerSupportEmail,
+    cpanelBridgeEnabled: data.config.cpanelBridgeEnabled,
     provisionDnsTarget: data.config.provisionDnsTarget,
     trackingPaths: data.config.trackingPaths,
     trackingHosts: data.config.trackingHosts,
@@ -9747,7 +10320,7 @@ async function customerDashboardData(data, session) {
         available: data.customers.available,
         active: tenant.subscriptionStatus === "active" ? 1 : 0,
         queued: 0,
-        tenants: [{ ...tenant, tracking: publicTenantTracking(tenant) }]
+        tenants: [publicTenantForCustomer(tenant)]
       }
       : { available: data.customers.available, active: 0, queued: 0, tenants: [] },
     provisioning: { available: true, path: "", requests: [] },
@@ -9782,7 +10355,7 @@ async function customerDashboardData(data, session) {
     usage: tenantUsage,
     reconciliation: tenantReconciliation,
     integrations: getIntegrationSummary({ orders: tenantOrders, requestSummary: todayEventsSummary }),
-    config: publicCustomerConfig(data)
+    config: { ...publicCustomerConfig(data), cpanelBridgeEnabled: cpanelBridgeAvailableFor(session.tenantId) }
   };
 }
 
@@ -10552,6 +11125,88 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Laravel Bridge purchase endpoint. The Bridge writes to a local outbox and
+    // sends after the checkout response; this endpoint verifies its per-tenant
+    // HMAC and then reuses the same deduplicated recovery path as WooCommerce.
+    if (pathname === "/api/orders/laravel" && req.method === "POST") {
+      let rawBody;
+      try {
+        rawBody = await readRawBody(req, 250000);
+      } catch (error) {
+        jsonResponse(res, 413, { error: error.message });
+        return;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        jsonResponse(res, 400, { error: "Invalid JSON payload." });
+        return;
+      }
+      const tenantId = sanitizeId(payload.tenant_id || payload.tenantId || "");
+      const loadedForSecret = await readDatabaseCached();
+      const snapshotTenant = loadedForSecret.available ? (loadedForSecret.data.tenants || []).find((item) => item.id === tenantId) : null;
+      const secret = snapshotTenant?.laravelBridgeSecret || "";
+      if (!tenantId || !secret || !isLaravelBridgeAuthorized(req, rawBody, secret)) {
+        jsonResponse(res, 401, { error: "Invalid Laravel Bridge signature." });
+        return;
+      }
+      if (String(payload.event_name || "purchase") !== "purchase") {
+        jsonResponse(res, 400, { error: "This Bridge version accepts purchase events only." });
+        return;
+      }
+      if (payload.source === "tagioo-cpanel-bridge" && !snapshotTenant?.tracking?.laravelSelfService?.active) {
+        jsonResponse(res, 409, { error: "Activate Laravel tracking from the Tagioo dashboard before sending orders." });
+        return;
+      }
+      const result = await addOrderWebhook({
+        ...payload,
+        tenant_id: tenantId,
+        order_id: payload.order_id || payload.event_id,
+        source: payload.source === "tagioo-cpanel-bridge" ? "tagioo-cpanel-bridge" : "tagioo-laravel-bridge"
+      });
+      jsonResponse(res, result.ok ? (result.created ? 202 : 200) : 400, result.ok
+        ? { accepted: true, created: result.created, order_id: result.order.id }
+        : { errors: result.errors });
+      return;
+    }
+
+    // Self-service bridge control channel. It carries schema names and runtime
+    // health only—never order rows—and uses the same isolated Laravel HMAC key.
+    if (pathname === "/api/laravel/bridge/heartbeat" && req.method === "POST") {
+      let rawBody;
+      try {
+        rawBody = await readRawBody(req, 100000);
+      } catch (error) {
+        jsonResponse(res, 413, { error: error.message });
+        return;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        jsonResponse(res, 400, { error: "Invalid JSON payload." });
+        return;
+      }
+      const tenantId = sanitizeId(payload.tenant_id || payload.tenantId || "");
+      if (!cpanelBridgeAvailableFor(tenantId)) {
+        jsonResponse(res, 404, { error: "Laravel self-service is not enabled for this tenant." });
+        return;
+      }
+      const loadedForSecret = await readDatabaseCached();
+      const snapshotTenant = loadedForSecret.available ? (loadedForSecret.data.tenants || []).find((item) => item.id === tenantId) : null;
+      const secret = snapshotTenant?.laravelBridgeSecret || "";
+      if (!tenantId || !secret || !isLaravelBridgeAuthorized(req, rawBody, secret)) {
+        jsonResponse(res, 401, { error: "Invalid Laravel Bridge signature." });
+        return;
+      }
+      const result = await recordLaravelBridgeHeartbeat(payload, tenantId, snapshotTenant);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
+        ? { accepted: true, active: result.active, status: result.status, mapping: result.mapping, heartbeat_interval: result.heartbeatInterval }
+        : { errors: result.errors });
+      return;
+    }
+
     // Worker VPS agents ship raw tracking log lines here. Authenticated by HMAC
     // signature over the raw body (shared WORKER_INGEST_SECRET), not by session,
     // so this route must stay above the session auth gate below.
@@ -10772,6 +11427,93 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === "/api/customer/laravel-managed-setup" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await requestLaravelManagedSetup(body, session);
+      if (result.ok) invalidateOwnerDashboardCache();
+      jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok
+        ? { setup: result.setup }
+        : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/laravel-self-service" && req.method === "GET") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const tenant = await tenantForSession(session);
+      jsonResponse(res, 200, {
+        available: cpanelBridgeAvailableFor(session.tenantId),
+        setup: publicLaravelSelfService(tenant?.tracking?.laravelSelfService || {})
+      });
+      return;
+    }
+
+    if (pathname === "/api/customer/laravel-self-service/start" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const result = await startLaravelSelfService(await readJson(req), session);
+      if (result.ok) invalidateOwnerDashboardCache();
+      jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok ? { setup: result.setup } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/laravel-self-service/mapping" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const result = await saveLaravelSelfServiceMapping(await readJson(req), session);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { setup: result.setup } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/laravel-self-service/activate" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const result = await activateLaravelSelfService(session);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { setup: result.setup } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/laravel-self-service/deactivate" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const result = await deactivateLaravelSelfService(session);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { setup: result.setup } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/laravel-self-service/verify" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const result = await verifyLaravelSelfService(session);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
+        ? { verified: result.verified, verification: result.verification }
+        : { errors: result.errors });
+      return;
+    }
+
     if (pathname === "/api/customer/setup-assistant/templates" && req.method === "POST") {
       const session = getSession(req);
       if (!session || session.role !== "customer") {
@@ -10805,6 +11547,124 @@ const server = createServer(async (req, res) => {
         res.end(zip);
       } catch {
         jsonResponse(res, 500, { error: "Plugin file not found on server." });
+      }
+      return;
+    }
+
+    if (pathname === "/api/customer/setup-assistant/laravel-bridge" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const ensured = await ensureCustomerLaravelBridgeSecret(session);
+      if (!ensured.ok) {
+        jsonResponse(res, ensured.status || 500, { errors: ensured.errors });
+        return;
+      }
+      const webhookSecret = ensured.secret;
+      const forwardedProto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+      const forwardedHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+      const panelBaseUrl = String(config.publicBaseUrl || config.appUrl || `${forwardedProto}://${forwardedHost}`).replace(/\/$/, "");
+      const endpoint = `${panelBaseUrl}/api/orders/laravel`;
+      jsonResponse(res, 200, {
+        endpoint,
+        tenantId: session.tenantId,
+        webhookSecret,
+        composerCommand: "composer require tagioo/laravel",
+        migrateCommand: "php artisan migrate",
+        doctorCommand: "php artisan tagioo:doctor",
+        env: [
+          "TAGIOO_ENABLED=true",
+          `TAGIOO_ENDPOINT=${endpoint}`,
+          `TAGIOO_TENANT=${session.tenantId}`,
+          `TAGIOO_SECRET=${webhookSecret}`
+        ].join("\n")
+      });
+      return;
+    }
+
+    if (pathname === "/api/customer/setup-assistant/laravel-bridge.zip" && req.method === "GET") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      try {
+        const packageDir = join(rootDir, "packages", "tagioo-laravel");
+        const entries = (await filesForZip(packageDir)).map((entry) => ({
+          ...entry,
+          name: `tagioo-laravel/${entry.name}`
+        }));
+        const zip = buildZip(entries);
+        res.writeHead(200, {
+          "Content-Type": "application/zip",
+          "Content-Disposition": "attachment; filename=\"tagioo-laravel-bridge.zip\"",
+          "Content-Length": String(zip.length),
+          "Cache-Control": "no-store"
+        });
+        res.end(zip);
+      } catch (error) {
+        jsonResponse(res, 500, { error: `Laravel Bridge package could not be prepared: ${error.message}` });
+      }
+      return;
+    }
+
+    if (pathname === "/api/customer/setup-assistant/cpanel-bridge.zip" && req.method === "GET") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      // Deliberately invisible until enabled for a controlled staging/pilot
+      // tenant. Existing production customers and tracking paths are unchanged.
+      if (!cpanelBridgeAvailableFor(session.tenantId)) {
+          jsonResponse(res, 404, { error: "The cPanel Bridge is not enabled for this account." });
+        return;
+      }
+      try {
+        const loaded = await readDatabase();
+        if (!loaded.available) throw new Error(loaded.detail || loaded.message || "Database unavailable.");
+        const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
+        const setup = tenant?.tracking?.laravelSelfService || tenant?.tracking?.laravelManagedSetup;
+        const webhookSecret = tenant?.laravelBridgeSecret || "";
+        if (!tenant || !setup?.storeUrl || !webhookSecret) {
+          jsonResponse(res, 409, { error: "Create your Laravel installation package before downloading the bridge." });
+          return;
+        }
+        const forwardedProto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+        const forwardedHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").split(",")[0].trim();
+        const panelBaseUrl = String(config.publicBaseUrl || config.appUrl || `${forwardedProto}://${forwardedHost}`).replace(/\/$/, "");
+        if (!panelBaseUrl.startsWith("https://")) {
+          jsonResponse(res, 503, { error: "The cPanel Bridge requires an HTTPS PUBLIC_BASE_URL on the Tagioo panel." });
+          return;
+        }
+        const sourceDir = join(rootDir, "packages", "tagioo-cpanel-bridge");
+        const sourceEntries = (await filesForZip(sourceDir))
+          .filter((entry) => entry.name !== "config.example.php")
+          .map((entry) => ({ ...entry, name: `tagioo-bridge/${entry.name}` }));
+        sourceEntries.push({
+          name: "tagioo-bridge/config.php",
+          content: buildCpanelBridgeConfig({
+            endpoint: `${panelBaseUrl}/api/orders/laravel`,
+            heartbeatEndpoint: `${panelBaseUrl}/api/laravel/bridge/heartbeat`,
+            tenantId: tenant.id,
+            webhookSecret,
+            storeUrl: setup.storeUrl,
+            currency: setup.currency || "BDT"
+          })
+        });
+        const zip = buildZip(sourceEntries);
+        res.writeHead(200, {
+          "Content-Type": "application/zip",
+          "Content-Disposition": "attachment; filename=\"tagioo-cpanel-bridge.zip\"",
+          "Content-Length": String(zip.length),
+          "Cache-Control": "no-store, private",
+          "X-Content-Type-Options": "nosniff"
+        });
+        res.end(zip);
+      } catch (error) {
+        jsonResponse(res, 500, { error: `cPanel Bridge package could not be prepared: ${error.message}` });
       }
       return;
     }

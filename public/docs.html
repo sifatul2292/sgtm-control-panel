@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="description" content="Tagioo documentation — WooCommerce plugin setup, GTM Setup Assistant, first-party domain & SSL, offline conversions upload, purchase gap alert thresholds, and troubleshooting." />
+    <meta name="description" content="Tagioo documentation — self-service Laravel and WooCommerce setup, GTM Setup Assistant, first-party domain & SSL, offline conversions, and troubleshooting." />
     <meta property="og:title" content="Docs — Tagioo" />
     <meta property="og:description" content="Reference documentation for the Tagioo server-side GTM platform." />
     <title>Docs — Tagioo</title>
@@ -69,6 +69,7 @@
         <nav class="docs-sidebar" aria-label="Documentation sections">
           <a href="#getting-started">Getting Started</a>
           <a href="#woocommerce">WooCommerce Plugin</a>
+          <a href="#laravel">Laravel Stores</a>
           <a href="#setup-assistant">GTM Setup Assistant</a>
           <a href="#domain-ssl">Domain &amp; SSL</a>
           <a href="#offline-conversions">Offline Conversions</a>
@@ -89,7 +90,7 @@
               <li>Point a subdomain at Tagioo via one CNAME record</li>
               <li>Create a container in your Tagioo dashboard</li>
               <li>Generate and import Web + Server GTM templates via Setup Assistant</li>
-              <li>Connect your store (WooCommerce plugin, or manual dataLayer)</li>
+              <li>Connect your store (WooCommerce plugin or the self-service Laravel Bridge)</li>
               <li>Test in Meta Events Manager and confirm events in your dashboard</li>
             </ul>
             <p>See the <a href="/how-it-works">full step-by-step walkthrough</a> for screenshots and detail on each step.</p>
@@ -107,6 +108,21 @@
               <li><code>purchase</code> — completed order, with transaction ID, value, and items</li>
               <li>Hashed <code>user_data</code> (email, phone) on purchase for Meta CAPI match quality, where available</li>
             </ul>
+          </section>
+
+          <section id="laravel" class="docs-section">
+            <h2>Laravel Stores — no coding required</h2>
+            <p>Laravel stores use the generated GTM templates for browser events and a private cPanel Bridge for reliable backend Purchase tracking. The complete flow is self-service and does not require Composer, a terminal, Laravel code changes, VPS access, or sharing a hosting password.</p>
+            <ol>
+              <li>Add your <strong>Web GTM ID</strong> in the website's tracking settings. Never use the Server GTM ID there.</li>
+              <li>In Tagioo Setup Assistant, select <strong>Ecommerce → Laravel / Custom Ecommerce</strong>.</li>
+              <li>Generate and import <code>web.json</code> into Web GTM and <code>server.json</code> into Server GTM using <strong>Merge</strong>.</li>
+              <li>Enter the store URL, create the private Bridge ZIP, and extract it with cPanel File Manager outside <code>public_html</code>.</li>
+              <li>Add the supplied command under <strong>cPanel → Cron Jobs</strong>, wait for automatic detection, then click <strong>Activate tracking</strong>.</li>
+              <li>Complete one test order and click <strong>Verify test order</strong> before publishing GTM.</li>
+            </ol>
+            <p>The Bridge detects safe schema metadata—table and column names only. When a custom store cannot be identified automatically, the dashboard presents those detected names as dropdowns under <strong>Advanced mapping</strong>; it never asks for database credentials or raw order data.</p>
+            <p>The Bridge reads orders with database <code>SELECT</code> queries only, skips existing orders on first activation, retries temporary network failures, and deduplicates by store and order ID. If cPanel does not show Cron Jobs, the hosting company can add the supplied command; root or VPS access is not required.</p>
           </section>
 
           <section id="setup-assistant" class="docs-section">

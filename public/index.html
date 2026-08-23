@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=44" />
+    <link rel="stylesheet" href="/styles.css?v=48" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -982,38 +982,103 @@
                   <div class="assistant-laravel-settings" data-laravel-settings hidden>
                     <div class="assistant-laravel-intro">
                       <div>
-                        <span class="badge">No-code beta</span>
-                        <h3>Laravel storefront detection</h3>
-                        <p>Tagioo will add a browser tracker to web.json. It reads structured product data, watches cart and checkout actions, and only sends Purchase when it can find a real order ID and total.</p>
+                        <span class="badge">No coding required</span>
+                        <h3>Self-service Laravel tracking</h3>
+                        <p>Install one private cPanel package, let Tagioo detect the store automatically, then confirm one test order.</p>
                       </div>
                     </div>
-                    <div class="assistant-form-grid assistant-form-grid--nested">
-                      <label>
-                        Product page pattern <span class="label-optional">optional</span>
-                        <input name="laravelProductPattern" placeholder="/products/*" />
-                      </label>
-                      <label>
-                        Checkout page pattern <span class="label-optional">optional</span>
-                        <input name="laravelCheckoutPattern" placeholder="/checkout*" />
-                      </label>
-                      <label>
-                        Order-success pattern
-                        <input name="laravelPurchasePattern" placeholder="/orders/*/success" />
-                      </label>
-                      <label>
-                        Add-to-cart button selector <span class="label-optional">optional</span>
-                        <input name="laravelAddToCartSelector" placeholder="[data-add-to-cart]" />
-                      </label>
-                      <label>
-                        Order ID selector <span class="label-optional">recommended</span>
-                        <input name="laravelOrderIdSelector" placeholder="[data-order-id]" />
-                      </label>
-                      <label>
-                        Order total selector <span class="label-optional">recommended</span>
-                        <input name="laravelOrderTotalSelector" placeholder="[data-order-total]" />
-                      </label>
+                    <div class="laravel-setup-options">
+                      <article class="laravel-setup-option">
+                        <span class="laravel-option-kicker">Included automatically</span>
+                        <h4>Quick browser setup</h4>
+                        <p>Your generated Web GTM template tracks visits and the shopping funnel. No website code or selectors are required from you.</p>
+                        <span class="laravel-option-status">Ready when you import web.json</span>
+                      </article>
+                      <article id="laravelSelfServiceStart" class="laravel-setup-option laravel-setup-option--recommended" hidden>
+                        <span class="laravel-option-kicker">Reliable backend Purchase</span>
+                        <h4>Create your installation package</h4>
+                        <p>The package is already connected to your Tagioo account. No secret, PHP code, Composer or database details are required.</p>
+                        <label>
+                          Store website
+                          <input id="laravelManagedStoreUrl" type="url" placeholder="https://yourstore.com" />
+                        </label>
+                        <button id="startLaravelSelfService" class="button button-primary" type="button">Create my package</button>
+                        <p id="laravelManagedSetupMessage" class="form-message"></p>
+                      </article>
                     </div>
-                    <p class="assistant-laravel-note">Patterns match the URL path and support <code>*</code>. Leave optional fields blank to use automatic JSON-LD and page detection. You must run one test order before relying on Purchase.</p>
+                    <div id="laravelSelfServiceWizard" class="laravel-self-wizard" hidden>
+                      <div class="laravel-self-progress" aria-label="Laravel setup progress">
+                        <span data-laravel-progress="install"><b>1</b> Install</span>
+                        <span data-laravel-progress="connect"><b>2</b> Connect</span>
+                        <span data-laravel-progress="test"><b>3</b> Test order</span>
+                      </div>
+
+                      <section class="laravel-self-stage" data-laravel-stage="install">
+                        <div>
+                          <span class="laravel-option-kicker">Step 1</span>
+                          <h4>Install with cPanel</h4>
+                          <ol>
+                            <li>Download your private ZIP.</li>
+                            <li>In cPanel File Manager, upload and extract it one level above <code>public_html</code>.</li>
+                            <li>Open cPanel → Cron Jobs and add the once-per-minute command from <code>README.txt</code>.</li>
+                          </ol>
+                        </div>
+                        <button id="downloadCpanelBridge" class="button button-primary" type="button">Download private ZIP</button>
+                      </section>
+
+                      <section class="laravel-self-stage" data-laravel-stage="connect">
+                        <div class="laravel-self-stage-header">
+                          <div>
+                            <span class="laravel-option-kicker">Step 2</span>
+                            <h4>Automatic store detection</h4>
+                            <p id="laravelConnectionDetail">Waiting for the first Cron run…</p>
+                          </div>
+                          <span id="laravelConnectionBadge" class="badge">Not connected</span>
+                        </div>
+                        <div id="laravelDetectedSchema" class="laravel-detected-schema" hidden></div>
+                        <div class="laravel-self-actions">
+                          <button id="checkLaravelConnection" class="button" type="button">Check connection</button>
+                          <button id="activateLaravelTracking" class="button button-primary" type="button" hidden>Activate tracking</button>
+                        </div>
+
+                        <details id="laravelAdvancedMapping" class="laravel-advanced-mapping" hidden>
+                          <summary>Advanced mapping</summary>
+                          <p>Use this only when automatic detection asks for it. Choose names from your Laravel database—no code is required.</p>
+                          <div class="laravel-mapping-grid">
+                            <label>Orders table<select id="laravelMapOrdersTable"></select></label>
+                            <label>Order ID<select id="laravelMapOrderId"></select></label>
+                            <label>Order total<select id="laravelMapTotal"></select></label>
+                            <label>Order status<select id="laravelMapStatus"></select></label>
+                            <label>Created time<select id="laravelMapCreated"></select></label>
+                            <label>Updated time<select id="laravelMapUpdated"></select></label>
+                            <label>Items table<select id="laravelMapItemsTable"></select></label>
+                            <label>Item order reference<select id="laravelMapItemOrderId"></select></label>
+                            <label>Product ID<select id="laravelMapItemId"></select></label>
+                            <label>Product name<select id="laravelMapItemName"></select></label>
+                            <label>Item price<select id="laravelMapItemPrice"></select></label>
+                            <label>Quantity<select id="laravelMapItemQuantity"></select></label>
+                            <label class="laravel-mapping-wide">Paid statuses<input id="laravelMapPaidStatuses" value="processing, completed, paid, success, confirmed, delivered" /></label>
+                          </div>
+                          <button id="saveLaravelMapping" class="button" type="button">Save mapping and detect again</button>
+                        </details>
+                      </section>
+
+                      <section class="laravel-self-stage" data-laravel-stage="test">
+                        <div>
+                          <span class="laravel-option-kicker">Step 3</span>
+                          <h4>Complete one test order</h4>
+                          <p id="laravelTestDetail">Activate tracking first. Then place one new paid order and return here.</p>
+                          <div id="laravelLastOrder" class="laravel-last-order" hidden></div>
+                        </div>
+                        <div class="laravel-self-actions">
+                          <button id="verifyLaravelTestOrder" class="button button-primary" type="button" hidden>Verify test order</button>
+                          <button id="pauseLaravelTracking" class="button" type="button" hidden>Pause tracking</button>
+                        </div>
+                      </section>
+                      <p id="cpanelBridgeMessage" class="form-message"></p>
+                    </div>
+                    <p id="laravelSelfServiceUnavailable" class="assistant-laravel-note">Reliable backend setup is currently in a limited pilot. Quick browser tracking remains available through web.json.</p>
+                    <p class="assistant-laravel-note">The bridge performs read-only order queries and remains inactive until you approve the detected configuration.</p>
                   </div>
                 </div>
 
@@ -2521,6 +2586,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=65" type="module"></script>
+    <script src="/app.js?v=70" type="module"></script>
   </body>
 </html>
