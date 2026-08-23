@@ -1920,11 +1920,62 @@ thead .col-tagioo { color: var(--accent) !important; }
 .docs-section { padding-bottom: 40px; margin-bottom: 40px; border-bottom: 1px solid var(--border); scroll-margin-top: 100px; }
 .docs-section:last-child { border-bottom: none; }
 .docs-section h2 { font-size: 1.4rem; margin-bottom: 14px; }
+.docs-section h3 { font-size: 1.08rem; margin: 30px 0 10px; }
 .docs-section p, .docs-section li { color: var(--text-2); font-size: 0.92rem; line-height: 1.75; margin-bottom: 12px; }
-.docs-section ul { padding-left: 22px; }
+.docs-section ul, .docs-section ol { padding-left: 22px; }
 .docs-section ul li { list-style: disc; }
+.docs-section ol li { list-style: decimal; padding-left: 2px; }
 .docs-section a { color: var(--accent); }
 .docs-section a:hover { text-decoration: underline; }
+.docs-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px;
+  margin: 18px 0 26px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--bg-2);
+}
+.docs-flow span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.docs-flow span:not(:last-child)::after { content: "→"; color: var(--muted); }
+.docs-callout {
+  padding: 14px 16px;
+  margin: 14px 0 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg));
+}
+.docs-callout p:last-child { margin-bottom: 0; }
+.docs-figure {
+  margin: 18px 0 28px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  background: var(--bg);
+  box-shadow: 0 12px 30px rgba(22, 18, 31, 0.08);
+}
+.docs-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fff;
+}
+.docs-figure figcaption {
+  padding: 12px 14px;
+  color: var(--text-2);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  border-top: 1px solid var(--border);
+}
 .docs-code {
   background: #16121f;
   color: #e8e0ff;

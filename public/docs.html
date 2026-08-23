@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/landing.css" />
+    <link rel="stylesheet" href="/landing.css?v=3" />
       <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -112,69 +112,148 @@
 
           <section id="laravel" class="docs-section">
             <h2>Laravel Setup</h2>
-            <p>Laravel stores use Tagioo's generated GTM templates for browser events and a private cPanel Bridge for reliable backend Purchase tracking. The standard installation needs no Composer, terminal, Laravel code changes, VPS access, or hosting-password sharing.</p>
+            <p>This is the complete self-service order for connecting a Laravel ecommerce store. The private cPanel Bridge is connected and mapped first; the GTM files are generated only after Tagioo understands the store's orders.</p>
 
-            <h3>Before you start</h3>
-            <ul>
-              <li>A live Tagioo container and first-party tracking domain</li>
-              <li>Your store URL and Web GTM container ID, such as <code>GTM-XXXXXXX</code></li>
-              <li>cPanel access with <strong>File Manager</strong> and <strong>Cron Jobs</strong></li>
-              <li>PHP 8.1 or newer on the Cron command line</li>
-            </ul>
-            <p>Add only the <strong>Web GTM ID</strong> to the Laravel website. The Server GTM container runs through Tagioo and is never pasted into the website.</p>
+            <div class="docs-flow" aria-label="Laravel setup sequence">
+              <span>Create containers</span><span>Create Bridge</span><span>Upload ZIP</span><span>Add Cron</span><span>Check connection</span><span>Map fields</span><span>Generate GTM files</span><span>Test</span>
+            </div>
 
-            <h3>1. Generate and import the GTM templates</h3>
+            <div class="docs-callout">
+              <p><strong>Before starting:</strong> create one Web container and one Server container in Google Tag Manager, create the Tagioo container and tracking domain, and make sure the customer can access cPanel File Manager and Cron Jobs. Add only the <strong>Web GTM ID</strong> to the Laravel website.</p>
+            </div>
+
+            <h3>Step 1 — Select Laravel and create the private Bridge package</h3>
             <ol>
-              <li>Open <strong>Setup Assistant</strong> and select <strong>Ecommerce → Laravel / Custom Ecommerce</strong>.</li>
-              <li>Confirm the currency, tracking domain, and only the destinations you actually use. Add the required IDs, tokens, and test codes for those destinations.</li>
-              <li>Generate the Web and Server container files.</li>
-              <li>Import <code>tagioo-web-template.json</code> into Web GTM and <code>tagioo-server-template.json</code> into Server GTM.</li>
-              <li>For a first import, choose <strong>Merge</strong>. When replacing an older Tagioo setup, choose <strong>Merge → Overwrite conflicting tags, triggers, and variables</strong>.</li>
-              <li>Keep both containers in Preview mode until the complete test below passes.</li>
+              <li>Open <strong>Tagioo → Setup Assistant</strong>.</li>
+              <li>Select <strong>Ecommerce</strong> and <strong>Laravel / Custom Ecommerce</strong>.</li>
+              <li>Enter the store's public URL, including <code>https://</code>, and confirm its default currency.</li>
+              <li>Continue to the Laravel Bridge area and click <strong>Download private ZIP</strong>.</li>
             </ol>
-            <p>The Web template tracks browser activity such as PageView, ViewContent, AddToCart, and InitiateCheckout. The Bridge supplies the authoritative backend Purchase, including orders missed by browser blockers, redirects, or a closed confirmation page.</p>
+            <p>The ZIP is unique to this store and tenant. Do not reuse it for another customer and do not share <code>config.php</code> or its private secret.</p>
 
-            <h3>2. Install the private cPanel Bridge</h3>
+            <h3>Step 2 — Upload and extract the Bridge in the cPanel home directory</h3>
             <ol>
-              <li>Enter the public store URL in the Laravel setup and download the private Bridge ZIP.</li>
-              <li>Open <strong>cPanel → File Manager</strong>, go to the account home directory one level above <code>public_html</code>, upload the ZIP, and extract it.</li>
-              <li>Confirm the resulting <code>tagioo-bridge</code> folder is outside <code>public_html</code>.</li>
-              <li>Open <code>README.txt</code> inside the package and copy its complete Cron command.</li>
-              <li>Open <strong>cPanel → Cron Jobs</strong>, select <strong>Once Per Minute</strong>, paste the complete command, and save it.</li>
+              <li>Open <strong>cPanel → File Manager</strong>.</li>
+              <li>Go to the account's home directory, which is one level above <code>public_html</code>.</li>
+              <li>Upload the private ZIP and click <strong>Extract</strong>.</li>
+              <li>Confirm that the result is <code>/home/CPANEL_USERNAME/tagioo-bridge/</code> and that it is outside <code>public_html</code>.</li>
+              <li>Open <code>tagioo-bridge/README.txt</code>. It contains the installation rules and the Cron command.</li>
             </ol>
-            <div class="docs-code">/usr/local/bin/php /home/CPANEL_USERNAME/tagioo-bridge/bridge.php run</div>
-            <p>Use the exact PHP path and cPanel username shown by the package or hosting account. If Cron Jobs is unavailable, ask the hosting company to schedule the supplied command once per minute. Root or VPS access is not required.</p>
+            <figure class="docs-figure">
+              <img src="/images/docs/laravel/package-readme.png" alt="Tagioo cPanel Bridge README showing the safe installation location and Cron command" loading="lazy" decoding="async" />
+              <figcaption>The downloaded README explains where the private folder belongs and provides the command format. Replace every placeholder with this customer's cPanel path.</figcaption>
+            </figure>
 
-            <h3>3. Confirm detection and mapping</h3>
-            <p>Wait up to two minutes, return to Tagioo, and click <strong>Check connection</strong>. The Bridge sends table and column names for detection—not database credentials, customer records, or passwords.</p>
-            <p>If the status is <strong>Needs mapping</strong>, open <strong>Advanced mapping</strong> and review the orders table, public Order ID, total, status, timestamps, items table, item reference, product ID/name, price, quantity, and valid order statuses.</p>
-            <ul>
-              <li>For <strong>Order ID</strong>, prefer the customer-facing invoice or order number, such as <code>invoice_id</code>, <code>invoice_number</code>, or <code>order_number</code>, instead of an internal database <code>id</code>.</li>
-              <li>For COD stores, include the status created for a valid placed order. It may be a word such as <code>pending</code> or a numeric value such as <code>1</code>.</li>
-              <li>Save the mapping and wait for the next Cron run. Tagioo will then show <strong>Ready</strong> or <strong>Active</strong>.</li>
-            </ul>
-            <p>Click <strong>Activate tracking</strong> only after the mapping is correct. Activation checkpoints existing orders, so the Bridge tracks new orders instead of importing the store's history.</p>
-
-            <h3>4. Complete and verify one test order</h3>
+            <h3>Step 3 — Add the once-per-minute Cron Job</h3>
             <ol>
-              <li>Start GTM Preview for both Web and Server containers.</li>
-              <li>Place one new order through the normal storefront after tracking is activated.</li>
-              <li>Make sure the order reaches one of the configured valid statuses.</li>
-              <li>Wait up to two minutes, then click <strong>Verify test order</strong> in Tagioo.</li>
-              <li>Confirm the public order ID, amount, currency, items, and selected destinations.</li>
-              <li>Publish both GTM containers only after the test passes.</li>
+              <li>Open <strong>cPanel → Cron Jobs</strong>.</li>
+              <li>Choose <strong>Once Per Minute</strong>. All five schedule fields should contain <code>*</code>.</li>
+              <li>Paste the complete command from <code>README.txt</code>.</li>
+              <li>Confirm the PHP executable, cPanel username, and Bridge path belong to this hosting account.</li>
+              <li>Click <strong>Add New Cron Job</strong>.</li>
+            </ol>
+            <div class="docs-code">/usr/local/bin/php /home/CPANEL_USERNAME/tagioo-bridge/bridge.php run &gt;&gt; /home/CPANEL_USERNAME/tagioo-bridge/cron.log 2&gt;&amp;1</div>
+            <p>Use the logging version during setup so any error is visible in <code>cron.log</code>. The log suffix does not make tracking work; it only records output. After the integration is Live, replace it with the production command below so the log does not grow forever.</p>
+            <div class="docs-code">/usr/local/bin/php /home/CPANEL_USERNAME/tagioo-bridge/bridge.php run &gt; /dev/null 2&gt;&amp;1</div>
+            <figure class="docs-figure">
+              <img src="/images/docs/laravel/cron-job.png" alt="cPanel Cron Jobs form configured to run the Tagioo Bridge once per minute" loading="lazy" decoding="async" />
+              <figcaption>Example cPanel schedule. Each customer must use their own home path and the PHP 8.1+ CLI path supplied by their host.</figcaption>
+            </figure>
+
+            <h3>Step 4 — Return to Tagioo and check the connection</h3>
+            <ol>
+              <li>Wait one or two minutes for the first Cron run.</li>
+              <li>Return to the Laravel Bridge area in Setup Assistant.</li>
+              <li>Click <strong>Check connection</strong>.</li>
+              <li>If the status remains <strong>Not connected</strong>, wait for another run and open <code>tagioo-bridge/cron.log</code> in File Manager.</li>
+            </ol>
+            <figure class="docs-figure">
+              <img src="/images/docs/laravel/waiting-for-connection.png" alt="Tagioo Laravel setup waiting for the first Cron run" loading="lazy" decoding="async" />
+              <figcaption>“Not connected” immediately after installation normally means Tagioo is waiting for the first Cron run.</figcaption>
+            </figure>
+            <div class="docs-callout">
+              <p><strong>About <code>laravel_root</code>:</strong> leave it blank. Tagioo detects the Laravel application automatically when the hosting account contains one app. Set it manually only if <code>cron.log</code> says that more than one Laravel app was found or Laravel could not be found.</p>
+            </div>
+
+            <h3>Step 5 — Review Advanced mapping before activation</h3>
+            <p>When the Bridge connects, Tagioo detects safe schema metadata—table and column names, not the customer's database password or historical customer records. A <strong>Needs mapping</strong> status means the Bridge is working but one or more detected choices need confirmation.</p>
+            <figure class="docs-figure">
+              <img src="/images/docs/laravel/needs-mapping.png" alt="Tagioo Laravel Bridge connected with Needs Mapping status and Advanced mapping available" loading="lazy" decoding="async" />
+              <figcaption>Open Advanced mapping whenever Tagioo shows “Needs mapping.” Do not activate tracking until the required fields are correct.</figcaption>
+            </figure>
+            <ol>
+              <li>Open <strong>Advanced mapping</strong>.</li>
+              <li>Confirm the orders table, order total, status, created time, updated time, items table, item reference, product ID/name, item price, and quantity.</li>
+              <li>For <strong>Order ID</strong>, choose the customer-facing invoice or order number—usually <code>invoice_id</code>, <code>invoice_number</code>, <code>invoice_no</code>, <code>order_number</code>, or <code>order_no</code>. Do not choose an internal <code>id</code> if the storefront displays a different invoice number.</li>
+              <li>For COD stores, add every database status that represents a valid placed order. This may include <code>pending</code> or a numeric value such as <code>1</code>.</li>
+              <li>Click <strong>Save mapping and detect again</strong>, wait for the next Cron run, and confirm Tagioo reports the mapping as ready.</li>
+            </ol>
+            <figure class="docs-figure">
+              <img src="/images/docs/laravel/advanced-mapping.png" alt="Laravel Advanced mapping with invoice_id selected as the public Order ID" loading="lazy" decoding="async" />
+              <figcaption>Example mapping: the public <code>invoice_id</code> is selected instead of the internal row ID, and the store's valid COD status values are included.</figcaption>
+            </figure>
+            <p>Click <strong>Activate tracking</strong> after the mapping is correct. Activation checkpoints existing orders, so only orders created afterward are treated as new purchases.</p>
+
+            <h3>Step 6 — Select destinations and generate the Web and Server GTM files</h3>
+            <ol>
+              <li>Continue through Setup Assistant to <strong>Select destinations</strong>.</li>
+              <li>Check only the platforms the customer uses. GA4 and Meta are the initial defaults; Google Ads and TikTok remain excluded unless selected.</li>
+              <li>Enter the credentials requested for those selected destinations.</li>
+              <li>Generate and download <code>tagioo-web-template.json</code> and <code>tagioo-server-template.json</code>.</li>
+              <li>Import the Web file into the Web GTM container and the Server file into the Server GTM container.</li>
+              <li>For a clean first import, choose <strong>Merge</strong>. For an updated Tagioo template, choose <strong>Merge → Overwrite conflicting tags, triggers, and variables</strong>.</li>
+              <li>Do not publish yet. Open Preview mode for both containers first.</li>
             </ol>
 
-            <h3>5. Check Meta browser/server deduplication</h3>
-            <p>In Meta Events Manager, open <strong>Test events</strong>, enter the test code used in Tagioo, clear old activity, and perform a fresh journey. Browser and Server rows are expected. For one logical event, their event name and Event ID must match; Meta normally marks one copy as <strong>Deduplicated</strong>.</p>
-            <p>Tagioo-created Event IDs begin with <code>tagioo-</code> for funnel events, while Purchase uses the mapped public order ID. An ID beginning with something else—such as <code>ob3_plugin-set_</code>—comes from another script installed on the Laravel website, not from Tagioo.</p>
+            <h3>Step 7 — Test the browser events in Web GTM Preview</h3>
+            <ol>
+              <li>Connect GTM Preview to the Laravel website.</li>
+              <li>Open one normal page, one product, add the product to the cart, continue to checkout, and complete one new order.</li>
+              <li>Confirm the corresponding Tagioo tags fire on the correct event. One action should not create several independent browser copies.</li>
+            </ol>
+            <figure class="docs-figure">
+              <img src="/images/docs/laravel/gtm-preview.png" alt="Web GTM Preview showing Tagioo PageView, ViewContent, AddToCart, InitiateCheckout, and Purchase tags" loading="lazy" decoding="async" />
+              <figcaption>Use GTM Preview to confirm that the Tagioo tags fire on the expected storefront actions before publishing.</figcaption>
+            </figure>
 
-            <h3>Existing Meta or TikTok tracking</h3>
-            <p>Keep the store's standard ecommerce <code>dataLayer</code> pushes, but disable old GTM tags or hard-coded <code>fbq('track', ...)</code>, <code>fbq('trackCustom', ...)</code>, and <code>ttq.track(...)</code> calls that send the same events directly. Two independent browser senders use different Event IDs and cannot be deduplicated correctly.</p>
+            <h3>Step 8 — Verify the backend Purchase in Tagioo</h3>
+            <ol>
+              <li>Create the test order only after Bridge activation.</li>
+              <li>Make sure the order reaches one of the valid mapped statuses.</li>
+              <li>Wait up to two minutes for the Cron Job.</li>
+              <li>Return to Tagioo and click <strong>Verify test order</strong>.</li>
+              <li>Confirm the public invoice/order number, value, currency, items, and selected destinations.</li>
+            </ol>
+
+            <h3>Step 9 — Verify Meta browser/server deduplication</h3>
+            <ol>
+              <li>Open <strong>Meta Events Manager → Test events</strong> and select <strong>Website</strong>.</li>
+              <li>Use the same test event code entered in Tagioo and clear earlier activity before the new test.</li>
+              <li>Browser and Server rows are expected. For one logical event, the event names and Event IDs must match exactly; Meta normally marks one row as <strong>Deduplicated</strong>.</li>
+              <li>For Purchase, compare the Event ID with the public invoice/order ID mapped in Tagioo.</li>
+            </ol>
+            <figure class="docs-figure">
+              <img src="/images/docs/laravel/meta-test-events.png" alt="Meta Test Events displaying Browser and Server events with Event IDs" loading="lazy" decoding="async" />
+              <figcaption>Compare “Received From,” event name, and Event ID. Browser + Server is correct only when the matching pair represents one deduplicated event.</figcaption>
+            </figure>
+
+            <h3>Step 10 — Publish and switch the Cron Job to production output</h3>
+            <ol>
+              <li>Publish the Web and Server GTM containers after Tagioo, GTM Preview, and the selected destinations all pass.</li>
+              <li>Edit the Cron command and replace the temporary <code>cron.log</code> suffix with <code>&gt; /dev/null 2&gt;&amp;1</code>.</li>
+              <li>Leave the once-per-minute Cron Job enabled.</li>
+            </ol>
+
+            <h3>Duplicate events from existing website tracking</h3>
+            <p>Keep the Laravel site's standard ecommerce <code>dataLayer</code> pushes, but disable older GTM tags or hard-coded <code>fbq('track', ...)</code>, <code>fbq('trackCustom', ...)</code>, and <code>ttq.track(...)</code> calls that send the same events directly.</p>
+            <p>Tagioo funnel Event IDs normally begin with <code>tagioo-</code>. An ID such as <code>ob3_plugin-set_...</code> is created by another script on the Laravel website, not by Tagioo.</p>
+            <figure class="docs-figure">
+              <img src="/images/docs/laravel/third-party-event-id.png" alt="Meta event details showing an ob3_plugin-set Event ID from another website script" loading="lazy" decoding="async" />
+              <figcaption>This <code>ob3_plugin-set_</code> Event ID identifies a separate website-side Meta sender. Disable that duplicate sender if Tagioo is responsible for the same event.</figcaption>
+            </figure>
 
             <h3>Safety, pausing, and removal</h3>
-            <p>The Bridge uses read-only database <code>SELECT</code> queries, does not edit Laravel source files, does not run migrations, retries temporary network failures, and deduplicates orders by store and Order ID. Keep the ZIP, <code>config.php</code>, and its secret outside <code>public_html</code> and never share them.</p>
-            <p>Use <strong>Pause tracking</strong> in Tagioo to stop new Bridge purchases. For an immediate local stop, disable the Cron Job. Removing the Cron Job and <code>tagioo-bridge</code> folder removes the Bridge without changing the Laravel website.</p>
+            <p>The Bridge uses read-only database <code>SELECT</code> queries, does not edit Laravel source files, and does not run migrations. Keep the ZIP, <code>config.php</code>, logs, and secret outside <code>public_html</code>. Use <strong>Pause tracking</strong> in Tagioo or disable the Cron Job for an immediate stop. Removing the Cron Job and <code>tagioo-bridge</code> folder removes the Bridge without changing the Laravel website.</p>
           </section>
 
           <section id="setup-assistant" class="docs-section">

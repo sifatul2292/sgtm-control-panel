@@ -94,6 +94,12 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-23.
   automatic detection, public invoice-ID mapping, COD statuses, activation,
   Tagioo/Meta test-order verification, browser/server deduplication, conflicting
   `fbq()`/`ttq()` senders, safe removal, security, and observed bridge errors.
+- Reordered that guide to match the completed cPanel pilot: create the Bridge,
+  upload/extract outside `public_html`, run a diagnostic Cron, check connection,
+  complete Advanced mapping, activate, and only then generate/import the GTM
+  files and test. Added eight lazy-loaded pilot screenshots with explanatory
+  captions; excluded the exposed-secret config screenshot, customer order/phone
+  data, and screenshots that showed the obsolete internal Order ID mapping.
 
 ## 2026-08-22 — Laravel Bridge foundation
 

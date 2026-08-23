@@ -284,7 +284,8 @@ const mimeTypes = {
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
-  ".svg": "image/svg+xml"
+  ".svg": "image/svg+xml",
+  ".png": "image/png"
 };
 
 function jsonResponse(res, status, body) {
@@ -10651,7 +10652,7 @@ const server = createServer(async (req, res) => {
       }
     }
 
-    if (pathname === "/landing.css" || pathname === "/terms.css" || pathname.startsWith("/assets/")) {
+    if (pathname === "/landing.css" || pathname === "/terms.css" || pathname.startsWith("/assets/") || pathname.startsWith("/images/docs/")) {
       await serveStatic(req, res);
       return;
     }
