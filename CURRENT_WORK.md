@@ -5,6 +5,24 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-24.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-08-24 — WooCommerce Meta event correctness
+
+- Fixed generated Web GTM PageView IDs inheriting the latest ecommerce
+  `event_id`. GTM lifecycle events now receive one stable per-URL PageView ID;
+  ViewContent, AddToCart, InitiateCheckout, and Purchase retain their own IDs.
+- WooCommerce templates now mark browser GA4 events and block only the
+  browser-origin server CAPI Purchase. GA4 still receives the browser Purchase,
+  the browser Meta Pixel still fires, and the plugin's authoritative scheduled
+  recovery supplies the single matching CAPI Purchase.
+- Bumped the WooCommerce plugin to 2.4.2. Its scheduled Purchase worker now uses
+  an atomic, stale-safe lock so overlapping payment/status hooks cannot run two
+  backend sends, and order events use the order's currency rather than the
+  store's current display currency.
+- Product pages intentionally emit both PageView and ViewContent; those describe
+  different facts and should not be collapsed. Customers must update the plugin
+  and reimport/publish both newly generated GTM JSON files for the fixes to take
+  effect.
+
 ## 2026-08-24 — Shopify app integration foundation
 
 - Created the standalone `tagioo-shopify-app` React Router project in a sibling

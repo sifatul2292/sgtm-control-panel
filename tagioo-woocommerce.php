@@ -3,7 +3,7 @@
  * Plugin Name: Tagioo for WooCommerce
  * Plugin URI:  https://tagioo.com
  * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.4.1
+ * Version:     2.4.2
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author:      Tagioo
@@ -14,7 +14,7 @@
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.4.1');
+define('TAGIOO_VERSION', '2.4.2');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
@@ -263,7 +263,7 @@ function tagioo_items_from_order(\WC_Order $order): array {
             'item_name'     => $item->get_name(),
             'item_category' => $cat,
             'price'         => tagioo_price((string) $order->get_item_subtotal($item, false)),
-            'currency'      => tagioo_currency(),
+            'currency'      => $order->get_currency(),
             'quantity'      => $item->get_quantity(),
         ]);
     }
@@ -577,7 +577,7 @@ add_action('woocommerce_thankyou', function (int $order_id) {
             'value'          => tagioo_price((string) $order->get_total()),
             'tax'            => tagioo_price((string) $order->get_total_tax()),
             'shipping'       => tagioo_price((string) $order->get_shipping_total()),
-            'currency'       => tagioo_currency(),
+            'currency'       => $order->get_currency(),
             'coupon'         => implode(',', $order->get_coupon_codes()),
             'items'          => tagioo_items_from_order($order),
         ],
@@ -592,6 +592,28 @@ add_action('woocommerce_thankyou', function (int $order_id) {
 // Meta deduplicates both to 1; GA4 dedups by transaction_id.
 // ---------------------------------------------------------------------------
 define('TAGIOO_SS_MAX_RETRY', 5);
+define('TAGIOO_SS_LOCK_TTL', 300);
+
+// WP-Cron may start two workers when payment_complete and the processing status
+// transition happen in overlapping requests. add_option() is an atomic insert,
+// so this lock prevents both workers from transmitting the same server Purchase.
+// A stale lock expires to preserve recovery after a PHP crash.
+function tagioo_server_purchase_lock(int $order_id): string {
+    return 'tagioo_ss_purchase_lock_' . $order_id;
+}
+
+function tagioo_claim_server_purchase(int $order_id): bool {
+    $key = tagioo_server_purchase_lock($order_id);
+    if (add_option($key, (string) time(), '', false)) return true;
+    $claimed_at = (int) get_option($key, 0);
+    if ($claimed_at > 0 && $claimed_at >= time() - TAGIOO_SS_LOCK_TTL) return false;
+    delete_option($key);
+    return add_option($key, (string) time(), '', false);
+}
+
+function tagioo_release_server_purchase(int $order_id): void {
+    delete_option(tagioo_server_purchase_lock($order_id));
+}
 
 // Enqueue the send out-of-band. Idempotent: skips if already sent or queued.
 function tagioo_enqueue_server_purchase(int $order_id): void {
@@ -611,14 +633,32 @@ add_action('woocommerce_order_status_processing', 'tagioo_enqueue_server_purchas
 add_action('tagioo_server_purchase', function (int $order_id, int $attempt = 1) {
     if (tagioo_opt('server_hit') !== '1') return;
 
+    if (!tagioo_claim_server_purchase($order_id)) {
+        // Another cron worker owns this order. Recheck later so a PHP crash
+        // cannot strand the Purchase behind the stale lock.
+        if (!wp_next_scheduled('tagioo_server_purchase', [$order_id, $attempt])) {
+            wp_schedule_single_event(time() + 60, 'tagioo_server_purchase', [$order_id, $attempt]);
+        }
+        return;
+    }
+
     $sgtm   = tagioo_opt('sgtm_domain');
     $mid    = tagioo_opt('measurement_id');
     $secret = tagioo_opt('api_secret');
-    if (!$sgtm || !$mid || !$secret) return;
+    if (!$sgtm || !$mid || !$secret) {
+        tagioo_release_server_purchase($order_id);
+        return;
+    }
 
     $order = wc_get_order($order_id);
-    if (!$order) return;
-    if ($order->get_meta(TAGIOO_META_SS_FIRED)) return;   // already sent
+    if (!$order) {
+        tagioo_release_server_purchase($order_id);
+        return;
+    }
+    if ($order->get_meta(TAGIOO_META_SS_FIRED)) {
+        tagioo_release_server_purchase($order_id);
+        return;   // already sent
+    }
 
     $order_num = (string) $order->get_order_number();
     $event_id  = tagioo_purchase_event_id($order);         // same as browser hit
@@ -647,7 +687,7 @@ add_action('tagioo_server_purchase', function (int $order_id, int $attempt = 1) 
         '_et'              => '100',                 // engagement, so GA4 records it
         'sid'              => (string) $ts,
         '_p'               => (string) wp_rand(1, 2147483647),
-        'cu'               => tagioo_currency(),
+        'cu'               => $order->get_currency(),
         'epn.value'        => tagioo_price((string) $order->get_total()),
         'epn.tax'          => tagioo_price((string) $order->get_total_tax()),
         'epn.shipping'     => tagioo_price((string) $order->get_shipping_total()),
@@ -697,6 +737,7 @@ add_action('tagioo_server_purchase', function (int $order_id, int $attempt = 1) 
     if ($code >= 200 && $code < 300) {
         $order->update_meta_data(TAGIOO_META_SS_FIRED, '1');
         $order->save();
+        tagioo_release_server_purchase($order_id);
         return;
     }
 
@@ -708,4 +749,5 @@ add_action('tagioo_server_purchase', function (int $order_id, int $attempt = 1) 
     } else {
         error_log("[tagioo] server purchase #{$order_num} gave up after {$attempt} attempts");
     }
+    tagioo_release_server_purchase($order_id);
 }, 10, 2);

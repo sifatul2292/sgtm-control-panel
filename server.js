@@ -1597,7 +1597,7 @@ function buildWebGtmTemplate(input) {
     {
       accountId: "0", containerId: "0", variableId: "32",
       name: "Tagioo - event_id", type: "jsm",
-      parameter: [gtmTemplateParam("javascript", "function(){function s(v){return String(v).replace(/[^A-Za-z0-9_.:@-]/g,'').substring(0,120);}var e={{dlv - event_id}};if(e)return s(e);var t={{dlv - ecommerce.transaction_id}};if(t)return s(t);var n='{{Event}}';if(n&&n.indexOf('gtm.')!==0){var u={{dlv - gtm.uniqueEventId}};if(u)return s('tagioo-event-'+u);}var k=location.href;var c=window.__tagiooPageEventId;if(!c||c.k!==k){c={k:k,v:'tagioo-pv-'+(new Date()).getTime()+'-'+Math.random().toString(36).substring(2,10)};window.__tagiooPageEventId=c;}return c.v;}")],
+      parameter: [gtmTemplateParam("javascript", "function(){function s(v){return String(v).replace(/[^A-Za-z0-9_.:@-]/g,'').substring(0,120);}var n='{{Event}}';if(n&&n.indexOf('gtm.')===0){var k=location.href;var c=window.__tagiooPageEventId;if(!c||c.k!==k){c={k:k,v:'tagioo-pv-'+(new Date()).getTime()+'-'+Math.random().toString(36).substring(2,10)};window.__tagiooPageEventId=c;}return c.v;}var e={{dlv - event_id}};if(e)return s(e);var t={{dlv - ecommerce.transaction_id}};if(t)return s(t);if(n){var u={{dlv - gtm.uniqueEventId}};if(u)return s('tagioo-event-'+u);}return '';}")],
       fingerprint: String(Date.now()), parentFolderId: "2"
     }
   ];
@@ -1645,6 +1645,14 @@ function buildWebGtmTemplate(input) {
         { parameter: "user_data.postal_code", parameterValue: "{{dlv - user_data.postal_code}}" },
         { parameter: "user_data.region", parameterValue: "{{dlv - user_data.region}}" }
       ];
+      // WooCommerce has an authoritative backend Purchase recovery hit. Mark
+      // browser events so the server container can keep forwarding them to GA4
+      // while suppressing only the redundant browser-origin CAPI Purchase.
+      // The browser Meta Pixel Purchase still fires below with the same event ID;
+      // the plugin's backend hit supplies the matching server/CAPI copy.
+      if (payload.platform === "woocommerce") {
+        eventSettingsRows.push({ parameter: "tagioo_transport", parameterValue: "browser" });
+      }
       if (["view_item", "add_to_cart", "begin_checkout", "add_payment_info", "add_shipping_info"].includes(eventName)) {
         eventSettingsRows.push(
           { parameter: "currency", parameterValue: "{{dlv - ecommerce.currency}}" },
@@ -1784,7 +1792,8 @@ function buildServerGtmTemplate(input) {
     gtmEventDataVariable(36, "ed - city", "user_data.city"),
     gtmEventDataVariable(37, "ed - country", "user_data.country"),
     gtmEventDataVariable(38, "ed - postal_code", "user_data.postal_code"),
-    gtmEventDataVariable(39, "ed - region", "user_data.region")
+    gtmEventDataVariable(39, "ed - region", "user_data.region"),
+    gtmEventDataVariable(40, "ed - tagioo_transport", "tagioo_transport")
   ];
   const triggers = [
     { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - GA4 Client", type: "ALWAYS", filter: [{ type: "CONTAINS", parameter: [gtmTemplateParam("arg0", "{{Client Name}}"), gtmTemplateParam("arg1", "GA4")] }], fingerprint: String(Date.now()) },
@@ -1794,6 +1803,14 @@ function buildServerGtmTemplate(input) {
     gtmTrigger(5, "Tagioo - GA4 add_payment_info", "add_payment_info", "GA4"),
     gtmTrigger(6, "Tagioo - GA4 view_item_list", "view_item_list", "GA4")
   ];
+  if (payload.platform === "woocommerce") {
+    const browserPurchase = gtmTrigger(7, "Tagioo - Woo browser Purchase", "purchase", "GA4");
+    browserPurchase.filter.push({
+      type: "EQUALS",
+      parameter: [gtmTemplateParam("arg0", "{{ed - tagioo_transport}}"), gtmTemplateParam("arg1", "browser")]
+    });
+    triggers.push(browserPurchase);
+  }
   const tags = [];
   const clients = [];
   if (destinations.includes("ga4")) {
@@ -1825,13 +1842,15 @@ function buildServerGtmTemplate(input) {
     tags.push(gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", ga4Params, ["1"], "3"));
   }
   if (destinations.includes("meta")) {
-    tags.push(gtmTag(tags.length + 1, "Tagioo Meta CAPI - All Events", "cvt_0_101", [
+    const metaTag = gtmTag(tags.length + 1, "Tagioo Meta CAPI - All Events", "cvt_0_101", [
       gtmTemplateParam("pixelId", "{{Tagioo - meta_pixel_id}}"),
       gtmTemplateParam("accessToken", "{{Tagioo - meta_capi_token}}"),
       gtmTemplateParam("testEventCode", metaTestEventCode ? "{{Tagioo - meta_test_event_code}}" : ""),
       gtmTemplateParam("actionSource", "website"),
       gtmBooleanParam("enableDebugLog", true)
-    ], ["1"], "4"));
+    ], ["1"], "4");
+    if (payload.platform === "woocommerce") metaTag.blockingTriggerId = ["7"];
+    tags.push(metaTag);
   }
   if (destinations.includes("googleAds")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Conversion Linker", "sgtmadscl", [

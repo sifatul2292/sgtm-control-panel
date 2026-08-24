@@ -1742,7 +1742,7 @@ window.dataLayer.push({
                     </li>
                     <li>Refund the test order. Store is now live with server-side tracking. 🎉</li>
                   </ol>
-                  <p class="woo-webhook-note">Seeing Meta duplicates? Both pixel and CAPI tag share the same <code>event_id</code>/<code>transaction_id</code> — Meta auto-deduplicates. Persistent duplicates mean an old pixel is hard-coded in your theme.</p>
+                  <p class="woo-webhook-note">On a product page, <strong>PageView + ViewContent is correct</strong>: PageView records the page load and ViewContent records the product. For Purchase, the browser Pixel and backend CAPI copy share one order <code>event_id</code>; the WooCommerce server template blocks the redundant browser-origin CAPI Purchase. If Meta still shows two Purchases with the same ID after reimporting both JSON files and updating the plugin, check for an old pixel or tracking plugin in the theme.</p>
                 </div>
 
                 <details class="woo-advanced">
