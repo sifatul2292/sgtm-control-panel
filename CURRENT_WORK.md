@@ -1,9 +1,35 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-08-24.
+Living status doc. Update after meaningful progress. Last updated: 2026-08-25.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
+
+## 2026-08-25 — Immediate WooCommerce AJAX AddToCart
+
+- Fixed Tagioo WooCommerce `add_to_cart` waiting until the next page load when
+  the cart action used WooCommerce AJAX. The PHP hook ran in the AJAX request,
+  but the queued dataLayer push previously depended on a later `wp_footer`.
+- Plugin 2.4.3 now listens for both classic WooCommerce `added_to_cart` and Woo
+  Blocks `wc-blocks_added_to_cart`, then uses a nonce-protected same-origin
+  callback to retrieve and clear the current shopper's server-built event.
+- Normal redirect/form carts retain the existing next-page footer delivery as a
+  fallback. Immediate and fallback delivery use the original event ID, with a
+  browser-side guard against duplicate pushes.
+- Newly generated WooCommerce Web GTM tags now use once-per-event firing rather
+  than once-per-page-load, so multiple legitimate AJAX cart actions on the same
+  product/listing page are not suppressed. Customers must update plugin 2.4.3
+  and regenerate/reimport Web GTM for the complete fix.
+
+## 2026-08-25 — Setup Assistant download step cleanup
+
+- Removed the large Meta CAPI and TikTok field-mapping reference cards from the
+  final Setup Assistant step. They were documentation-only and did not control
+  template generation.
+- Moved the Generate Templates action into the Download Templates card. The
+  wizard footer now keeps only Back on the final step, and the card exposes a
+  clear generating, ready-to-download, and regenerate flow.
+- The Web and Server GTM generator payloads were not changed by this UI cleanup.
 
 ## 2026-08-24 — WooCommerce Meta event correctness
 

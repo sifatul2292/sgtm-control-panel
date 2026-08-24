@@ -3,7 +3,7 @@
  * Plugin Name: Tagioo for WooCommerce
  * Plugin URI:  https://tagioo.com
  * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.4.2
+ * Version:     2.4.3
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author:      Tagioo
@@ -14,7 +14,7 @@
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.4.2');
+define('TAGIOO_VERSION', '2.4.3');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
@@ -497,7 +497,13 @@ add_action('wp_footer', function () {
 }, 20);
 
 // ---------------------------------------------------------------------------
-// add_to_cart (session-queued, survives AJAX redirect)
+// add_to_cart
+//
+// The Woo hook runs inside both normal page requests and wc-ajax requests. A
+// wc-ajax response has no wp_footer, so merely storing the push in the session
+// delays it until the shopper loads another page. The browser bridge below
+// drains that same queued push immediately after Woo reports AJAX success.
+// Normal form/redirect carts keep the wp_footer fallback.
 // ---------------------------------------------------------------------------
 add_action('woocommerce_add_to_cart', function (string $key, int $product_id, int $qty, int $variation_id) {
     if (tagioo_opt('track_add_cart') !== '1') return;
@@ -513,6 +519,83 @@ add_action('woocommerce_add_to_cart', function (string $key, int $product_id, in
     if ($ud) $push['user_data'] = $ud;
     WC()->session?->set('tagioo_atc', $push);
 }, 10, 4);
+
+// Return and atomically clear only the current shopper's queued cart event.
+// A nonce prevents another site from draining the session with a forged POST.
+function tagioo_ajax_take_add_to_cart(): void {
+    check_ajax_referer('tagioo_take_add_to_cart', 'nonce');
+    if (tagioo_opt('track_add_cart') !== '1') {
+        wp_send_json_success(['event' => null]);
+    }
+    $session = WC()->session ?? null;
+    $pending = $session?->get('tagioo_atc');
+    if ($pending) $session->set('tagioo_atc', null);
+    wp_send_json_success(['event' => $pending ?: null]);
+}
+add_action('wp_ajax_tagioo_take_add_to_cart', 'tagioo_ajax_take_add_to_cart');
+add_action('wp_ajax_nopriv_tagioo_take_add_to_cart', 'tagioo_ajax_take_add_to_cart');
+
+// Classic WooCommerce dispatches the jQuery `added_to_cart` event; Cart and
+// Checkout Blocks dispatch the native `wc-blocks_added_to_cart` event. Listen
+// for both, fetch the server-built ecommerce payload, and push it immediately.
+add_action('wp_footer', function () {
+    if (tagioo_opt('track_add_cart') !== '1') return;
+    $endpoint = esc_url(admin_url('admin-ajax.php'));
+    $nonce    = esc_js(wp_create_nonce('tagioo_take_add_to_cart'));
+    ?>
+    <script>
+    (function () {
+        if (window.__tagiooAtcBridge) return;
+        window.__tagiooAtcBridge = true;
+        var endpoint = <?= wp_json_encode($endpoint) ?>;
+        var nonce = <?= wp_json_encode($nonce) ?>;
+        var busy = false;
+
+        function pushEvent(payload) {
+            if (!payload || payload.event !== 'add_to_cart') return;
+            var id = String(payload.event_id || '');
+            var sent = window.__tagiooDataLayerSent = window.__tagiooDataLayerSent || {};
+            var key = 'add_to_cart|' + id;
+            if (id && sent[key]) return;
+            if (id) sent[key] = true;
+            var layer = window.dataLayer = window.dataLayer || [];
+            layer.push({ecommerce: null});
+            layer.push(payload);
+        }
+
+        function takeQueuedEvent() {
+            if (busy) return;
+            busy = true;
+            fetch(endpoint, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
+                body: 'action=tagioo_take_add_to_cart&nonce=' + encodeURIComponent(nonce)
+            })
+                .then(function (response) { return response.ok ? response.json() : null; })
+                .then(function (result) {
+                    if (result && result.success && result.data) pushEvent(result.data.event);
+                })
+                .catch(function () {})
+                .then(function () { busy = false; });
+        }
+
+        function bind() {
+            if (window.jQuery) {
+                window.jQuery(document.body).on('added_to_cart.tagioo', takeQueuedEvent);
+            }
+            document.body.addEventListener('wc-blocks_added_to_cart', takeQueuedEvent);
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bind, {once: true});
+        } else {
+            bind();
+        }
+    })();
+    </script>
+    <?php
+}, 5);
 
 add_action('wp_footer', function () {
     if (tagioo_opt('track_add_cart') !== '1') return;

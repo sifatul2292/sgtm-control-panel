@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=48" />
+    <link rel="stylesheet" href="/styles.css?v=49" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -1158,10 +1158,11 @@
                     <h2>Download Templates</h2>
                     <p>Generate Tagioo Web and Server GTM import files from your settings.</p>
                     <div class="assistant-download-actions">
+                      <button id="generateTemplates" class="button button-primary" type="button">Generate templates</button>
                       <button id="downloadWebTemplate" class="button" type="button" disabled>⇣ web.json</button>
                       <button id="downloadServerTemplate" class="button" type="button" disabled>⇣ server.json</button>
                     </div>
-                    <p id="setupAssistantResult" class="form-message"></p>
+                    <p id="setupAssistantResult" class="form-message" role="status" aria-live="polite"></p>
                   </div>
                   <div id="shopifyAppConnectCard" class="assistant-download-card" hidden>
                     <span class="assistant-download-icon" aria-hidden="true">S</span>
@@ -1183,45 +1184,6 @@
                       <li>Preview both containers, fire a Purchase event, then verify Tagioo Event Logs, GA4 Realtime, and Meta Test Events.</li>
                     </ol>
 
-                    <div class="assistant-template-prereqs assistant-template-prereqs--wide">
-                      <div>
-                        <h4>Meta CAPI — full field mapping</h4>
-                        <p>Template: <strong>Tagioo Meta CAPI</strong> (included in server.json)</p>
-                        <div class="mapping-grid">
-                          <span class="mapping-label">Pixel ID</span><code>{{Tagioo - meta_pixel_id}}</code>
-                          <span class="mapping-label">Access Token</span><code>{{Tagioo - meta_capi_token}}</code>
-                          <span class="mapping-label">Test Event Code</span><code>{{Tagioo - meta_test_event_code}}</code>
-                          <span class="mapping-label">Event Name</span><code>Auto-mapped from GA4 event name</code>
-                          <span class="mapping-label">Event ID</span><code>{{ed - event_id}}</code>
-                          <span class="mapping-label">Action Source</span><code>website</code>
-                          <span class="mapping-label">Value</span><code>{{ed - value}}</code>
-                          <span class="mapping-label">Currency</span><code>{{ed - currency}}</code>
-                          <span class="mapping-label">Transaction ID</span><code>{{ed - transaction_id}}</code>
-                          <span class="mapping-label">Email</span><code>{{ed - email_address}}</code>
-                          <span class="mapping-label">Phone</span><code>{{ed - phone_number}}</code>
-                          <span class="mapping-label">First Name</span><code>{{ed - first_name}}</code>
-                          <span class="mapping-label">Last Name</span><code>{{ed - last_name}}</code>
-                          <span class="mapping-label">External ID</span><code>{{ed - external_id}}</code>
-                          <span class="mapping-label">fbp / fbc</span><code>Read automatically from first-party cookies</code>
-                          <span class="mapping-label">Client IP / User Agent</span><code>Read automatically from request headers</code>
-                        </div>
-                      </div>
-                      <div>
-                        <h4>TikTok Events API — field mapping</h4>
-                        <p>Template: <strong>TikTok Events API</strong> (Community Gallery)</p>
-                        <div class="mapping-grid">
-                          <span class="mapping-label">Pixel ID</span><code>{{Tagioo - tiktok_pixel_id}}</code>
-                          <span class="mapping-label">Access Token</span><code>{{Tagioo - tiktok_access_token}}</code>
-                          <span class="mapping-label">Event Name</span><code>{{Event Name}}</code>
-                          <span class="mapping-label">Event ID</span><code>{{ed - event_id}}</code>
-                          <span class="mapping-label">Value</span><code>{{ed - value}}</code>
-                          <span class="mapping-label">Currency</span><code>{{ed - currency}}</code>
-                          <span class="mapping-label">Content / Items</span><code>{{ed - items}}</code>
-                          <span class="mapping-label">Email</span><code>{{ed - email_address}}</code>
-                          <span class="mapping-label">Phone</span><code>{{ed - phone_number}}</code>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                   <div class="assistant-verify-card">
                     <h3>Verify your tracking</h3>
@@ -2596,6 +2558,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=73" type="module"></script>
+    <script src="/app.js?v=74" type="module"></script>
   </body>
 </html>

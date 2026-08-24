@@ -1,3 +1,4 @@
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 */
 html,
 body {
   overflow-x: clip;
@@ -1534,45 +1535,6 @@ h2 {
   text-align: left;
 }
 
-.assistant-template-prereqs {
-  width: min(100%, 880px);
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-md);
-  text-align: left;
-}
-
-.assistant-template-prereqs > div {
-  display: grid;
-  gap: var(--space-xs);
-  padding: var(--space-md);
-  border: var(--rule-thin) solid var(--color-line);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-2);
-}
-
-.assistant-template-prereqs h4 {
-  margin: 0;
-}
-
-.assistant-template-prereqs p {
-  margin: 0 0 var(--space-xs);
-  color: var(--color-muted);
-}
-
-.assistant-template-prereqs code {
-  display: block;
-  overflow-wrap: anywhere;
-  padding: 8px 10px;
-  border: var(--rule-thin) solid var(--color-line);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-accent-deep);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: 500;
-}
-
 .assistant-actions {
   justify-content: space-between;
   padding: var(--space-lg);
@@ -1803,29 +1765,6 @@ h2 {
 }
 .download-plugin-btn { flex-shrink: 0; }
 .form-message--error { color: var(--color-danger, #dc2626); }
-
-/* ── Mapping grid ─────────────────────────────────────────────────── */
-.assistant-template-prereqs--wide {
-  grid-template-columns: 1fr;
-  max-width: 100%;
-}
-.mapping-grid {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px var(--space-sm);
-  align-items: center;
-  margin-top: var(--space-xs);
-}
-.mapping-label {
-  color: var(--color-muted);
-  font-size: var(--text-sm);
-  font-weight: 850;
-  white-space: nowrap;
-}
-.mapping-grid code {
-  font-size: var(--text-sm);
-  padding: 3px 8px;
-}
 
 /* ── Website instructions section ────────────────────────────────── */
 .assistant-instructions {
@@ -4387,7 +4326,6 @@ textarea::placeholder {
   .assistant-layout,
   .assistant-form-grid,
   .assistant-destination-grid,
-  .assistant-template-prereqs,
   .detail-setting-row,
   .dns-instruction-card,
   .quick-link-list,

@@ -1684,10 +1684,10 @@ function buildWebGtmTemplate(input) {
         gtmTemplateParam("eventSettingsVariable", "{{Tagioo - ga4 event settings}}"),
         gtmListParam("eventSettingsTable", eventSettingsRows)
       ], [triggerId], "3");
-      // A Livewire/Inertia storefront can legitimately push the same event type
-      // several times without a page load. Keep legacy templates unchanged, but
-      // let Laravel tags fire once for each dataLayer event.
-      if (payload.platform !== "laravel") tagObj.tagFiringOption = "ONCE_PER_LOAD";
+      // Livewire/Inertia and WooCommerce AJAX storefronts can legitimately push
+      // the same event type several times without a page load. Keep other legacy
+      // templates unchanged, but let those platforms fire per dataLayer event.
+      if (!["laravel", "woocommerce"].includes(payload.platform)) tagObj.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tagObj);
     }
   }
@@ -1707,7 +1707,7 @@ function buildWebGtmTemplate(input) {
       const metaTag = gtmTag(tags.length + 1, `Tagioo Meta - ${metaEventName}`, "html", [
         gtmTemplateParam("html", metaPixelEventScript(metaEventName))
       ], [triggerId], "4");
-      if (payload.platform !== "laravel") metaTag.tagFiringOption = "ONCE_PER_LOAD";
+      if (!["laravel", "woocommerce"].includes(payload.platform)) metaTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(metaTag);
     }
   }
@@ -1727,7 +1727,7 @@ function buildWebGtmTemplate(input) {
       const tiktokTag = gtmTag(tags.length + 1, `Tagioo TikTok - ${tiktokEventName}`, "html", [
         gtmTemplateParam("html", tiktokPixelEventScript(tiktokEventName))
       ], [triggerId], "6");
-      if (payload.platform !== "laravel") tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
+      if (!["laravel", "woocommerce"].includes(payload.platform)) tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tiktokTag);
     }
   }

@@ -72,6 +72,7 @@ const els = {
   setupAssistantResult: document.querySelector("#setupAssistantResult"),
   assistantBack: document.querySelector("#assistantBack"),
   assistantNext: document.querySelector("#assistantNext"),
+  generateTemplates: document.querySelector("#generateTemplates"),
   downloadWebTemplate: document.querySelector("#downloadWebTemplate"),
   downloadServerTemplate: document.querySelector("#downloadServerTemplate"),
   downloadPlugin: document.querySelector("#downloadPlugin"),
@@ -3204,7 +3205,7 @@ function updateSetupAssistantStep() {
     }
   });
   if (els.assistantBack) els.assistantBack.disabled = setupAssistantStep === 1;
-  if (els.assistantNext) els.assistantNext.textContent = setupAssistantStep === 4 ? "Generate templates" : "Next";
+  if (els.assistantNext) els.assistantNext.hidden = setupAssistantStep === 4;
   if (els.setupAssistantBadge) {
     els.setupAssistantBadge.textContent = `Step ${setupAssistantStep} of 4`;
   }
@@ -3220,6 +3221,11 @@ function setupAssistantPayload() {
 
 async function generateSetupAssistantTemplates() {
   if (!els.setupAssistantForm) return;
+  const button = els.generateTemplates;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Generating…";
+  }
   if (els.setupAssistantResult) els.setupAssistantResult.textContent = "Generating Tagioo GTM templates...";
   try {
     const response = await fetch("/api/customer/setup-assistant/templates", {
@@ -3236,8 +3242,12 @@ async function generateSetupAssistantTemplates() {
       const warnings = (result.warnings || []).join(" ");
       els.setupAssistantResult.textContent = `Templates are ready. ${warnings}`;
     }
+    if (button) button.textContent = "Regenerate templates";
   } catch (error) {
     if (els.setupAssistantResult) els.setupAssistantResult.textContent = error.message;
+    if (button) button.textContent = "Generate templates";
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
@@ -6359,14 +6369,13 @@ document.querySelector("#saveLaravelMapping")?.addEventListener("click", (event)
     successText: "Mapping saved. The next Cron run will detect the selected fields automatically."
   });
 });
-els.assistantNext?.addEventListener("click", async () => {
+els.assistantNext?.addEventListener("click", () => {
   if (setupAssistantStep < 4) {
     setupAssistantStep += 1;
     updateSetupAssistantStep();
-    return;
   }
-  await generateSetupAssistantTemplates();
 });
+els.generateTemplates?.addEventListener("click", generateSetupAssistantTemplates);
 els.downloadWebTemplate?.addEventListener("click", () => downloadGeneratedTemplate("web"));
 els.downloadServerTemplate?.addEventListener("click", () => downloadGeneratedTemplate("server"));
 function playSetupVideo(trigger) {
