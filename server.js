@@ -4317,6 +4317,17 @@ function isLaravelBridgeAuthorized(req, rawBody, secret) {
   return safeEqual(signature, expected);
 }
 
+function isShopifyIntegrationAuthorized(req, rawBody, secret) {
+  if (!secret) return false;
+  const timestamp = String(req.headers["x-tagioo-timestamp"] || "");
+  const signature = String(req.headers["x-tagioo-signature"] || "");
+  const seconds = Number(timestamp);
+  if (!/^\d{10}$/.test(timestamp) || !Number.isFinite(seconds)) return false;
+  if (Math.abs(Math.floor(Date.now() / 1000) - seconds) > 300) return false;
+  const expected = createHmac("sha256", secret).update(`${timestamp}.${rawBody.toString("utf8")}`).digest("hex");
+  return safeEqual(signature, expected);
+}
+
 // Paddle signs "ts:body" (colon-joined) with the webhook secret, sent as
 // "Paddle-Signature: ts=<unix>;h1=<hex>". https://developer.paddle.com/webhooks/signature-verification
 function isPaddleWebhookAuthorized(req, rawBody) {
@@ -6745,6 +6756,76 @@ async function rotateCustomerWebhookSecret(session) {
   };
   await writeDatabase(data);
   return { ok: true, webhookSecret };
+}
+
+async function createShopifyConnectionCode(session) {
+  if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+    const data = loaded.data;
+    const index = (data.tenants || []).findIndex((tenant) => tenant.id === session.tenantId);
+    if (index === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+    const tenant = data.tenants[index];
+    const tracking = { ...(tenant.tracking || {}) };
+    if (!tracking.domain || !tracking.measurementId) {
+      return { ok: false, status: 400, errors: ["Generate your GTM templates first so Tagioo has the tracking domain and GA4 Measurement ID."] };
+    }
+    const code = randomBytes(18).toString("base64url");
+    const now = new Date();
+    tracking.shopify = {
+      ...(tracking.shopify || {}),
+      connectCodeHash: createHash("sha256").update(code).digest("hex"),
+      connectCodeExpiresAt: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+      codeCreatedAt: now.toISOString(),
+      status: tracking.shopify?.shop ? "connected" : "waiting"
+    };
+    tenant.tracking = tracking;
+    tenant.updatedAt = now.toISOString();
+    await writeDatabase(data);
+    return { ok: true, code, expiresAt: tracking.shopify.connectCodeExpiresAt };
+  });
+}
+
+async function redeemShopifyConnectionCode(input) {
+  const code = String(input.code || "").trim();
+  const shop = String(input.shop || "").trim().toLowerCase();
+  if (!code || !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/i.test(shop)) {
+    return { ok: false, status: 400, errors: ["Enter a valid Tagioo connection code and Shopify store domain."] };
+  }
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+    const data = loaded.data;
+    const codeHash = createHash("sha256").update(code).digest("hex");
+    const tenant = (data.tenants || []).find((item) => safeEqual(String(item.tracking?.shopify?.connectCodeHash || ""), codeHash));
+    const setup = tenant?.tracking?.shopify || {};
+    if (!tenant || !setup.connectCodeExpiresAt || new Date(setup.connectCodeExpiresAt) < new Date()) {
+      return { ok: false, status: 401, errors: ["This connection code is invalid or expired. Generate a new code in Tagioo."] };
+    }
+    const integrationToken = randomBytes(32).toString("hex");
+    tenant.tracking = {
+      ...(tenant.tracking || {}),
+      shopify: {
+        shop,
+        status: "connected",
+        integrationToken,
+        connectedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    };
+    tenant.platform = "shopify";
+    tenant.updatedAt = new Date().toISOString();
+    await writeDatabase(data);
+    return {
+      ok: true,
+      tenantId: tenant.id,
+      tenantName: tenant.name || tenant.id,
+      trackingDomain: tenant.tracking.domain,
+      measurementId: tenant.tracking.measurementId,
+      integrationToken
+    };
+  });
 }
 
 async function requestLaravelManagedSetup(input, session) {
@@ -11192,6 +11273,50 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Shopify verifies the original webhook; the app signs this second hop with
+    // the tenant-specific integration token before Tagioo accepts the order.
+    if (pathname === "/api/orders/shopify" && req.method === "POST") {
+      const tenantId = sanitizeId(reqUrl.searchParams.get("tenant") || "");
+      let rawBody;
+      try {
+        rawBody = await readRawBody(req, 500000);
+      } catch (error) {
+        jsonResponse(res, 413, { error: error.message });
+        return;
+      }
+      const loadedForSecret = await readDatabaseCached();
+      const tenant = loadedForSecret.available ? (loadedForSecret.data.tenants || []).find((item) => item.id === tenantId) : null;
+      const secret = tenant?.tracking?.shopify?.integrationToken || "";
+      if (!tenantId || !secret || !isShopifyIntegrationAuthorized(req, rawBody, secret)) {
+        jsonResponse(res, 401, { error: "Invalid Shopify integration signature." });
+        return;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        jsonResponse(res, 400, { error: "Invalid JSON payload." });
+        return;
+      }
+      const result = await addOrderWebhook({ ...payload, tenant_id: tenantId, source: "tagioo-shopify-app" });
+      jsonResponse(res, result.ok ? (result.created ? 202 : 200) : 400, result.ok
+        ? { accepted: true, created: result.created, order_id: result.order.id }
+        : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/integrations/shopify/connect" && req.method === "POST") {
+      const result = await redeemShopifyConnectionCode(await readJson(req));
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? {
+        tenantId: result.tenantId,
+        tenantName: result.tenantName,
+        trackingDomain: result.trackingDomain,
+        measurementId: result.measurementId,
+        integrationToken: result.integrationToken
+      } : { errors: result.errors });
+      return;
+    }
+
     // Self-service bridge control channel. It carries schema names and runtime
     // health only—never order rows—and uses the same isolated Laravel HMAC key.
     if (pathname === "/api/laravel/bridge/heartbeat" && req.method === "POST") {
@@ -11445,6 +11570,19 @@ const server = createServer(async (req, res) => {
       }
       const result = await rotateCustomerWebhookSecret(session);
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { webhookSecret: result.webhookSecret } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/shopify/connect-code" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const result = await createShopifyConnectionCode(session);
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
+        ? { code: result.code, expiresAt: result.expiresAt }
+        : { errors: result.errors });
       return;
     }
 

@@ -1163,6 +1163,16 @@
                     </div>
                     <p id="setupAssistantResult" class="form-message"></p>
                   </div>
+                  <div id="shopifyAppConnectCard" class="assistant-download-card" hidden>
+                    <span class="assistant-download-icon" aria-hidden="true">S</span>
+                    <h2>Connect the Tagioo Shopify app</h2>
+                    <p>Generate a one-time code, then paste it into the Tagioo Tracking app in Shopify Admin. The code expires after 30 minutes.</p>
+                    <div class="assistant-download-actions">
+                      <button id="generateShopifyConnectCode" class="button button-primary" type="button">Generate connection code</button>
+                    </div>
+                    <p id="shopifyConnectCode" class="form-message"></p>
+                    <p class="assistant-laravel-note">When the app is connected, it installs the browser pixel and reliable backend Purchase webhook. Import <strong>server.json</strong>; do not also run Tagioo browser tags from <strong>web.json</strong>, or browser events can duplicate.</p>
+                  </div>
                   <div class="assistant-import-guide">
                     <h3>How to import</h3>
                     <ol>
@@ -2586,6 +2596,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=72" type="module"></script>
+    <script src="/app.js?v=73" type="module"></script>
   </body>
 </html>

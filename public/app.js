@@ -3169,8 +3169,11 @@ async function refreshLaravelSelfService(showMessage = true) {
 function updateLaravelAssistantFields() {
   if (!els.setupAssistantForm) return;
   const isLaravel = els.setupAssistantForm.elements.platform?.value === "laravel";
+  const isShopify = els.setupAssistantForm.elements.platform?.value === "shopify";
   const settings = els.setupAssistantForm.querySelector("[data-laravel-settings]");
   if (settings) settings.hidden = !isLaravel;
+  const shopifyCard = document.querySelector("#shopifyAppConnectCard");
+  if (shopifyCard) shopifyCard.hidden = !isShopify;
   if (!isLaravel) updateLaravelSelfServicePolling(false);
 }
 
@@ -6186,6 +6189,24 @@ els.assistantBack?.addEventListener("click", () => {
   updateSetupAssistantStep();
 });
 els.setupAssistantForm?.elements.platform?.addEventListener("change", updateLaravelAssistantFields);
+document.querySelector("#generateShopifyConnectCode")?.addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  const output = document.querySelector("#shopifyConnectCode");
+  button.disabled = true;
+  button.textContent = "Generating…";
+  if (output) output.textContent = "";
+  try {
+    const response = await fetch("/api/customer/shopify/connect-code", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Could not generate a connection code."]).join(" "));
+    if (output) output.innerHTML = `Connection code: <strong><code>${escapeHtml(result.code)}</code></strong> · expires ${new Date(result.expiresAt).toLocaleTimeString()}`;
+  } catch (error) {
+    if (output) output.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Generate new connection code";
+  }
+});
 document.querySelector("#laravelMapOrdersTable")?.addEventListener("change", (event) => {
   const reportTable = latestData?.tracking?.laravelSelfService?.report?.orders?.table || "";
   if (event.currentTarget.value === reportTable) return;

@@ -1,9 +1,34 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-08-23.
+Living status doc. Update after meaningful progress. Last updated: 2026-08-24.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
+
+## 2026-08-24 — Shopify app integration foundation
+
+- Created the standalone `tagioo-shopify-app` React Router project in a sibling
+  Git repository. It is linked to the Shopify Partner app **Tagioo Tracking**;
+  it does not add Shopify framework dependencies to this control panel.
+- Added a Shopify Web Pixel extension for page, product, cart, checkout, and
+  browser Purchase events. It sends GA4-compatible requests directly to the
+  customer's existing first-party Tagioo sGTM domain.
+- Added Shopify `orders/paid` backend recovery. Shopify authenticates the first
+  webhook hop; the app then HMAC-signs the exact payload and timestamp with a
+  unique tenant integration token before `/api/orders/shopify` accepts it.
+- Added a 30-minute, one-time connection-code flow. Codes are stored hashed,
+  consumed on redemption, and exchanged for a per-store 256-bit integration
+  token. No global customer secret is exposed or reused across stores.
+- Setup Assistant now shows the Shopify connection-code card after templates
+  are generated. Shopify app-pixel users import `server.json` only and must not
+  simultaneously publish the generated Web GTM browser tags, which would create
+  duplicate browser events.
+- Existing WooCommerce, Laravel, generic webhooks, GTM template generation,
+  sGTM forwarding, and production tenant tracking behavior were not changed.
+- Local checks passed: control-panel Node syntax, browser JS syntax, Shopify
+  ESLint, React Router type generation, TypeScript, production build, and
+  Shopify app configuration validation. A development-store install and paid
+  order through a throwaway Tagioo tenant are still required before release.
 
 ## 2026-08-23 — Self-service cPanel Laravel Bridge
 
