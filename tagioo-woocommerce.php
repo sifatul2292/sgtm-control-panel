@@ -3,7 +3,7 @@
  * Plugin Name: Tagioo for WooCommerce
  * Plugin URI:  https://tagioo.com
  * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.4.3
+ * Version:     2.4.4
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author:      Tagioo
@@ -14,13 +14,12 @@
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.4.3');
+define('TAGIOO_VERSION', '2.4.4');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
 define('TAGIOO_META_UA',    '_tagioo_ua');
 define('TAGIOO_META_IP',    '_tagioo_ip');
-define('TAGIOO_META_FIRED', '_tagioo_purchase_fired');
 define('TAGIOO_META_SS_FIRED', '_tagioo_ss_purchase_fired');
 
 // ---------------------------------------------------------------------------
@@ -634,24 +633,20 @@ add_action('woocommerce_before_checkout_form', function () {
 }, 5);
 
 // ---------------------------------------------------------------------------
-// purchase — thank-you page (browser hit)
+// purchase — thank-you / order-received page (browser hit)
 // event_id = raw WooCommerce order ID → matches the plugin's own server hit AND
 // the panel's order-webhook purchase recovery (which keys on the Woo order id),
 // so Meta deduplicates all of them to a single Purchase.
 // ---------------------------------------------------------------------------
-add_action('woocommerce_thankyou', function (int $order_id) {
+function tagioo_emit_browser_purchase(int $order_id): void {
+    static $rendered = [];
     if (tagioo_opt('track_purchase') !== '1' || !$order_id) return;
+    if (isset($rendered[$order_id])) return;
     $order = wc_get_order($order_id);
     if (!$order) return;
-
-    // Dedup: fire browser hit once per order.
-    if ($order->get_meta(TAGIOO_META_FIRED)) return;
-    $order->update_meta_data(TAGIOO_META_FIRED, '1');
-    $order->save();
-
+    $rendered[$order_id] = true;
     $event_id = tagioo_purchase_event_id($order);
-
-    tagioo_push_script([
+    $payload = [
         'event'    => 'purchase',
         'event_id' => $event_id,    // used by GTM browser pixel for dedup eventID
         'user_data' => tagioo_user_data_from_order($order),
@@ -664,8 +659,36 @@ add_action('woocommerce_thankyou', function (int $order_id) {
             'coupon'         => implode(',', $order->get_coupon_codes()),
             'items'          => tagioo_items_from_order($order),
         ],
-    ]);
-}, 10);
+    ];
+
+    // PHP cannot know whether the browser actually executed its response. An
+    // order-meta "sent" flag written before JavaScript runs permanently lost
+    // Purchase when the first response was interrupted or GTM loaded late.
+    // Dedup inside the current browser session only after dataLayer accepts the
+    // event; the raw order ID still deduplicates browser/server hits at Meta.
+    $json = wp_json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo "\n<script>(function(){var p={$json},k='tagioo_purchase_'+String(p.event_id||''),s=window.__tagiooDataLayerSent=window.__tagiooDataLayerSent||{};if(s[k])return;try{if(window.sessionStorage&&sessionStorage.getItem(k))return;}catch(e){}var d=window.dataLayer=window.dataLayer||[];d.push({ecommerce:null});d.push(p);s[k]=1;try{if(window.sessionStorage)sessionStorage.setItem(k,'1');}catch(e){}})();</script>\n";
+}
+add_action('woocommerce_thankyou', 'tagioo_emit_browser_purchase', 10, 1);
+
+// Custom themes and some block-based confirmation pages omit the classic
+// woocommerce_thankyou action. Recover the same event from the authenticated
+// order-received URL without exposing an order selected by ID alone.
+add_action('wp_footer', function () {
+    if (tagioo_opt('track_purchase') !== '1' || !function_exists('is_order_received_page') || !is_order_received_page()) return;
+    $order_key = isset($_GET['key']) ? sanitize_text_field(wp_unslash($_GET['key'])) : '';
+    if ($order_key === '') return;
+
+    $order_id = absint(get_query_var('order-received'));
+    if (!$order_id && function_exists('wc_get_order_id_by_order_key')) {
+        $order_id = absint(wc_get_order_id_by_order_key($order_key));
+    }
+    if (!$order_id) return;
+
+    $order = wc_get_order($order_id);
+    if (!$order || !hash_equals((string) $order->get_order_key(), $order_key)) return;
+    tagioo_emit_browser_purchase($order_id);
+}, 30);
 
 // ---------------------------------------------------------------------------
 // Server-side purchase hit → sGTM /g/collect  (replaces WooCommerce webhook)

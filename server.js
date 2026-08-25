@@ -1468,11 +1468,35 @@ const PIXEL_CONTEXT_SCRIPT =
   "if(eid&&e.event_id&&s(e.event_id)===eid){ec=e.ecommerce;break;}if(!fb)fb=e.ecommerce;}" +
   "ec=ec||fb||{};";
 
+// Ecommerce events can already be queued when GTM loads a checkout/thank-you
+// page. Make every Meta tag capable of bootstrapping the pixel so an early
+// Purchase never reports "tag fired" while silently dropping its browser hit.
+const META_PIXEL_BOOTSTRAP_SCRIPT =
+  "!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};" +
+  "if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];" +
+  "t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}" +
+  "(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');" +
+  "var pixel='{{Tagioo - meta_pixel_id}}',init=window.__tagiooMetaInit=window.__tagiooMetaInit||{};" +
+  "if(!init[pixel]){fbq('init',pixel);init[pixel]=1;}";
+
+function metaPixelBaseScript() {
+  return "<script>(function(){" + META_PIXEL_BOOTSTRAP_SCRIPT +
+    "var eid='{{Tagioo - event_id}}';if(eid==='undefined')eid='';" +
+    "var sent=window.__tagiooMetaSent=window.__tagiooMetaSent||{},key=pixel+'|PageView|'+(eid||location.href);" +
+    "if(sent[key])return;fbq('track','PageView',{},eid?{eventID:String(eid)}:{});sent[key]=1;})();</script>";
+}
+
 // Browser-side Meta Pixel event tag. eventID is omitted entirely when no id
 // exists, to avoid sending the literal string "undefined".
 function metaPixelEventScript(metaEventName) {
   const orderId = metaEventName === "Purchase" ? "if(ec.transaction_id)p.order_id=ec.transaction_id;" : "";
-  return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + "var pixel='{{Tagioo - meta_pixel_id}}';var sent=window.__tagiooMetaSent=window.__tagiooMetaSent||{};var key=pixel+'|" + metaEventName + "|'+(eid||location.href);if(sent[key])return;sent[key]=1;var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;" + orderId + "if(window.fbq)fbq('track','" + metaEventName + "',p,eid?{eventID:String(eid)}:{});})();</script>";
+  return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + META_PIXEL_BOOTSTRAP_SCRIPT +
+    "var sent=window.__tagiooMetaSent=window.__tagiooMetaSent||{};var key=pixel+'|" + metaEventName + "|'+(eid||location.href);" +
+    "if(sent[key])return;var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});" +
+    "var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});" +
+    "var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;" +
+    "if(ec.value!=null&&ec.value!=='')p.value=ec.value;" + orderId +
+    "fbq('track','" + metaEventName + "',p,eid?{eventID:String(eid)}:{});sent[key]=1;})();</script>";
 }
 
 // Browser-side TikTok Pixel event tag. Same message-anchored id + fallback.
@@ -1693,7 +1717,7 @@ function buildWebGtmTemplate(input) {
   }
   if (destinations.includes("meta")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo Meta - Pixel Base", "html", [
-      gtmTemplateParam("html", "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');(function(){var pixel='{{Tagioo - meta_pixel_id}}',init=window.__tagiooMetaInit=window.__tagiooMetaInit||{};if(!init[pixel]){fbq('init',pixel);init[pixel]=1;}var eid='{{Tagioo - event_id}}';if(eid==='undefined')eid='';var sent=window.__tagiooMetaSent=window.__tagiooMetaSent||{},key=pixel+'|PageView|'+(eid||location.href);if(sent[key])return;sent[key]=1;fbq('track','PageView',{},eid?{eventID:String(eid)}:{});})();</script>")
+      gtmTemplateParam("html", metaPixelBaseScript())
     ], ["2147479553"], "4"));
     // Browser pixel events, deduped with server CAPI via event_id.
     const metaEventMap = [

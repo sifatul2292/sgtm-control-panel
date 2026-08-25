@@ -5,6 +5,25 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-25.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-08-25 — Reliable WooCommerce browser Purchase + Meta initialization
+
+- Fixed generated Meta browser ecommerce tags silently dropping early checkout
+  or Purchase events when GTM processed them before its Pixel Base tag. Every
+  generated Meta tag now safely bootstraps/initializes the shared pixel and
+  marks its event as sent only after `fbq('track', ...)` accepts it.
+- Bumped the WooCommerce plugin to 2.4.4. Browser Purchase no longer writes a
+  permanent order-meta sent flag before the shopper's JavaScript executes;
+  same-tab reloads are deduplicated with session storage after the dataLayer
+  push, while Browser and Server keep the same raw WooCommerce order event ID.
+- Added an order-received footer fallback for custom/block confirmation pages
+  that omit the classic `woocommerce_thankyou` hook. The fallback requires the
+  order's matching secret order key, and a per-request guard prevents the
+  classic hook and fallback from emitting the event twice.
+- Customers must update plugin 2.4.4 and regenerate/reimport/publish Web GTM.
+  Existing Server GTM templates do not need replacement for this change. To
+  see Browser and Server copies together in Meta Test Events, open the site
+  through the Test Events URL flow and configure its test code in Server GTM.
+
 ## 2026-08-25 — Immediate WooCommerce AJAX AddToCart
 
 - Fixed Tagioo WooCommerce `add_to_cart` waiting until the next page load when
