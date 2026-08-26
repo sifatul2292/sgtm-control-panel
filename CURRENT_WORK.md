@@ -5,6 +5,27 @@ Living status doc. Update after meaningful progress. Last updated: 2026-08-25.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-08-25 — Isolated containers inside one customer account
+
+- Added an active-container selector for accounts with multiple containers.
+  Dashboard events, purchase inspection, retained analytics, Setup Assistant,
+  Power-Ups, offline conversions, and tracking verification now follow the
+  selected container instead of mixing every store in the account.
+- Preserved the original production container's existing account-level tracking
+  configuration and webhook behavior. Additional containers now receive their
+  own GA4 measurement ID, tracking domain, Meta credentials, Shopify connection
+  code/integration token, Laravel Bridge state, and independent order IDs.
+- WooCommerce webhook URLs now include their container. Newly downloaded cPanel
+  Bridge packages include a container identifier when needed; already-installed
+  production bridges and webhook URLs continue using their original paths.
+- SQLite event history can now be read by a specific container access-log source
+  while retaining shared-log compatibility. The container list also shows each
+  store's own daily and billing-period request counts; subscription request
+  totals remain account-wide across all owned containers.
+- Added focused regression coverage for existing-production preservation,
+  separate Shopify credentials, cross-account container rejection, retained
+  secondary configuration, and isolated per-container event history.
+
 ## 2026-08-25 — Reliable WooCommerce browser Purchase + Meta initialization
 
 - Fixed generated Meta browser ecommerce tags silently dropping early checkout

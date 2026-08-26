@@ -330,6 +330,30 @@ h2 {
   flex-wrap: wrap;
 }
 
+.container-switcher {
+  display: grid;
+  gap: 3px;
+  min-width: 190px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted, #667085);
+}
+
+.container-switcher[hidden] {
+  display: none;
+}
+
+.container-switcher select {
+  min-height: 38px;
+  max-width: 260px;
+  padding: 0 10px;
+  border: var(--rule-thin) solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: inherit;
+  font-size: var(--text-sm);
+}
+
 .button {
   min-height: 38px;
   display: inline-flex;

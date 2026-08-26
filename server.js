@@ -6,6 +6,7 @@ import { execFile, spawn } from "node:child_process";
 import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import { deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
+import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
 
 const gzipAsync = promisify(gzip);
 
@@ -4295,6 +4296,7 @@ function normalizeOrderPayload(body) {
   const currency = String(firstValue(body, ["currency", "currencyCode", "currency_code"]) || "BDT").trim().toUpperCase();
   const createdAt = orderDate(firstValue(body, ["created_at", "createdAt", "ordered_at", "orderedAt", "date", "time"]));
   const tenantId = sanitizeId(firstValue(body, ["tenant_id", "tenantId", "customer_id", "customerId"]) || config.tenantId);
+  const containerId = sanitizeId(firstValue(body, ["container_id", "containerId"]) || "");
   const orderType = sanitizeId(firstValue(body, ["order_type", "orderType", "channel", "source_type"]) || "store");
   const items = (Array.isArray(body.items) ? body.items : []).slice(0, 100).map((item) => ({
     item_id: String(firstValue(item, ["item_id", "product_id", "id", "sku"]) || "").trim().slice(0, 200),
@@ -4309,6 +4311,7 @@ function normalizeOrderPayload(body) {
     currency,
     createdAt: createdAt.toISOString(),
     tenantId,
+    containerId,
     orderType,
     source: String(body.source || "webhook"),
     // Customer identifiers for purchase-recovery match quality. Captured so the
@@ -4434,7 +4437,9 @@ async function addOrderWebhookLocked(body) {
   data.orders = data.orders || [];
   // Order numbers are only unique inside a store. Two Laravel/Woo tenants can
   // both have order "1", so panel-level idempotency must include the tenant.
-  const index = data.orders.findIndex((item) => item.id === order.id && item.tenantId === order.tenantId);
+  const index = data.orders.findIndex((item) =>
+    item.id === order.id && item.tenantId === order.tenantId && String(item.containerId || "") === String(order.containerId || "")
+  );
   if (index === -1) data.orders.push(order);
   else data.orders[index] = { ...data.orders[index], ...order, updatedAt: acceptedAt };
 
@@ -4445,9 +4450,9 @@ async function addOrderWebhookLocked(body) {
   // without double-counting the ones it caught. Fire-and-forget; never blocks
   // or fails the webhook response.
   const tenant = (data.tenants || []).find((item) => item.id === order.tenantId);
-  const tracking = tenant?.tracking || null;
+  const tracking = tenant ? trackingForContainer(tenant, data.customerSetupRequests || [], order.containerId) : null;
   if (tenant && order.source === "tagioo-cpanel-bridge" && tracking?.laravelSelfService?.active) {
-    tenant.tracking = {
+    setTrackingForContainer(tenant, data.customerSetupRequests || [], order.containerId, {
       ...tracking,
       laravelSelfService: {
         ...tracking.laravelSelfService,
@@ -4460,7 +4465,7 @@ async function addOrderWebhookLocked(body) {
         },
         updatedAt: acceptedAt
       }
-    };
+    });
   }
   const alreadyForwarded = index !== -1 && data.orders[index].forwardedToSgtmAt;
   // Recovery forwards via the gtag /g/collect path, which needs no api_secret —
@@ -4476,7 +4481,9 @@ async function addOrderWebhookLocked(body) {
     tracking.measurementId &&
     tracking.domain;
   if (shouldForward) {
-    const stored = data.orders.find((item) => item.id === order.id && item.tenantId === order.tenantId);
+    const stored = data.orders.find((item) =>
+      item.id === order.id && item.tenantId === order.tenantId && String(item.containerId || "") === String(order.containerId || "")
+    );
     if (stored) stored.forwardedToSgtmAt = new Date().toISOString();
   }
 
@@ -4488,7 +4495,7 @@ async function addOrderWebhookLocked(body) {
     // Direct Meta CAPI with hashed email/phone/name/geo for high match quality.
     // Same event_id (order id) as the gtag path and the browser pixel, so Meta
     // dedupes to a single Purchase and merges the richer user data.
-    sendOrderToMetaCapi(tenant, order).catch(() => {});
+    sendOrderToMetaCapi({ ...tenant, tracking }, order).catch(() => {});
   }
   return { ok: true, order, created: index === -1 };
 }
@@ -5056,62 +5063,70 @@ async function verifyTenantTracking(tenant) {
 }
 
 // Persist the latest verification result so the Setup Assistant can show it on load.
-async function recordTenantVerify(tenantId, result) {
+async function recordTenantVerify(tenantId, result, containerId = "") {
   if (!tenantId) return;
   try {
-    const loaded = await readDatabase();
-    if (!loaded.available) return;
-    const data = loaded.data;
-    data.tenants ||= [];
-    const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
-    if (index === -1) return;
-    const tracking = { ...(data.tenants[index].tracking || {}) };
-    tracking.lastVerify = result;
-    data.tenants[index] = { ...data.tenants[index], tracking };
-    await writeDatabase(data);
+    await withDbLock(async () => {
+      const loaded = await readDatabase();
+      if (!loaded.available) return;
+      const data = loaded.data;
+      data.tenants ||= [];
+      const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
+      if (index === -1) return;
+      const tenant = data.tenants[index];
+      const tracking = { ...trackingForContainer(tenant, data.customerSetupRequests || [], containerId) };
+      tracking.lastVerify = result;
+      if (!setTrackingForContainer(tenant, data.customerSetupRequests || [], containerId, tracking)) return;
+      await writeDatabase(data);
+    });
   } catch {
     // Recording the result must never fail the verification response.
   }
 }
 
-async function saveTenantTrackingConfig(tenantId, input) {
+async function saveTenantTrackingConfig(tenantId, input, containerId = "") {
   if (!tenantId) return;
   try {
-    const loaded = await readDatabase();
-    if (!loaded.available) return;
-    const data = loaded.data;
-    data.tenants ||= [];
-    const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
-    if (index === -1) return;
-    const measurementId = String(input.ga4MeasurementId || "").trim();
-    const apiSecret = String(input.ga4ApiSecret || "").trim();
-    const domain = trackingOrigin(input.trackingDomain);
-    const metaPixelId = String(input.metaPixelId || "").trim();
-    const metaCapiToken = String(input.metaAccessToken || input.metaCapiToken || "").trim();
-    const metaTestEventCode = String(input.metaTestEventCode || "").trim();
-    const tracking = { ...(data.tenants[index].tracking || {}) };
-    if (measurementId) tracking.measurementId = measurementId;
-    if (apiSecret) tracking.apiSecret = apiSecret;
-    if (domain) tracking.domain = domain;
-    // Persist Meta CAPI creds so server-side offline conversion uploads can reuse them.
-    if (metaPixelId || metaCapiToken || metaTestEventCode) {
-      const meta = { ...(tracking.meta || {}) };
-      if (metaPixelId) meta.pixelId = metaPixelId;
-      if (metaCapiToken) meta.capiToken = metaCapiToken;
-      if (metaTestEventCode) meta.testEventCode = metaTestEventCode;
-      tracking.meta = meta;
-    }
-    // Cookie life extension: drives the GA4 server client's FPID cookie max-age.
-    if (input.cookieExtensionEnabled !== undefined || input.cookieExtensionDays !== undefined) {
-      const prev = tracking.cookieExtension || {};
-      tracking.cookieExtension = {
-        enabled: input.cookieExtensionEnabled !== undefined ? Boolean(input.cookieExtensionEnabled) : Boolean(prev.enabled),
-        days: clampCookieDays(input.cookieExtensionDays !== undefined ? input.cookieExtensionDays : prev.days)
-      };
-    }
-    tracking.updatedAt = new Date().toISOString();
-    data.tenants[index] = { ...data.tenants[index], tracking };
-    await writeDatabase(data);
+    await withDbLock(async () => {
+      const loaded = await readDatabase();
+      if (!loaded.available) return;
+      const data = loaded.data;
+      data.tenants ||= [];
+      const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
+      if (index === -1) return;
+      const measurementId = String(input.ga4MeasurementId || "").trim();
+      const apiSecret = String(input.ga4ApiSecret || "").trim();
+      const domain = trackingOrigin(input.trackingDomain);
+      const metaPixelId = String(input.metaPixelId || "").trim();
+      const metaCapiToken = String(input.metaAccessToken || input.metaCapiToken || "").trim();
+      const metaTestEventCode = String(input.metaTestEventCode || "").trim();
+      const platform = sanitizeId(input.platform || "");
+      const tenant = data.tenants[index];
+      const tracking = { ...trackingForContainer(tenant, data.customerSetupRequests || [], containerId) };
+      if (measurementId) tracking.measurementId = measurementId;
+      if (apiSecret) tracking.apiSecret = apiSecret;
+      if (domain) tracking.domain = domain;
+      if (platform) tracking.platform = platform;
+      // Persist Meta CAPI creds so server-side offline conversion uploads can reuse them.
+      if (metaPixelId || metaCapiToken || metaTestEventCode) {
+        const meta = { ...(tracking.meta || {}) };
+        if (metaPixelId) meta.pixelId = metaPixelId;
+        if (metaCapiToken) meta.capiToken = metaCapiToken;
+        if (metaTestEventCode) meta.testEventCode = metaTestEventCode;
+        tracking.meta = meta;
+      }
+      // Cookie life extension: drives the GA4 server client's FPID cookie max-age.
+      if (input.cookieExtensionEnabled !== undefined || input.cookieExtensionDays !== undefined) {
+        const prev = tracking.cookieExtension || {};
+        tracking.cookieExtension = {
+          enabled: input.cookieExtensionEnabled !== undefined ? Boolean(input.cookieExtensionEnabled) : Boolean(prev.enabled),
+          days: clampCookieDays(input.cookieExtensionDays !== undefined ? input.cookieExtensionDays : prev.days)
+        };
+      }
+      tracking.updatedAt = new Date().toISOString();
+      if (!setTrackingForContainer(tenant, data.customerSetupRequests || [], containerId, tracking)) return;
+      await writeDatabase(data);
+    });
   } catch {
     // Persisting tracking config must never block template generation.
   }
@@ -5128,8 +5143,8 @@ function clampCookieDays(value) {
 }
 
 // Client-safe view of a tenant's tracking config — never leaks the CAPI token.
-function publicTenantTracking(tenant) {
-  const tracking = (tenant && tenant.tracking) || {};
+function publicTenantTracking(tenant, scopedTracking = null) {
+  const tracking = scopedTracking || (tenant && tenant.tracking) || {};
   const meta = tracking.meta || {};
   const cookieExtension = tracking.cookieExtension || {};
   const laravelManagedSetup = tracking.laravelManagedSetup || {};
@@ -5137,6 +5152,12 @@ function publicTenantTracking(tenant) {
   return {
     domain: tracking.domain || "",
     measurementId: tracking.measurementId || "",
+    platform: tracking.platform || "",
+    shopify: tracking.shopify?.shop ? {
+      shop: String(tracking.shopify.shop),
+      status: String(tracking.shopify.status || "connected"),
+      connectedAt: tracking.shopify.connectedAt || ""
+    } : null,
     meta: {
       pixelId: meta.pixelId || "",
       hasToken: Boolean(meta.capiToken),
@@ -5261,7 +5282,7 @@ function publicLaravelSelfService(state = {}) {
   };
 }
 
-function publicTenantForCustomer(tenant) {
+function publicTenantForCustomer(tenant, scopedTracking = null) {
   if (!tenant) return null;
   // Secrets are exposed only through their purpose-built authenticated setup
   // endpoints. A raw tenant object must never carry them into /api/dashboard.
@@ -5273,7 +5294,7 @@ function publicTenantForCustomer(tenant) {
     tracking: _tracking,
     ...safeTenant
   } = tenant;
-  return { ...safeTenant, tracking: publicTenantTracking(tenant) };
+  return { ...safeTenant, tracking: publicTenantTracking(tenant, scopedTracking) };
 }
 
 // Reduce a tracking-domain input to a clean origin ("https://host"), no path.
@@ -5432,20 +5453,23 @@ async function sendMetaOfflineConversions(tenant, events, { useTestCode = true }
 }
 
 // Append an offline-upload summary to the tenant's tracking log (cap last 20).
-async function recordOfflineUpload(tenantId, summary) {
+async function recordOfflineUpload(tenantId, summary, containerId = "") {
   if (!tenantId) return;
   try {
-    const loaded = await readDatabase();
-    if (!loaded.available) return;
-    const data = loaded.data;
-    data.tenants ||= [];
-    const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
-    if (index === -1) return;
-    const tracking = { ...(data.tenants[index].tracking || {}) };
-    const log = Array.isArray(tracking.offlineUploads) ? tracking.offlineUploads.slice(0, 19) : [];
-    tracking.offlineUploads = [{ at: new Date().toISOString(), ...summary }, ...log];
-    data.tenants[index] = { ...data.tenants[index], tracking };
-    await writeDatabase(data);
+    await withDbLock(async () => {
+      const loaded = await readDatabase();
+      if (!loaded.available) return;
+      const data = loaded.data;
+      data.tenants ||= [];
+      const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
+      if (index === -1) return;
+      const tenant = data.tenants[index];
+      const tracking = { ...trackingForContainer(tenant, data.customerSetupRequests || [], containerId) };
+      const log = Array.isArray(tracking.offlineUploads) ? tracking.offlineUploads.slice(0, 19) : [];
+      tracking.offlineUploads = [{ at: new Date().toISOString(), ...summary }, ...log];
+      if (!setTrackingForContainer(tenant, data.customerSetupRequests || [], containerId, tracking)) return;
+      await writeDatabase(data);
+    });
   } catch {
     // Logging the upload must never fail the upload itself.
   }
@@ -5459,14 +5483,18 @@ async function tenantForSession(session) {
 }
 
 // Handle an offline-conversion upload. validateOnly=true parses + reports without sending.
-async function handleOfflineConversionUpload(session, csvText, { validateOnly = false } = {}) {
+async function handleOfflineConversionUpload(session, csvText, { validateOnly = false, containerId = "" } = {}) {
   const { rows, errors } = parseOfflineCsv(csvText);
   if (errors.length) return { ok: false, status: 400, errors };
   if (!rows.length) return { ok: false, status: 400, errors: ["No data rows found in CSV."] };
   const { events, rowErrors } = buildOfflineMetaEvents(rows);
   if (!events.length) return { ok: false, status: 400, errors: rowErrors.length ? rowErrors : ["No valid rows to send."] };
 
-  const tenant = await tenantForSession(session);
+  let tenant = await tenantForSession(session);
+  if (tenant && containerId) {
+    const loaded = await readDatabaseCached();
+    tenant = { ...tenant, tracking: trackingForContainer(tenant, loaded.available ? loaded.data.customerSetupRequests || [] : [], containerId) };
+  }
   const meta = (tenant && tenant.tracking && tenant.tracking.meta) || {};
   if (!meta.pixelId || !meta.capiToken) {
     return { ok: false, status: 409, errors: ["Connect your Meta pixel + CAPI token in the Setup Assistant before uploading offline conversions."] };
@@ -5484,7 +5512,7 @@ async function handleOfflineConversionUpload(session, csvText, { validateOnly = 
     status: result.ok ? "sent" : "error",
     errors: [...rowErrors, ...(result.fbErrors || [])].slice(0, 10)
   };
-  await recordOfflineUpload(session.tenantId, summary);
+  await recordOfflineUpload(session.tenantId, summary, containerId);
   return { ok: result.ok, status: result.ok ? 200 : 502, ...summary };
 }
 
@@ -6801,7 +6829,7 @@ async function rotateCustomerWebhookSecret(session) {
   return { ok: true, webhookSecret };
 }
 
-async function createShopifyConnectionCode(session) {
+async function createShopifyConnectionCode(session, containerId = "") {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   return withDbLock(async () => {
     const loaded = await readDatabase();
@@ -6810,7 +6838,11 @@ async function createShopifyConnectionCode(session) {
     const index = (data.tenants || []).findIndex((tenant) => tenant.id === session.tenantId);
     if (index === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
     const tenant = data.tenants[index];
-    const tracking = { ...(tenant.tracking || {}) };
+    const requests = data.customerSetupRequests || [];
+    if (containerId && !customerContainerRequests(requests, tenant.id).some((request) => request.id === containerId)) {
+      return { ok: false, status: 404, errors: ["The selected container does not belong to this account."] };
+    }
+    const tracking = { ...trackingForContainer(tenant, requests, containerId) };
     if (!tracking.domain || !tracking.measurementId) {
       return { ok: false, status: 400, errors: ["Generate your GTM templates first so Tagioo has the tracking domain and GA4 Measurement ID."] };
     }
@@ -6823,7 +6855,7 @@ async function createShopifyConnectionCode(session) {
       codeCreatedAt: now.toISOString(),
       status: tracking.shopify?.shop ? "connected" : "waiting"
     };
-    tenant.tracking = tracking;
+    setTrackingForContainer(tenant, requests, containerId, tracking);
     tenant.updatedAt = now.toISOString();
     await writeDatabase(data);
     return { ok: true, code, expiresAt: tracking.shopify.connectCodeExpiresAt };
@@ -6841,14 +6873,25 @@ async function redeemShopifyConnectionCode(input) {
     if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
     const data = loaded.data;
     const codeHash = createHash("sha256").update(code).digest("hex");
-    const tenant = (data.tenants || []).find((item) => safeEqual(String(item.tracking?.shopify?.connectCodeHash || ""), codeHash));
-    const setup = tenant?.tracking?.shopify || {};
+    let tenant = null;
+    let matchedContainerId = "";
+    let matchedTracking = null;
+    for (const candidate of data.tenants || []) {
+      const entry = scopedTrackingEntries(candidate, data.customerSetupRequests || [])
+        .find((item) => safeEqual(String(item.tracking?.shopify?.connectCodeHash || ""), codeHash));
+      if (!entry) continue;
+      tenant = candidate;
+      matchedContainerId = entry.containerId || "";
+      matchedTracking = entry.tracking;
+      break;
+    }
+    const setup = matchedTracking?.shopify || {};
     if (!tenant || !setup.connectCodeExpiresAt || new Date(setup.connectCodeExpiresAt) < new Date()) {
       return { ok: false, status: 401, errors: ["This connection code is invalid or expired. Generate a new code in Tagioo."] };
     }
     const integrationToken = randomBytes(32).toString("hex");
-    tenant.tracking = {
-      ...(tenant.tracking || {}),
+    const updatedTracking = {
+      ...matchedTracking,
       shopify: {
         shop,
         status: "connected",
@@ -6857,15 +6900,17 @@ async function redeemShopifyConnectionCode(input) {
         updatedAt: new Date().toISOString()
       }
     };
-    tenant.platform = "shopify";
+    setTrackingForContainer(tenant, data.customerSetupRequests || [], matchedContainerId, updatedTracking);
+    if (!matchedContainerId || matchedContainerId === primaryContainerId(tenant, data.customerSetupRequests || [])) tenant.platform = "shopify";
     tenant.updatedAt = new Date().toISOString();
     await writeDatabase(data);
     return {
       ok: true,
       tenantId: tenant.id,
       tenantName: tenant.name || tenant.id,
-      trackingDomain: tenant.tracking.domain,
-      measurementId: tenant.tracking.measurementId,
+      containerId: matchedContainerId,
+      trackingDomain: updatedTracking.domain,
+      measurementId: updatedTracking.measurementId,
       integrationToken
     };
   });
@@ -6874,6 +6919,7 @@ async function redeemShopifyConnectionCode(input) {
 async function requestLaravelManagedSetup(input, session) {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   const storeUrl = normalizeWebsiteUrl(input.storeUrl);
+  const containerId = sanitizeId(input.containerId || "");
   if (!storeUrl) return { ok: false, status: 400, errors: ["Enter a valid Laravel store website URL."] };
   const currency = String(input.currency || "BDT").trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) return { ok: false, status: 400, errors: ["Currency must be a 3-letter code such as BDT or USD."] };
@@ -6888,7 +6934,11 @@ async function requestLaravelManagedSetup(input, session) {
       const index = (data.tenants || []).findIndex((tenant) => tenant.id === session.tenantId);
       if (index === -1) throw new Error("Customer account was not found.");
       const tenant = data.tenants[index];
-      const tracking = { ...(tenant.tracking || {}) };
+      const requests = data.customerSetupRequests || [];
+      if (containerId && !customerContainerRequests(requests, tenant.id).some((request) => request.id === containerId)) {
+        throw new Error("The selected container does not belong to this account.");
+      }
+      const tracking = { ...trackingForContainer(tenant, requests, containerId) };
       const previous = tracking.laravelManagedSetup || {};
       const now = new Date().toISOString();
       savedSetup = {
@@ -6899,9 +6949,9 @@ async function requestLaravelManagedSetup(input, session) {
         updatedAt: now
       };
       tracking.laravelManagedSetup = savedSetup;
+      setTrackingForContainer(tenant, requests, containerId, tracking);
       data.tenants[index] = {
         ...tenant,
-        tracking,
         // Created silently for the tenant-scoped bridge package. It is never
         // returned by the managed-setup API or exposed in dashboard payloads.
         laravelBridgeSecret: tenant.laravelBridgeSecret || randomBytes(24).toString("hex"),
@@ -6923,6 +6973,7 @@ async function startLaravelSelfService(input, session) {
   if (!cpanelBridgeAvailableFor(session.tenantId)) return { ok: false, status: 404, errors: ["Laravel self-service is not enabled for this account."] };
   const storeUrl = normalizeWebsiteUrl(input.storeUrl);
   const currency = String(input.currency || "BDT").trim().toUpperCase();
+  const containerId = sanitizeId(input.containerId || "");
   if (!storeUrl) return { ok: false, status: 400, errors: ["Enter a valid Laravel store website URL."] };
   if (!/^[A-Z]{3}$/.test(currency)) return { ok: false, status: 400, errors: ["Currency must be a 3-letter code such as BDT or USD."] };
   return withDbLock(async () => {
@@ -6931,7 +6982,11 @@ async function startLaravelSelfService(input, session) {
     const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
     if (!tenant) return { ok: false, status: 404, errors: ["Customer account was not found."] };
     const now = new Date().toISOString();
-    const tracking = { ...(tenant.tracking || {}) };
+    const requests = loaded.data.customerSetupRequests || [];
+    if (containerId && !customerContainerRequests(requests, tenant.id).some((request) => request.id === containerId)) {
+      return { ok: false, status: 404, errors: ["The selected tracking container was not found."] };
+    }
+    const tracking = { ...trackingForContainer(tenant, requests, containerId) };
     const previous = tracking.laravelSelfService || {};
     const sameStore = previous.storeUrl === storeUrl && previous.currency === currency;
     tracking.laravelSelfService = {
@@ -6943,7 +6998,7 @@ async function startLaravelSelfService(input, session) {
       startedAt: sameStore ? previous.startedAt || now : now,
       updatedAt: now
     };
-    tenant.tracking = tracking;
+    setTrackingForContainer(tenant, requests, containerId, tracking);
     if (!tenant.laravelBridgeSecret) {
       tenant.laravelBridgeSecret = randomBytes(24).toString("hex");
       tenant.laravelBridgeSecretUpdatedAt = now;
@@ -6953,8 +7008,9 @@ async function startLaravelSelfService(input, session) {
   });
 }
 
-async function recordLaravelBridgeHeartbeat(input, tenantId, snapshotTenant) {
-  const previous = snapshotTenant?.tracking?.laravelSelfService || {};
+async function recordLaravelBridgeHeartbeat(input, tenantId, snapshotTenant, requests = []) {
+  const containerId = sanitizeId(input.container_id || input.containerId || "");
+  const previous = trackingForContainer(snapshotTenant, requests, containerId)?.laravelSelfService || {};
   if (!previous.status) return { ok: false, status: 409, errors: ["Start Laravel self-service from the Tagioo dashboard first."] };
   const report = sanitizeLaravelBridgeReport(input.report || {});
   const version = String(input.bridge_version || "").slice(0, 20);
@@ -6976,9 +7032,10 @@ async function recordLaravelBridgeHeartbeat(input, tenantId, snapshotTenant) {
       const loaded = await readDatabase();
       if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
       const tenant = (loaded.data.tenants || []).find((item) => item.id === tenantId);
-      if (!tenant?.tracking?.laravelSelfService) return { ok: false, status: 409, errors: ["Start Laravel self-service first."] };
+      const tracking = trackingForContainer(tenant, loaded.data.customerSetupRequests || [], containerId);
+      if (!tracking?.laravelSelfService) return { ok: false, status: 409, errors: ["Start Laravel self-service first."] };
       const now = new Date().toISOString();
-      const freshState = tenant.tracking.laravelSelfService;
+      const freshState = tracking.laravelSelfService;
       const freshStatus = freshState.status === "live"
         ? "live"
         : freshState.status === "paused" && !freshState.active
@@ -6986,7 +7043,7 @@ async function recordLaravelBridgeHeartbeat(input, tenantId, snapshotTenant) {
         : freshState.active
           ? (freshState.lastOrder ? "test_received" : "waiting_test")
           : ready ? "detected" : "needs_mapping";
-      tenant.tracking.laravelSelfService = {
+      const nextState = {
         ...freshState,
         status: freshStatus,
         report,
@@ -6994,8 +7051,12 @@ async function recordLaravelBridgeHeartbeat(input, tenantId, snapshotTenant) {
         lastSeenAt: now,
         updatedAt: now
       };
+      setTrackingForContainer(tenant, loaded.data.customerSetupRequests || [], containerId, {
+        ...tracking,
+        laravelSelfService: nextState
+      });
       await writeDatabase(loaded.data);
-      return { ok: true, state: tenant.tracking.laravelSelfService };
+      return { ok: true, state: nextState };
     });
     if (!persisted.ok) return persisted;
     current = persisted.state;
@@ -7013,12 +7074,14 @@ async function saveLaravelSelfServiceMapping(input, session) {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   if (!cpanelBridgeAvailableFor(session.tenantId)) return { ok: false, status: 404, errors: ["Laravel self-service is not enabled for this account."] };
   const mapping = sanitizeLaravelBridgeMapping(input || {});
+  const containerId = sanitizeId(input.containerId || "");
   if (!mapping.orders_table) return { ok: false, status: 400, errors: ["Choose the Laravel orders table."] };
   return withDbLock(async () => {
     const loaded = await readDatabase();
     if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
     const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
-    const setup = tenant?.tracking?.laravelSelfService;
+    const tracking = trackingForContainer(tenant, loaded.data.customerSetupRequests || [], containerId);
+    const setup = tracking?.laravelSelfService;
     if (!tenant || !setup) return { ok: false, status: 409, errors: ["Start Laravel self-service first."] };
     if (setup.active || setup.status === "live") return { ok: false, status: 409, errors: ["Mapping cannot be changed while Laravel tracking is active."] };
     const report = setup.report || {};
@@ -7041,8 +7104,8 @@ async function saveLaravelSelfServiceMapping(input, session) {
       : "";
     if (columnError || itemColumnError) return { ok: false, status: 400, errors: [columnError || itemColumnError] };
     const now = new Date().toISOString();
-    tenant.tracking = {
-      ...(tenant.tracking || {}),
+    const nextTracking = {
+      ...tracking,
       laravelSelfService: {
         ...setup,
         mapping,
@@ -7051,19 +7114,21 @@ async function saveLaravelSelfServiceMapping(input, session) {
         updatedAt: now
       }
     };
+    setTrackingForContainer(tenant, loaded.data.customerSetupRequests || [], containerId, nextTracking);
     await writeDatabase(loaded.data);
-    return { ok: true, setup: publicLaravelSelfService(tenant.tracking.laravelSelfService) };
+    return { ok: true, setup: publicLaravelSelfService(nextTracking.laravelSelfService) };
   });
 }
 
-async function activateLaravelSelfService(session) {
+async function activateLaravelSelfService(session, containerId = "") {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   if (!cpanelBridgeAvailableFor(session.tenantId)) return { ok: false, status: 404, errors: ["Laravel self-service is not enabled for this account."] };
   return withDbLock(async () => {
     const loaded = await readDatabase();
     if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
     const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
-    const setup = tenant?.tracking?.laravelSelfService;
+    const tracking = trackingForContainer(tenant, loaded.data.customerSetupRequests || [], containerId);
+    const setup = tracking?.laravelSelfService;
     if (!tenant || !setup) return { ok: false, status: 409, errors: ["Start Laravel self-service first."] };
     const lastSeen = Date.parse(setup.lastSeenAt || "");
     if (!Number.isFinite(lastSeen) || Date.now() - lastSeen > 10 * 60 * 1000) {
@@ -7073,8 +7138,8 @@ async function activateLaravelSelfService(session) {
       return { ok: false, status: 409, errors: ["Required order fields have not been detected yet. Complete the advanced mapping first."] };
     }
     const now = new Date().toISOString();
-    tenant.tracking = {
-      ...(tenant.tracking || {}),
+    const nextTracking = {
+      ...tracking,
       laravelSelfService: {
         ...setup,
         active: true,
@@ -7085,41 +7150,51 @@ async function activateLaravelSelfService(session) {
         updatedAt: now
       }
     };
+    setTrackingForContainer(tenant, loaded.data.customerSetupRequests || [], containerId, nextTracking);
     await writeDatabase(loaded.data);
-    return { ok: true, setup: publicLaravelSelfService(tenant.tracking.laravelSelfService) };
+    return { ok: true, setup: publicLaravelSelfService(nextTracking.laravelSelfService) };
   });
 }
 
-async function deactivateLaravelSelfService(session) {
+async function deactivateLaravelSelfService(session, containerId = "") {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   return withDbLock(async () => {
     const loaded = await readDatabase();
     if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
     const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
-    const setup = tenant?.tracking?.laravelSelfService;
+    const tracking = trackingForContainer(tenant, loaded.data.customerSetupRequests || [], containerId);
+    const setup = tracking?.laravelSelfService;
     if (!tenant || !setup) return { ok: false, status: 409, errors: ["Laravel self-service has not been started."] };
     const now = new Date().toISOString();
-    tenant.tracking.laravelSelfService = { ...setup, active: false, status: "paused", updatedAt: now };
+    const nextSetup = { ...setup, active: false, status: "paused", updatedAt: now };
+    setTrackingForContainer(tenant, loaded.data.customerSetupRequests || [], containerId, {
+      ...tracking,
+      laravelSelfService: nextSetup
+    });
     await writeDatabase(loaded.data);
-    return { ok: true, setup: publicLaravelSelfService(tenant.tracking.laravelSelfService) };
+    return { ok: true, setup: publicLaravelSelfService(nextSetup) };
   });
 }
 
-async function verifyLaravelSelfService(session) {
+async function verifyLaravelSelfService(session, containerId = "") {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   if (!cpanelBridgeAvailableFor(session.tenantId)) return { ok: false, status: 404, errors: ["Laravel self-service is not enabled for this account."] };
   const loaded = await readDatabase();
   if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
   const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
-  const setup = tenant?.tracking?.laravelSelfService;
+  const requests = loaded.data.customerSetupRequests || [];
+  const tracking = trackingForContainer(tenant, requests, containerId);
+  const setup = tracking?.laravelSelfService;
   if (!tenant || !setup?.active) return { ok: false, status: 409, errors: ["Activate the cPanel Bridge before testing an order."] };
   // Older Bridge purchases could be accepted into data.orders while a
   // simultaneous heartbeat overwrote only the tenant verification marker.
   // Recover from that state using the newest accepted cPanel order. New writes
   // are serialized under withDbLock, so this is also a safe migration path for
   // customers already piloting the bridge.
+  const storedContainerId = containerId === primaryContainerId(tenant, requests) ? "" : containerId;
   const fallbackOrder = (loaded.data.orders || []).slice().reverse().find((order) =>
     order.tenantId === session.tenantId && order.source === "tagioo-cpanel-bridge"
+      && String(order.containerId || "") === storedContainerId
   );
   const lastOrder = setup.lastOrder || (fallbackOrder ? {
     id: fallbackOrder.id,
@@ -7132,7 +7207,7 @@ async function verifyLaravelSelfService(session) {
   if (!lastOrder || !Number.isFinite(receivedAt) || receivedAt < activatedAt) {
     return { ok: false, status: 409, errors: ["No new paid test order has reached Tagioo yet. Place one order after activation and try again."] };
   }
-  const trackingResult = await verifyTenantTracking(tenant);
+  const trackingResult = await verifyTenantTracking({ ...tenant, tracking });
   const bridgeOk = true;
   const containerOk = Boolean(trackingResult.checks?.container?.ok);
   const now = new Date().toISOString();
@@ -7148,16 +7223,21 @@ async function verifyLaravelSelfService(session) {
     const fresh = await readDatabase();
     if (!fresh.available) return;
     const freshTenant = (fresh.data.tenants || []).find((item) => item.id === session.tenantId);
-    if (!freshTenant?.tracking?.laravelSelfService) return;
-    freshTenant.tracking.laravelSelfService = {
-      ...freshTenant.tracking.laravelSelfService,
-      status: verification.ok ? "live" : "verification_failed",
-      lastOrder,
-      liveAt: verification.ok ? now : freshTenant.tracking.laravelSelfService.liveAt || "",
-      verification,
-      updatedAt: now
-    };
-    freshTenant.tracking.lastVerify = trackingResult;
+    const freshTracking = trackingForContainer(freshTenant, fresh.data.customerSetupRequests || [], containerId);
+    if (!freshTracking?.laravelSelfService) return;
+    const freshSetup = freshTracking.laravelSelfService;
+    setTrackingForContainer(freshTenant, fresh.data.customerSetupRequests || [], containerId, {
+      ...freshTracking,
+      laravelSelfService: {
+        ...freshSetup,
+        status: verification.ok ? "live" : "verification_failed",
+        lastOrder,
+        liveAt: verification.ok ? now : freshSetup.liveAt || "",
+        verification,
+        updatedAt: now
+      },
+      lastVerify: trackingResult
+    });
     await writeDatabase(fresh.data);
   });
   return { ok: true, verified: verification.ok, verification };
@@ -7193,7 +7273,7 @@ function phpSingleQuoted(value) {
   return `'${String(value ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
 }
 
-function buildCpanelBridgeConfig({ endpoint, heartbeatEndpoint, tenantId, webhookSecret, storeUrl, currency }) {
+function buildCpanelBridgeConfig({ endpoint, heartbeatEndpoint, tenantId, containerId = "", webhookSecret, storeUrl, currency }) {
   return `<?php
 
 return [
@@ -7201,6 +7281,7 @@ return [
     'endpoint' => ${phpSingleQuoted(endpoint)},
     'heartbeat_endpoint' => ${phpSingleQuoted(heartbeatEndpoint)},
     'tenant' => ${phpSingleQuoted(tenantId)},
+    'container_id' => ${phpSingleQuoted(containerId)},
     'secret' => ${phpSingleQuoted(webhookSecret)},
     'store_url' => ${phpSingleQuoted(storeUrl)},
     'laravel_root' => '',
@@ -10030,7 +10111,7 @@ function emptyCustomerRequestSummary() {
   };
 }
 
-async function getCustomerDashboardData(session) {
+async function getCustomerDashboardData(session, requestedContainerId = "") {
   const loaded = await readDatabase();
   const raw = loaded.data;
   const docker = customerDockerPlaceholder();
@@ -10093,7 +10174,7 @@ async function getCustomerDashboardData(session) {
     webhookSecret: tenantWebhookSecret(raw, session.tenantId)
   };
 
-  return customerDashboardData(data, session);
+  return customerDashboardData(data, session, requestedContainerId);
 }
 
 // Stale-while-revalidate cache for the customer dashboard payload, keyed by tenant.
@@ -10105,8 +10186,8 @@ const CUSTOMER_DASHBOARD_FRESH_MS = Number(process.env.CUSTOMER_DASHBOARD_FRESH_
 const CUSTOMER_DASHBOARD_STALE_MS = Number(process.env.CUSTOMER_DASHBOARD_STALE_MS || 120000);
 const customerDashboardCache = new Map();
 
-async function getCustomerDashboardDataCached(session) {
-  const key = session.tenantId;
+async function getCustomerDashboardDataCached(session, containerId = "") {
+  const key = `${session.tenantId}:${containerId || "default"}`;
   const now = Date.now();
   const entry = customerDashboardCache.get(key);
 
@@ -10117,7 +10198,7 @@ async function getCustomerDashboardDataCached(session) {
   if (entry && now - entry.at < CUSTOMER_DASHBOARD_STALE_MS) {
     if (!entry.refreshing) {
       entry.refreshing = true;
-      getCustomerDashboardData(session)
+      getCustomerDashboardData(session, containerId)
         .then((payload) => { customerDashboardCache.set(key, { payload, at: Date.now(), refreshing: false }); })
         .catch(() => { entry.refreshing = false; });
     }
@@ -10125,7 +10206,7 @@ async function getCustomerDashboardDataCached(session) {
   }
 
   const startedAt = Date.now();
-  const payload = await getCustomerDashboardData(session);
+  const payload = await getCustomerDashboardData(session, containerId);
   payload.timing = { dashboardMs: Date.now() - startedAt, role: "customer", cache: "miss" };
   customerDashboardCache.set(key, { payload, at: Date.now(), refreshing: false });
   return payload;
@@ -10189,13 +10270,14 @@ const ownerDashboardWarmer = setInterval(() => {
 }, OWNER_DASHBOARD_WARM_MS);
 ownerDashboardWarmer.unref?.();
 
-function provisioningRequestsForTenant(data, tenantId) {
+function provisioningRequestsForTenant(data, tenantId, containerId = "") {
   const setupIds = new Set((data.customerSetup?.requests || [])
     .filter((request) => request.tenantId === tenantId && !isDeletedStatus(request.status))
     .map((request) => request.id));
-  return (data.provisioning?.requests || []).filter((request) =>
-    !isDeletedStatus(request.status) && (request.tenantId === tenantId || setupIds.has(request.sourceRequestId))
-  );
+  return (data.provisioning?.requests || []).filter((request) => {
+    if (isDeletedStatus(request.status) || !(request.tenantId === tenantId || setupIds.has(request.sourceRequestId))) return false;
+    return !containerId || request.sourceRequestId === containerId || request.id === containerId;
+  });
 }
 
 function logPathsForProvisioningRequest(request) {
@@ -10207,16 +10289,16 @@ function logPathsForProvisioningRequest(request) {
   };
 }
 
-function customerAccessLogPaths(data, tenantId) {
-  const requests = provisioningRequestsForTenant(data, tenantId);
+function customerAccessLogPaths(data, tenantId, containerId = "") {
+  const requests = provisioningRequestsForTenant(data, tenantId, containerId);
   const paths = requests
     .map((request) => logPathsForProvisioningRequest(request).accessLog)
     .filter(Boolean);
   return [...new Set(paths)];
 }
 
-async function customerAccessLogForTenant(data, tenantId) {
-  const paths = customerAccessLogPaths(data, tenantId);
+async function customerAccessLogForTenant(data, tenantId, containerId = "") {
+  const paths = customerAccessLogPaths(data, tenantId, containerId);
   if (!paths.length) {
     return unavailable("No container access log is available yet.", "Create a live container first.");
   }
@@ -10261,7 +10343,10 @@ function tenantBillingUsageMap(data, tenants = []) {
     // for uncached days — an in-process SQLite read, NOT a live nginx log scan, so the
     // owner hot path stays cheap and this never touches live tracking. Empty {} for
     // tenants with no event source, leaving their JSON-only count unchanged.
-    const sqliteSnaps = sqliteSnapshotsForTenant(tenant.id, tenant);
+    const billingTenant = tenantSetupRequests.length > 1
+      ? { ...tenant, containerDomains: tenantSetupRequests.map((request) => request.trackingDomain).filter(Boolean) }
+      : tenant;
+    const sqliteSnaps = sqliteSnapshotsForTenant(tenant.id, billingTenant);
     // Per day in the billing period take the larger of the JSON-stored count and the
     // SQLite snapshot total, so a day missed/undercounted by one source is covered by
     // the other (rotation loss, un-persisted days). Matches customerDashboardData.
@@ -10283,12 +10368,20 @@ function tenantBillingUsageMap(data, tenants = []) {
   return Object.fromEntries(entries);
 }
 
-async function customerDashboardData(data, session) {
+async function customerDashboardData(data, session, requestedContainerId = "") {
   const customerRows = data.owner?.customers || data.customers?.tenants || [];
   const tenant = customerRows.find((customer) => customer.id === session.tenantId) || customerRows[0] || null;
-  const tenantOrders = filterOrdersForTenant(data.orders, tenant);
-  const tenantLogPaths = customerAccessLogPaths(data, session.tenantId);
-  const tenantSetupRequests = (data.customerSetup.requests || []).filter((request) => request.tenantId === session.tenantId && !isDeletedStatus(request.status));
+  const tenantSetupRequests = customerContainerRequests(data.customerSetup.requests || [], session.tenantId);
+  const activeContainer = selectedContainer(tenant, tenantSetupRequests, requestedContainerId);
+  const activeContainerId = activeContainer?.id || "";
+  const multiContainer = tenantSetupRequests.length > 1;
+  const scopedContainerId = multiContainer ? activeContainerId : "";
+  const tenantOrders = filterOrdersForTenant(data.orders, tenant, scopedContainerId, primaryContainerId(tenant, tenantSetupRequests));
+  const allTenantLogPaths = customerAccessLogPaths(data, session.tenantId);
+  const tenantLogPaths = customerAccessLogPaths(data, session.tenantId, scopedContainerId);
+  const scopedTenant = scopedContainerId && activeContainer?.trackingDomain
+    ? { ...tenant, domain: activeContainer.trackingDomain }
+    : tenant;
   const billingPeriod = billingPeriodForTenant(tenant, tenantSetupRequests);
   const customerSummaryOptions = { lineLimit: config.customerSummaryTailLines, ttl: CUSTOMER_SUMMARY_CACHE_TTL_MS };
 
@@ -10311,24 +10404,24 @@ async function customerDashboardData(data, session) {
   const emptyPeriodSummary = { available: false, count: 0, period: billingPeriod };
   const [tenantAccessLog, rawTodaySummary, rawPeriodSummary] = await Promise.all([
     useDedicatedLogs
-      ? customerAccessLogForTenant(data, session.tenantId)
+      ? customerAccessLogForTenant(data, session.tenantId, scopedContainerId)
       : allowSharedFallback
         ? tailFile(config.accessLog, config.logTailLines)
         : Promise.resolve(unavailable("No container access log is available yet.", "Create a live container first.")),
     fallbackPaths.length
       ? summarizeRequestsTodayForPaths(fallbackPaths, customerSummaryOptions)
       : Promise.resolve({ available: false, count: 0, recentEvents: [] }),
-    fallbackPaths.length
-      ? summarizeRequestsForPeriodForPaths(fallbackPaths, billingPeriod, customerSummaryOptions)
+    allTenantLogPaths.length || fallbackPaths.length
+      ? summarizeRequestsForPeriodForPaths(allTenantLogPaths.length ? allTenantLogPaths : fallbackPaths, billingPeriod, customerSummaryOptions)
       : Promise.resolve(emptyPeriodSummary)
   ]);
-  const tenantRequestSummary = filterRequestSummaryForTenant(rawTodaySummary, tenant);
+  const tenantRequestSummary = filterRequestSummaryForTenant(rawTodaySummary, scopedTenant);
   const tenantPeriodSummary = rawPeriodSummary;
   const requestLimit = tenant?.requestLimit || data.usage.requestLimit;
   const todayKey = localDateKey();
   // No event source → no retained history / SQLite snapshots either, so the daily
   // charts and Event-Log-by-Day table stay empty for containerless accounts.
-  const tenantEventHistory = hasEventSource
+  const tenantEventHistory = hasEventSource && !multiContainer
     ? (data.history?.tenantEventHistory || data.tenantEventHistory || {})[session.tenantId] || {}
     : {};
   const eventHistoryCutoff = localDateKey(addDays(new Date(), -29));
@@ -10341,7 +10434,17 @@ async function customerDashboardData(data, session) {
   // SQLite event store: per-day snapshots rebuilt from raw ingested lines. Survives
   // log rotation and works across worker VPSes. Per date, keep whichever source saw
   // more events (tail summaries undercount after rotation; SQLite may lag a tick).
-  const sqliteSnapshotsByDate = hasEventSource ? sqliteSnapshotsForTenant(session.tenantId, tenant) : {};
+  const scopedSource = scopedContainerId ? tenantLogPaths[0] || "" : "";
+  const snapshotCacheKey = scopedContainerId ? `${session.tenantId}:${scopedContainerId}` : session.tenantId;
+  const sqliteSnapshotsByDate = hasEventSource
+    ? sqliteSnapshotsForTenant(session.tenantId, scopedTenant, 30, { source: scopedSource, cacheKey: snapshotCacheKey })
+    : {};
+  const accountTenant = multiContainer
+    ? { ...tenant, containerDomains: tenantSetupRequests.map((request) => request.trackingDomain).filter(Boolean) }
+    : tenant;
+  const accountSqliteSnapshots = multiContainer && hasEventSource
+    ? sqliteSnapshotsForTenant(session.tenantId, accountTenant)
+    : sqliteSnapshotsByDate;
   for (const [dateKey, snapshot] of Object.entries(sqliteSnapshotsByDate)) {
     const existing = retainedSnapshotsByDate[dateKey];
     if (!existing || Number(snapshot.total || 0) > Number(existing.total || 0)) {
@@ -10355,7 +10458,7 @@ async function customerDashboardData(data, session) {
   // sqliteSnapshotsForTenant) whenever it has seen at least as many events, so the
   // dashboard's today KPIs / top events / distribution / graph match the Event Logs.
   // Only fall back to the tail when SQLite is momentarily lagging (fewer events).
-  const sqliteTodayCache = hasEventSource ? todaySnapshotCache.get(session.tenantId) : null;
+  const sqliteTodayCache = hasEventSource ? todaySnapshotCache.get(snapshotCacheKey) : null;
   const sqliteTodaySummary = (sqliteTodayCache && sqliteTodayCache.dateKey === todayKey && sqliteTodayCache.summary?.available)
     ? sqliteTodayCache.summary
     : null;
@@ -10382,7 +10485,8 @@ async function customerDashboardData(data, session) {
   // Build per-day rows enriched with per-event-type counts + purchase totals so the
   // browser can drive the 24h/7d/30d KPI slider and multi-series daily chart without
   // another request. `total` is kept for back-compat with the existing chart.
-  const dailyDateKeys = [...new Set([...Object.keys(tenantDailyReqs), ...Object.keys(retainedSnapshotsByDate)])]
+  const containerDailyReqs = multiContainer ? {} : tenantDailyReqs;
+  const dailyDateKeys = [...new Set([...Object.keys(containerDailyReqs), ...Object.keys(retainedSnapshotsByDate)])]
     .sort((a, b) => b.localeCompare(a))
     .slice(0, 30);
   const tenantDailyHistory = dailyDateKeys.map((date) => {
@@ -10393,7 +10497,7 @@ async function customerDashboardData(data, session) {
     const purchaseCount = Number(ps.uniqueCount || 0) || byType("Purchase");
     return {
       date,
-      total: Math.max(Number(tenantDailyReqs[date] || 0), Number(snap?.total || 0)),
+      total: Math.max(Number(containerDailyReqs[date] || 0), Number(snap?.total || 0)),
       errors: Number(snap?.errors || 0),
       pageView: byType("PageView"),
       viewItem: byType("ViewItem"),
@@ -10410,21 +10514,32 @@ async function customerDashboardData(data, session) {
   // total (clean events), so a day missed by one source is covered by the other.
   const billingDayKeys = new Set([
     ...Object.keys(tenantDailyReqs).filter((d) => d >= billingStartKey && d < todayKey),
-    ...Object.keys(sqliteSnapshotsByDate).filter((d) => d >= billingStartKey && d < todayKey)
+    ...Object.keys(accountSqliteSnapshots).filter((d) => d >= billingStartKey && d < todayKey)
   ]);
   const historicCount = [...billingDayKeys].reduce((sum, d) => sum + Math.max(
     Number(tenantDailyReqs[d] || 0),
-    Number(sqliteSnapshotsByDate[d]?.total || 0)
+    Number(accountSqliteSnapshots[d]?.total || 0)
   ), 0);
   const todayLiveCount = Math.max(
     Number(tenantRequestSummary.count || 0),
     Number(sqliteSnapshotsByDate[todayKey]?.total || 0)
   );
-  const accumulatedCount = historicCount + todayLiveCount;
+  const sourceCountsToday = eventStore?.sourceCountsForTenantDate(session.tenantId, todayKey) || {};
+  const containerRequestCounts = Object.fromEntries(tenantSetupRequests.map((request) => {
+    const sourceCount = customerAccessLogPaths(data, session.tenantId, request.id)
+      .reduce((total, pathname) => total + Number(sourceCountsToday[pathname] || 0), 0);
+    return [request.id, request.id === activeContainerId ? Math.max(sourceCount, todayLiveCount) : sourceCount];
+  }));
+  const accountTodayCount = Math.max(todayLiveCount, Number(accountSqliteSnapshots[todayKey]?.total || 0), Number(tenantDailyReqs[todayKey] || 0));
+  const accumulatedCount = historicCount + accountTodayCount;
   // Keep whichever is higher: accumulated (rotation-safe) vs live log period scan
   const livePeriodCount = tenantPeriodSummary.available ? Number(tenantPeriodSummary.count || 0) : 0;
   const requestsMonth = Math.max(accumulatedCount, livePeriodCount);
   const usagePercent = requestLimit ? Math.min(100, Math.round((requestsMonth / requestLimit) * 1000) / 10) : 0;
+  const containerHistoricCount = Object.entries(retainedSnapshotsByDate)
+    .filter(([dateKey]) => dateKey >= billingStartKey && dateKey < todayKey)
+    .reduce((total, [, snapshot]) => total + Number(snapshot.total || 0), 0);
+  const containerRequestsMonth = multiContainer ? containerHistoricCount + todayLiveCount : requestsMonth;
   const tenantUsage = {
     ...data.usage,
     plan: tenant?.plan || data.usage.plan,
@@ -10465,7 +10580,7 @@ async function customerDashboardData(data, session) {
         available: data.customers.available,
         active: tenant.subscriptionStatus === "active" ? 1 : 0,
         queued: 0,
-        tenants: [publicTenantForCustomer(tenant)]
+        tenants: [publicTenantForCustomer(tenant, trackingForContainer(tenant, tenantSetupRequests, activeContainerId))]
       }
       : { available: data.customers.available, active: 0, queued: 0, tenants: [] },
     provisioning: { available: true, path: "", requests: [] },
@@ -10496,6 +10611,20 @@ async function customerDashboardData(data, session) {
     // shipping the all-tenants map to the browser leaked cross-tenant data and
     // inflated the payload, so the customer response carries an empty map.
     history: { available: data.history.available, daily: tenantDailyHistory, tenantEventHistory: {} },
+    activeContainer: activeContainer ? {
+      id: activeContainer.id,
+      name: activeContainer.containerName || activeContainer.tenantName || activeContainer.trackingDomain || "Container",
+      trackingDomain: activeContainer.trackingDomain || "",
+      websiteUrl: activeContainer.websiteUrl || ""
+    } : null,
+    containerRequestCounts,
+    containerUsage: {
+      requestsToday: todayLiveCount,
+      requestsMonth: containerRequestsMonth,
+      requestLimit,
+      usagePercent: requestLimit ? Math.min(100, Math.round((containerRequestsMonth / requestLimit) * 1000) / 10) : 0
+    },
+    tracking: publicTenantTracking(tenant, trackingForContainer(tenant, tenantSetupRequests, activeContainerId)),
     orders: tenantOrders,
     usage: tenantUsage,
     reconciliation: tenantReconciliation,
@@ -10506,6 +10635,13 @@ async function customerDashboardData(data, session) {
 
 function hostMatchesTenant(host, tenant) {
   if (!tenant) return true;
+  if (Array.isArray(tenant.containerDomains) && tenant.containerDomains.length) {
+    const hostName = normalizeHost(host);
+    return tenant.containerDomains.some((value) => {
+      const domain = normalizeHost(value);
+      return domain && (hostName === domain || hostName.endsWith(`.${domain}`) || domain.endsWith(`.${hostName}`));
+    });
+  }
   const domain = normalizeHost(tenant.domain);
   if (!domain) return tenant.source === "environment";
   const hostName = normalizeHost(host);
@@ -10632,14 +10768,19 @@ function filterRequestSummaryForTenant(summary, tenant) {
   };
 }
 
-function filterOrdersForTenant(orders, tenant) {
-  if (!tenant || tenant.source === "environment") return orders;
+function filterOrdersForTenant(orders, tenant, containerId = "", primaryId = "") {
+  if (!tenant || (tenant.source === "environment" && !containerId)) return orders;
   const todayOrders = orders.today || {};
-  const rawOrders = (orders.rawToday || []).filter((order) => order.tenantId === tenant.id);
+  const rawOrders = (orders.rawToday || []).filter((order) => {
+    if (order.tenantId !== tenant.id) return false;
+    if (!containerId) return true;
+    return String(order.containerId || "") === containerId || (!order.containerId && containerId === primaryId);
+  });
   const revenue = rawOrders.reduce((total, order) => total + Number(order.amount || 0), 0);
   const currencies = new Set(rawOrders.map((order) => order.currency).filter(Boolean));
   return {
     ...orders,
+    rawToday: rawOrders,
     today: {
       ...todayOrders,
       count: rawOrders.length,
@@ -11230,9 +11371,18 @@ const server = createServer(async (req, res) => {
     // must stay above the session auth gate below.
     if (pathname === "/api/orders/woocommerce" && req.method === "POST") {
       const tenantParam = sanitizeId(reqUrl.searchParams.get("tenant") || "");
+      const requestedContainerId = sanitizeId(reqUrl.searchParams.get("container") || "");
       // Per-tenant secret (generated from the customer dashboard) wins; the
       // global ORDER_WEBHOOK_SECRET stays as fallback for single-tenant setups.
       const loadedForSecret = await readDatabase();
+      const webhookTenant = loadedForSecret.available
+        ? (loadedForSecret.data.tenants || []).find((item) => item.id === tenantParam)
+        : null;
+      if (requestedContainerId && !customerContainerRequests(loadedForSecret.data?.customerSetupRequests || [], tenantParam)
+        .some((request) => request.id === requestedContainerId)) {
+        jsonResponse(res, 404, { error: "The selected tracking container was not found." });
+        return;
+      }
       const perTenantSecret = loadedForSecret.available ? tenantWebhookSecret(loadedForSecret.data, tenantParam) : "";
       const webhookSecret = perTenantSecret || config.orderWebhookSecret;
       if (!webhookSecret) {
@@ -11265,7 +11415,12 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 400, { error: "Invalid JSON payload." });
         return;
       }
-      const result = await addOrderWebhook(normalizeWooOrderPayload(payload, tenantParam));
+      const primaryId = primaryContainerId(webhookTenant, loadedForSecret.data?.customerSetupRequests || []);
+      const containerId = requestedContainerId === primaryId ? "" : requestedContainerId;
+      const result = await addOrderWebhook({
+        ...normalizeWooOrderPayload(payload, tenantParam),
+        container_id: containerId
+      });
       jsonResponse(res, result.ok ? 202 : 400, result.ok ? { order: result.order, created: result.created } : { errors: result.errors });
       return;
     }
@@ -11289,6 +11444,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const tenantId = sanitizeId(payload.tenant_id || payload.tenantId || "");
+      const requestedContainerId = sanitizeId(payload.container_id || payload.containerId || "");
       const loadedForSecret = await readDatabaseCached();
       const snapshotTenant = loadedForSecret.available ? (loadedForSecret.data.tenants || []).find((item) => item.id === tenantId) : null;
       const secret = snapshotTenant?.laravelBridgeSecret || "";
@@ -11296,17 +11452,25 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 401, { error: "Invalid Laravel Bridge signature." });
         return;
       }
+      const containerRequests = loadedForSecret.data?.customerSetupRequests || [];
+      if (requestedContainerId && !customerContainerRequests(containerRequests, tenantId)
+        .some((request) => request.id === requestedContainerId)) {
+        jsonResponse(res, 404, { error: "The selected tracking container was not found." });
+        return;
+      }
+      const bridgeTracking = trackingForContainer(snapshotTenant, containerRequests, requestedContainerId);
       if (String(payload.event_name || "purchase") !== "purchase") {
         jsonResponse(res, 400, { error: "This Bridge version accepts purchase events only." });
         return;
       }
-      if (payload.source === "tagioo-cpanel-bridge" && !snapshotTenant?.tracking?.laravelSelfService?.active) {
+      if (payload.source === "tagioo-cpanel-bridge" && !bridgeTracking?.laravelSelfService?.active) {
         jsonResponse(res, 409, { error: "Activate Laravel tracking from the Tagioo dashboard before sending orders." });
         return;
       }
       const result = await addOrderWebhook({
         ...payload,
         tenant_id: tenantId,
+        container_id: requestedContainerId === primaryContainerId(snapshotTenant, containerRequests) ? "" : requestedContainerId,
         order_id: payload.order_id || payload.event_id,
         source: payload.source === "tagioo-cpanel-bridge" ? "tagioo-cpanel-bridge" : "tagioo-laravel-bridge"
       });
@@ -11329,8 +11493,13 @@ const server = createServer(async (req, res) => {
       }
       const loadedForSecret = await readDatabaseCached();
       const tenant = loadedForSecret.available ? (loadedForSecret.data.tenants || []).find((item) => item.id === tenantId) : null;
-      const secret = tenant?.tracking?.shopify?.integrationToken || "";
-      if (!tenantId || !secret || !isShopifyIntegrationAuthorized(req, rawBody, secret)) {
+      const matchedIntegration = tenant
+        ? scopedTrackingEntries(tenant, loadedForSecret.data.customerSetupRequests || []).find((entry) =>
+          entry.tracking?.shopify?.integrationToken
+          && isShopifyIntegrationAuthorized(req, rawBody, entry.tracking.shopify.integrationToken)
+        )
+        : null;
+      if (!tenantId || !matchedIntegration) {
         jsonResponse(res, 401, { error: "Invalid Shopify integration signature." });
         return;
       }
@@ -11341,7 +11510,9 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 400, { error: "Invalid JSON payload." });
         return;
       }
-      const result = await addOrderWebhook({ ...payload, tenant_id: tenantId, source: "tagioo-shopify-app" });
+      const primaryId = primaryContainerId(tenant, loadedForSecret.data.customerSetupRequests || []);
+      const containerId = matchedIntegration.containerId === primaryId ? "" : matchedIntegration.containerId;
+      const result = await addOrderWebhook({ ...payload, tenant_id: tenantId, container_id: containerId, source: "tagioo-shopify-app" });
       jsonResponse(res, result.ok ? (result.created ? 202 : 200) : 400, result.ok
         ? { accepted: true, created: result.created, order_id: result.order.id }
         : { errors: result.errors });
@@ -11353,6 +11524,7 @@ const server = createServer(async (req, res) => {
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? {
         tenantId: result.tenantId,
         tenantName: result.tenantName,
+        containerId: result.containerId,
         trackingDomain: result.trackingDomain,
         measurementId: result.measurementId,
         integrationToken: result.integrationToken
@@ -11378,6 +11550,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const tenantId = sanitizeId(payload.tenant_id || payload.tenantId || "");
+      const requestedContainerId = sanitizeId(payload.container_id || payload.containerId || "");
       if (!cpanelBridgeAvailableFor(tenantId)) {
         jsonResponse(res, 404, { error: "Laravel self-service is not enabled for this tenant." });
         return;
@@ -11389,7 +11562,13 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 401, { error: "Invalid Laravel Bridge signature." });
         return;
       }
-      const result = await recordLaravelBridgeHeartbeat(payload, tenantId, snapshotTenant);
+      const containerRequests = loadedForSecret.data?.customerSetupRequests || [];
+      if (requestedContainerId && !customerContainerRequests(containerRequests, tenantId)
+        .some((request) => request.id === requestedContainerId)) {
+        jsonResponse(res, 404, { error: "The selected tracking container was not found." });
+        return;
+      }
+      const result = await recordLaravelBridgeHeartbeat(payload, tenantId, snapshotTenant, containerRequests);
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
         ? { accepted: true, active: result.active, status: result.status, mapping: result.mapping, heartbeat_interval: result.heartbeatInterval }
         : { errors: result.errors });
@@ -11576,7 +11755,8 @@ const server = createServer(async (req, res) => {
       const session = getSession(req);
       const startedAt = Date.now();
       if (session?.role === "customer") {
-        const payload = await getCustomerDashboardDataCached(session);
+        const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+        const payload = await getCustomerDashboardDataCached(session, containerId);
         if (payload.timing?.dashboardMs > 2000) {
           console.warn(`[dashboard] customer dashboard took ${payload.timing.dashboardMs}ms for tenant ${session.tenantId}`);
         }
@@ -11622,7 +11802,8 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 401, { error: "Customer session required." });
         return;
       }
-      const result = await createShopifyConnectionCode(session);
+      const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+      const result = await createShopifyConnectionCode(session, containerId);
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
         ? { code: result.code, expiresAt: result.expiresAt }
         : { errors: result.errors });
@@ -11651,9 +11832,12 @@ const server = createServer(async (req, res) => {
         return;
       }
       const tenant = await tenantForSession(session);
+      const loaded = await readDatabaseCached();
+      const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+      const tracking = trackingForContainer(tenant, loaded.available ? loaded.data.customerSetupRequests || [] : [], containerId);
       jsonResponse(res, 200, {
         available: cpanelBridgeAvailableFor(session.tenantId),
-        setup: publicLaravelSelfService(tenant?.tracking?.laravelSelfService || {})
+        setup: publicLaravelSelfService(tracking?.laravelSelfService || {})
       });
       return;
     }
@@ -11687,7 +11871,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 401, { error: "Customer session required." });
         return;
       }
-      const result = await activateLaravelSelfService(session);
+      const result = await activateLaravelSelfService(session, sanitizeId(reqUrl.searchParams.get("container") || ""));
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { setup: result.setup } : { errors: result.errors });
       return;
     }
@@ -11698,7 +11882,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 401, { error: "Customer session required." });
         return;
       }
-      const result = await deactivateLaravelSelfService(session);
+      const result = await deactivateLaravelSelfService(session, sanitizeId(reqUrl.searchParams.get("container") || ""));
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { setup: result.setup } : { errors: result.errors });
       return;
     }
@@ -11709,7 +11893,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 401, { error: "Customer session required." });
         return;
       }
-      const result = await verifyLaravelSelfService(session);
+      const result = await verifyLaravelSelfService(session, sanitizeId(reqUrl.searchParams.get("container") || ""));
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
         ? { verified: result.verified, verification: result.verification }
         : { errors: result.errors });
@@ -11723,6 +11907,15 @@ const server = createServer(async (req, res) => {
         return;
       }
       const body = await readJson(req);
+      const containerId = sanitizeId(body.containerId || "");
+      if (containerId) {
+        const loaded = await readDatabaseCached();
+        if (!loaded.available || !customerContainerRequests(loaded.data.customerSetupRequests || [], session.tenantId)
+          .some((request) => request.id === containerId)) {
+          jsonResponse(res, 404, { error: "The selected tracking container was not found." });
+          return;
+        }
+      }
       if (selectedDestinations(body).length === 0) {
         jsonResponse(res, 400, { error: "Select at least one tracking destination." });
         return;
@@ -11730,7 +11923,7 @@ const server = createServer(async (req, res) => {
       const templates = buildSetupAssistantTemplates(body);
       // Persist GA4 creds + tracking origin so the order webhook can forward
       // server-side purchase recovery events to this tenant's sGTM.
-      await saveTenantTrackingConfig(session.tenantId, body);
+      await saveTenantTrackingConfig(session.tenantId, body, containerId);
       jsonResponse(res, 200, templates);
       return;
     }
@@ -11832,7 +12025,14 @@ const server = createServer(async (req, res) => {
         const loaded = await readDatabase();
         if (!loaded.available) throw new Error(loaded.detail || loaded.message || "Database unavailable.");
         const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
-        const setup = tenant?.tracking?.laravelSelfService || tenant?.tracking?.laravelManagedSetup;
+        const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+        const requests = loaded.data.customerSetupRequests || [];
+        if (containerId && !customerContainerRequests(requests, session.tenantId).some((request) => request.id === containerId)) {
+          jsonResponse(res, 404, { error: "The selected tracking container was not found." });
+          return;
+        }
+        const tracking = trackingForContainer(tenant, requests, containerId);
+        const setup = tracking?.laravelSelfService || tracking?.laravelManagedSetup;
         const webhookSecret = tenant?.laravelBridgeSecret || "";
         if (!tenant || !setup?.storeUrl || !webhookSecret) {
           jsonResponse(res, 409, { error: "Create your Laravel installation package before downloading the bridge." });
@@ -11855,6 +12055,7 @@ const server = createServer(async (req, res) => {
             endpoint: `${panelBaseUrl}/api/orders/laravel`,
             heartbeatEndpoint: `${panelBaseUrl}/api/laravel/bridge/heartbeat`,
             tenantId: tenant.id,
+            containerId: containerId === primaryContainerId(tenant, requests) ? "" : containerId,
             webhookSecret,
             storeUrl: setup.storeUrl,
             currency: setup.currency || "BDT"
@@ -11884,7 +12085,8 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const csvText = typeof body === "string" ? body : String(body.csv || "");
       const validateOnly = pathname.endsWith("/validate");
-      const result = await handleOfflineConversionUpload(session, csvText, { validateOnly });
+      const containerId = sanitizeId(body.containerId || reqUrl.searchParams.get("container") || "");
+      const result = await handleOfflineConversionUpload(session, csvText, { validateOnly, containerId });
       const { ok, status, ...rest } = result;
       jsonResponse(res, status || (ok ? 200 : 400), rest);
       return;
@@ -11901,8 +12103,11 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 404, { error: "Tenant not found." });
         return;
       }
-      const result = await verifyTenantTracking(tenant);
-      await recordTenantVerify(tenant.id, result);
+      const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+      const loaded = await readDatabaseCached();
+      const tracking = trackingForContainer(tenant, loaded.available ? loaded.data.customerSetupRequests || [] : [], containerId);
+      const result = await verifyTenantTracking({ ...tenant, tracking });
+      await recordTenantVerify(tenant.id, result, containerId);
       jsonResponse(res, 200, result);
       return;
     }
@@ -11914,12 +12119,14 @@ const server = createServer(async (req, res) => {
         return;
       }
       const body = await readJson(req);
+      const containerId = sanitizeId(body.containerId || "");
       await saveTenantTrackingConfig(session.tenantId, {
         cookieExtensionEnabled: Boolean(body.enabled),
         cookieExtensionDays: body.days
-      });
+      }, containerId);
       const tenant = await tenantForSession(session);
-      jsonResponse(res, 200, { tracking: publicTenantTracking(tenant) });
+      const loaded = await readDatabaseCached();
+      jsonResponse(res, 200, { tracking: publicTenantTracking(tenant, trackingForContainer(tenant, loaded.available ? loaded.data.customerSetupRequests || [] : [], containerId)) });
       return;
     }
 
@@ -12072,7 +12279,9 @@ const server = createServer(async (req, res) => {
         return;
       }
       const tenant = (loaded.data.tenants || []).find((t) => t.id === account.tenantId) || null;
-      jsonResponse(res, 200, { account: publicCustomerAccount(account), tracking: publicTenantTracking(tenant) });
+      const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+      const tracking = trackingForContainer(tenant, loaded.data.customerSetupRequests || [], containerId);
+      jsonResponse(res, 200, { account: publicCustomerAccount(account), tracking: publicTenantTracking(tenant, tracking) });
       return;
     }
 
@@ -12574,28 +12783,28 @@ async function ingestLocalLogsTick() {
 // seconds, so reuse the result until new lines arrive for that tenant+day.
 const todaySnapshotCache = new Map();
 
-function sqliteSnapshotsForTenant(tenantId, tenant, days = 30) {
+function sqliteSnapshotsForTenant(tenantId, tenant, days = 30, { source = "", cacheKey = tenantId } = {}) {
   if (!eventStore) return {};
   const fromKey = localDateKey(addDays(new Date(), -(days - 1)));
   const todayKey = localDateKey();
   const snapshots = {};
   try {
-    const lineCounts = eventStore.dateCountsForTenant(tenantId, fromKey);
-    for (const dateKey of eventStore.tenantDates(tenantId, fromKey)) {
+    const lineCounts = eventStore.dateCountsForTenant(tenantId, fromKey, source);
+    for (const dateKey of eventStore.tenantDates(tenantId, fromKey, source)) {
       if (dateKey !== todayKey) {
-        const cached = eventStore.getDailySummary(tenantId, dateKey);
+        const cached = eventStore.getDailySummary(cacheKey, dateKey);
         if (cached) {
           snapshots[dateKey] = cached;
           continue;
         }
       } else {
-        const cached = todaySnapshotCache.get(tenantId);
+        const cached = todaySnapshotCache.get(cacheKey);
         if (cached && cached.dateKey === todayKey && cached.lineCount === (lineCounts[dateKey] || 0)) {
           snapshots[dateKey] = cached.snapshot;
           continue;
         }
       }
-      const lines = eventStore.linesForTenantDate(tenantId, dateKey);
+      const lines = eventStore.linesForTenantDate(tenantId, dateKey, source);
       if (!lines.length) continue;
       const summary = filterRequestSummaryForTenant(
         aggregateTrackingLines(lines, { path: "sqlite:events.db" }),
@@ -12607,8 +12816,8 @@ function sqliteSnapshotsForTenant(tenantId, tenant, days = 30) {
       // Cache today's FULL summary (untruncated, unlike the ~500-line live tail) so
       // the dashboard's today KPIs / top events / distribution / graph read accurate
       // counts that match the Event Logs, not the truncated tail summary.
-      if (dateKey !== todayKey) eventStore.setDailySummary(tenantId, dateKey, snapshot);
-      else todaySnapshotCache.set(tenantId, { dateKey, lineCount: lines.length, snapshot, summary });
+      if (dateKey !== todayKey) eventStore.setDailySummary(cacheKey, dateKey, snapshot);
+      else todaySnapshotCache.set(cacheKey, { dateKey, lineCount: lines.length, snapshot, summary });
     }
   } catch (error) {
     console.error(`[events] snapshot build failed for tenant ${tenantId}: ${error.message}`);

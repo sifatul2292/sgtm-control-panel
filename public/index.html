@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=49" />
+    <link rel="stylesheet" href="/styles.css?v=50" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -132,6 +132,10 @@
             <h1 id="pageTitle">Server Overview</h1>
           </div>
           <div class="topbar-actions">
+            <label id="customerContainerSwitcher" class="container-switcher" hidden>
+              <span>Container</span>
+              <select id="customerActiveContainer" aria-label="Active tracking container"></select>
+            </label>
             <span id="generatedAt" class="timestamp">Loading...</span>
             <a class="button" href="/logout">Logout</a>
             <button id="refreshButton" class="button button-primary" type="button">
@@ -2558,6 +2562,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=74" type="module"></script>
+    <script src="/app.js?v=75" type="module"></script>
   </body>
 </html>

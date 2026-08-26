@@ -5,6 +5,7 @@ return [
     'endpoint' => 'https://panel.example.com/api/orders/laravel',
     'heartbeat_endpoint' => 'https://panel.example.com/api/laravel/bridge/heartbeat',
     'tenant' => 'customer-id',
+    'container_id' => '',
     'secret' => 'replace-with-a-random-secret',
     'store_url' => 'https://store.example.com',
 

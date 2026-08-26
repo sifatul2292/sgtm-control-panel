@@ -3,6 +3,8 @@ const els = {
   refreshButton: document.querySelector("#refreshButton"),
   breadcrumb: document.querySelector("#breadcrumb"),
   pageTitle: document.querySelector("#pageTitle"),
+  customerContainerSwitcher: document.querySelector("#customerContainerSwitcher"),
+  customerActiveContainer: document.querySelector("#customerActiveContainer"),
   navItems: document.querySelectorAll("[data-view-target]"),
   views: document.querySelectorAll("[data-view]"),
   offlineConversionsBody: document.querySelector("#offlineConversionsBody"),
@@ -211,6 +213,7 @@ let customerChartRange = "24h";
 let customerKpiRange = "24h";
 let purchaseRange = "day";
 let selectedCustomerContainerId = "";
+let setupAssistantContainerId = "";
 let selectedManageCustomerId = "";
 const MANAGE_PLANS = ["Free", "Starter", "Pro", "Enterprise"];
 let setupAssistantStep = 1;
@@ -515,8 +518,16 @@ document.querySelector('a[href="/logout"]')?.addEventListener("click", () => {
 });
 
 function applySession(session) {
+  const previousTenantId = currentSession.tenantId || "";
   currentSession = session || { role: "owner" };
   const customerMode = currentSession.role === "customer";
+  if (customerMode && currentSession.tenantId && currentSession.tenantId !== previousTenantId) {
+    try {
+      selectedCustomerContainerId = window.localStorage.getItem(`tagioo_active_container_${currentSession.tenantId}`) || "";
+    } catch {
+      selectedCustomerContainerId = "";
+    }
+  }
   identifyPostHog();
   try {
     window.localStorage.setItem("tagioo_session_role", customerMode ? "customer" : "owner");
@@ -1076,7 +1087,8 @@ function renderEventRows(visibleItems, emptyMessage) {
 }
 
 function customerFallbackHost(data) {
-  const request = (data.customerSetup?.requests || []).find((item) => item.trackingDomain || item.websiteUrl);
+  const request = (data.customerSetup?.requests || []).find((item) => item.id === data.activeContainer?.id)
+    || (data.customerSetup?.requests || []).find((item) => item.trackingDomain || item.websiteUrl);
   const value = request?.trackingDomain || request?.websiteUrl || data.config?.tenantDomain || data.config?.sslDomain || "";
   try {
     return new URL(value.startsWith("http") ? value : `https://${value}`).hostname;
@@ -1962,7 +1974,7 @@ function renderUpgradeNudge(usage) {
 
 function renderCustomerSetup(data) {
   const requests = (data.customerSetup?.requests || []).filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()));
-  const latest = requests[0];
+  const latest = requests.find((request) => request.id === data.activeContainer?.id) || requests[0];
   const usage = data.usage || {};
   const dnsTarget = data.config?.provisionDnsTarget || data.config?.publicBaseUrl || window.location.host || "bd.tagioo.com";
   const usagePercent = Math.min(100, Math.max(0, Number(usage.usagePercent || 0)));
@@ -2367,7 +2379,7 @@ function renderCustomerContainers(data) {
   }
 
   if (!requests.some((request) => request.id === selectedCustomerContainerId)) {
-    selectedCustomerContainerId = requests[0]?.id || "";
+    selectedCustomerContainerId = data.activeContainer?.id || requests[0]?.id || "";
   }
 
   const searchTerm = String(els.customerContainerSearch?.value || "").trim().toLowerCase();
@@ -2383,17 +2395,22 @@ function renderCustomerContainers(data) {
   }
 
   els.customerContainersTable.querySelectorAll("[data-container-select]").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectedCustomerContainerId = button.dataset.containerSelect || selectedCustomerContainerId;
-      renderCustomerContainers(latestData || data);
+    button.addEventListener("click", async () => {
+      await selectCustomerContainer(button.dataset.containerSelect || selectedCustomerContainerId);
       document.querySelector("#customerContainerDetail")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
   els.customerContainersTable.querySelectorAll("[data-container-logs]").forEach((button) => {
-    button.addEventListener("click", () => setView("logs"));
+    button.addEventListener("click", async () => {
+      await selectCustomerContainer(button.dataset.containerLogs || selectedCustomerContainerId);
+      setView("logs");
+    });
   });
   els.customerContainersTable.querySelectorAll("[data-container-powerups]").forEach((button) => {
-    button.addEventListener("click", () => setView("powerUps"));
+    button.addEventListener("click", async () => {
+      await selectCustomerContainer(button.dataset.containerPowerups || selectedCustomerContainerId);
+      setView("powerUps");
+    });
   });
   els.customerContainersTable.querySelectorAll("[data-container-delete]").forEach((button) => {
     button.addEventListener("click", () => deleteCustomerContainer(button.dataset.containerDelete));
@@ -2467,7 +2484,7 @@ function customerContainerDetail(request, data, dnsTarget) {
   const usage = data.usage || {};
   const planName = usage.plan || "Starter";
   const requestLimit = Number(usage.requestLimit || 100000);
-  const monthRequests = Number(usage.requestsMonth || 0);
+  const monthRequests = Number(data.containerUsage?.requestsMonth ?? usage.requestsMonth ?? 0);
   const requestCount = customerContainerRequestCount(request, data);
   const usagePercent = requestLimit ? Math.min(100, Math.round((monthRequests / requestLimit) * 1000) / 10) : 0;
   const serverUrl = request.trackingDomain ? `https://${request.trackingDomain}` : null;
@@ -2485,7 +2502,7 @@ function customerContainerDetail(request, data, dnsTarget) {
         <p>${escapeHtml(request.websiteUrl || "Website not set")}</p>
         <div class="container-detail-progress">
           <strong>${Number(monthRequests).toLocaleString()}</strong>
-          <span>of ${Number(requestLimit).toLocaleString()} requests this billing period</span>
+          <span>of ${Number(requestLimit).toLocaleString()} account requests this billing period</span>
           <em>${usagePercent}% used</em>
         </div>
         <div class="usage-bar" role="progressbar" aria-valuenow="${usagePercent}" aria-valuemin="0" aria-valuemax="100">
@@ -2577,6 +2594,9 @@ function containerDisplayName(request) {
 }
 
 function customerContainerRequestCount(request, data) {
+  if (Object.prototype.hasOwnProperty.call(data.containerRequestCounts || {}, request.id)) {
+    return Number(data.containerRequestCounts[request.id] || 0);
+  }
   const trackingDomain = String(request.trackingDomain || "").toLowerCase();
   const rows = todayRows(data);
   const matchingRows = trackingDomain
@@ -2939,7 +2959,7 @@ async function renderPowerUps(data) {
   if (regenBtn) regenBtn.addEventListener("click", () => triggerRegenNginx(data));
 
   // Power-up card action buttons
-  const trackingDomain = (data.containerSetup?.trackingDomain || data.customerSetup?.requests?.[0]?.trackingDomain || "");
+  const trackingDomain = (data.activeContainer?.trackingDomain || data.containerSetup?.trackingDomain || data.customerSetup?.requests?.[0]?.trackingDomain || "");
   els.powerUpsGrid.querySelectorAll("[data-powerup-action]").forEach((button) => {
     button.addEventListener("click", () => {
       const item = powerUps.find((entry) => entry.id === button.dataset.powerupAction);
@@ -2981,18 +3001,39 @@ function renderSetupAssistant(data) {
   const tenantTracking = data.tracking || data.customers?.tenants?.[0]?.tracking || {};
   // Keep action handlers and polling on the same tenant-scoped view used here.
   data.tracking = tenantTracking;
-  const latest = (data.customerSetup?.requests || [])
-    .filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()))
-    .at(0);
+  const requests = (data.customerSetup?.requests || [])
+    .filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()));
+  const latest = requests.find((request) => request.id === data.activeContainer?.id) || requests[0];
+  const containerChanged = setupAssistantContainerId !== (latest?.id || "");
+  if (containerChanged) {
+    setupAssistantContainerId = latest?.id || "";
+    setupAssistantStep = 1;
+    els.setupAssistantForm.reset();
+    generatedAssistantTemplates = null;
+    if (els.downloadWebTemplate) els.downloadWebTemplate.disabled = true;
+    if (els.downloadServerTemplate) els.downloadServerTemplate.disabled = true;
+    if (els.setupAssistantResult) els.setupAssistantResult.textContent = "";
+    if (els.verifyTrackingResult) els.verifyTrackingResult.hidden = true;
+  }
   const trackingDomainInput = els.setupAssistantForm.elements.trackingDomain;
-  if (trackingDomainInput && !trackingDomainInput.value && latest?.trackingDomain) {
-    trackingDomainInput.value = `https://${latest.trackingDomain}`;
+  if (trackingDomainInput && (containerChanged || !trackingDomainInput.value) && latest?.trackingDomain) {
+    trackingDomainInput.value = tenantTracking.domain || `https://${latest.trackingDomain}`;
+  }
+  if (containerChanged) {
+    const form = els.setupAssistantForm.elements;
+    if (form.ga4MeasurementId) form.ga4MeasurementId.value = tenantTracking.measurementId || "";
+    if (form.metaPixelId) form.metaPixelId.value = tenantTracking.meta?.pixelId || "";
+    if (form.metaTestEventCode) form.metaTestEventCode.value = tenantTracking.meta?.testEventCode || "";
+    if (form.platform && tenantTracking.platform) form.platform.value = tenantTracking.platform;
   }
   const wooUrlEl = document.querySelector("[data-woo-webhook-url]");
   if (wooUrlEl) {
     const base = (data.config?.publicBaseUrl || window.location.origin).replace(/\/$/, "");
     const tenantId = data.session?.tenantId || currentSession.tenantId || "";
-    wooUrlEl.textContent = `${base}/api/orders/woocommerce${tenantId ? `?tenant=${tenantId}` : ""}`;
+    const query = new URLSearchParams();
+    if (tenantId) query.set("tenant", tenantId);
+    if (latest?.id) query.set("container", latest.id);
+    wooUrlEl.textContent = `${base}/api/orders/woocommerce${query.size ? `?${query}` : ""}`;
   }
   const wooDomainEl = document.querySelector("[data-woo-tracking-domain]");
   if (wooDomainEl) {
@@ -3154,7 +3195,8 @@ async function refreshLaravelSelfService(showMessage = true) {
   laravelRefreshInFlight = true;
   const message = document.querySelector("#cpanelBridgeMessage");
   try {
-    const response = await fetch("/api/customer/laravel-self-service");
+    const query = selectedCustomerContainerId ? `?container=${encodeURIComponent(selectedCustomerContainerId)}` : "";
+    const response = await fetch(`/api/customer/laravel-self-service${query}`);
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Could not check the Laravel connection.");
     if (latestData?.tracking) latestData.tracking.laravelSelfService = result.setup;
@@ -3216,6 +3258,7 @@ function setupAssistantPayload() {
   const form = els.setupAssistantForm;
   const payload = Object.fromEntries(new FormData(form).entries());
   payload.destinations = [...form.querySelectorAll("input[name='destinations']:checked")].map((input) => input.value);
+  payload.containerId = selectedCustomerContainerId || "";
   return payload;
 }
 
@@ -3280,7 +3323,8 @@ async function verifyTracking() {
     els.verifyTrackingResult.innerHTML = `<p class="verify-stamp">Sending test events to GA4 and Meta…</p>`;
   }
   try {
-    const response = await fetch("/api/customer/verify-tracking", { method: "POST" });
+    const query = selectedCustomerContainerId ? `?container=${encodeURIComponent(selectedCustomerContainerId)}` : "";
+    const response = await fetch(`/api/customer/verify-tracking${query}`, { method: "POST" });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Verification failed.");
     renderVerifyResult(result);
@@ -5869,8 +5913,14 @@ function offlineUploadHistoryHtml(uploads) {
 function renderOfflineConversions() {
   const mount = els.offlineConversionsBody;
   if (!mount) return;
+  if (latestData?.tracking) {
+    offlineTracking = latestData.tracking;
+    paintOfflineConversions();
+    return;
+  }
   mount.innerHTML = `<p class="muted-note">Loading…</p>`;
-  fetch("/api/customer/me")
+  const query = selectedCustomerContainerId ? `?container=${encodeURIComponent(selectedCustomerContainerId)}` : "";
+  fetch(`/api/customer/me${query}`)
     .then((r) => r.json())
     .then((result) => {
       offlineTracking = result.tracking || null;
@@ -5952,7 +6002,7 @@ async function postOffline(path, csv) {
   const res = await fetch(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ csv })
+    body: JSON.stringify({ csv, containerId: selectedCustomerContainerId || "" })
   });
   return { status: res.status, body: await res.json().catch(() => ({})) };
 }
@@ -6022,7 +6072,7 @@ function wireOfflineConversions() {
     try {
       const res = await fetch("/api/customer/cookie-extension", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ enabled, days })
+        body: JSON.stringify({ enabled, days, containerId: selectedCustomerContainerId || "" })
       });
       const body = await res.json().catch(() => ({}));
       if (res.ok) { offlineTracking = body.tracking || offlineTracking; if (msg) { msg.textContent = "Saved."; msg.className = "muted-note ok-text"; } }
@@ -6088,6 +6138,7 @@ function renderCurrentView(data) {
 
 function renderAll(data) {
   applySessionAccess(data);
+  renderContainerSwitcher(data);
   els.generatedAt.textContent = `Updated ${formatDate(data.generatedAt)}`;
   renderCurrentView(data);
 }
@@ -6095,7 +6146,10 @@ function renderAll(data) {
 async function loadDashboard() {
   els.refreshButton.disabled = true;
   try {
-    const response = await fetch("/api/dashboard", { cache: "no-store" });
+    const query = currentSession.role === "customer" && selectedCustomerContainerId
+      ? `?container=${encodeURIComponent(selectedCustomerContainerId)}`
+      : "";
+    const response = await fetch(`/api/dashboard${query}`, { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || data.error || "Request failed");
     latestData = data;
@@ -6109,6 +6163,37 @@ async function loadDashboard() {
     els.refreshButton.disabled = false;
   }
 }
+
+function renderContainerSwitcher(data) {
+  if (!els.customerContainerSwitcher || !els.customerActiveContainer) return;
+  const requests = (data.customerSetup?.requests || []).filter((request) =>
+    !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase())
+  );
+  const show = currentSession.role === "customer" && requests.length > 1;
+  els.customerContainerSwitcher.hidden = !show;
+  if (data.activeContainer?.id) selectedCustomerContainerId = data.activeContainer.id;
+  els.customerActiveContainer.innerHTML = requests.map((request) =>
+    `<option value="${escapeHtml(request.id)}"${request.id === selectedCustomerContainerId ? " selected" : ""}>${escapeHtml(request.containerName || request.trackingDomain || request.websiteUrl || "Container")}</option>`
+  ).join("");
+  if (currentSession.tenantId && selectedCustomerContainerId) {
+    try { window.localStorage.setItem(`tagioo_active_container_${currentSession.tenantId}`, selectedCustomerContainerId); } catch { /* optional preference */ }
+  }
+}
+
+async function selectCustomerContainer(containerId) {
+  if (!containerId) return;
+  if (containerId === selectedCustomerContainerId && latestData?.activeContainer?.id === containerId) {
+    renderCurrentView(latestData);
+    return;
+  }
+  selectedCustomerContainerId = containerId;
+  if (currentSession.tenantId) {
+    try { window.localStorage.setItem(`tagioo_active_container_${currentSession.tenantId}`, containerId); } catch { /* optional preference */ }
+  }
+  await loadDashboard();
+}
+
+els.customerActiveContainer?.addEventListener("change", (event) => selectCustomerContainer(event.currentTarget.value));
 
 els.navItems.forEach((item) => {
   item.addEventListener("click", () => setView(item.dataset.viewTarget));
@@ -6206,7 +6291,8 @@ document.querySelector("#generateShopifyConnectCode")?.addEventListener("click",
   button.textContent = "Generating…";
   if (output) output.textContent = "";
   try {
-    const response = await fetch("/api/customer/shopify/connect-code", { method: "POST" });
+    const query = selectedCustomerContainerId ? `?container=${encodeURIComponent(selectedCustomerContainerId)}` : "";
+    const response = await fetch(`/api/customer/shopify/connect-code${query}`, { method: "POST" });
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Could not generate a connection code."]).join(" "));
     if (output) output.innerHTML = `Connection code: <strong><code>${escapeHtml(result.code)}</code></strong> · expires ${new Date(result.expiresAt).toLocaleTimeString()}`;
@@ -6241,7 +6327,7 @@ document.querySelector("#startLaravelSelfService")?.addEventListener("click", as
     const response = await fetch("/api/customer/laravel-self-service/start", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ storeUrl, currency })
+      body: JSON.stringify({ storeUrl, currency, containerId: selectedCustomerContainerId || "" })
     });
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Could not create the installation package."]).join(" "));
@@ -6263,7 +6349,8 @@ document.querySelector("#downloadCpanelBridge")?.addEventListener("click", async
   button.textContent = "Preparing private ZIP…";
   if (message) message.textContent = "";
   try {
-    const response = await fetch("/api/customer/setup-assistant/cpanel-bridge.zip");
+    const query = selectedCustomerContainerId ? `?container=${encodeURIComponent(selectedCustomerContainerId)}` : "";
+    const response = await fetch(`/api/customer/setup-assistant/cpanel-bridge.zip${query}`);
     if (!response.ok) {
       const result = await response.json().catch(() => ({}));
       throw new Error(result.error || "Could not prepare the cPanel Bridge.");
@@ -6294,10 +6381,11 @@ async function runLaravelSelfServiceAction(button, path, { body, busyText, succe
   button.textContent = busyText || "Saving…";
   if (message) message.textContent = "";
   try {
-    const response = await fetch(path, {
+    const query = selectedCustomerContainerId ? `?container=${encodeURIComponent(selectedCustomerContainerId)}` : "";
+    const response = await fetch(`${path}${query}`, {
       method: "POST",
       headers: body ? { "content-type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined
+      body: body ? JSON.stringify({ ...body, containerId: selectedCustomerContainerId || "" }) : undefined
     });
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "The action could not be completed."]).join(" "));
@@ -6657,12 +6745,14 @@ els.customerSetupForm.addEventListener("submit", async (event) => {
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Setup request failed"]).join(" "));
     els.customerSetupFormMessage.textContent = `Container created for ${result.request.trackingDomain}.`;
+    selectedCustomerContainerId = result.request.id || selectedCustomerContainerId;
+    setupAssistantContainerId = "";
     await loadDashboard();
     // Prefill the Setup Assistant tracking domain from the new container, then
     // send the user straight there to finish wiring GA4 / Meta / etc.
     if (els.setupAssistantForm) {
       const td = els.setupAssistantForm.elements.trackingDomain;
-      if (td && !td.value) td.value = result.request.trackingDomain || "";
+      if (td) td.value = result.request.trackingDomain ? `https://${result.request.trackingDomain}` : "";
     }
     setView("setupAssistant");
     document.querySelector("#setupAssistantView")?.scrollIntoView({ behavior: "smooth", block: "start" });

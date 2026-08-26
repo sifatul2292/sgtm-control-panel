@@ -377,6 +377,7 @@ function tagioo_order_payload(object $row, array $schema, array $config): ?array
         'source' => 'tagioo-cpanel-bridge',
         'page_location' => rtrim((string) $config['store_url'], '/'),
     ];
+    if (!empty($config['container_id'])) $payload['container_id'] = (string) $config['container_id'];
     foreach (['email', 'phone', 'first_name', 'last_name', 'city', 'state', 'postcode', 'country'] as $field) {
         $value = trim((string) tagioo_value($row, $schema[$field]));
         if ($value !== '') $payload[$field] = $value;
@@ -445,7 +446,7 @@ function tagioo_send(array $config, array $payload): array
 
 function tagioo_heartbeat(array $config, array $report, array $state): array
 {
-    return tagioo_signed_post($config, (string) $config['heartbeat_endpoint'], [
+    $payload = [
         'event_name' => 'bridge_heartbeat',
         'tenant_id' => (string) $config['tenant'],
         'bridge_version' => (string) TAGIOO_BRIDGE_VERSION,
@@ -454,7 +455,9 @@ function tagioo_heartbeat(array $config, array $report, array $state): array
             'initialized' => (bool) ($state['initialized'] ?? false),
             'pending_count' => count((array) ($state['pending'] ?? [])),
         ],
-    ]);
+    ];
+    if (!empty($config['container_id'])) $payload['container_id'] = (string) $config['container_id'];
+    return tagioo_signed_post($config, (string) $config['heartbeat_endpoint'], $payload);
 }
 
 function tagioo_doctor(array $config): void
