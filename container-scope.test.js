@@ -33,6 +33,7 @@ test("saving a second container does not overwrite production credentials", () =
 
 test("unknown or another account's container cannot receive scoped configuration", () => {
   const { tenant, requests } = fixture();
+  assert.equal(trackingForContainer(tenant, requests, "someone-else"), null);
   assert.equal(setTrackingForContainer(tenant, requests, "someone-else", { measurementId: "G-BAD" }), null);
   assert.equal(tenant.tracking.containerConfigs, undefined);
 });

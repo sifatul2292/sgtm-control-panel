@@ -35,7 +35,7 @@ export function trackingForContainer(tenant, requests = [], containerId = "") {
   const root = tenant?.tracking || {};
   if (!containerId || containerId === primaryContainerId(tenant, requests)) return root;
   const request = customerContainerRequests(requests, tenant?.id).find((item) => item.id === containerId);
-  if (!request) return root;
+  if (!request) return null;
   const scoped = root.containerConfigs?.[containerId];
   if (scoped && typeof scoped === "object") return scoped;
   return request.trackingDomain ? { domain: `https://${normalizedHost(request.trackingDomain)}` } : {};

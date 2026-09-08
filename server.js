@@ -4296,7 +4296,7 @@ function normalizeOrderPayload(body) {
   const currency = String(firstValue(body, ["currency", "currencyCode", "currency_code"]) || "BDT").trim().toUpperCase();
   const createdAt = orderDate(firstValue(body, ["created_at", "createdAt", "ordered_at", "orderedAt", "date", "time"]));
   const tenantId = sanitizeId(firstValue(body, ["tenant_id", "tenantId", "customer_id", "customerId"]) || config.tenantId);
-  const containerId = sanitizeId(firstValue(body, ["container_id", "containerId"]) || "");
+  const containerId = normalizeContainerId(firstValue(body, ["container_id", "containerId"]) || "");
   const orderType = sanitizeId(firstValue(body, ["order_type", "orderType", "channel", "source_type"]) || "store");
   const items = (Array.isArray(body.items) ? body.items : []).slice(0, 100).map((item) => ({
     item_id: String(firstValue(item, ["item_id", "product_id", "id", "sku"]) || "").trim().slice(0, 200),
@@ -6919,7 +6919,7 @@ async function redeemShopifyConnectionCode(input) {
 async function requestLaravelManagedSetup(input, session) {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   const storeUrl = normalizeWebsiteUrl(input.storeUrl);
-  const containerId = sanitizeId(input.containerId || "");
+  const containerId = normalizeContainerId(input.containerId || "");
   if (!storeUrl) return { ok: false, status: 400, errors: ["Enter a valid Laravel store website URL."] };
   const currency = String(input.currency || "BDT").trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) return { ok: false, status: 400, errors: ["Currency must be a 3-letter code such as BDT or USD."] };
@@ -6973,7 +6973,7 @@ async function startLaravelSelfService(input, session) {
   if (!cpanelBridgeAvailableFor(session.tenantId)) return { ok: false, status: 404, errors: ["Laravel self-service is not enabled for this account."] };
   const storeUrl = normalizeWebsiteUrl(input.storeUrl);
   const currency = String(input.currency || "BDT").trim().toUpperCase();
-  const containerId = sanitizeId(input.containerId || "");
+  const containerId = normalizeContainerId(input.containerId || "");
   if (!storeUrl) return { ok: false, status: 400, errors: ["Enter a valid Laravel store website URL."] };
   if (!/^[A-Z]{3}$/.test(currency)) return { ok: false, status: 400, errors: ["Currency must be a 3-letter code such as BDT or USD."] };
   return withDbLock(async () => {
@@ -7009,7 +7009,7 @@ async function startLaravelSelfService(input, session) {
 }
 
 async function recordLaravelBridgeHeartbeat(input, tenantId, snapshotTenant, requests = []) {
-  const containerId = sanitizeId(input.container_id || input.containerId || "");
+  const containerId = normalizeContainerId(input.container_id || input.containerId || "");
   const previous = trackingForContainer(snapshotTenant, requests, containerId)?.laravelSelfService || {};
   if (!previous.status) return { ok: false, status: 409, errors: ["Start Laravel self-service from the Tagioo dashboard first."] };
   const report = sanitizeLaravelBridgeReport(input.report || {});
@@ -7074,7 +7074,7 @@ async function saveLaravelSelfServiceMapping(input, session) {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   if (!cpanelBridgeAvailableFor(session.tenantId)) return { ok: false, status: 404, errors: ["Laravel self-service is not enabled for this account."] };
   const mapping = sanitizeLaravelBridgeMapping(input || {});
-  const containerId = sanitizeId(input.containerId || "");
+  const containerId = normalizeContainerId(input.containerId || "");
   if (!mapping.orders_table) return { ok: false, status: 400, errors: ["Choose the Laravel orders table."] };
   return withDbLock(async () => {
     const loaded = await readDatabase();
@@ -8358,6 +8358,12 @@ function sanitizeId(value) {
     .replace(/[^a-z0-9-]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
+}
+
+// Container IDs are persisted opaque keys (for example setup_m..._abc123), not
+// slugs. Preserve them for exact ownership checks instead of rewriting them.
+function normalizeContainerId(value) {
+  return String(value || "").trim();
 }
 
 function validDomain(value) {
@@ -11371,7 +11377,7 @@ const server = createServer(async (req, res) => {
     // must stay above the session auth gate below.
     if (pathname === "/api/orders/woocommerce" && req.method === "POST") {
       const tenantParam = sanitizeId(reqUrl.searchParams.get("tenant") || "");
-      const requestedContainerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+      const requestedContainerId = normalizeContainerId(reqUrl.searchParams.get("container") || "");
       // Per-tenant secret (generated from the customer dashboard) wins; the
       // global ORDER_WEBHOOK_SECRET stays as fallback for single-tenant setups.
       const loadedForSecret = await readDatabase();
@@ -11444,7 +11450,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const tenantId = sanitizeId(payload.tenant_id || payload.tenantId || "");
-      const requestedContainerId = sanitizeId(payload.container_id || payload.containerId || "");
+      const requestedContainerId = normalizeContainerId(payload.container_id || payload.containerId || "");
       const loadedForSecret = await readDatabaseCached();
       const snapshotTenant = loadedForSecret.available ? (loadedForSecret.data.tenants || []).find((item) => item.id === tenantId) : null;
       const secret = snapshotTenant?.laravelBridgeSecret || "";
@@ -11550,7 +11556,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const tenantId = sanitizeId(payload.tenant_id || payload.tenantId || "");
-      const requestedContainerId = sanitizeId(payload.container_id || payload.containerId || "");
+      const requestedContainerId = normalizeContainerId(payload.container_id || payload.containerId || "");
       if (!cpanelBridgeAvailableFor(tenantId)) {
         jsonResponse(res, 404, { error: "Laravel self-service is not enabled for this tenant." });
         return;
@@ -11755,7 +11761,7 @@ const server = createServer(async (req, res) => {
       const session = getSession(req);
       const startedAt = Date.now();
       if (session?.role === "customer") {
-        const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+        const containerId = normalizeContainerId(reqUrl.searchParams.get("container") || "");
         const payload = await getCustomerDashboardDataCached(session, containerId);
         if (payload.timing?.dashboardMs > 2000) {
           console.warn(`[dashboard] customer dashboard took ${payload.timing.dashboardMs}ms for tenant ${session.tenantId}`);
@@ -11802,7 +11808,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 401, { error: "Customer session required." });
         return;
       }
-      const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+      const containerId = normalizeContainerId(reqUrl.searchParams.get("container") || "");
       const result = await createShopifyConnectionCode(session, containerId);
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
         ? { code: result.code, expiresAt: result.expiresAt }
@@ -11833,7 +11839,7 @@ const server = createServer(async (req, res) => {
       }
       const tenant = await tenantForSession(session);
       const loaded = await readDatabaseCached();
-      const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+      const containerId = normalizeContainerId(reqUrl.searchParams.get("container") || "");
       const tracking = trackingForContainer(tenant, loaded.available ? loaded.data.customerSetupRequests || [] : [], containerId);
       jsonResponse(res, 200, {
         available: cpanelBridgeAvailableFor(session.tenantId),
@@ -11871,7 +11877,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 401, { error: "Customer session required." });
         return;
       }
-      const result = await activateLaravelSelfService(session, sanitizeId(reqUrl.searchParams.get("container") || ""));
+      const result = await activateLaravelSelfService(session, normalizeContainerId(reqUrl.searchParams.get("container") || ""));
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { setup: result.setup } : { errors: result.errors });
       return;
     }
@@ -11882,7 +11888,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 401, { error: "Customer session required." });
         return;
       }
-      const result = await deactivateLaravelSelfService(session, sanitizeId(reqUrl.searchParams.get("container") || ""));
+      const result = await deactivateLaravelSelfService(session, normalizeContainerId(reqUrl.searchParams.get("container") || ""));
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { setup: result.setup } : { errors: result.errors });
       return;
     }
@@ -11893,7 +11899,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 401, { error: "Customer session required." });
         return;
       }
-      const result = await verifyLaravelSelfService(session, sanitizeId(reqUrl.searchParams.get("container") || ""));
+      const result = await verifyLaravelSelfService(session, normalizeContainerId(reqUrl.searchParams.get("container") || ""));
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
         ? { verified: result.verified, verification: result.verification }
         : { errors: result.errors });
@@ -11907,7 +11913,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const body = await readJson(req);
-      const containerId = sanitizeId(body.containerId || "");
+      const containerId = normalizeContainerId(body.containerId || "");
       if (containerId) {
         const loaded = await readDatabaseCached();
         if (!loaded.available || !customerContainerRequests(loaded.data.customerSetupRequests || [], session.tenantId)
@@ -12025,7 +12031,7 @@ const server = createServer(async (req, res) => {
         const loaded = await readDatabase();
         if (!loaded.available) throw new Error(loaded.detail || loaded.message || "Database unavailable.");
         const tenant = (loaded.data.tenants || []).find((item) => item.id === session.tenantId);
-        const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+        const containerId = normalizeContainerId(reqUrl.searchParams.get("container") || "");
         const requests = loaded.data.customerSetupRequests || [];
         if (containerId && !customerContainerRequests(requests, session.tenantId).some((request) => request.id === containerId)) {
           jsonResponse(res, 404, { error: "The selected tracking container was not found." });
@@ -12085,7 +12091,7 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const csvText = typeof body === "string" ? body : String(body.csv || "");
       const validateOnly = pathname.endsWith("/validate");
-      const containerId = sanitizeId(body.containerId || reqUrl.searchParams.get("container") || "");
+      const containerId = normalizeContainerId(body.containerId || reqUrl.searchParams.get("container") || "");
       const result = await handleOfflineConversionUpload(session, csvText, { validateOnly, containerId });
       const { ok, status, ...rest } = result;
       jsonResponse(res, status || (ok ? 200 : 400), rest);
@@ -12103,7 +12109,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 404, { error: "Tenant not found." });
         return;
       }
-      const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+      const containerId = normalizeContainerId(reqUrl.searchParams.get("container") || "");
       const loaded = await readDatabaseCached();
       const tracking = trackingForContainer(tenant, loaded.available ? loaded.data.customerSetupRequests || [] : [], containerId);
       const result = await verifyTenantTracking({ ...tenant, tracking });
@@ -12119,7 +12125,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const body = await readJson(req);
-      const containerId = sanitizeId(body.containerId || "");
+      const containerId = normalizeContainerId(body.containerId || "");
       await saveTenantTrackingConfig(session.tenantId, {
         cookieExtensionEnabled: Boolean(body.enabled),
         cookieExtensionDays: body.days
@@ -12279,7 +12285,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const tenant = (loaded.data.tenants || []).find((t) => t.id === account.tenantId) || null;
-      const containerId = sanitizeId(reqUrl.searchParams.get("container") || "");
+      const containerId = normalizeContainerId(reqUrl.searchParams.get("container") || "");
       const tracking = trackingForContainer(tenant, loaded.data.customerSetupRequests || [], containerId);
       jsonResponse(res, 200, { account: publicCustomerAccount(account), tracking: publicTenantTracking(tenant, tracking) });
       return;
