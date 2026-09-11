@@ -7,6 +7,7 @@ import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeE
 import { deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
 import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
+import { removeShopifyOrders, shopifyCustomerOrders } from "./shopify-privacy.js";
 
 const gzipAsync = promisify(gzip);
 
@@ -4622,6 +4623,25 @@ function isShopifyIntegrationAuthorized(req, rawBody, secret) {
   if (Math.abs(Math.floor(Date.now() / 1000) - seconds) > 300) return false;
   const expected = createHmac("sha256", secret).update(`${timestamp}.${rawBody.toString("utf8")}`).digest("hex");
   return safeEqual(signature, expected);
+}
+
+function shopifyPrivacyEmailBody(shop, payload, orders) {
+  const customer = payload.customer || {};
+  const rows = orders.map((order) => [
+    `<tr><td style="padding:6px 8px;border:1px solid #E5E7EB">${escapeHtml(order.id)}</td>`,
+    `<td style="padding:6px 8px;border:1px solid #E5E7EB">${escapeHtml(order.createdAt)}</td>`,
+    `<td style="padding:6px 8px;border:1px solid #E5E7EB">${escapeHtml(`${order.amount} ${order.currency}`)}</td>`,
+    `<td style="padding:6px 8px;border:1px solid #E5E7EB">${escapeHtml([order.firstName, order.lastName, order.email, order.phone, order.city, order.region, order.postalCode, order.country].filter(Boolean).join(" · "))}</td></tr>`
+  ].join("")).join("");
+  return [
+    `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Shopify customer data request</p>`,
+    `<p style="color:#5B6B8A;line-height:1.6">Shopify asked Tagioo to provide the data stored for a customer of <strong>${escapeHtml(shop)}</strong>. Give this information to the requesting customer through your normal secure support process.</p>`,
+    `<p style="color:#5B6B8A"><strong>Customer ID:</strong> ${escapeHtml(customer.id)}<br><strong>Email:</strong> ${escapeHtml(customer.email)}<br><strong>Phone:</strong> ${escapeHtml(customer.phone)}</p>`,
+    orders.length
+      ? `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th>Order</th><th>Date</th><th>Total</th><th>Stored customer data</th></tr></thead><tbody>${rows}</tbody></table>`
+      : `<p style="color:#5B6B8A">Tagioo found no stored order data for the supplied customer and order IDs.</p>`,
+    `<p style="color:#9BA8C0;font-size:12px">Request ID: ${escapeHtml(payload.data_request?.id || "")}</p>`
+  ].join("");
 }
 
 // Paddle signs "ts:body" (colon-joined) with the webhook secret, sent as
@@ -11772,6 +11792,93 @@ const server = createServer(async (req, res) => {
       jsonResponse(res, result.ok ? (result.created ? 202 : 200) : 400, result.ok
         ? { accepted: true, created: result.created, order_id: result.order.id }
         : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/integrations/shopify/privacy" && req.method === "POST") {
+      const tenantId = sanitizeId(reqUrl.searchParams.get("tenant") || "");
+      let rawBody;
+      try {
+        rawBody = await readRawBody(req, 250000);
+      } catch (error) {
+        jsonResponse(res, 413, { error: error.message });
+        return;
+      }
+      const loadedForSecret = await readDatabaseCached();
+      const tenant = loadedForSecret.available ? (loadedForSecret.data.tenants || []).find((item) => item.id === tenantId) : null;
+      const matchedIntegration = tenant
+        ? scopedTrackingEntries(tenant, loadedForSecret.data.customerSetupRequests || []).find((entry) =>
+          entry.tracking?.shopify?.integrationToken
+          && isShopifyIntegrationAuthorized(req, rawBody, entry.tracking.shopify.integrationToken)
+        )
+        : null;
+      if (!tenantId || !matchedIntegration) {
+        jsonResponse(res, 401, { error: "Invalid Shopify integration signature." });
+        return;
+      }
+      let requestPayload;
+      try {
+        requestPayload = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        jsonResponse(res, 400, { error: "Invalid JSON payload." });
+        return;
+      }
+      const topic = String(requestPayload.topic || "").toUpperCase();
+      const payload = requestPayload.payload || {};
+      const configuredShop = String(matchedIntegration.tracking.shopify.shop || "").toLowerCase();
+      if (!["CUSTOMERS_DATA_REQUEST", "CUSTOMERS_REDACT", "SHOP_REDACT"].includes(topic)
+        || String(requestPayload.shop || payload.shop_domain || "").toLowerCase() !== configuredShop) {
+        jsonResponse(res, 400, { error: "Invalid Shopify privacy request." });
+        return;
+      }
+      const primaryId = primaryContainerId(tenant, loadedForSecret.data.customerSetupRequests || []);
+      const containerId = matchedIntegration.containerId === primaryId ? "" : matchedIntegration.containerId;
+      const options = {
+        tenantId,
+        containerId,
+        customer: payload.customer || {},
+        orderIds: payload.orders_requested || payload.orders_to_redact || []
+      };
+
+      if (topic === "CUSTOMERS_DATA_REQUEST") {
+        const orders = shopifyCustomerOrders(loadedForSecret.data.orders || [], options);
+        const account = (loadedForSecret.data.customerAccounts || []).find((item) => item.tenantId === tenantId);
+        const recipient = account?.email || account?.username || tenant.email || tenant.username || "";
+        const sent = await sendEmail({
+          to: recipient,
+          subject: `Shopify customer data request — ${configuredShop}`,
+          bodyHtml: shopifyPrivacyEmailBody(configuredShop, payload, orders)
+        });
+        if (!sent.ok) {
+          jsonResponse(res, 503, { error: "Could not deliver the customer data report to the merchant." });
+          return;
+        }
+        jsonResponse(res, 200, { accepted: true, records: orders.length });
+        return;
+      }
+
+      const result = await withDbLock(async () => {
+        const loaded = await readDatabase();
+        if (!loaded.available) return { ok: false };
+        const data = loaded.data;
+        const before = (data.orders || []).length;
+        data.orders = removeShopifyOrders(data.orders || [], { ...options, allForShop: topic === "SHOP_REDACT" });
+        if (topic === "SHOP_REDACT") {
+          const currentTenant = (data.tenants || []).find((item) => item.id === tenantId);
+          if (currentTenant) {
+            const tracking = { ...trackingForContainer(currentTenant, data.customerSetupRequests || [], matchedIntegration.containerId) };
+            delete tracking.shopify;
+            setTrackingForContainer(currentTenant, data.customerSetupRequests || [], matchedIntegration.containerId, tracking);
+          }
+        }
+        await writeDatabase(data);
+        return { ok: true, removed: before - data.orders.length };
+      });
+      if (!result.ok) {
+        jsonResponse(res, 503, { error: "Tagioo data store is unavailable." });
+        return;
+      }
+      jsonResponse(res, 200, { accepted: true, removed: result.removed });
       return;
     }
 
