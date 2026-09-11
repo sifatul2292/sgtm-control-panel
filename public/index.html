@@ -1182,8 +1182,7 @@
                     <h3>How to import</h3>
                     <ol>
                       <li>Open Web GTM → Admin → Import Container → upload <strong>web.json</strong>. Choose <em>Merge</em>.</li>
-                      <li>Import <strong>server.json</strong> into Server GTM → Merge. The GA4 forwarding tag and Meta CAPI tag are included.</li>
-                      <li>If TikTok is selected, open Server GTM → Templates → Search Gallery → add <strong>TikTok Events API</strong>.</li>
+                      <li>Import <strong>server.json</strong> into Server GTM → Merge. GA4, Meta CAPI, Google Ads, and selected TikTok Events API tags are included.</li>
                       <li>web.json now fires browser-side Meta &amp; TikTok pixel events (ViewContent, AddToCart, InitiateCheckout, AddPaymentInfo, Purchase) stamped with the same <code>event_id</code> as the server CAPI hit — the platforms dedupe automatically, so you get browser + server coverage without double-counting.</li>
                       <li>Preview both containers, fire a Purchase event, then verify Tagioo Event Logs, GA4 Realtime, and Meta Test Events.</li>
                     </ol>
