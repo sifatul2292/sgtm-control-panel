@@ -4720,8 +4720,8 @@ function planFeatureList(features) {
   return `<ul class="subscription-feature-list">${features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join("")}</ul>`;
 }
 
-// currency: "USD" for a Paddle tenant, "BDT" (default) for bKash/Nagad.
-// A USD tenant is always monthly (Paddle has no multi-month cycle), so
+// currency: "USD" for Shopify/Paddle tenants, "BDT" for bKash/Nagad.
+// A USD tenant is always monthly, so
 // callers pass billingCycles[0] for them regardless of selectedCycle.
 function formatPlanPrice(plan, currency = "BDT") {
   if (plan.price === "Free") return "Free";
@@ -4745,13 +4745,11 @@ function formatCyclePrice(plan, cycle, currency = "BDT") {
   return `৳${total.toLocaleString()}`;
 }
 
-// A Paddle (USD) tenant's plan-change flow isn't built yet — selectSubscriptionPlan
-// only knows how to stage a BDT bKash/Nagad claim (see /api/customer/subscription),
-// which would show a bKash amount to someone who pays by card. Route them to
-// support instead of a broken/misleading modal until Paddle subscription updates
-// (Paddle's Subscription API, not just re-opening Checkout) are built.
-function isPaddleTenant(data) {
-  return (data.usage || {}).paymentProvider === "paddle";
+// External billing customers see USD prices. Plan changes are sent to their
+// billing authority instead of creating a bKash/Nagad payment claim.
+function externalBillingProvider(data) {
+  const provider = (data.usage || {}).paymentProvider;
+  return ["paddle", "shopify"].includes(provider) ? provider : "";
 }
 
 function renewalText(value) {
@@ -4764,7 +4762,8 @@ function renewalText(value) {
 
 function renderBilling(data) {
   const usage = data.usage || {};
-  const currency = isPaddleTenant(data) ? "USD" : "BDT";
+  const billingProvider = externalBillingProvider(data);
+  const currency = billingProvider ? "USD" : "BDT";
   const activePlanName = usage.plan || "Starter";
   customerActivePlanName = activePlanName;
   const activePlan = subscriptionPlans.find((plan) => plan.name === activePlanName) || subscriptionPlans[1];
@@ -4812,7 +4811,7 @@ function renderBilling(data) {
   `;
 
   if (els.subscriptionPlans) {
-    renderPlanCards(activePlanName, currency);
+    renderPlanCards(activePlanName, currency, billingProvider, usage.shopifyPlanSelectionUrl || "");
   }
   const sectionTitle = document.getElementById("planSectionTitle");
   if (sectionTitle) sectionTitle.textContent = activePlanName === "Free" ? "Choose a Plan" : "Change Plan";
@@ -4822,7 +4821,7 @@ function renderBilling(data) {
   loadBillingPayment();
 }
 
-function renderPlanCards(activePlanName, currency = "BDT") {
+function renderPlanCards(activePlanName, currency = "BDT", billingProvider = "", shopifyPlanSelectionUrl = "") {
   const container = els.subscriptionPlans;
   if (!container) return;
   const activeRank = planRank[activePlanName] ?? 0;
@@ -4833,8 +4832,6 @@ function renderPlanCards(activePlanName, currency = "BDT") {
   const cycleLabel = cycle.months === 1 ? "/ month" : `/ ${cycle.months} months`;
 
   const toggle = currency === "USD" ? "" : `<div class="billing-cycle-toggle">${billingCycles.map((c) => `<button class="bct-btn ${c.id === cycle.id ? "is-active" : ""}" type="button" data-cycle="${c.id}">${escapeHtml(c.label)}${c.discount ? ` <span class="bct-save">-${Math.round(c.discount * 100)}%</span>` : ""}</button>`).join("")}</div>`;
-
-  const isPaddle = currency === "USD";
 
   const cards = subscriptionPlans
     .filter((plan) => plan.name !== "Free")
@@ -4863,7 +4860,7 @@ function renderPlanCards(activePlanName, currency = "BDT") {
           ${planFeatureList([`${plan.containers} container${plan.containers === 1 ? "" : "s"}`, `${plan.domains} domain${plan.domains === 1 ? "" : "s"}`, `${plan.receivers} receivers/container`, plan.retention, ...plan.features])}
           ${isCurrent
             ? `<button class="spc-btn spc-btn-current" type="button" disabled>Active</button>`
-            : `<button class="spc-btn" type="button" ${isPaddle ? `data-paddle-plan-select="${escapeHtml(plan.name)}"` : `data-plan-select="${escapeHtml(plan.name)}"`}>${btnLabel}</button>`}
+            : `<button class="spc-btn" type="button" ${billingProvider === "shopify" ? `data-shopify-plan-select="${escapeHtml(shopifyPlanSelectionUrl)}"` : billingProvider === "paddle" ? `data-paddle-plan-select="${escapeHtml(plan.name)}"` : `data-plan-select="${escapeHtml(plan.name)}"`}>${btnLabel}</button>`}
         </div>
       </article>`;
     }).join("");
@@ -4875,10 +4872,15 @@ function renderPlanCards(activePlanName, currency = "BDT") {
   container.querySelectorAll("[data-paddle-plan-select]").forEach((button) => {
     button.addEventListener("click", () => selectPaddleSubscriptionPlan(button.dataset.paddlePlanSelect));
   });
+  container.querySelectorAll("[data-shopify-plan-select]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.dataset.shopifyPlanSelect) window.location.assign(button.dataset.shopifyPlanSelect);
+    });
+  });
   container.querySelectorAll("[data-cycle]").forEach((button) => {
     button.addEventListener("click", () => {
       selectedCycle = billingCycles.find((c) => c.id === button.dataset.cycle) || billingCycles[0];
-      renderPlanCards(activePlanName, currency);
+      renderPlanCards(activePlanName, currency, billingProvider, shopifyPlanSelectionUrl);
     });
   });
 }

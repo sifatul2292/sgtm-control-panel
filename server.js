@@ -7,6 +7,7 @@ import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeE
 import { deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
 import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
+import { highestActiveShopifyPlan, normalizeShopifyBillingState } from "./shopify-billing.js";
 import { removeShopifyOrders, shopifyCustomerOrders } from "./shopify-privacy.js";
 
 const gzipAsync = promisify(gzip);
@@ -6388,6 +6389,9 @@ async function selectCustomerPlanLocked(input, session) {
 
   const now = new Date();
   const current = data.tenants[tenantIndex];
+  if (current.paymentProvider === "shopify") {
+    return { ok: false, status: 409, errors: ["Manage this subscription from the Tagioo app in Shopify Admin."] };
+  }
   // A tenant "holds a paid plan" whenever they have paid for a non-Free plan —
   // true through the active window AND the overdue grace period (enforcePaidRenewals
   // flips subscriptionStatus to "overdue" but leaves paymentStatus "paid" until the
@@ -7184,6 +7188,136 @@ async function redeemShopifyConnectionCode(input) {
       integrationToken
     };
   });
+}
+
+async function syncShopifySubscription(tenantId, containerId, billingState) {
+  const result = await withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+    const data = loaded.data;
+    const tenantIndex = (data.tenants || []).findIndex((item) => item.id === tenantId);
+    if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+    const tenant = data.tenants[tenantIndex];
+    const currentTracking = trackingForContainer(tenant, data.customerSetupRequests || [], containerId);
+    if (String(currentTracking?.shopify?.shop || "").toLowerCase() !== billingState.shop) {
+      return { ok: false, status: 409, errors: ["The Shopify subscription does not match this connected store."] };
+    }
+    if (billingState.plan !== "Free"
+      && tenant.plan !== "Free"
+      && tenant.paymentProvider
+      && tenant.paymentProvider !== "shopify") {
+      return { ok: false, status: 409, errors: ["This Tagioo account already has a paid subscription through another billing provider."] };
+    }
+
+    const now = new Date();
+    const nextTracking = { ...currentTracking };
+    if (billingState.status === "disconnected") {
+      delete nextTracking.shopify;
+    } else {
+      nextTracking.shopify = {
+        ...currentTracking.shopify,
+        billing: { ...billingState, syncedAt: now.toISOString() },
+        updatedAt: now.toISOString()
+      };
+    }
+    if (!setTrackingForContainer(tenant, data.customerSetupRequests || [], containerId, nextTracking)) {
+      return { ok: false, status: 404, errors: ["The connected Shopify container was not found."] };
+    }
+
+    const activeShopifyPlans = scopedTrackingEntries(tenant, data.customerSetupRequests || [])
+      .map((entry) => entry.tracking?.shopify?.billing)
+      .filter(Boolean);
+    const effective = highestActiveShopifyPlan(activeShopifyPlans, planRankFor);
+    const hasConnectedShopify = scopedTrackingEntries(tenant, data.customerSetupRequests || [])
+      .some((entry) => entry.tracking?.shopify?.shop);
+    let lifecycleAction = "";
+    let profile = null;
+
+    if (effective) {
+      profile = resourceProfileForPlan(effective.plan);
+      const activateContainer = tenant.plan !== effective.plan
+        || tenant.paymentProvider !== "shopify"
+        || tenant.subscriptionStatus !== "active";
+      data.tenants[tenantIndex] = {
+        ...tenant,
+        plan: effective.plan,
+        billingCycle: "monthly",
+        requestLimit: profile.monthlyRequestLimit,
+        containerLimit: profile.containerLimit + Number(tenant.extraContainers || 0),
+        domainLimit: profile.domainLimit,
+        monthlyAmount: Number(effective.amount || 0),
+        resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
+        subscriptionStatus: "active",
+        paymentStatus: "paid",
+        paymentProvider: "shopify",
+        paidAt: effective.cycleStart || tenant.paidAt || now.toISOString(),
+        renewalDate: effective.cycleEnd,
+        renewalReminder: 99,
+        overdueAt: "",
+        expiredAt: "",
+        pendingPlan: "",
+        pendingAmount: 0,
+        pendingBillingCycle: "",
+        pendingInvoiceNo: "",
+        scheduledPlan: "",
+        scheduledPlanCycle: "",
+        updatedAt: now.toISOString()
+      };
+      lifecycleAction = activateContainer ? "activate" : "";
+    } else if (tenant.paymentProvider === "shopify" || (tenant.plan === "Free" && !tenant.paymentProvider)) {
+      profile = resourceProfileForPlan("Free");
+      const resetFreeCycle = tenant.paymentProvider === "shopify" && tenant.plan !== "Free";
+      const resizeForFree = tenant.plan !== "Free" || Number(tenant.requestLimit || 0) !== profile.monthlyRequestLimit;
+      data.tenants[tenantIndex] = {
+        ...tenant,
+        plan: "Free",
+        billingCycle: "monthly",
+        requestLimit: profile.monthlyRequestLimit,
+        containerLimit: profile.containerLimit,
+        domainLimit: profile.domainLimit,
+        monthlyAmount: 0,
+        resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
+        subscriptionStatus: "free",
+        paymentStatus: "free",
+        paymentProvider: hasConnectedShopify ? "shopify" : "",
+        paidAt: "",
+        renewalDate: "",
+        renewalReminder: 99,
+        overdueAt: "",
+        expiredAt: "",
+        cycleStart: resetFreeCycle ? now.toISOString() : (tenant.cycleStart || now.toISOString()),
+        cycleEnd: resetFreeCycle
+          ? new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString()
+          : (tenant.cycleEnd || new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString()),
+        nudgedAt: resetFreeCycle ? "" : (tenant.nudgedAt || ""),
+        cycleNudge: resetFreeCycle ? 0 : Number(tenant.cycleNudge || 0),
+        cappedAt: resetFreeCycle ? "" : (tenant.cappedAt || ""),
+        updatedAt: now.toISOString()
+      };
+      lifecycleAction = resizeForFree ? "free" : "";
+    } else {
+      tenant.updatedAt = now.toISOString();
+    }
+
+    await writeDatabase(data);
+    return {
+      ok: true,
+      tenant: data.tenants[tenantIndex],
+      lifecycleAction,
+      profile,
+      containerName: tenantContainerName(data, tenantId)
+    };
+  });
+
+  if (!result.ok) return result;
+  const containerName = result.containerName;
+  if (containerName && result.lifecycleAction === "activate") {
+    await controlContainerLifecycle(containerName, "start").catch(() => {});
+    await resizeContainer(containerName, { memoryMb: result.profile.memoryMb, cpuLimit: result.profile.cpuLimit }).catch(() => null);
+  } else if (containerName && result.lifecycleAction === "free") {
+    await resizeContainer(containerName, { memoryMb: result.profile.memoryMb, cpuLimit: result.profile.cpuLimit }).catch(() => null);
+  }
+  return { ok: true, tenant: result.tenant };
 }
 
 async function requestLaravelManagedSetup(input, session) {
@@ -9362,10 +9496,11 @@ async function enforcePaidRenewals(data) {
   const now = new Date();
   for (const tenant of (data.tenants || [])) {
     if (!tenant?.id) continue;
-    // Paddle owns renewal billing, dunning, and cancellation on its side —
+    // Paddle and Shopify own renewal billing, dunning, and cancellation on
+    // their side —
     // this sweep is the manual bKash/Nagad flow's overdue/expire enforcement
-    // and must not touch a Paddle subscription's status.
-    if (tenant.paymentProvider === "paddle") continue;
+    // and must not touch an externally managed subscription's status.
+    if (["paddle", "shopify"].includes(tenant.paymentProvider)) continue;
 
     // Self-heal legacy corruption from the old plan-change flow, which demoted a
     // paid plan to "pending_payment" and could stage a downgrade as a pending
@@ -10462,6 +10597,13 @@ const CUSTOMER_DASHBOARD_FRESH_MS = Number(process.env.CUSTOMER_DASHBOARD_FRESH_
 const CUSTOMER_DASHBOARD_STALE_MS = Number(process.env.CUSTOMER_DASHBOARD_STALE_MS || 120000);
 const customerDashboardCache = new Map();
 
+function invalidateCustomerDashboardCache(tenantId = "") {
+  const prefix = tenantId ? `${tenantId}:` : "";
+  for (const key of customerDashboardCache.keys()) {
+    if (!prefix || key.startsWith(prefix)) customerDashboardCache.delete(key);
+  }
+}
+
 async function getCustomerDashboardDataCached(session, containerId = "") {
   const key = `${session.tenantId}:${containerId || "default"}`;
   const now = Date.now();
@@ -10658,6 +10800,10 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
   const scopedTenant = scopedContainerId && activeContainer?.trackingDomain
     ? { ...tenant, domain: activeContainer.trackingDomain }
     : tenant;
+  const connectedShopifyShop = tenant
+    ? scopedTrackingEntries(tenant, tenantSetupRequests).find((entry) => entry.tracking?.shopify?.shop)?.tracking.shopify.shop || ""
+    : "";
+  const connectedShopifyHandle = connectedShopifyShop.replace(/\.myshopify\.com$/i, "");
   const billingPeriod = billingPeriodForTenant(tenant, tenantSetupRequests);
   const customerSummaryOptions = { lineLimit: config.customerSummaryTailLines, ttl: CUSTOMER_SUMMARY_CACHE_TTL_MS };
 
@@ -10825,8 +10971,12 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
     monthlyAmount: tenant?.monthlyAmount ?? data.usage.monthlyAmount,
     containerLimit: tenant?.containerLimit || data.usage.containerLimit,
     // Drives which currency "My Subscription" displays — a Paddle tenant sees
-    // USD pricing, everyone else sees the BDT bKash/Nagad catalog.
+    // USD pricing, Shopify plans are managed in Shopify Admin, and everyone
+    // else sees the BDT bKash/Nagad catalog.
     paymentProvider: tenant?.paymentProvider || "",
+    shopifyPlanSelectionUrl: connectedShopifyHandle
+      ? `https://admin.shopify.com/store/${encodeURIComponent(connectedShopifyHandle)}/charges/tagioo-tracking/pricing_plans`
+      : "",
     requestsToday: todayLiveCount,
     requestsMonth,
     requestLimit,
@@ -11795,6 +11945,54 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Shopify App Pricing is the payment authority for connected Shopify
+    // merchants. The app queries Shopify's Partner API, then signs this
+    // tenant-scoped entitlement update with the existing integration token.
+    if (pathname === "/api/integrations/shopify/subscription" && req.method === "POST") {
+      const tenantId = sanitizeId(reqUrl.searchParams.get("tenant") || "");
+      let rawBody;
+      try {
+        rawBody = await readRawBody(req, 100000);
+      } catch (error) {
+        jsonResponse(res, 413, { error: error.message });
+        return;
+      }
+      const loadedForSecret = await readDatabaseCached();
+      const tenant = loadedForSecret.available ? (loadedForSecret.data.tenants || []).find((item) => item.id === tenantId) : null;
+      const matchedIntegration = tenant
+        ? scopedTrackingEntries(tenant, loadedForSecret.data.customerSetupRequests || []).find((entry) =>
+          entry.tracking?.shopify?.integrationToken
+          && isShopifyIntegrationAuthorized(req, rawBody, entry.tracking.shopify.integrationToken)
+        )
+        : null;
+      if (!tenantId || !matchedIntegration) {
+        jsonResponse(res, 401, { error: "Invalid Shopify integration signature." });
+        return;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        jsonResponse(res, 400, { error: "Invalid JSON payload." });
+        return;
+      }
+      const normalized = normalizeShopifyBillingState(payload);
+      const configuredShop = String(matchedIntegration.tracking.shopify.shop || "").toLowerCase();
+      if (!normalized.ok || normalized.value?.shop !== configuredShop) {
+        jsonResponse(res, 400, { error: normalized.error || "The Shopify subscription does not match this connected store." });
+        return;
+      }
+      const result = await syncShopifySubscription(tenantId, matchedIntegration.containerId, normalized.value);
+      if (result.ok) {
+        invalidateCustomerDashboardCache(tenantId);
+        invalidateOwnerDashboardCache();
+      }
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
+        ? { accepted: true, plan: result.tenant.plan, subscriptionStatus: result.tenant.subscriptionStatus }
+        : { errors: result.errors });
+      return;
+    }
+
     if (pathname === "/api/integrations/shopify/privacy" && req.method === "POST") {
       const tenantId = sanitizeId(reqUrl.searchParams.get("tenant") || "");
       let rawBody;
@@ -11863,20 +12061,29 @@ const server = createServer(async (req, res) => {
         const data = loaded.data;
         const before = (data.orders || []).length;
         data.orders = removeShopifyOrders(data.orders || [], { ...options, allForShop: topic === "SHOP_REDACT" });
-        if (topic === "SHOP_REDACT") {
-          const currentTenant = (data.tenants || []).find((item) => item.id === tenantId);
-          if (currentTenant) {
-            const tracking = { ...trackingForContainer(currentTenant, data.customerSetupRequests || [], matchedIntegration.containerId) };
-            delete tracking.shopify;
-            setTrackingForContainer(currentTenant, data.customerSetupRequests || [], matchedIntegration.containerId, tracking);
-          }
-        }
         await writeDatabase(data);
         return { ok: true, removed: before - data.orders.length };
       });
       if (!result.ok) {
         jsonResponse(res, 503, { error: "Tagioo data store is unavailable." });
         return;
+      }
+      if (topic === "SHOP_REDACT") {
+        const disconnected = await syncShopifySubscription(tenantId, matchedIntegration.containerId, {
+          shop: configuredShop,
+          plan: "Free",
+          status: "disconnected",
+          billingPeriod: "",
+          cycleStart: "",
+          cycleEnd: "",
+          cancelAtEndOfCycle: false,
+          amount: 0,
+          currency: "USD"
+        });
+        if (!disconnected.ok) {
+          jsonResponse(res, disconnected.status || 503, { errors: disconnected.errors });
+          return;
+        }
       }
       jsonResponse(res, 200, { accepted: true, removed: result.removed });
       return;
