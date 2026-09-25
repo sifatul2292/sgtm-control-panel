@@ -7,6 +7,24 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-25.
 
 ## 2026-09-25 — Protected-data controls prepared
 
+- Production rollout completed. The first in-memory migration exhausted Node's
+  heap before replacing any file; the panel was restored immediately and the
+  converter was replaced with a bounded-memory streaming AES-GCM migration that
+  verifies the decrypted SHA-256 checksum before each atomic rename.
+- Production now runs panel commit `6f3343e`. The active `history.json`, four
+  panel snapshots, the rollback copy, and two historical JSON backups all use
+  `TAGIOO-PROTECTED-V2`; current and historical files are mode 0600. The panel
+  stayed online after its scheduled persistence cycle and returned HTTP 200.
+- The production audit log is mode 0600 and contains a pseudonymous control
+  verification record. The staff-password startup gate is active.
+- The Shopify app now runs image `tagioo-shopify-app:release-bee157b` with a
+  server-generated encryption key. Its isolated canary and production endpoint
+  returned HTTP 200. The prior image remains stopped as
+  `tagioo-shopify-app-before-bee157b`; its online SQLite backup is under
+  `/var/backups/tagioo-shopify-20260925-bee157b/` and contains no queued orders.
+- The adopted operating policy and incident-response exercise record are in
+  the sibling app's `docs/SECURITY_OPERATIONS.md` on `main`.
+
 - Added versioned AES-256-GCM protection for `history.json` and panel-created
   backups. Reads remain compatible with legacy plaintext during the controlled
   migration; writes become encrypted once `TAGIOO_DATA_ENCRYPTION_KEY` is set.
