@@ -5,6 +5,17 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-25.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-09-25 — Faster owner dashboard payload and cold start
+
+- Removed the all-tenant retained-event maps and duplicate raw daily event rows
+  from the owner dashboard response. They were used only for server-side usage
+  calculations but could add thousands of purchase/event records per tenant/day
+  to every owner request, delaying stringify, compression, transfer, and browser
+  parsing before any dashboard card could render.
+- Owner cold builds are now in-flight deduplicated, the startup cache warm runs
+  before the slower per-tenant persistence sweep, and the boot-time payments
+  badge reuses the shared read cache instead of decrypting the database again.
+
 ## 2026-09-25 — Faster login-to-dashboard transition
 
 - Removed the customer-login lock waterfall that made the redirect wait for a

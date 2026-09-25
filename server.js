@@ -7083,7 +7083,7 @@ async function getCustomerBilling(session) {
 
 // Owner: list payment claims (newest first), optionally filtered by status.
 async function listPayments(statusFilter) {
-  const loaded = await readDatabase();
+  const loaded = await readDatabaseCached();
   if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
   let payments = (loaded.data.payments || []).slice();
   if (statusFilter) payments = payments.filter((p) => p.status === statusFilter);
@@ -10457,7 +10457,15 @@ async function getDashboardData() {
     dockerLogs,
     alerts,
     deploymentChecks,
-    history,
+    // Per-tenant retained events are server-side inputs for usage calculations.
+    // Sending every tenant/day event list made the owner payload enormous even
+    // though the browser only consumes the aggregate daily rows.
+    history: {
+      available: history.available,
+      path: history.path,
+      retentionDays: history.retentionDays,
+      daily: (history.daily || []).map(({ recentEvents, purchaseEvents, ...day }) => day)
+    },
     orders,
     customers,
     customerAccounts,
@@ -10670,6 +10678,7 @@ const OWNER_DASHBOARD_FRESH_MS = Number(process.env.OWNER_DASHBOARD_FRESH_MS || 
 const OWNER_DASHBOARD_STALE_MS = Number(process.env.OWNER_DASHBOARD_STALE_MS || 3600000);
 let ownerDashboardCache = null;       // { payload, at, refreshing }
 let ownerDashboardLastAccess = 0;
+let ownerDashboardBuildInFlight = null;
 
 // Mark the cache dirty WITHOUT dropping it: keep serving the last payload
 // instantly and rebuild in the background. Nulling it would force the next
@@ -10685,14 +10694,23 @@ function invalidateOwnerDashboardCache({ structural = false } = {}) {
   }
   if (!ownerDashboardCache) return;
   ownerDashboardLastAccess = Date.now();
-  if (!ownerDashboardCache.refreshing) refreshOwnerDashboardCache();
+  if (!ownerDashboardCache.refreshing) refreshOwnerDashboardCache().catch(() => {});
 }
 
 function refreshOwnerDashboardCache() {
+  if (ownerDashboardBuildInFlight) return ownerDashboardBuildInFlight;
   if (ownerDashboardCache) ownerDashboardCache.refreshing = true;
-  return getDashboardData()
-    .then((payload) => { ownerDashboardCache = { payload, at: Date.now(), refreshing: false }; })
-    .catch(() => { if (ownerDashboardCache) ownerDashboardCache.refreshing = false; });
+  ownerDashboardBuildInFlight = getDashboardData()
+    .then((payload) => {
+      ownerDashboardCache = { payload, at: Date.now(), refreshing: false };
+      return payload;
+    })
+    .catch((error) => {
+      if (ownerDashboardCache) ownerDashboardCache.refreshing = false;
+      throw error;
+    })
+    .finally(() => { ownerDashboardBuildInFlight = null; });
+  return ownerDashboardBuildInFlight;
 }
 
 async function getDashboardDataCached() {
@@ -10703,14 +10721,15 @@ async function getDashboardDataCached() {
     return { ...entry.payload, timing: { ...(entry.payload.timing || {}), cache: "fresh" } };
   }
   if (entry && now - entry.at < OWNER_DASHBOARD_STALE_MS) {
-    if (!entry.refreshing) refreshOwnerDashboardCache();
+    if (!entry.refreshing) refreshOwnerDashboardCache().catch(() => {});
     return { ...entry.payload, timing: { ...(entry.payload.timing || {}), cache: "stale" } };
   }
   const startedAt = Date.now();
-  const payload = await getDashboardData();
-  payload.timing = { dashboardMs: Date.now() - startedAt, cache: "miss" };
-  ownerDashboardCache = { payload, at: Date.now(), refreshing: false };
-  return payload;
+  const payload = await refreshOwnerDashboardCache();
+  return {
+    ...payload,
+    timing: { ...(payload.timing || {}), dashboardMs: Date.now() - startedAt, cache: "miss" }
+  };
 }
 
 // Keep the payload hot while an owner is actively using the panel; idle after
@@ -10720,7 +10739,7 @@ const OWNER_DASHBOARD_WARM_MS = Number(process.env.OWNER_DASHBOARD_WARM_MS || 30
 const ownerDashboardWarmer = setInterval(() => {
   if (Date.now() - ownerDashboardLastAccess > 15 * 60 * 1000) return;
   if (ownerDashboardCache?.refreshing) return;
-  refreshOwnerDashboardCache();
+  refreshOwnerDashboardCache().catch(() => {});
 }, OWNER_DASHBOARD_WARM_MS);
 ownerDashboardWarmer.unref?.();
 
@@ -13518,11 +13537,11 @@ persistenceTimer.unref?.();
 
 server.listen(config.port, config.host, () => {
   console.log(`SGTM control panel running at http://${config.host}:${config.port}`);
-  // Populate stored history once at boot (today's snapshot) so a fresh restart
-  // isn't missing today's counts until the first timer tick.
-  runPersistenceCycle()
-    // Pre-warm the owner dashboard cache after history is current, so the first
-    // login after a restart hits a ready payload instead of a cold build.
-    .then(() => { ownerDashboardLastAccess = Date.now(); return refreshOwnerDashboardCache(); })
-    .catch(() => {});
+  // Prioritize the first owner paint after a restart. The persistence sweep scans
+  // every tenant log and can take many seconds; run it only after the dashboard
+  // cache is ready instead of making cache warming wait behind it.
+  ownerDashboardLastAccess = Date.now();
+  refreshOwnerDashboardCache()
+    .catch(() => {})
+    .finally(() => { runPersistenceCycle(); });
 });
