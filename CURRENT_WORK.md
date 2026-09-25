@@ -17,7 +17,7 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-25.
   disclosure/redaction, and owner backup actions. Tenant and record identifiers
   are pseudonymized so the audit file does not become another customer-data
   store.
-- Added an optional production staff-password gate requiring a 14-character
+- Added an optional production staff-password gate requiring a 12-character
   owner password and blocking common or username-derived values.
 - The local staging launcher now generates a separate encryption key, enables
   the staff-password gate, keeps its own encrypted data directory, and continues
