@@ -1,9 +1,284 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-08-25.
+Living status doc. Update after meaningful progress. Last updated: 2026-09-25.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
+
+## 2026-09-25 — Protected-data controls prepared
+
+- Added versioned AES-256-GCM protection for `history.json` and panel-created
+  backups. Reads remain compatible with legacy plaintext during the controlled
+  migration; writes become encrypted once `TAGIOO_DATA_ENCRYPTION_KEY` is set.
+- Added an idempotent migration command that authenticates every encrypted
+  replacement before atomically renaming it, plus tests for round trips,
+  tampering, incorrect keys, and legacy reads.
+- Added a root-only JSONL audit trail for Shopify order storage, privacy
+  disclosure/redaction, and owner backup actions. Tenant and record identifiers
+  are pseudonymized so the audit file does not become another customer-data
+  store.
+- Added an optional production staff-password gate requiring a 14-character
+  owner password and blocking common or username-derived values.
+- The local staging launcher now generates a separate encryption key, enables
+  the staff-password gate, keeps its own encrypted data directory, and continues
+  to exclude production credentials and integrations. HTTP and encryption smoke
+  checks passed.
+- The sibling Shopify app commit `bee157b` encrypts queued order and uninstall
+  payloads with AES-256-GCM while retaining read compatibility for legacy queue
+  rows. Unit tests, lint, typecheck, and production build pass.
+- These controls are locally verified but not yet deployed. Production rollout
+  must create keys privately on the VPS, verify the current owner password
+  policy without exposing it, migrate the panel files atomically, deploy the
+  Shopify app with its key, and run restore/health/order checks.
+
+## 2026-09-25 — Shopify launch release prepared
+
+- Follow-up verification completed on the connected reviewer workspace. Shopify
+  order `#1007` (`19060219740464`) was paid for USD 27.99; Tagioo Event Logs
+  showed one unique Purchase and Purchase Inspector showed `1 TRACKED`, `1 ORDER`,
+  and `RE-SENT ×2`. Browser and backend copies shared the same order/event ID,
+  proving live deduplication.
+- Exercised Shopify Managed Pricing on the development store: Free → Starter →
+  Free. Shopify explicitly marked the development-store approval as non-billed,
+  and the embedded app now reports the Free plan without a refresh warning.
+- Partner API responses sometimes exceeded the app's former 10-second timeout.
+  Shopify app commit `eebc072` raises only that request timeout to 30 seconds;
+  tests, lint, typecheck, build, CLI validation, isolated canary, and production
+  HTTP checks passed. Production runs `tagioo-shopify-app:release-eebc072`; the
+  stopped rollback container is `tagioo-shopify-app-before-eebc072`, the stopped
+  canary is `tagioo-shopify-app-canary-eebc072`, and the SQLite backup is under
+  `/var/backups/tagioo-shopify-20260925-eebc072/`.
+- The current Partner Dashboard has every preliminary step complete. A fresh
+  fetch of Shopify's canonical review requirements found
+  no clear local-code violation; configuration, unit tests, lint, typecheck, and
+  production build pass. Live decline/reinstall behavior remains a reviewer-time
+  check rather than local proof.
+- Follow-up: the AI self-review is now marked complete and Shopify shows **Ready
+  to submit**. The temporary public diagnostic file was deleted from the active
+  Shopify container and `https://connect.tagioo.com/diag-925b7.json` returns 404.
+  Final submission was not sent because the review page still says the app does
+  not need protected customer data while the protected-data request remains an
+  unapproved draft and the production integration processes customer fields.
+- Protected-customer-data access remains a **New Draft** and is the launch
+  blocker. Name, email, phone, address, and general protected data are selected
+  for app functionality, analytics, and advertising, but the saved questionnaire
+  truthfully answers No for encryption at rest, encrypted backups, test/production
+  separation, DLP, strong staff password requirements, personal-data access
+  logging, and an adopted incident-response policy. The App Store review page
+  therefore still says the app does not need protected data until that draft can
+  be submitted and approved.
+
+- Re-ran the current Shopify App Store AI self-review requirements against the
+  sibling app. No clear local-code violation was found; managed-billing decline
+  and reinstall behavior still require live development-store verification.
+- Committed and pushed Shopify app commit `346ac0c` to `main`. It preserves the
+  deployed Shopify-owned login flow and limits queued paid-order payloads to the
+  fields used by purchase delivery and customer redaction.
+- Shopify unit tests, lint, typecheck, production build, and CLI configuration
+  validation pass under Node 22.
+- Deployed the Shopify app release `346ac0c` as image
+  `tagioo-shopify-app:release-346ac0c` after an isolated canary against an
+  online SQLite backup. The previous app container is retained, stopped, as
+  `tagioo-shopify-app-before-346ac0c`; the backup is under
+  `/var/backups/tagioo-shopify-20260925-042930` and passed `PRAGMA quick_check`.
+- Enabled Shopify managed-billing reconciliation in the app container with a
+  root-owned runtime environment. The public app, login route, Tagioo site, and
+  Partner API query all returned successfully after rollout. No Nginx, sGTM,
+  event-ingest worker, or live tracking container was changed.
+- The development store is currently disconnected from Tagioo, so Free → paid
+  → cancellation and reinstall still need a fresh reviewer-workspace connection
+  before those live test flows can be completed.
+- Protected-customer-data access is still the main submission blocker. Level 2
+  access remains necessary for name/email/phone/address ad matching, and the
+  unverified security controls in `docs/SECURITY_OPERATIONS_DRAFT.md` must not be
+  represented to Shopify as implemented.
+
+## 2026-09-17 — Shopify launch security and billing audit
+
+- Rechecked the live Partner Dashboard. The listing, emergency contact,
+  automated checks, and embedded-app checks are complete. The submission is
+  still Draft, with AI self-review open. Its green “doesn't need access to
+  protected customer data” row conflicts with the paid-order/customer fields
+  processed by the app. Protected-data access remains a draft and not approved;
+  the saved questionnaire answers No for encryption at rest/backups, separate
+  test data, DLP, staff password rules, access logs, and incident response.
+- Verified that the existing Partner API client has Manage apps permission and
+  an access token. With the owner's explicit approval, copied that token to a
+  root-owned 0600 file at `/etc/tagioo-shopify-app/partner-api.env` on the
+  production VPS. A read-only Partner API query from that VPS returned HTTP
+  200 with no GraphQL errors. The running Shopify container still has no
+  Partner API environment variables and billing remains disabled. A later
+  read-only SQLite check found no current store connections; the development
+  store's embedded app also displays its disconnected state.
+- The VPS guest root filesystem is ext4 without guest-side disk encryption;
+  the Shopify SQLite file and local backup have root-only 0600 permissions.
+  Hostinger VPS backup encryption has not been established. `auditd` is
+  inactive. These observations do not justify changing questionnaire answers.
+- Locally narrowed the Shopify app's queued paid-order payload to fields used
+  by its existing delivery and redaction flows, and added a focused test.
+  Lint, typecheck, two unit tests, and production build pass. This code has not
+  been deployed; live tracking remains unchanged.
+- Added `docs/SECURITY_OPERATIONS_DRAFT.md` in the Shopify app as a proposed
+  control inventory and incident procedure. It is not an adopted policy or
+  proof that the controls run.
+- Added an on-demand, localhost-only panel staging launcher with separate
+  SQLite data and credentials. Verified HTTP 200 on its home route and 401 for
+  an unauthenticated session, then stopped it. This does not establish a
+  separate production-like Shopify staging environment or justify a Yes answer
+  to the questionnaire's test/production separation item.
+
+## 2026-09-17 — Shopify login route production rollout
+
+- Removed the standalone shop-domain login form from the sibling Shopify app.
+  Merchants are directed to install or open the app from Shopify Admin. Local
+  lint, typecheck, tests, build, and Shopify CLI config validation passed with
+  Node 22.
+- Built and deployed only the Shopify app image
+  `tagioo-shopify-app:login-fix-20260917`. The original `ddec00b` container is
+  retained, stopped, as `tagioo-shopify-app-before-loginfix-20260917`; the
+  previous route and a SQLite online backup are under `/var/backups/`.
+- The first replacement was bound to the wrong host port, temporarily returning
+  502 from `connect.tagioo.com`. Recreated it on the original localhost port
+  3200; the app and `tagioo.com` both returned HTTP 200 afterward. The live
+  `/auth/login` page no longer contains the manual shop-domain field. No
+  sGTM container, tracking route, or Nginx configuration was changed.
+- The running Shopify container still lacks production managed-billing Partner
+  API variables. Billing was not enabled. Protected-customer-data approval and
+  production billing flows remain launch blockers.
+
+## 2026-09-14 — Preserve customer login during container launch
+
+- Fixed a lost-update race between verified customer signup/account creation and
+  automatic container provisioning. Both operations read and rewrite the JSON
+  database; a slow Docker/Nginx/SSL launch could finish with an older snapshot
+  and remove the newly created `customerAccounts` row while leaving its signed
+  customer session and tenant/container active.
+- Customer-account creation and customer container creation now share the
+  existing database mutation lock. A concurrent signup waits for provisioning
+  (or vice versa), then reads the latest state before writing.
+- The affected `shopify-app-reviewer` tenant/container remains live, but its
+  missing login row must be restored once through the owner dashboard using the
+  same tenant ID and reviewer email.
+- Removed a broken startup migration call that materialized the entire 1.8 GB
+  event store before failing on an initialization-order error. This caused the
+  panel process to approach or exceed Node's heap limit after every restart.
+  The migration had never completed, so removing the automatic call preserves
+  existing analytics behavior while keeping login and dashboard service stable.
+
+## 2026-09-13 — Shopify public-review verification
+
+- The running Shopify Docker image is `ddec00b`. The embedded development-store
+  app is connected, and Shopify's emergency contact and automated App Store
+  checks are complete.
+- Placed a simulated Test Payment Gateway order `#1003` in `tagioo-test-store`.
+  Shopify marked it paid. The app recorded the backend order, and Tagioo's event
+  store received the browser and backend Purchase requests for order
+  `19038871355696`; both use the same transaction ID. After reloading Event
+  Logs, the unique Purchase count increased from 3 to 4. Earlier Shopify
+  `orders/paid` retries on September 12 timed out; the later deliveries worked.
+- Production Shopify billing is still disabled in the running container. Its
+  `SHOPIFY_PARTNER_ORG_ID`, `SHOPIFY_PARTNER_APP_ID`, and
+  `SHOPIFY_PARTNER_API_ACCESS_TOKEN` are absent there (values were not read).
+  Creating a Partner API client in Shopify does not configure the VPS.
+- The live App Store review page is Draft: English listing shows Create,
+  protected-customer-data details show 0/16 questions completed, and capability
+  selection/self-review remain open. The app settings page still offers Upload
+  icon. The Partner payout settings have no payout method. Do not infer these
+  states from the prepared listing copy or icon files in the sibling repo.
+- The sibling app stores queued order payloads and tokens in SQLite; panel
+  backups include plain JSON. Encryption at rest/backups, access auditing,
+  production/test separation, DLP, and incident response need operational
+  evidence or implementation before answering Shopify's questionnaire Yes.
+
+## 2026-09-13 — Shopify App Pricing integration
+
+- Prepared the public legal pages for a global Shopify launch: billing language now distinguishes Shopify App Pricing, Paddle, and local payments; the privacy policy now describes Shopify order/customer fields, compliance webhooks, selected analytics destinations, subprocessors, retention, and international processing. These are operational drafts and still require legal review before public submission.
+- Deployed isolated Tagioo commit `35846f2` and Shopify app image `b4b31cf`
+  on the VPS. Before rollout, saved `history.json` and online SQLite backups
+  of Tagioo events and Shopify app data in
+  `/var/backups/tagioo-release-a7AbCD`; both copied databases passed
+  `PRAGMA quick_check`. The two additive Shopify Prisma migrations applied
+  successfully. The previous Shopify container/image is retained, stopped,
+  as `tagioo-shopify-app-prev` for rollback. After startup, both public HTTPS
+  sites returned 200; the unauthenticated privacy endpoint returned 401.
+  Shopify billing remains disabled or unset in the production env.
+- Published the four Shopify App Pricing plans with the handles expected by
+  the integration: Free (`free`), Starter (`starter`, $30/month), Pro (`pro`,
+  $50/month), and Enterprise (`enterprise`, $100/month). Development stores
+  can test the paid plans without being charged.
+- Added the signed Shopify subscription entitlement endpoint. Shopify-managed
+  plans now map to Tagioo's public Free/Starter/Pro/Enterprise limits,
+  preserve the 15,000-event rolling Free allowance, resume/resize a capped
+  container only after a paid plan is confirmed, and return to Free after the
+  last Shopify subscription is removed.
+- Shopify-managed customers now change plans in Shopify Admin instead of the
+  manual bKash/Nagad flow. Shopify remains the authority for renewals and
+  cancellation, so those tenants are excluded from Tagioo's manual renewal
+  sweep. Multiple connected Shopify stores retain the highest active plan.
+- The sibling `tagioo-shopify-app` now queries Shopify's Partner API with a
+  five-minute cache, stores subscription state in SQLite, periodically
+  reconciles cancellation, and sends HMAC-signed entitlement updates to Tagioo.
+  Disconnect/uninstall/shop-redaction revoke the linked entitlement.
+- Billing is deliberately off by default (`SHOPIFY_BILLING_ENABLED=false`).
+  Before enabling it, configure matching managed-pricing handles in Shopify,
+  create a Partner API client with Manage apps permission, add its credentials
+  only to the VPS environment, deploy both services, and test Free → paid →
+  cancellation on the development store.
+- Local checks passed: Tagioo syntax/browser checks plus 12 focused tests;
+  Shopify Prisma migrations, lint, typecheck, production build, and CLI config
+  validation.
+
+## 2026-09-11 — Shopify app launch preparation
+
+- Verified the embedded Shopify app in `tagioo-test-store`, including install,
+  requested scopes, merchant connection UI, lint, typecheck, production build,
+  and Shopify CLI configuration validation.
+- Added a signed Shopify privacy endpoint. Customer data requests email the
+  matching Tagioo merchant, customer redaction removes only matching Shopify
+  orders, and shop redaction removes only that store/container's Shopify data
+  and connection metadata. Focused isolation tests cover the deletion rules.
+- Selected `connect.tagioo.com` as the production app host so the submitted app
+  URL does not use Shopify's trademark. The live `shopify.tagioo.com` tracking
+  hostname remains unchanged.
+- Next: deploy the control-panel endpoint and Shopify Docker app, provision the
+  production Shopify secret and persistent SQLite volume, add Nginx/TLS, deploy
+  the Shopify app configuration, and run install/order/privacy smoke tests.
+
+## 2026-09-09 — One-import TikTok setup
+
+- Generated `server.json` now includes a Tagioo TikTok Events API custom
+  template and a preconfigured all-events server tag. Customers no longer need
+  to install or configure a Server GTM Community Gallery template manually.
+- The included tag maps GA4 event names to TikTok standard events, sends shared
+  browser/server event IDs for deduplication, and carries ecommerce, matching,
+  click-ID, browser, and IP data already available to Server GTM.
+- TikTok remains opt-in. Existing generated containers and customers who do not
+  select TikTok are unchanged; customers selecting it only import `web.json`
+  and `server.json` with Merge, preview, then publish.
+
+## 2026-09-08 — Template generation preserves container IDs
+
+- Fixed customer template generation rejecting every generated container ID as
+  missing. Container request IDs contain underscores, but route parsing treated
+  them as slugs and rewrote those underscores before the ownership lookup.
+- Container IDs are now validated as opaque keys without mutation across the
+  template, dashboard, webhook, Laravel, verification, and customer settings
+  boundaries. Added a focused regression test for generated IDs.
+- This changes control-panel identifier parsing only; GTM template contents and
+  live tracking paths are unchanged.
+
+## 2026-08-27 — Immediate visibility for newly created containers
+
+- Structural container creation now clears the affected customer's dashboard
+  cache and forces the owner container catalog to rebuild once. A successful
+  second-container request therefore appears immediately instead of serving the
+  previous one-container snapshot during stale-while-revalidate.
+- Creating an additional container no longer overwrites the tenant row's legacy
+  primary-container fields. Existing production container metadata and tracking
+  credentials remain the primary account defaults; secondary container state
+  stays in its own setup request and scoped tracking configuration.
+- This change affects control-panel catalog/cache behavior only. It does not
+  change live event ingest, Nginx, sGTM forwarding, or GTM template behavior.
 
 ## 2026-08-25 — Isolated containers inside one customer account
 

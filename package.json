@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js"
+    "check": "node --check server.js",
+    "test:data-protection": "node --test test/data-protection.test.js test/protected-data-audit.test.js test/staff-password-policy.test.js"
   },
   "engines": {
     "node": ">=20"

@@ -9,6 +9,9 @@ import { promisify } from "node:util";
 import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
 import { highestActiveShopifyPlan, normalizeShopifyBillingState } from "./shopify-billing.js";
 import { removeShopifyOrders, shopifyCustomerOrders } from "./shopify-privacy.js";
+import { parseDataProtectionKey, parseProtectedJson, serializeProtectedJson } from "./data-protection.js";
+import { appendProtectedDataAudit } from "./protected-data-audit.js";
+import { staffPasswordPolicyErrors } from "./staff-password-policy.js";
 
 const gzipAsync = promisify(gzip);
 
@@ -91,6 +94,7 @@ const config = {
   customerSummaryTailLines: Number(process.env.CUSTOMER_SUMMARY_TAIL_LINES || Math.min(Number(process.env.SUMMARY_TAIL_LINES || 50000), 10000)),
   eventLogLimit: Number(process.env.EVENT_LOG_LIMIT || 500),
   dataDir: configuredDataDir,
+  dataEncryptionKey: process.env.TAGIOO_DATA_ENCRYPTION_KEY || "",
   historyRetentionDays: Number(process.env.HISTORY_RETENTION_DAYS || 90),
   // SQLite event store: raw event lines kept 35 days (30-day dashboard window + buffer)
   eventRetentionDays: Number(process.env.EVENT_RETENTION_DAYS || 35),
@@ -129,6 +133,7 @@ const config = {
   authUsername: process.env.AUTH_USERNAME || "admin",
   authPassword: process.env.AUTH_PASSWORD || "",
   authSecret: process.env.AUTH_SECRET || "",
+  requireStrongStaffPasswords: process.env.REQUIRE_STRONG_STAFF_PASSWORDS === "true",
   orderWebhookSecret: process.env.ORDER_WEBHOOK_SECRET || "",
   alertWebhookUrl: process.env.ALERT_WEBHOOK_URL || "",
   alertMinIntervalMinutes: Number(process.env.ALERT_MIN_INTERVAL_MINUTES || 60),
@@ -174,7 +179,24 @@ const config = {
   }
 };
 
+// Fail before serving requests if an operator supplied a malformed key. Existing
+// plaintext files remain readable until the migration rewrites them.
+parseDataProtectionKey(config.dataEncryptionKey);
+if (config.authEnabled && config.requireStrongStaffPasswords) {
+  const staffPasswordErrors = staffPasswordPolicyErrors(config.authPassword, config.authUsername);
+  if (staffPasswordErrors.length) throw new Error(staffPasswordErrors.join(" "));
+}
+
 const authSecret = config.authSecret || config.authPassword || randomBytes(32).toString("hex");
+const protectedDataAuditSecret = config.authSecret || config.dataEncryptionKey || authSecret;
+
+async function recordProtectedDataAccess(entry) {
+  try {
+    await appendProtectedDataAudit(config.dataDir, protectedDataAuditSecret, entry);
+  } catch (error) {
+    console.error(`[protected-data-audit] ${entry.action || "unknown"}: ${error.message}`);
+  }
+}
 const PURCHASE_ESTIMATE_WINDOW_MS = 5 * 60 * 1000;
 const EVENT_ESTIMATE_WINDOW_MS = 10 * 1000;
 const DASHBOARD_COMMAND_TIMEOUT_MS = 1000;
@@ -211,15 +233,6 @@ try {
   const { openEventStore } = await import("./db.js");
   eventStore = openEventStore(config.dataDir);
   console.log(`[events] SQLite event store ready: ${join(config.dataDir, "events.db")}`);
-  // One-time backfill: re-key stored event lines to their Asia/Dhaka day so
-  // historical dashboard counts align with the live Dhaka-pinned aggregation.
-  // Analytics-only; the live tracking path is untouched.
-  try {
-    const rekey = eventStore.rekeyDateKeys(nginxLineDhakaKey);
-    if (rekey.migrated) console.log(`[events] Dhaka date_key backfill: ${rekey.updated}/${rekey.scanned} rows re-keyed`);
-  } catch (error) {
-    console.error(`[events] Dhaka date_key backfill skipped (${error.message})`);
-  }
 } catch (error) {
   console.error(`[events] SQLite event store unavailable (${error.message}); using log tail + history.json only`);
 }
@@ -3118,6 +3131,15 @@ async function changeTenantPlan(tenantId, planName) {
   };
   await writeDatabase(data);
 
+  if (order.source === "tagioo-shopify-app") {
+    await recordProtectedDataAccess({
+      actor: "shopify-app",
+      action: index === -1 ? "shopify_order_stored" : "shopify_order_updated",
+      tenantId: order.tenantId,
+      recordId: order.id
+    });
+  }
+
   // Notify the customer their plan was changed by the Tagioo team (only on a real
   // change). Best-effort — never blocks the plan update.
   if (previousPlan !== planName) {
@@ -4204,7 +4226,7 @@ async function readDatabase() {
   };
   try {
     const content = await readFile(databasePath, "utf8");
-    const parsed = JSON.parse(content);
+    const parsed = parseProtectedJson(content, config.dataEncryptionKey);
     return {
       available: true,
       path: databasePath,
@@ -4271,14 +4293,14 @@ async function writeDatabase(data) {
   // millisecond would otherwise share one temp file, interleave their bytes and
   // rename a corrupted history.json into place.
   const tempPath = `${databasePath}.${Date.now()}.${randomBytes(4).toString("hex")}.tmp`;
-  await writeFile(tempPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  await writeFile(tempPath, serializeProtectedJson(data, config.dataEncryptionKey), { encoding: "utf8", mode: 0o600 });
   await rename(tempPath, databasePath);
   dbReadCacheEntry = null;   // written data changed → drop the read cache
 }
 
 // ── Backups (history.json snapshots) ───────────────────────────────────────
 // Local-VPS-only snapshots of the JSON database (tenants, payments, customer
-// logins, settings). Kept as plain files under data/backups/, pruned to the
+// logins, settings). Encrypted when TAGIOO_DATA_ENCRYPTION_KEY is configured and
 // newest BACKUPS_TO_KEEP. Not a substitute for offsite backup, but protects
 // against a bad write, accidental delete, or owner mistake on this box.
 
@@ -4302,7 +4324,7 @@ async function createBackup(source = "manual") {
   const now = new Date();
   const id = backupIdFor(now, randomBytes(3).toString("hex"));
   const payload = { id, createdAt: now.toISOString(), source, data: loaded.data };
-  await writeFile(join(backupsDir, id), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await writeFile(join(backupsDir, id), serializeProtectedJson(payload, config.dataEncryptionKey), { encoding: "utf8", mode: 0o600 });
   await pruneBackups();
   return id;
 }
@@ -4317,7 +4339,7 @@ async function listBackups() {
     if (!info) continue;
     let meta = { createdAt: null, source: "manual" };
     try {
-      const raw = JSON.parse(await readFile(path, "utf8"));
+      const raw = parseProtectedJson(await readFile(path, "utf8"), config.dataEncryptionKey);
       meta = { createdAt: raw.createdAt || info.mtime.toISOString(), source: raw.source || "manual" };
     } catch { /* corrupt file: still list it so the owner can delete it */ }
     backups.push({ id: name, createdAt: meta.createdAt, source: meta.source, sizeBytes: info.size });
@@ -4334,7 +4356,7 @@ async function restoreBackupLocked(id) {
   const path = join(backupsDir, id);
   let payload;
   try {
-    payload = JSON.parse(await readFile(path, "utf8"));
+    payload = parseProtectedJson(await readFile(path, "utf8"), config.dataEncryptionKey);
   } catch {
     return { ok: false, status: 404, errors: ["Backup not found or unreadable."] };
   }
@@ -4359,7 +4381,7 @@ async function importBackupLocked(rawData) {
   const now = new Date();
   const id = backupIdFor(now, randomBytes(3).toString("hex"));
   const payload = { id, createdAt: now.toISOString(), source: "import", data: rawData };
-  await writeFile(join(backupsDir, id), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  await writeFile(join(backupsDir, id), serializeProtectedJson(payload, config.dataEncryptionKey), { encoding: "utf8", mode: 0o600 });
   await pruneBackups();
   return { ok: true, id };
 }
@@ -5924,6 +5946,10 @@ function validateCustomerAccountInput(input) {
 }
 
 async function addCustomerAccount(input, options = {}) {
+  return withDbLock(() => addCustomerAccountLocked(input, options));
+}
+
+async function addCustomerAccountLocked(input, options = {}) {
   const allowUpdate = options.allowUpdate !== false;
   const validated = validateCustomerAccountInput(input);
   if (validated.errors.length) return { ok: false, errors: validated.errors };
@@ -7807,6 +7833,10 @@ function validateCustomerSetupInput(input, session) {
 }
 
 async function addCustomerSetupRequest(input, session) {
+  return withDbLock(() => addCustomerSetupRequestLocked(input, session));
+}
+
+async function addCustomerSetupRequestLocked(input, session) {
   const loaded = await readDatabase();
   if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
   const data = loaded.data;
@@ -7853,6 +7883,10 @@ async function addCustomerSetupRequest(input, session) {
   const now = new Date().toISOString();
   const tenantIndex = data.tenants.findIndex((tenant) => tenant.id === validated.value.tenantId);
   const existingTenant = tenantIndex === -1 ? null : data.tenants[tenantIndex];
+  const hadExistingContainer = customerContainerRequests(
+    data.customerSetupRequests,
+    validated.value.tenantId
+  ).length > 0;
   const planName = existingTenant?.plan || config.billingPlan || "Starter";
   const resourceLimits = resourceProfileForPlan(planName);
   if (existingTenant?.name && validated.value.tenantName === validated.value.tenantId) {
@@ -7941,10 +7975,14 @@ async function addCustomerSetupRequest(input, session) {
       createdAt: now
     });
   } else {
-    data.tenants[tenantIndex] = {
-      ...data.tenants[tenantIndex],
-      ...tenantUpdate
-    };
+    // The tenant row predates multi-container accounts and still represents the
+    // account's primary/oldest container in several legacy read paths. Creating
+    // container #2 must not replace those production-facing fields with the new
+    // container. Each additional container lives in customerSetupRequests and
+    // keeps its own tracking configuration in tenant.tracking.containerConfigs.
+    data.tenants[tenantIndex] = hadExistingContainer
+      ? { ...data.tenants[tenantIndex], updatedAt: now }
+      : { ...data.tenants[tenantIndex], ...tenantUpdate };
   }
 
   await writeDatabase(data);
@@ -10646,7 +10684,15 @@ let ownerDashboardLastAccess = 0;
 // Mark the cache dirty WITHOUT dropping it: keep serving the last payload
 // instantly and rebuild in the background. Nulling it would force the next
 // load to block on a full cold build right after an owner action.
-function invalidateOwnerDashboardCache() {
+function invalidateOwnerDashboardCache({ structural = false } = {}) {
+  // Container creation/deletion changes which rows exist. Serving the previous
+  // list while a background refresh runs makes a successful new container look
+  // as if it disappeared, so structural mutations deliberately force one fresh
+  // build. Routine status/count updates retain stale-while-revalidate behavior.
+  if (structural) {
+    ownerDashboardCache = null;
+    return;
+  }
   if (!ownerDashboardCache) return;
   ownerDashboardLastAccess = Date.now();
   if (!ownerDashboardCache.refreshing) refreshOwnerDashboardCache();
@@ -12051,6 +12097,13 @@ const server = createServer(async (req, res) => {
           jsonResponse(res, 503, { error: "Could not deliver the customer data report to the merchant." });
           return;
         }
+        await recordProtectedDataAccess({
+          actor: "shopify-app",
+          action: "shopify_customer_data_disclosed_to_merchant",
+          tenantId,
+          recordId: payload.data_request?.id,
+          count: orders.length
+        });
         jsonResponse(res, 200, { accepted: true, records: orders.length });
         return;
       }
@@ -12085,6 +12138,13 @@ const server = createServer(async (req, res) => {
           return;
         }
       }
+      await recordProtectedDataAccess({
+        actor: "shopify-app",
+        action: topic === "SHOP_REDACT" ? "shopify_shop_redacted" : "shopify_customer_redacted",
+        tenantId,
+        recordId: payload.customer?.id,
+        count: result.removed
+      });
       jsonResponse(res, 200, { accepted: true, removed: result.removed });
       return;
     }
@@ -12350,7 +12410,10 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await addCustomerSetupRequest(body, session);
-      if (result.ok) invalidateOwnerDashboardCache();
+      if (result.ok) {
+        invalidateCustomerDashboardCache(result.request.tenantId);
+        invalidateOwnerDashboardCache({ structural: true });
+      }
       jsonResponse(res, result.ok ? 201 : (result.status || 400), result.ok ? { request: result.request } : { errors: result.errors });
       return;
     }
@@ -12708,6 +12771,10 @@ const server = createServer(async (req, res) => {
         return;
       }
       const result = await deleteCustomerContainer(decodeURIComponent(customerDeleteMatch[1]), session);
+      if (result.ok) {
+        invalidateCustomerDashboardCache(result.request.tenantId);
+        invalidateOwnerDashboardCache({ structural: true });
+      }
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { request: result.request } : { errors: result.errors });
       return;
     }
@@ -12979,6 +13046,7 @@ const server = createServer(async (req, res) => {
     if (pathname === "/api/admin/backups" && req.method === "GET") {
       if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
       const backups = await listBackups();
+      await recordProtectedDataAccess({ actor: "owner", action: "protected_backup_inventory_viewed" });
       jsonResponse(res, 200, { backups });
       return;
     }
@@ -12987,6 +13055,7 @@ const server = createServer(async (req, res) => {
       if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
       try {
         const id = await createBackup("manual");
+        await recordProtectedDataAccess({ actor: "owner", action: "protected_backup_created", recordId: id });
         jsonResponse(res, 201, { id, backups: await listBackups() });
       } catch (error) {
         jsonResponse(res, 500, { errors: [error.message || "Backup failed."] });
@@ -13004,6 +13073,7 @@ const server = createServer(async (req, res) => {
         return;
       }
       const result = await importBackup(body?.data ?? body);
+      if (result.ok) await recordProtectedDataAccess({ actor: "owner", action: "protected_backup_imported", recordId: result.id });
       jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok ? { id: result.id, backups: await listBackups() } : { errors: result.errors });
       return;
     }
@@ -13013,6 +13083,7 @@ const server = createServer(async (req, res) => {
       if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
       const id = decodeURIComponent(backupActionMatch[1]);
       const result = await restoreBackup(id);
+      if (result.ok) await recordProtectedDataAccess({ actor: "owner", action: "protected_backup_restored", recordId: id });
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { id: result.id } : { errors: result.errors });
       return;
     }
@@ -13022,6 +13093,7 @@ const server = createServer(async (req, res) => {
       if (!isOwner(req)) { jsonResponse(res, 403, { error: "Owner access required." }); return; }
       const id = decodeURIComponent(backupDeleteMatch[1]);
       const result = await deleteBackup(id);
+      if (result.ok) await recordProtectedDataAccess({ actor: "owner", action: "protected_backup_deleted", recordId: id });
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? { backups: await listBackups() } : { errors: result.errors });
       return;
     }
