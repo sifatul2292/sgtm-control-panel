@@ -3142,15 +3142,6 @@ async function changeTenantPlan(tenantId, planName) {
   };
   await writeDatabase(data);
 
-  if (order.source === "tagioo-shopify-app") {
-    await recordProtectedDataAccess({
-      actor: "shopify-app",
-      action: index === -1 ? "shopify_order_stored" : "shopify_order_updated",
-      tenantId: order.tenantId,
-      recordId: order.id
-    });
-  }
-
   // Notify the customer their plan was changed by the Tagioo team (only on a real
   // change). Best-effort — never blocks the plan update.
   if (previousPlan !== planName) {

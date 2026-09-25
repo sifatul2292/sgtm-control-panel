@@ -4394,54 +4394,79 @@ function renderOwnerDashboard(data) {
 // ── Owner: Customers management view ────────────────────────────────────────
 function renderCustomersView(data) {
   const customers = (data?.owner && data.owner.customers) || [];
+  const metrics = data?.owner?.metrics || {};
   const listEl = document.getElementById("manageCustomersList");
   const searchEl = document.getElementById("manageCustomersSearch");
+  const filterEl = document.getElementById("manageCustomersFilter");
   if (!listEl) return;
 
   const q = (searchEl?.value || "").trim().toLowerCase();
-  const matched = q
+  const filter = filterEl?.value || "all";
+  const isCurrent = (c) => c.source !== "environment"
+    && ["active", "trial"].includes(c.subscriptionStatus)
+    && !c.unpaid;
+  const needsAttention = (c) => c.unpaid
+    || ["pending", "pending_payment", "attention", "expired", "overdue", "suspended", "cancelled"].includes(c.subscriptionStatus)
+    || ["failed", "overdue", "unpaid", "expired"].includes(c.paymentStatus);
+  const matchesFilter = (c) => filter === "all"
+    || (filter === "paying" && isCurrent(c))
+    || (filter === "trial" && c.subscriptionStatus === "trial" && !c.unpaid)
+    || (filter === "attention" && needsAttention(c))
+    || (filter === "nonpaying" && !isCurrent(c));
+  const matchedBySearch = q
     ? customers.filter((c) => [c.fullName, c.name, c.email, c.phone, c.id, c.plan]
         .some((v) => String(v || "").toLowerCase().includes(q)))
     : customers.slice();
+  const matched = matchedBySearch.filter(matchesFilter);
 
-  // Paying customers first, then pending, then trial, then free/other. Within a
-  // rank, higher monthly amount first, then name.
-  const isPaid = (c) => c.subscriptionStatus === "active" && c.paymentStatus === "paid";
-  const rankOf = (c) => isPaid(c) ? 0
-    : c.subscriptionStatus === "pending_payment" ? 1
-    : c.subscriptionStatus === "trial" ? 2 : 3;
+  // Current subscriptions first, then accounts needing attention, then the rest.
+  const rankOf = (c) => isCurrent(c) ? 0 : needsAttention(c) ? 1 : 2;
   const filtered = matched.sort((a, b) =>
     rankOf(a) - rankOf(b)
     || Number(b.monthlyAmount || 0) - Number(a.monthlyAmount || 0)
     || String(a.fullName || a.name || a.id).localeCompare(String(b.fullName || b.name || b.id)));
 
-  // Summary: how many are actually paying and the combined monthly revenue.
+  if (!filtered.some((c) => c.id === selectedManageCustomerId)) {
+    selectedManageCustomerId = filtered[0]?.id || "";
+  }
+
+  // Use the same canonical subscription and MRR definitions as the owner overview.
   const statsEl = document.getElementById("customerStats");
   if (statsEl) {
-    const paid = customers.filter(isPaid);
-    const mrr = paid.reduce((sum, c) => sum + Number(c.monthlyAmount || 0), 0);
-    const free = customers.length - paid.length;
+    const current = Number(metrics.healthySubscriptions ?? customers.filter(isCurrent).length);
+    const total = Number(metrics.totalCustomers ?? customers.length);
+    const mrr = Number(metrics.mrr ?? customers.filter(isCurrent).reduce((sum, c) => sum + Number(c.monthlyAmount || 0), 0));
+    const nonpaying = Math.max(0, total - current);
     const stat = (label, value) => `<div class="cstat"><span>${label}</span><strong>${value}</strong></div>`;
     statsEl.innerHTML =
-      stat("Paying customers", paid.length.toLocaleString())
+      stat("Current subscriptions", current.toLocaleString())
       + stat("Monthly revenue", `৳${mrr.toLocaleString()}`)
-      + stat("Free / non-paying", free.toLocaleString())
-      + stat("Total customers", customers.length.toLocaleString());
+      + stat("Free / non-paying", nonpaying.toLocaleString())
+      + stat("Total customers", total.toLocaleString());
+  }
+
+  const countEl = document.getElementById("customerResultsCount");
+  if (countEl) {
+    countEl.textContent = `${filtered.length.toLocaleString()} ${filtered.length === 1 ? "customer" : "customers"}`;
   }
 
   listEl.innerHTML = filtered.length
     ? filtered.map((c) => `
-        <button type="button" class="customer-row${c.id === selectedManageCustomerId ? " is-selected" : ""}" data-manage-customer="${escapeHtml(c.id)}">
+        <button type="button" class="customer-row${c.id === selectedManageCustomerId ? " is-selected" : ""}" data-manage-customer="${escapeHtml(c.id)}" aria-pressed="${c.id === selectedManageCustomerId}" aria-controls="manageCustomerDetail">
           <div class="cr-main">
             <strong>${escapeHtml(c.fullName || c.name || c.id)}</strong>
             <span>${escapeHtml(c.email || "no email")}</span>
           </div>
           <div class="cr-meta">
             ${statusPill(c.subscriptionStatus || "unknown", lifecycleStatusClass(c.subscriptionStatus))}
-            <span>${escapeHtml(c.plan || "—")}</span>
+            <span>${escapeHtml(c.plan || "—")}${c.monthlyAmount ? ` · ৳${Number(c.monthlyAmount).toLocaleString()}` : ""}</span>
           </div>
         </button>`).join("")
-    : `<div class="customer-detail-empty">No customers match.</div>`;
+    : `<div class="customer-detail-empty customer-search-empty">
+        <strong>No matching customers</strong>
+        <span>Try a different search or filter.</span>
+        <button class="button" type="button" id="clearCustomerSearch">Clear filters</button>
+      </div>`;
 
   listEl.querySelectorAll("[data-manage-customer]").forEach((b) => {
     b.onclick = () => { selectedManageCustomerId = b.dataset.manageCustomer; renderCustomersView(latestData); };
@@ -4451,8 +4476,18 @@ function renderCustomersView(data) {
     searchEl.dataset.wired = "1";
     searchEl.addEventListener("input", () => renderCustomersView(latestData));
   }
+  if (filterEl && !filterEl.dataset.wired) {
+    filterEl.dataset.wired = "1";
+    filterEl.addEventListener("change", () => renderCustomersView(latestData));
+  }
+  listEl.querySelector("#clearCustomerSearch")?.addEventListener("click", () => {
+    if (searchEl) searchEl.value = "";
+    if (filterEl) filterEl.value = "all";
+    renderCustomersView(latestData);
+    searchEl?.focus();
+  });
 
-  const detail = customers.find((c) => c.id === selectedManageCustomerId) || null;
+  const detail = filtered.find((c) => c.id === selectedManageCustomerId) || null;
   renderCustomerDetail(detail);
 }
 
@@ -4466,21 +4501,40 @@ function renderCustomerDetail(customer) {
   const c = customer;
   const money = (n) => `৳${Number(n || 0).toLocaleString()}`;
   const containers = c.customerContainers || [];
-  const info = [
-    ["Name", c.fullName || c.name || c.id],
+  const accountInfo = [
     ["Email", c.email || "—"],
     ["Phone", c.phone || "—"],
-    ["Tenant ID", c.id],
+    ["Tenant ID", c.id]
+  ];
+  const billingInfo = [
     ["Plan", c.plan || "—"],
-    ["Status", String(c.subscriptionStatus || "—").replaceAll("_", " ")],
     ["Payment", c.paymentStatus || "—"],
     ["Renews", c.renewalDate ? formatShortDate(c.renewalDate) : "—"],
-    ["Monthly", money(c.monthlyAmount)],
-    ["Requests (month)", `${Number(c.requestsMonth || 0).toLocaleString()} / ${Number(c.requestLimit || 0).toLocaleString()} (${Number(c.usagePercent || 0)}%)`],
-    ["Requests (today)", Number(c.requestsToday || 0).toLocaleString()],
-    ["Containers", String(containers.length)]
+    ["Monthly", money(c.monthlyAmount)]
   ];
-  const planOpts = MANAGE_PLANS.map((p) => `<option value="${p}"${p === c.plan ? " selected" : ""}>${p}</option>`).join("");
+  const usagePercent = Math.max(0, Math.min(100, Number(c.usagePercent || 0)));
+  const infoGrid = (items) => items.map(([k, v]) => `<div class="cd-cell"><span>${escapeHtml(k)}</span><strong>${escapeHtml(String(v))}</strong></div>`).join("");
+  const canManage = !["environment", "provisioning"].includes(c.source);
+  const currentPlanOption = c.plan && !MANAGE_PLANS.includes(c.plan)
+    ? `<option value="${escapeHtml(c.plan)}" selected disabled>${escapeHtml(c.plan)} (current)</option>`
+    : "";
+  const planOpts = currentPlanOption + MANAGE_PLANS.map((p) => `<option value="${p}"${p === c.plan ? " selected" : ""}>${p}</option>`).join("");
+  const planManagement = canManage
+    ? `<div class="cd-plan-row">
+        <div><h5>Change plan</h5><p>Choose a plan, then save. Container capacity may be resized.</p></div>
+        <div class="cd-actions">
+          <label class="cd-plan-label" for="cdPlanSelect"><span>New plan</span><select id="cdPlanSelect">${planOpts}</select></label>
+          <button class="button button-primary" type="button" id="cdPlanSave" disabled>Save change</button>
+        </div>
+      </div>
+      <div id="cdActionMsg" class="cd-msg" aria-live="polite"></div>`
+    : `<div class="cd-readonly-note"><strong>Managed outside Customers</strong><span>${c.source === "environment" ? "This default account comes from the server configuration." : "Finish this account in Provisioning before managing its plan here."}</span></div>`;
+  const dangerZone = canManage
+    ? `<details class="cd-danger">
+        <summary>Danger zone</summary>
+        <div><p>Deleting this customer tears down their containers and removes every record. This cannot be undone.</p><button class="button button-danger" type="button" id="cdDeleteCustomer">Delete customer</button></div>
+      </details>`
+    : "";
   const containerRows = containers.length
     ? containers.map((ct) => `
         <div class="cd-container">
@@ -4492,25 +4546,42 @@ function renderCustomerDetail(customer) {
 
   pane.innerHTML = `
     <div class="cd-head">
-      <div><h3>${escapeHtml(c.fullName || c.name || c.id)}</h3><span>${escapeHtml(c.email || "")}</span></div>
+      <div><span class="cd-kicker">Customer account</span><h3>${escapeHtml(c.fullName || c.name || c.id)}</h3><span>${escapeHtml(c.email || "No email address")}</span></div>
       ${statusPill(c.subscriptionStatus || "unknown", lifecycleStatusClass(c.subscriptionStatus))}
     </div>
-    <div class="cd-grid">${info.map(([k, v]) => `<div class="cd-cell"><span>${escapeHtml(k)}</span><strong>${escapeHtml(String(v))}</strong></div>`).join("")}</div>
-    <div class="cd-actions">
-      <label class="cd-plan-label">Change plan
-        <select id="cdPlanSelect">${planOpts}</select>
-      </label>
-      <button class="button button-primary" type="button" id="cdPlanSave">Save plan</button>
-      <button class="button button-danger" type="button" id="cdDeleteCustomer">Delete customer</button>
-    </div>
-    <div id="cdActionMsg" class="cd-msg"></div>
-    <h4 class="cd-subhead">Docker containers</h4>
-    <div class="cd-containers">${containerRows}</div>`;
+    <section class="cd-section" aria-labelledby="cdAccountHeading">
+      <h4 id="cdAccountHeading">Account details</h4>
+      <div class="cd-grid cd-grid-account">${infoGrid(accountInfo)}</div>
+    </section>
+    <section class="cd-section cd-billing" aria-labelledby="cdBillingHeading">
+      <div class="cd-section-head"><div><h4 id="cdBillingHeading">Billing and usage</h4><p>Subscription health and this billing period.</p></div></div>
+      <div class="cd-grid cd-grid-billing">${infoGrid(billingInfo)}</div>
+      <div class="cd-usage">
+        <div class="cd-usage-head"><span>Monthly requests</span><strong>${Number(c.requestsMonth || 0).toLocaleString()} / ${Number(c.requestLimit || 0).toLocaleString()}</strong></div>
+        <div class="cd-usage-track" role="progressbar" aria-label="Monthly request usage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${usagePercent}"><span style="--usage-width:${usagePercent}%"></span></div>
+        <div class="cd-usage-foot"><span>${usagePercent}% used</span><span>${Number(c.requestsToday || 0).toLocaleString()} today</span></div>
+      </div>
+      ${planManagement}
+    </section>
+    <section class="cd-section" aria-labelledby="cdContainersHeading">
+      <div class="cd-section-head"><div><h4 id="cdContainersHeading">Docker containers</h4><p>${containers.length} ${containers.length === 1 ? "container" : "containers"} attached to this account.</p></div></div>
+      <div class="cd-containers">${containerRows}</div>
+    </section>
+    ${dangerZone}`;
+
+  if (!canManage) return;
 
   const msg = pane.querySelector("#cdActionMsg");
-  pane.querySelector("#cdPlanSave").onclick = async () => {
-    const plan = pane.querySelector("#cdPlanSelect").value;
+  const planSelect = pane.querySelector("#cdPlanSelect");
+  const planSave = pane.querySelector("#cdPlanSave");
+  planSelect.onchange = () => { planSave.disabled = planSelect.value === c.plan; };
+  planSave.onclick = async () => {
+    const plan = planSelect.value;
+    planSave.disabled = true;
+    planSelect.disabled = true;
+    planSave.textContent = "Saving…";
     msg.textContent = "Updating plan…";
+    msg.className = "cd-msg";
     try {
       const r = await fetch(`/api/admin/customers/${encodeURIComponent(c.id)}/plan`, {
         method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan })
@@ -4518,21 +4589,53 @@ function renderCustomerDetail(customer) {
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Plan change failed.");
       msg.textContent = `Plan changed to ${plan}. Resizing container if applicable…`;
-      await loadDashboard();
-      renderCustomersView(latestData);
-    } catch (e) { msg.textContent = e.message; }
+      msg.classList.add("is-success");
+      const refreshed = await loadDashboard();
+      if (!refreshed) {
+        c.plan = plan;
+        msg.textContent = `Plan changed to ${plan}, but the dashboard could not refresh. Use Refresh to retry.`;
+        msg.className = "cd-msg is-error";
+      }
+    } catch (e) {
+      msg.textContent = e.message;
+      msg.classList.add("is-error");
+    } finally {
+      if (planSave.isConnected) {
+        planSelect.disabled = false;
+        planSave.disabled = planSelect.value === c.plan;
+        planSave.textContent = "Save change";
+      }
+    }
   };
-  pane.querySelector("#cdDeleteCustomer").onclick = async () => {
-    if (!window.confirm(`Delete customer "${c.fullName || c.id}" permanently?\n\nThis tears down their containers and removes all their records. This cannot be undone.`)) return;
+  const deleteButton = pane.querySelector("#cdDeleteCustomer");
+  deleteButton.onclick = async () => {
+    const typedId = window.prompt(`Type the tenant ID "${c.id}" to permanently delete this customer.`);
+    if (typedId !== c.id) return;
+    msg.className = "cd-msg";
     msg.textContent = "Deleting customer…";
+    deleteButton.disabled = true;
+    deleteButton.textContent = "Deleting…";
+    let deleted = false;
     try {
       const r = await fetch(`/api/admin/customers/${encodeURIComponent(c.id)}`, { method: "DELETE" });
       const j = await r.json();
       if (!r.ok) throw new Error((j.errors || [j.error || "Delete failed."]).join(" "));
+      deleted = true;
       selectedManageCustomerId = "";
-      await loadDashboard();
-      renderCustomersView(latestData);
-    } catch (e) { msg.textContent = e.message; }
+      const refreshed = await loadDashboard();
+      if (!refreshed) {
+        msg.textContent = "Customer deleted, but the dashboard could not refresh. Use Refresh to retry.";
+        msg.classList.add("is-error");
+      }
+    } catch (e) {
+      msg.textContent = e.message;
+      msg.classList.add("is-error");
+    } finally {
+      if (deleteButton.isConnected) {
+        deleteButton.disabled = deleted;
+        deleteButton.textContent = deleted ? "Deleted" : "Delete customer";
+      }
+    }
   };
 }
 
@@ -6159,10 +6262,12 @@ async function loadDashboard() {
     latestData = data;
     renderAll(data);
     document.body.classList.remove("app-loading");
+    return true;
   } catch (error) {
     els.generatedAt.textContent = "Update failed";
     els.containerCards.innerHTML = `<div class="empty-log">${escapeHtml(error.message)}</div>`;
     document.body.classList.remove("app-loading");
+    return false;
   } finally {
     els.refreshButton.disabled = false;
   }

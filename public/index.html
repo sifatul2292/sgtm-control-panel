@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=50" />
+    <link rel="stylesheet" href="/styles.css?v=52" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -2315,16 +2315,40 @@ window.dataLayer.push({
         </section>
 
         <section id="customersView" class="view" data-view="customers">
-          <section class="customer-page-head">
+          <section class="customer-page-head customer-directory-head">
             <div>
               <h2>Customers</h2>
-              <p>Every customer account — plan, usage, status. Click one to manage their containers and plan.</p>
+              <p>Find an account, review its health, then manage its plan and containers.</p>
             </div>
-            <input id="manageCustomersSearch" class="input" type="search" placeholder="Search name, email, tenant…" autocomplete="off" />
+            <div class="customer-directory-controls">
+              <label class="customer-filter-field" for="manageCustomersSearch">
+                <span>Find customer</span>
+                <input id="manageCustomersSearch" class="input" type="search" placeholder="Name, email, or tenant ID" autocomplete="off" />
+              </label>
+              <label class="customer-filter-field" for="manageCustomersFilter">
+                <span>Show</span>
+                <select id="manageCustomersFilter">
+                  <option value="all">All customers</option>
+                  <option value="paying">Current subscriptions</option>
+                  <option value="trial">Trial</option>
+                  <option value="attention">Needs attention</option>
+                  <option value="nonpaying">Free / non-paying</option>
+                </select>
+              </label>
+            </div>
           </section>
           <div id="customerStats" class="customer-stats"></div>
           <div class="customers-layout">
-            <div id="manageCustomersList" class="customers-list"></div>
+            <aside class="customer-directory" aria-label="Customer directory">
+              <div class="customer-list-head">
+                <div>
+                  <span>Directory</span>
+                  <strong id="customerResultsCount">0 customers</strong>
+                </div>
+                <span>Current subscriptions appear first</span>
+              </div>
+              <div id="manageCustomersList" class="customers-list"></div>
+            </aside>
             <div id="manageCustomerDetail" class="customer-detail-pane">
               <div class="customer-detail-empty">Select a customer to view details.</div>
             </div>
@@ -2561,6 +2585,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=77" type="module"></script>
+    <script src="/app.js?v=79" type="module"></script>
   </body>
 </html>

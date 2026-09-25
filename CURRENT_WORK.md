@@ -5,6 +5,26 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-25.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-09-25 — Clearer owner customer workspace
+
+- Reworked the owner Customers view into a clearer directory-and-detail
+  workspace with labeled search and status filters, an automatic first
+  selection, result counts, grouped account/billing/usage information, and a
+  compact request-usage meter.
+- Customer summary cards now reuse the owner dashboard's canonical subscription
+  and MRR metrics, avoiding conflicting totals. Plan saving stays disabled until
+  the selection changes, reports loading/error state, and the irreversible
+  customer deletion action is isolated behind a danger-zone disclosure with
+  tenant-ID confirmation.
+- Removed an unrelated Shopify audit fragment from the owner plan-change helper;
+  it referenced an undefined order after persisting the new plan, causing the UI
+  to report a false failure and skip its resize/notification follow-through.
+- Fixed the ineffective responsive rule that applied grid columns to a flex
+  container. The directory and detail now stack cleanly with no horizontal
+  overflow at 320, 375, 414, and 768 px. Local owner-session UI checks covered
+  automatic selection, filtering, empty/reset state, plan dirty state, and
+  browser console errors.
+
 ## 2026-09-25 — Faster owner dashboard payload and cold start
 
 - Removed the all-tenant retained-event maps and duplicate raw daily event rows
