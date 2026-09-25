@@ -853,14 +853,25 @@ async function authenticateLogin(username, password) {
     };
   }
 
-  const account = await findCustomerAccountByUsername(username);
+  // Keep the data snapshot used for authentication long enough to decide whether
+  // this rare account needs the unpaid-signup release. Most customer logins can
+  // then redirect after one database parse instead of doing a second parse just
+  // to discover that there is nothing to change.
+  const readGeneration = dbWriteGeneration;
+  const loaded = await readDatabase();
+  const account = (loaded.data.customerAccounts || []).find(
+    (item) => item.username === String(username || "").trim()
+  ) || null;
   if (account && account.status === "active" && verifyPassword(password, account.passwordHash)) {
-    void markCustomerAccountLogin(account.id);
+    // The redirected shell's checkout gate reads the same fresh snapshot. Prime
+    // the short-lived read cache so it does not decrypt and parse the file again.
+    if (readGeneration === dbWriteGeneration) dbReadCacheEntry = { at: Date.now(), loaded };
+    const tenant = (loaded.data.tenants || []).find((item) => item.id === account.tenantId) || null;
     return {
       username: account.username,
       role: "customer",
       tenantId: account.tenantId,
-      accountId: account.id
+      releaseUnpaidSignup: checkoutRequired(tenant, loaded.data)
     };
   }
   return null;
@@ -4225,7 +4236,7 @@ async function readDatabase() {
     integrations: []
   };
   try {
-    const content = await readFile(databasePath, "utf8");
+    const content = await readFile(databasePath);
     const parsed = parseProtectedJson(content, config.dataEncryptionKey);
     return {
       available: true,
@@ -4270,6 +4281,7 @@ async function readDatabase() {
 const DB_READ_CACHE_TTL_MS = Number(process.env.DB_READ_CACHE_TTL_MS || 5000);
 let dbReadCacheEntry = null;   // { at, loaded }
 let dbReadInFlight = null;     // Promise<loaded>
+let dbWriteGeneration = 0;
 
 async function readDatabaseCached() {
   const now = Date.now();
@@ -4295,6 +4307,7 @@ async function writeDatabase(data) {
   const tempPath = `${databasePath}.${Date.now()}.${randomBytes(4).toString("hex")}.tmp`;
   await writeFile(tempPath, serializeProtectedJson(data, config.dataEncryptionKey), { encoding: "utf8", mode: 0o600 });
   await rename(tempPath, databasePath);
+  dbWriteGeneration += 1;
   dbReadCacheEntry = null;   // written data changed → drop the read cache
 }
 
@@ -4339,7 +4352,7 @@ async function listBackups() {
     if (!info) continue;
     let meta = { createdAt: null, source: "manual" };
     try {
-      const raw = parseProtectedJson(await readFile(path, "utf8"), config.dataEncryptionKey);
+      const raw = parseProtectedJson(await readFile(path), config.dataEncryptionKey);
       meta = { createdAt: raw.createdAt || info.mtime.toISOString(), source: raw.source || "manual" };
     } catch { /* corrupt file: still list it so the owner can delete it */ }
     backups.push({ id: name, createdAt: meta.createdAt, source: meta.source, sizeBytes: info.size });
@@ -4356,7 +4369,7 @@ async function restoreBackupLocked(id) {
   const path = join(backupsDir, id);
   let payload;
   try {
-    payload = parseProtectedJson(await readFile(path, "utf8"), config.dataEncryptionKey);
+    payload = parseProtectedJson(await readFile(path), config.dataEncryptionKey);
   } catch {
     return { ok: false, status: 404, errors: ["Backup not found or unreadable."] };
   }
@@ -5886,11 +5899,6 @@ function publicCustomerAccount(account) {
     updatedAt: account.updatedAt || "",
     lastLoginAt: account.lastLoginAt || ""
   };
-}
-
-async function findCustomerAccountByUsername(username) {
-  const loaded = await readDatabase();
-  return (loaded.data.customerAccounts || []).find((account) => account.username === String(username || "").trim()) || null;
 }
 
 function validateCustomerAccountInput(input) {
@@ -7731,24 +7739,6 @@ return [
 function cpanelBridgeAvailableFor(tenantId) {
   if (!config.cpanelBridgeEnabled || !tenantId) return false;
   return config.cpanelBridgeTenants.includes("*") || config.cpanelBridgeTenants.includes(String(tenantId));
-}
-
-async function markCustomerAccountLogin(id) {
-  try {
-    // Under the DB lock: this fires and forgets during login, so it would
-    // otherwise race the login handler's own read-modify-write (releasing an
-    // unpaid signup to Free) and one of the two writes would be lost.
-    await withDbLock(async () => {
-      const loaded = await readDatabase();
-      if (!loaded.available) return;
-      const account = (loaded.data.customerAccounts || []).find((item) => item.id === id);
-      if (!account) return;
-      account.lastLoginAt = new Date().toISOString();
-      await writeDatabase(loaded.data);
-    });
-  } catch {
-    // Login telemetry should never block authentication.
-  }
 }
 
 async function getCustomerAccountsSummary() {
@@ -11802,7 +11792,7 @@ const server = createServer(async (req, res) => {
       // Paid-plan signup that never paid: don't send them back to the checkout
       // wall on every login. Drop the unpaid invoice and let them in on Free —
       // they can re-pick a paid plan from Account & Billing whenever they want.
-      if (account.role === "customer" && account.tenantId) {
+      if (account.role === "customer" && account.tenantId && account.releaseUnpaidSignup) {
         const released = await releaseUnpaidSignupToFree(account.tenantId).catch(() => ({ released: false }));
         if (released.released) invalidateOwnerDashboardCache();
       }

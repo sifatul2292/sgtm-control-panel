@@ -5,8 +5,30 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-25.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-09-25 — Faster login-to-dashboard transition
+
+- Removed the customer-login lock waterfall that made the redirect wait for a
+  full `history.json` telemetry rewrite and then another full read. The normal
+  customer path now decides whether the rare unpaid-signup release is needed
+  from the authentication snapshot, skips the no-op release read, sends the
+  redirect immediately, and no longer rewrites the full database just to stamp
+  nonessential `lastLoginAt` telemetry.
+- The panel shell now becomes usable immediately after the cheap session probe;
+  dashboard data continues loading in place instead of keeping the whole UI
+  behind the splash until a cold dashboard build finishes.
+- Bumped the immutable `app.js` asset version. Syntax checks and a local owner
+  login/session/dashboard smoke test passed (302/200/200; warm dashboard 11 ms).
+
 ## 2026-09-25 — Protected-data controls prepared
 
+- Fixed the production customer-list outage after the encryption rollout. The
+  encrypted JSON was correct, but three reads decoded binary AES-GCM ciphertext
+  as UTF-8 before authentication. Those reads now pass `Buffer` values directly
+  to `parseProtectedJson`. The authenticated production dashboard reports 37
+  tenants, 36 customer accounts, and 38 owner customer rows; all 14 containers
+  remained running and the public endpoint returned HTTP 200. A verified
+  pre-fix recovery set is stored locally under
+  `~/Documents/tagioo-vps-recovery-20260925/`.
 - Production rollout completed. The first in-memory migration exhausted Node's
   heap before replacing any file; the panel was restored immediately and the
   converter was replaced with a bounded-memory streaming AES-GCM migration that
@@ -44,10 +66,9 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-25.
 - The sibling Shopify app commit `bee157b` encrypts queued order and uninstall
   payloads with AES-256-GCM while retaining read compatibility for legacy queue
   rows. Unit tests, lint, typecheck, and production build pass.
-- These controls are locally verified but not yet deployed. Production rollout
-  must create keys privately on the VPS, verify the current owner password
-  policy without exposing it, migrate the panel files atomically, deploy the
-  Shopify app with its key, and run restore/health/order checks.
+- These controls are deployed. Production keys were created privately on the
+  VPS, protected files were migrated atomically, and the panel and Shopify app
+  passed authenticated data, endpoint, and container health checks.
 
 ## 2026-09-25 — Shopify launch release prepared
 

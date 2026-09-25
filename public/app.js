@@ -487,11 +487,13 @@ function applySessionAccess(data) {
 async function initSession() {
   try {
     const r = await fetch("/api/session", { cache: "no-store" });
-    if (!r.ok) return;
+    if (!r.ok) return false;
     const { session } = await r.json();
     if (session) applySession(session);
+    return Boolean(session);
   } catch {
     // Fall back to whatever loadDashboard resolves.
+    return false;
   }
 }
 
@@ -6765,8 +6767,12 @@ els.customerSetupForm.addEventListener("submit", async (event) => {
 window.addEventListener("hashchange", () => setView(window.location.hash.replace("#", "") || "dashboard"));
 
 (async () => {
-  await initSession();                                   // resolve role first (cheap)
+  const sessionReady = await initSession();              // resolve role first (cheap)
   setView(window.location.hash.replace("#", "") || "dashboard");
+  // Authentication and access controls are ready, so reveal the usable shell now.
+  // Dashboard data can keep loading in-place without trapping the user behind the
+  // full-screen splash during a cold server/cache build.
+  if (sessionReady) document.body.classList.remove("app-loading");
   loadDashboard();                                       // heavy data; may fail without breaking access
   // Owner: keep the pending-payments nav badge fresh so new claims surface fast
   // from any view (the activation bottleneck is owner awareness, not clicks).
