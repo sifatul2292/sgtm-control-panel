@@ -5,6 +5,32 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-26.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-09-26 — Transactional email deliverability hardening
+
+- Decoupled the verified Resend sender (`notifications@tagioo.com`) from the
+  customer support inbox and added an explicit Reply-To address for both Resend
+  and the dormant Brevo fallback. Plain-text email alternatives now retain CTA
+  destinations instead of dropping every link.
+- Removed promotional and emoji-heavy wording from customer-facing subjects and
+  softened the welcome message while keeping billing and account meaning intact.
+- Rechecked public mail DNS: Resend DKIM and the aligned `send.tagioo.com`
+  SPF/MX records exist. DMARC remains `p=none` with reports going to Brevo; do
+  not tighten it until reports and all legitimate senders are audited.
+- Made the PM2 ecosystem load `.env` on every process start, and documented the
+  production verification checklist.
+  Final inbox-placement diagnosis still requires a spammed Gmail **Show
+  original** sample plus Resend bounce/complaint/suppression metrics; the young
+  domain's reputation cannot be repaired solely in application code.
+
+## 2026-09-26 — Clear owner container status
+
+- Replaced the two unlabeled Docker state/health pills on owner container cards
+  with one operational status: Healthy, Needs attention, Starting, Running, or
+  Stopped. Stopped containers no longer display a stale pre-stop health result.
+- Docker and per-customer unhealthy totals now count only running containers
+  whose active health check is failing, so exited containers cannot create a
+  false infrastructure alert.
+
 ## 2026-09-26 — Consistent owner plan grants
 
 - Owner dashboard plan changes now update the complete billing lifecycle

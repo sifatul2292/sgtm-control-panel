@@ -584,6 +584,30 @@ function stateClass(value) {
   return String(value || "unknown").toLowerCase().replace(/[^a-z0-9_-]/g, "-");
 }
 
+function containerOperationalStatus(container) {
+  const state = String(container?.state || "unknown").toLowerCase();
+  const health = String(container?.health || "unknown").toLowerCase();
+
+  if (state === "running" && health === "healthy") {
+    return { label: "Healthy", className: "healthy", title: "Running; Docker health check is passing" };
+  }
+  if (state === "running" && health === "unhealthy") {
+    return { label: "Needs attention", className: "unhealthy", title: "Running; Docker health check is failing" };
+  }
+  if (state === "running" && health === "starting") {
+    return { label: "Starting", className: "warning", title: "Running; Docker health check is starting" };
+  }
+  if (state === "running") {
+    return { label: "Running", className: "running", title: "Container is running" };
+  }
+  if (state === "exited") {
+    return { label: "Stopped", className: "exited", title: "Container is stopped" };
+  }
+
+  const label = state.replace(/[-_]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return { label, className: stateClass(state), title: `Container state: ${label}` };
+}
+
 function levelFromMessage(message = "") {
   const lower = message.toLowerCase();
   if (lower.includes("error") || lower.includes("failed") || lower.includes("exception")) return "error";
@@ -1343,6 +1367,7 @@ function renderContainers(docker) {
       // Owner-only lifecycle controls — only for managed sgtm-* containers.
       const controllable = currentSession.role === "owner" && /^sgtm-[a-z0-9-]+$/.test(container.name || "");
       const running = container.state === "running";
+      const operationalStatus = containerOperationalStatus(container);
       const actions = controllable
         ? `<div class="container-actions">
             <button class="btn-mini" data-container-action="restart" data-container="${escapeHtml(container.name)}">Restart</button>
@@ -1354,8 +1379,7 @@ function renderContainers(docker) {
         <div>
           <div class="container-title">
             <strong>${escapeHtml(container.name)}</strong>
-            <span class="state ${stateClass(container.state)}">${escapeHtml(container.state)}</span>
-            <span class="state ${stateClass(container.health)}">${escapeHtml(container.health)}</span>
+            <span class="state ${operationalStatus.className}" title="${escapeHtml(operationalStatus.title)}" aria-label="${escapeHtml(operationalStatus.title)}">${escapeHtml(operationalStatus.label)}</span>
           </div>
           <p class="container-meta">${escapeHtml(container.image)}</p>
           <p class="container-meta">${escapeHtml(text(container.ports, "No exposed ports"))}</p>

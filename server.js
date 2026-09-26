@@ -150,6 +150,8 @@ const config = {
   monthlyRequestLimit: Number(process.env.MONTHLY_REQUEST_LIMIT || 500000),
   monthlyContainerLimit: Number(process.env.MONTHLY_CONTAINER_LIMIT || 1),
   customerSupportEmail: process.env.CUSTOMER_SUPPORT_EMAIL || "",
+  emailFrom: process.env.EMAIL_FROM || process.env.CUSTOMER_SUPPORT_EMAIL || "notifications@tagioo.com",
+  emailReplyTo: process.env.EMAIL_REPLY_TO || process.env.CUSTOMER_SUPPORT_EMAIL || "",
   // The standalone cPanel bridge is a staged pilot. Keep it off in production
   // until a throwaway Laravel tenant has completed doctor + test-order checks.
   cpanelBridgeEnabled: process.env.CPANEL_BRIDGE_ENABLED === "true",
@@ -447,6 +449,10 @@ async function findCustomerAccountByEmail(email) {
 function htmlToPlainText(html) {
   return String(html)
     .replace(/<\s*(br|\/p|\/div|\/h[1-6]|hr)\s*\/?\s*>/gi, "\n")
+    .replace(/<a\b[^>]*\bhref=(["'])(.*?)\1[^>]*>(.*?)<\/a>/gis, (_, _quote, href, label) => {
+      const text = String(label).replace(/<[^>]*>/g, "").trim();
+      return text ? `${text} (${href})` : href;
+    })
     .replace(/<[^>]*>/g, "")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
@@ -474,7 +480,7 @@ async function sendEmail({ to, subject, bodyHtml }) {
     return { ok: false };
   }
   try {
-    const fromAddr = config.customerSupportEmail || "noreply@tagioo.com";
+    const fromAddr = config.emailFrom;
     const html = [
       `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:40px 24px">`,
       bodyHtml,
@@ -492,7 +498,8 @@ async function sendEmail({ to, subject, bodyHtml }) {
             to: [to],
             subject,
             html,
-            text: htmlToPlainText(html)
+            text: htmlToPlainText(html),
+            ...(config.emailReplyTo ? { reply_to: config.emailReplyTo } : {})
           })
         })
       : await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -507,7 +514,8 @@ async function sendEmail({ to, subject, bodyHtml }) {
             to: [{ email: to }],
             subject,
             htmlContent: html,
-            textContent: htmlToPlainText(html)
+            textContent: htmlToPlainText(html),
+            ...(config.emailReplyTo ? { replyTo: { email: config.emailReplyTo } } : {})
           })
         });
     // `r.ok` covers both: Resend answers 200, Brevo 201. Log the body too — the
@@ -549,13 +557,13 @@ async function emailWelcome(toEmail, fullName) {
   const name = String(fullName || "").trim().split(" ")[0] || "there";
   return sendEmail({
     to: toEmail,
-    subject: "👋 Welcome to Tagioo — let's recover your lost sales",
+    subject: "Welcome to Tagioo",
     bodyHtml: [
       `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Welcome, ${escapeHtml(name)}!</p>`,
       `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Your Tagioo account is ready. You're on the <strong>Free</strong> plan — 15,000 tracked events per month, no card needed. Here's how to go live:</p>`,
       `<ol style="color:#0F0A1E;margin:0 0 20px;padding-left:20px;line-height:1.9">`,
       `<li>Open <strong>Setup</strong> in your dashboard and enter your domain + GTM config.</li>`,
-      `<li>Install the first-party loader so Brave &amp; ad-blockers can't strip your tracking.</li>`,
+      `<li>Install the first-party loader to keep tracking reliable across supported browsers.</li>`,
       `<li>Run the tracking test to confirm Meta &amp; GA4 are receiving events.</li>`,
       `</ol>`,
       `<a href="https://tagioo.com/#setupAssistant" style="display:inline-block;background:#5B21B6;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Start setup →</a>`,
@@ -604,7 +612,7 @@ async function notifyOwnerPaymentClaim(payment, ownerEmail) {
 async function emailCustomerClaimReceived(toEmail, payment) {
   return sendEmail({
     to: toEmail,
-    subject: `⏳ We received your payment — verifying now`,
+    subject: `Tagioo payment received — pending verification`,
     bodyHtml: [
       `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Payment received — verifying</p>`,
       `<p style="color:#5B6B8A;margin:0 0 16px;line-height:1.6">Thanks! We got your payment details for invoice <strong>${escapeHtml(payment.invoiceNo)}</strong> (<strong>${escapeHtml(payment.plan)}</strong> · ৳${escapeHtml(String(payment.amount))}). We're verifying the transaction now and will activate your plan shortly — usually within a few hours.</p>`,
@@ -622,7 +630,7 @@ async function emailCustomerActivated(toEmail, payment, renewalDate) {
   const renew = renewalDate ? new Date(renewalDate).toISOString().slice(0, 10) : "";
   return sendEmail({
     to: toEmail,
-    subject: `✅ Your Tagioo ${payment.plan} plan is active`,
+    subject: `Your Tagioo ${payment.plan} plan is active`,
     bodyHtml: [
       `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Payment confirmed 🎉</p>`,
       `<p style="color:#5B6B8A;margin:0 0 20px;line-height:1.6">We verified your payment for invoice <strong>${escapeHtml(payment.invoiceNo)}</strong>. Your <strong>${escapeHtml(payment.plan)}</strong> plan is now active${renew ? ` until <strong>${renew}</strong>` : ""}. Tracking is running.</p>`,
@@ -636,7 +644,7 @@ async function emailCustomerActivated(toEmail, payment, renewalDate) {
 async function emailPlanUpgradedByAdmin(toEmail, fullName, plan) {
   return sendEmail({
     to: toEmail,
-    subject: `🚀 Your Tagioo plan was updated to ${plan}`,
+    subject: `Your Tagioo plan was updated to ${plan}`,
     bodyHtml: [
       `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Plan updated 🚀</p>`,
       `<p style="color:#5B6B8A;margin:0 0 20px;line-height:1.6">Hi ${escapeHtml(fullName || "there")}, the Tagioo team has updated your account to the <strong>${escapeHtml(plan)}</strong> plan. Your new limits are active now — nothing more to do on your end.</p>`,
@@ -649,7 +657,7 @@ async function emailPlanUpgradedByAdmin(toEmail, fullName, plan) {
 async function emailExtraContainerConfirmed(toEmail, fullName, containerLimit) {
   return sendEmail({
     to: toEmail,
-    subject: `✅ Extra container added to your Tagioo account`,
+    subject: `An extra container was added to your Tagioo account`,
     bodyHtml: [
       `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Extra container ready 📦</p>`,
       `<p style="color:#5B6B8A;margin:0 0 20px;line-height:1.6">Hi ${escapeHtml(fullName || "there")}, we verified your payment and added an extra sGTM container. You can now run up to <strong>${Number(containerLimit || 0)}</strong> containers. The ৳${EXTRA_CONTAINER_PRICE.toLocaleString()}/month add-on is included in your next renewal.</p>`,
@@ -662,7 +670,7 @@ async function emailExtraContainerConfirmed(toEmail, fullName, containerLimit) {
 async function emailCustomerPaymentRejected(toEmail, payment, reason) {
   return sendEmail({
     to: toEmail,
-    subject: `⚠️ We couldn't verify your Tagioo payment`,
+    subject: `Your Tagioo payment could not be verified`,
     bodyHtml: [
       `<p style="font-size:20px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Payment not verified</p>`,
       `<p style="color:#5B6B8A;margin:0 0 16px;line-height:1.6">We couldn't match the transaction for invoice <strong>${escapeHtml(payment.invoiceNo)}</strong>${reason ? `: ${escapeHtml(reason)}` : "."}. Please double-check the transaction ID and submit it again from your dashboard.</p>`,
@@ -690,7 +698,7 @@ async function emailFreeTierNudge(toEmail, tenant, threshold, used, limit, purch
   const remaining = Math.max(0, limit - used);
   return sendEmail({
     to: toEmail,
-    subject: `${tier.emoji} ${tier.heading} — Tagioo`,
+    subject: `Tagioo Free plan: ${tier.heading}`,
     bodyHtml: [
       `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:${tier.color}">${tier.emoji} ${escapeHtml(tier.heading)}</p>`,
       `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">${escapeHtml(tier.tone)}</p>`,
@@ -704,7 +712,7 @@ async function emailFreeTierNudge(toEmail, tenant, threshold, used, limit, purch
 async function emailFreeTierCapped(toEmail, tenant, purchaseData) {
   return sendEmail({
     to: toEmail,
-    subject: `🛑 Tracking paused — you hit your free limit`,
+    subject: `Tagioo tracking paused at your Free plan limit`,
     bodyHtml: [
       `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#DC2626">🛑 Your tracking is paused</p>`,
       `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">You've used all 15,000 free events this cycle, so your sGTM container is paused. New conversions are <strong>not</strong> reaching Meta, GA4, or Google Ads right now. Upgrade to a paid plan to resume tracking immediately.</p>`,
@@ -731,7 +739,7 @@ async function emailRenewalReminder(toEmail, tenant, daysLeft, data) {
   const when = daysLeft <= 0 ? "today" : daysLeft === 1 ? "tomorrow" : `in ${daysLeft} days`;
   return sendEmail({
     to: toEmail,
-    subject: `${urgent ? "🚨 " : "🔔 "}Your Tagioo ${tenant.plan} plan renews ${when}`,
+    subject: `Your Tagioo ${tenant.plan} plan renews ${when}`,
     bodyHtml: [
       `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:${color}">${urgent ? "🚨 " : "🔔 "}Renewal due ${escapeHtml(when)}</p>`,
       `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Your <strong>${escapeHtml(tenant.plan)}</strong> plan expires on <strong>${escapeHtml(String(tenant.renewalDate || "").slice(0, 10))}</strong>. Pay now to keep your server-side tracking running without interruption.</p>`,
@@ -3789,7 +3797,7 @@ async function getDockerSummary() {
     totals: {
       running: inspectedContainers.filter((container) => container.state === "running").length,
       stopped: inspectedContainers.filter((container) => container.state !== "running").length,
-      unhealthy: inspectedContainers.filter((container) => container.health === "unhealthy").length,
+      unhealthy: inspectedContainers.filter((container) => container.state === "running" && container.health === "unhealthy").length,
       total: inspectedContainers.length
     }
   };
@@ -8523,7 +8531,7 @@ function customerContainerHealth(customer, docker) {
   return {
     total: containers.length,
     running: containers.filter((container) => container.state === "running").length,
-    unhealthy: containers.filter((container) => container.health === "unhealthy").length
+    unhealthy: containers.filter((container) => container.state === "running" && container.health === "unhealthy").length
   };
 }
 

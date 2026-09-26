@@ -81,6 +81,9 @@ AUTH_SECRET=replace-with-openssl-rand-hex-32
 SERVICE_NAME=Tagioo
 PUBLIC_BASE_URL=https://tagioo.com
 CUSTOMER_SUPPORT_EMAIL=support@tagioo.com
+EMAIL_FROM=notifications@tagioo.com
+EMAIL_REPLY_TO=support@tagioo.com
+RESEND_API_KEY=replace-with-resend-api-key
 
 PROVISION_DNS_TARGET=bd.tagioo.com
 PROVISION_OUTPUT_DIR=./data/provisioning
@@ -136,9 +139,12 @@ deployuser ALL=(ALL) NOPASSWD: /usr/bin/docker, /usr/local/bin/docker, /usr/bin/
 
 ## Start With PM2
 
+PM2 does not read `.env` by itself. The checked-in ecosystem file makes Node
+load it on every start and restart:
+
 ```bash
 cd /var/www/tagioo
-pm2 start server.js --name tagioo
+pm2 startOrReload ecosystem.config.cjs --update-env
 pm2 save
 pm2 startup
 ```
@@ -189,12 +195,38 @@ sudo certbot --nginx -d tagioo.com -d www.tagioo.com -d app.tagioo.com -d bd.tag
 
 ## Deploy Updates
 
+If this VPS still has the legacy process named `tagioo`, migrate it once before
+using the ecosystem file. This briefly restarts the panel under the canonical
+`sgtm-control-panel` name:
+
 ```bash
 cd /var/www/tagioo
 git pull origin main
 npm install
-pm2 restart tagioo
+pm2 describe tagioo >/dev/null 2>&1 && pm2 delete tagioo
+pm2 startOrReload ecosystem.config.cjs --update-env
 ```
+
+## Transactional Email Deliverability
+
+Use Resend for production mail. Keep `EMAIL_FROM` on the verified `tagioo.com`
+domain and use `EMAIL_REPLY_TO` for the inbox that receives customer replies.
+Do not switch to Brevo until Brevo DKIM and return-path records are published
+and its dashboard marks the domain authenticated.
+
+After changing sender settings, restart PM2 with `--update-env`, send a signup
+verification email to a Gmail test account, and use **Show original** to confirm:
+
+```text
+SPF: PASS (send.tagioo.com)
+DKIM: PASS (tagioo.com)
+DMARC: PASS (tagioo.com)
+```
+
+Also review Resend's 30-day Delivered, Bounced, Complained, and Suppressed
+metrics and Google Postmaster Tools before changing DNS. The current DMARC
+record is monitoring-only and sends reports to Brevo; move its report mailbox
+and increase enforcement only after reviewing all legitimate senders.
 
 ## First Customer Test
 

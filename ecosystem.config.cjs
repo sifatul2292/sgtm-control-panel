@@ -5,6 +5,7 @@ module.exports = {
       name: "sgtm-control-panel",
       script: "server.js",
       interpreter: "node",
+      node_args: "--env-file=.env",
       // restart on crash, max 10 restarts in 10 minutes before giving up
       max_restarts: 10,
       min_uptime: "30s",
