@@ -17,6 +17,10 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-26.
   Rollback is limited to restoring `EMAIL_FROM=support@tagioo.com` (or removing
   the override to use the existing support fallback) and reloading PM2. The
   subdomain DNS records can remain without affecting the root-domain sender.
+- Added a visible verification-page notice directing customers to check Spam
+  or Junk and mark legitimate Tagioo messages as not spam/not junk, accurately
+  describing this as improving future delivery rather than guaranteeing inbox
+  placement.
 - Decoupled the verified Resend sender (`notifications@tagioo.com`) from the
   customer support inbox and added an explicit Reply-To address for both Resend
   and the dormant Brevo fallback. Plain-text email alternatives now retain CTA

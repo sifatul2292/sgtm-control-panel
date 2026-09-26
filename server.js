@@ -2560,6 +2560,9 @@ function verifyPage({ email = "", error = "", info = "" } = {}) {
           </div>
           ${error ? `<div class="lf-error su-anim" style="--d:40ms">${escapeHtml(error)}</div>` : ""}
           ${info ? `<div class="lf-plan-note su-anim" style="--d:40ms;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#166534;font-size:14px">${escapeHtml(info)}</div>` : ""}
+          <div class="su-anim" role="note" style="--d:60ms;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#92400E;font-size:14px;line-height:1.5">
+            <strong>Can't find the email?</strong> Check your Spam or Junk folder. If it's there, open it and choose <strong>Report not spam</strong> or <strong>Not junk</strong>. This helps future Tagioo emails reach your inbox.
+          </div>
 
           <form method="post" action="/verify" class="lf-form" id="verifyForm">
             <div class="lf-field su-anim" style="--d:80ms">
