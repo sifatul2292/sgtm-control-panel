@@ -3062,7 +3062,7 @@ async function findProvisioningRecordByContainer(containerName) {
 // Resize an sGTM container's memory/CPU caps. Applies live via `docker update`
 // (no downtime) and persists into the compose file + provisioning record so a
 // later recreate keeps the new limits.
-async function resizeContainer(containerName, { memoryMb, cpuLimit } = {}) {
+async function resizeContainer(containerName, { memoryMb, cpuLimit } = {}, { persist = true } = {}) {
   if (!SGTM_CONTAINER_RE.test(containerName)) {
     return { ok: false, status: 400, error: "Only sgtm-* containers can be resized." };
   }
@@ -3091,7 +3091,10 @@ async function resizeContainer(containerName, { memoryMb, cpuLimit } = {}) {
   }
 
   // 2. Persist into compose + record (best effort; live cap already applied).
-  let persisted = false;
+  let persisted = !persist;
+  if (!persist) {
+    return { ok: true, container: containerName, memoryMb: mb, cpuLimit: cpu.toFixed(2), persisted };
+  }
   const { db, request } = await findProvisioningRecordByContainer(containerName);
   if (db && request?.plan?.composePath) {
     try {
@@ -3111,54 +3114,145 @@ async function resizeContainer(containerName, { memoryMb, cpuLimit } = {}) {
   return { ok: true, container: containerName, memoryMb: mb, cpuLimit: cpu.toFixed(2), persisted };
 }
 
-// Owner changes a customer's plan: updates billing limits on the stored tenant
-// and auto-resizes that tenant's container to the new plan's mem/cpu profile.
+// Owner changes a customer's plan as an authoritative administrative grant.
+// Paid plans become active for 30 days immediately; Free gets a fresh rolling
+// allowance. This is distinct from both a customer payment claim and lifetime
+// access, and all billing fields must move together with the plan limits.
 async function changeTenantPlan(tenantId, planName) {
   if (!tenantId) return { ok: false, status: 400, error: "tenantId is required." };
   if (!planResourceProfiles[planName] || planName === "Customer") {
     return { ok: false, status: 400, error: "Unknown plan." };
   }
-  const loaded = await readDatabase();
-  if (!loaded.available) return { ok: false, status: 503, error: "Database unavailable." };
-  const data = loaded.data;
-  data.tenants ||= [];
-  const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
-  if (index === -1) {
-    return { ok: false, status: 404, error: "Customer not found (the Default account cannot be changed here)." };
-  }
+  const saved = await withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 503, error: "Database unavailable." };
+    const data = loaded.data;
+    data.tenants ||= [];
+    const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
+    if (index === -1) {
+      return { ok: false, status: 404, error: "Customer not found (the Default account cannot be changed here)." };
+    }
 
-  const previousPlan = data.tenants[index].plan;
-  if (data.tenants[index].lifetimeAccess && planName === "Free") {
-    return { ok: false, status: 409, error: "Disable lifetime access before moving this customer to Free." };
-  }
-  const profile = resourceProfileForPlan(planName);
-  data.tenants[index] = {
-    ...data.tenants[index],
-    plan: planName,
-    requestLimit: profile.monthlyRequestLimit,
-    containerLimit: profile.containerLimit + Number(data.tenants[index].extraContainers || 0),
-    domainLimit: profile.domainLimit,
-    monthlyAmount: monthlyAmountForPlan(planName) + Number(data.tenants[index].extraContainers || 0) * EXTRA_CONTAINER_PRICE,
-    resourceLimits: { ...(data.tenants[index].resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
-    planUpdatedAt: new Date().toISOString()
-  };
-  await writeDatabase(data);
+    const tenant = data.tenants[index];
+    const previousPlan = tenant.plan;
+    if (["paddle", "shopify"].includes(tenant.paymentProvider)) {
+      return { ok: false, status: 409, error: "This subscription is managed by its billing provider." };
+    }
+    if (tenant.lifetimeAccess) {
+      return { ok: false, status: 409, error: "Disable lifetime access before changing this customer's plan." };
+    }
 
-  // Notify the customer their plan was changed by the Tagioo team (only on a real
-  // change). Best-effort — never blocks the plan update.
-  if (previousPlan !== planName) {
-    const account = (data.customerAccounts || []).find((a) => a.tenantId === tenantId);
-    const toEmail = account?.email || account?.username;
-    if (toEmail) emailPlanUpgradedByAdmin(toEmail, account?.fullName || data.tenants[index].fullName, planName).catch(() => {});
-  }
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const profile = resourceProfileForPlan(planName);
+    const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenantId && item.containerName);
+    const isFree = planName === "Free";
+    const extraContainers = isFree ? 0 : Number(tenant.extraContainers || 0);
+    const renewalDate = !isFree && !tenant.lifetimeAccess
+      ? new Date(now.getTime() + 30 * 86400000).toISOString()
+      : "";
 
-  // Auto-resize the tenant's container to match the new plan, if one exists.
-  let resize = null;
-  const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenantId && item.containerName);
-  if (request?.containerName) {
-    resize = await resizeContainer(request.containerName, { memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit });
-  }
-  return { ok: true, tenantId, plan: planName, requestLimit: profile.monthlyRequestLimit, resize };
+    let container = null;
+    let resize = null;
+    let composePersisted = !request?.plan?.composePath;
+    let composeYml = "";
+    if (request?.containerName) {
+      container = await controlContainerLifecycle(request.containerName, "start").catch(() => null);
+      resize = await resizeContainer(request.containerName, {
+        memoryMb: profile.memoryMb,
+        cpuLimit: profile.cpuLimit
+      }, { persist: false }).catch(() => null);
+      if (request.plan?.composePath) {
+        try {
+          composeYml = (await readFile(request.plan.composePath, "utf8"))
+            .replace(/mem_limit:\s*\S+/g, `mem_limit: ${profile.memoryMb}m`)
+            .replace(/cpus:\s*"[^"]*"/g, `cpus: "${Number(profile.cpuLimit).toFixed(2)}"`);
+          await writeFile(request.plan.composePath, composeYml, "utf8");
+          composePersisted = true;
+        } catch {
+          composePersisted = false;
+        }
+      }
+    }
+
+    // Re-read after Docker/file I/O and apply the grant to the freshest snapshot.
+    // This leaves one atomic database write and no nested stale resize write.
+    const latest = await readDatabase();
+    if (!latest.available) return { ok: false, status: 503, error: "Database unavailable." };
+    const latestData = latest.data;
+    latestData.tenants ||= [];
+    const latestIndex = latestData.tenants.findIndex((item) => item.id === tenantId);
+    if (latestIndex === -1) return { ok: false, status: 404, error: "Customer not found." };
+    const latestTenant = latestData.tenants[latestIndex];
+    if (["paddle", "shopify"].includes(latestTenant.paymentProvider) || latestTenant.lifetimeAccess) {
+      return { ok: false, status: 409, error: "The customer's billing authority changed; refresh and try again." };
+    }
+    const latestRequest = (latestData.provisioning?.requests || []).find((item) => item.tenantId === tenantId && item.containerName);
+    if (latestRequest) {
+      latestRequest.resourceLimits = {
+        ...(latestRequest.resourceLimits || {}),
+        memoryMb: profile.memoryMb,
+        cpuLimit: Number(profile.cpuLimit).toFixed(2)
+      };
+      if (composePersisted && composeYml) latestRequest.plan.dockerCompose = composeYml;
+    }
+
+    latestData.tenants[latestIndex] = {
+      ...latestTenant,
+      plan: planName,
+      billingCycle: "monthly",
+      requestLimit: profile.monthlyRequestLimit,
+      containerLimit: profile.containerLimit + extraContainers,
+      domainLimit: profile.domainLimit,
+      extraContainers,
+      monthlyAmount: monthlyAmountForPlan(planName) + extraContainers * EXTRA_CONTAINER_PRICE,
+      resourceLimits: { ...(latestTenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
+      subscriptionStatus: isFree ? "free" : "active",
+      paymentStatus: isFree ? "free" : (tenant.lifetimeAccess ? tenant.paymentStatus : "paid"),
+      paymentProvider: isFree ? "" : (tenant.lifetimeAccess ? (tenant.paymentProvider || "") : "manual"),
+      paidAt: isFree ? "" : (tenant.lifetimeAccess ? (tenant.paidAt || "") : nowIso),
+      renewalDate,
+      renewalReminder: 99,
+      overdueAt: "",
+      expiredAt: "",
+      pendingPlan: "",
+      pendingAmount: 0,
+      pendingBillingCycle: "",
+      pendingInvoiceNo: "",
+      scheduledPlan: "",
+      scheduledPlanCycle: "",
+      cycleStart: isFree ? nowIso : (latestTenant.cycleStart || ""),
+      cycleEnd: isFree ? new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString() : (latestTenant.cycleEnd || ""),
+      cycleBaseline: isFree ? tenantRequestBaselineNow(latestData, tenantId, now) : Number(latestTenant.cycleBaseline || 0),
+      nudgedAt: "",
+      cycleNudge: 0,
+      cappedAt: "",
+      suspensionEnforcedAt: latestRequest?.containerName && !container?.ok ? (latestTenant.suspensionEnforcedAt || nowIso) : "",
+      resourceResizePendingAt: latestRequest?.containerName && !(resize?.ok && composePersisted)
+        ? (latestTenant.resourceResizePendingAt || nowIso)
+        : "",
+      planUpdatedAt: nowIso,
+      updatedAt: nowIso
+    };
+
+    for (const payment of (latestData.payments || [])) {
+      if (payment.tenantId !== tenantId || payment.status !== "pending" || payment.type === "addon_container") continue;
+      payment.status = "rejected";
+      payment.note = "Superseded by an owner plan change.";
+      payment.confirmedBy = "owner";
+      payment.confirmedAt = nowIso;
+    }
+    await writeDatabase(latestData);
+
+    if (previousPlan !== planName) {
+      const account = (latestData.customerAccounts || []).find((item) => item.tenantId === tenantId);
+      const toEmail = account?.email || account?.username;
+      if (toEmail) emailPlanUpgradedByAdmin(toEmail, account?.fullName || latestData.tenants[latestIndex].fullName, planName).catch(() => {});
+    }
+
+    return { ok: true, tenant: latestData.tenants[latestIndex], container, resize };
+  });
+  return saved;
 }
 
 // Owner-only access override for internal/partner accounts. This is deliberately
@@ -6452,13 +6546,22 @@ function withDbLock(fn) {
   return run;
 }
 
-async function clearTenantSuspensionMarker(tenantId) {
+async function clearTenantRuntimeMarkers(tenantId, { suspension = false, resize = false } = {}) {
   return withDbLock(async () => {
     const loaded = await readDatabase();
     if (!loaded.available) return false;
     const tenant = (loaded.data.tenants || []).find((item) => item.id === tenantId);
-    if (!tenant?.suspensionEnforcedAt) return true;
-    tenant.suspensionEnforcedAt = "";
+    if (!tenant) return false;
+    let changed = false;
+    if (suspension && tenant.suspensionEnforcedAt) {
+      tenant.suspensionEnforcedAt = "";
+      changed = true;
+    }
+    if (resize && tenant.resourceResizePendingAt) {
+      tenant.resourceResizePendingAt = "";
+      changed = true;
+    }
+    if (!changed) return true;
     tenant.updatedAt = new Date().toISOString();
     await writeDatabase(loaded.data);
     return true;
@@ -7480,7 +7583,7 @@ async function syncShopifySubscription(tenantId, containerId, billingState) {
   const containerName = result.containerName;
   if (containerName && result.lifecycleAction === "activate") {
     const resumed = await controlContainerLifecycle(containerName, "start").catch(() => null);
-    if (resumed?.ok) await clearTenantSuspensionMarker(result.tenant.id).catch(() => false);
+    if (resumed?.ok) await clearTenantRuntimeMarkers(result.tenant.id, { suspension: true }).catch(() => false);
     await resizeContainer(containerName, { memoryMb: result.profile.memoryMb, cpuLimit: result.profile.cpuLimit }).catch(() => null);
   } else if (containerName && result.lifecycleAction === "free") {
     await resizeContainer(containerName, { memoryMb: result.profile.memoryMb, cpuLimit: result.profile.cpuLimit }).catch(() => null);
@@ -9685,6 +9788,17 @@ async function enforcePaidRenewals(data) {
   const renewalActions = [];
   for (const tenant of (data.tenants || [])) {
     if (!tenant?.id) continue;
+    let repairedOwnerGrant = false;
+    if (tenant.resourceResizePendingAt && planResourceProfiles[tenant.plan]) {
+      const name = tenantContainerName(data, tenant.id);
+      if (name) renewalActions.push({
+        type: "resize",
+        tenantId: tenant.id,
+        containerName: name,
+        profile: resourceProfileForPlan(tenant.plan)
+      });
+      else tenant.resourceResizePendingAt = "";
+    }
     // Any paid activation can race with a temporary Docker outage. Retry its
     // durable resume marker even for lifetime and provider-managed tenants.
     if (tenant.plan !== "Free" && tenant.subscriptionStatus === "active" && tenant.suspensionEnforcedAt
@@ -9699,6 +9813,49 @@ async function enforcePaidRenewals(data) {
       tenant.overdueAt = "";
       tenant.expiredAt = "";
       continue;
+    }
+    // Repair rows created by the former owner plan-change path, which updated
+    // the plan/limits but retained an older Free, pending, or paid lifecycle.
+    const changedAt = validDate(tenant.planUpdatedAt);
+    const paidAt = validDate(tenant.paidAt);
+    const renewalAt = validDate(tenant.renewalDate);
+    const expectedRenewal = changedAt ? new Date(changedAt.getTime() + 30 * 86400000) : null;
+    const incompleteOwnerGrant = tenant.plan !== "Free" && changedAt
+      && !["paddle", "shopify"].includes(tenant.paymentProvider)
+      && (tenant.subscriptionStatus !== "active"
+        || tenant.paymentStatus !== "paid"
+        || !paidAt
+        || paidAt.getTime() < changedAt.getTime() - 60000
+        || !renewalAt
+        || renewalAt.getTime() < expectedRenewal.getTime() - 60000);
+    if (incompleteOwnerGrant) {
+      const name = tenantContainerName(data, tenant.id);
+      tenant.subscriptionStatus = "active";
+      tenant.paymentStatus = "paid";
+      tenant.paymentProvider = "manual";
+      tenant.paidAt = changedAt.toISOString();
+      tenant.renewalDate = expectedRenewal.toISOString();
+      tenant.renewalReminder = 99;
+      tenant.overdueAt = "";
+      tenant.expiredAt = "";
+      tenant.pendingPlan = "";
+      tenant.pendingAmount = 0;
+      tenant.pendingBillingCycle = "";
+      tenant.pendingInvoiceNo = "";
+      tenant.scheduledPlan = "";
+      tenant.scheduledPlanCycle = "";
+      tenant.cappedAt = "";
+      tenant.suspensionEnforcedAt = name ? (tenant.suspensionEnforcedAt || now.toISOString()) : "";
+      tenant.resourceResizePendingAt = name ? (tenant.resourceResizePendingAt || now.toISOString()) : "";
+      tenant.updatedAt = now.toISOString();
+      for (const payment of (data.payments || [])) {
+        if (payment.tenantId !== tenant.id || payment.status !== "pending" || payment.type === "addon_container") continue;
+        payment.status = "rejected";
+        payment.note = "Superseded by an owner plan change.";
+        payment.confirmedBy = "owner";
+        payment.confirmedAt = now.toISOString();
+      }
+      repairedOwnerGrant = true;
     }
     // Paddle and Shopify own renewal billing, dunning, and cancellation on
     // their side —
@@ -9740,7 +9897,12 @@ async function enforcePaidRenewals(data) {
     if (now < renewal) {
       if (tenant.suspensionEnforcedAt) {
         const name = tenantContainerName(data, tenant.id);
-        if (name) renewalActions.push({ type: "resume", tenantId: tenant.id, containerName: name });
+        if (name) renewalActions.push({
+          type: "resume",
+          tenantId: tenant.id,
+          containerName: name,
+          profile: repairedOwnerGrant ? resourceProfileForPlan(tenant.plan) : null
+        });
         else tenant.suspensionEnforcedAt = "";
       }
       const daysLeft = Math.ceil((renewal.getTime() - now.getTime()) / 86400000);
@@ -9911,19 +10073,20 @@ async function persistDailySummaryLocked(summary) {
   }
   pruneTenantEventHistory(data.tenantEventHistory, 30);
 
-  // Phase 2: evaluate Free-tier usage cycles (nudges + hard cap) before persisting.
-  await enforceFreeTierUsage(data).catch((e) => console.error("[free-tier] enforcement error:", e.message));
+  // Repair/expire paid rows before Free enforcement so a legacy owner-granted
+  // paid plan cannot be capped as Free during the same tick.
   const renewalActions = await enforcePaidRenewals(data).catch((e) => {
     console.error("[renewal] enforcement error:", e.message);
     return [];
   });
+  await enforceFreeTierUsage(data).catch((e) => console.error("[free-tier] enforcement error:", e.message));
 
   try {
     await writeDatabase(data);
     let lifecycleStateChanged = false;
     for (const action of renewalActions) {
       let resumed = null;
-      if (action.containerName) {
+      if (action.containerName && action.type !== "resize") {
         resumed = await controlContainerLifecycle(action.containerName, "start").catch(() => null);
         if (resumed?.ok) {
           const tenant = (data.tenants || []).find((item) => item.id === action.tenantId);
@@ -9933,8 +10096,15 @@ async function persistDailySummaryLocked(summary) {
           }
         }
       }
-      if (action.type === "fallback" && action.profile) {
-        await resizeContainer(action.containerName, { memoryMb: action.profile.memoryMb, cpuLimit: action.profile.cpuLimit }).catch(() => null);
+      if (action.profile) {
+        const resized = await resizeContainer(action.containerName, { memoryMb: action.profile.memoryMb, cpuLimit: action.profile.cpuLimit }).catch(() => null);
+        if (resized?.ok) {
+          const tenant = (data.tenants || []).find((item) => item.id === action.tenantId);
+          if (tenant?.resourceResizePendingAt) {
+            tenant.resourceResizePendingAt = "";
+            lifecycleStateChanged = true;
+          }
+        }
       }
       if (action.type === "fallback" || action.type === "email") {
         const tenant = (data.tenants || []).find((item) => item.id === action.tenantId);

@@ -93,6 +93,12 @@ Customer                          System                           Owner
 Owner may also **Reject** a claim (wrong/duplicate TxnID) → `paymentStatus = rejected`,
 customer emailed to resubmit.
 
+An owner plan change from the Customers dashboard is an administrative grant,
+not a payment claim: selecting a paid plan activates it immediately for 30 days,
+sets payment state to paid, resumes/resizes the container, and creates no payment
+record. Selecting Free starts a fresh Free cycle. Paddle- and Shopify-managed
+subscriptions must be changed through their billing provider instead.
+
 ### Renewal
 - Cron sends renewal reminders at T-7 / T-3 / T-1 before `renewalDate`.
 - An unpaid renewal moves immediately to a fresh Free cycle (15,000 requests / 30 days).

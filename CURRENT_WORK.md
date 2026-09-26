@@ -5,6 +5,18 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-26.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-09-26 — Consistent owner plan grants
+
+- Owner dashboard plan changes now update the complete billing lifecycle
+  atomically. A paid plan becomes active/paid immediately with a 30-day renewal,
+  clears stale Free/pending markers, resumes and resizes the container, and does
+  not fabricate a customer payment record. Free starts a fresh 15K/30-day cycle.
+- Paddle/Shopify subscriptions reject manual owner plan changes, lifetime access
+  retains its no-renewal semantics, and pending plan claims are cancelled when an
+  owner grant supersedes them.
+- Existing rows created by the old partial update (`paid plan + Free status + no
+  renewal`) self-repair on the next enforcement cycle, including container resume.
+
 ## 2026-09-26 — Unpaid renewal fallback and durable suspension
 
 - Manual paid subscriptions now move directly to a fresh Free 15K/30-day cycle
