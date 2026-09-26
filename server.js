@@ -741,28 +741,14 @@ async function emailRenewalReminder(toEmail, tenant, daysLeft, data) {
   });
 }
 
-async function emailOverdue(toEmail, tenant, data, graceDays) {
+async function emailRenewalMovedToFree(toEmail, tenant, previousPlan) {
   return sendEmail({
     to: toEmail,
-    subject: `⚠️ Your Tagioo payment is overdue`,
+    subject: `Your Tagioo account moved to the Free plan`,
     bodyHtml: [
-      `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#EA580C">⚠️ Payment overdue</p>`,
-      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Your <strong>${escapeHtml(tenant.plan)}</strong> plan renewal hasn't been received. Your tracking is still running, but it will <strong>pause in ${Number(graceDays || 7)} days</strong> if payment isn't confirmed. Renew now to avoid losing conversion data.</p>`,
-      renewalPayHtml(tenant, data),
-      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:#EA580C;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Pay now →</a>`
-    ].join("")
-  });
-}
-
-async function emailExpiredSuspended(toEmail, tenant, data) {
-  return sendEmail({
-    to: toEmail,
-    subject: `🛑 Tracking paused — renew to resume`,
-    bodyHtml: [
-      `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#DC2626">🛑 Your service is paused</p>`,
-      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Your <strong>${escapeHtml(tenant.plan)}</strong> plan expired and the renewal grace period has ended, so your sGTM container is paused. New conversions are <strong>not</strong> reaching Meta, GA4, or Google Ads. Renew now to resume immediately.</p>`,
-      renewalPayHtml(tenant, data),
-      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:#DC2626;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Renew & resume →</a>`
+      `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#5B21B6">Your Free allowance is active</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">We did not receive the renewal for your <strong>${escapeHtml(previousPlan)}</strong> plan, so your account moved to Tagioo Free. Tracking remains available for up to <strong>15,000 requests during the next 30 days</strong>, then pauses until you upgrade or the Free cycle resets.</p>`,
+      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:#5B21B6;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Choose a paid plan →</a>`
     ].join("")
   });
 }
@@ -3035,7 +3021,10 @@ async function dockerContainerExists(containerName) {
 }
 
 // Restart / stop / start an sGTM container. Owner-gated at the route; this layer
-// re-validates the name and existence so it is safe regardless of caller.
+// re-validates the name and existence so it is safe regardless of caller. A
+// deliberate stop also disables Docker auto-restart; start/restart restores it.
+// The host watchdog uses that durable policy to distinguish billing suspension
+// from a crash and must never resurrect an intentionally stopped container.
 async function controlContainerLifecycle(containerName, action) {
   if (!SGTM_CONTAINER_RE.test(containerName)) {
     return { ok: false, status: 400, error: "Only sgtm-* containers can be controlled." };
@@ -3046,8 +3035,18 @@ async function controlContainerLifecycle(containerName, action) {
   if (!(await dockerContainerExists(containerName))) {
     return { ok: false, status: 404, error: `Container ${containerName} not found.` };
   }
+  // Set the policy before stopping so the watchdog cannot race the stop. If the
+  // stop fails, restore normal crash recovery before returning the failure.
+  const restartPolicy = action === "stop" ? "no" : "unless-stopped";
+  const policyResult = await systemCommand("docker", ["update", `--restart=${restartPolicy}`, containerName], { timeout: 30000, maxBuffer: 1024 * 1024 });
+  if (!policyResult.ok) {
+    return { ok: false, status: 500, error: policyResult.stderr || policyResult.error || `Could not set ${containerName} restart policy.` };
+  }
   const result = await systemCommand("docker", [action, containerName], { timeout: 30000, maxBuffer: 1024 * 1024 });
   if (!result.ok) {
+    if (action === "stop") {
+      await systemCommand("docker", ["update", "--restart=unless-stopped", containerName], { timeout: 30000, maxBuffer: 1024 * 1024 });
+    }
     return { ok: false, status: 500, error: result.stderr || result.error || `docker ${action} failed.` };
   }
   return { ok: true, action, container: containerName };
@@ -6434,6 +6433,8 @@ async function releaseUnpaidSignupToFree(tenantId) {
       scheduledPlanCycle: "",
       cycleStart,
       cycleEnd,
+      cycleBaseline: tenant.cycleStart && tenant.cycleEnd ? Number(tenant.cycleBaseline || 0) : tenantRequestBaselineNow(data, tenant.id, now),
+      suspensionEnforcedAt: "",
       updatedAt: now.toISOString()
     };
     await writeDatabase(data);
@@ -6449,6 +6450,19 @@ function withDbLock(fn) {
   const run = dbLockChain.then(fn, fn);
   dbLockChain = run.then(() => {}, () => {});
   return run;
+}
+
+async function clearTenantSuspensionMarker(tenantId) {
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return false;
+    const tenant = (loaded.data.tenants || []).find((item) => item.id === tenantId);
+    if (!tenant?.suspensionEnforcedAt) return true;
+    tenant.suspensionEnforcedAt = "";
+    tenant.updatedAt = new Date().toISOString();
+    await writeDatabase(loaded.data);
+    return true;
+  });
 }
 
 // Customer chooses a plan. Free applies immediately; a PAID plan does NOT activate
@@ -6498,11 +6512,10 @@ async function selectCustomerPlanLocked(input, session) {
   if (current.paymentProvider === "shopify") {
     return { ok: false, status: 409, errors: ["Manage this subscription from the Tagioo app in Shopify Admin."] };
   }
-  // A tenant "holds a paid plan" whenever they have paid for a non-Free plan —
-  // true through the active window AND the overdue grace period (enforcePaidRenewals
-  // flips subscriptionStatus to "overdue" but leaves paymentStatus "paid" until the
-  // plan expires). Upgrade/downgrade must be decided against the plan they actually
-  // hold, NOT gated on subscriptionStatus === "active" — otherwise an overdue Pro
+  // A tenant "holds a paid plan" whenever they have paid for a non-Free plan.
+  // Include legacy overdue records until the renewal sweep migrates them to Free.
+  // Upgrade/downgrade must be decided against the plan they actually hold, NOT
+  // gated on subscriptionStatus === "active" — otherwise an overdue Pro
   // customer selecting Starter reads as currentRank 0 and gets mislabeled an
   // "upgrade" that demands payment for a cheaper plan.
   const holdsPaidPlan = current.plan !== "Free" && current.paymentStatus === "paid"
@@ -6542,8 +6555,10 @@ async function selectCustomerPlanLocked(input, session) {
   // Free plan chosen while not on a paid plan: apply right away, no payment needed.
   if (planName === "Free") {
     const profile = resourceProfileForPlan("Free");
-    const cycleStart = now.toISOString();
-    const cycleEnd = new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString();
+    const preserveCycle = current.plan === "Free" && current.cycleStart && current.cycleEnd;
+    const cycleStart = preserveCycle ? current.cycleStart : now.toISOString();
+    const cycleEnd = preserveCycle ? current.cycleEnd : new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString();
+    const remainsCapped = preserveCycle && current.subscriptionStatus === "free_capped";
     data.tenants[tenantIndex] = {
       ...current,
       plan: "Free",
@@ -6552,7 +6567,7 @@ async function selectCustomerPlanLocked(input, session) {
       domainLimit: profile.domainLimit,
       extraContainers: 0,
       monthlyAmount: 0,
-      subscriptionStatus: "free",
+      subscriptionStatus: remainsCapped ? "free_capped" : "free",
       paymentStatus: "free",
       pendingPlan: "",
       pendingAmount: 0,
@@ -6561,9 +6576,11 @@ async function selectCustomerPlanLocked(input, session) {
       scheduledPlanCycle: "",
       cycleStart,
       cycleEnd,
-      nudgedAt: "",
-      cappedAt: "",
-      cycleNudge: 0,
+      cycleBaseline: preserveCycle ? Number(current.cycleBaseline || 0) : tenantRequestBaselineNow(data, current.id, now),
+      nudgedAt: preserveCycle ? (current.nudgedAt || "") : "",
+      cappedAt: remainsCapped ? (current.cappedAt || "") : "",
+      cycleNudge: preserveCycle ? Number(current.cycleNudge || 0) : 0,
+      suspensionEnforcedAt: preserveCycle ? (current.suspensionEnforcedAt || "") : "",
       updatedAt: now.toISOString()
     };
     await writeDatabase(data);
@@ -6771,6 +6788,7 @@ async function confirmPaymentLocked(paymentId, session) {
   const cycleDays = (billingCycleConfig[cycleId] || billingCycleConfig.monthly).months * 30;
   const renewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000).toISOString();
   const profile = resourceProfileForPlan(payment.plan);
+  const request = (data.provisioning?.requests || []).find((item) => item.tenantId === payment.tenantId && item.containerName);
   data.tenants[tenantIndex] = {
     ...tenant,
     plan: payment.plan,
@@ -6787,6 +6805,9 @@ async function confirmPaymentLocked(paymentId, session) {
     renewalReminder: 99,
     overdueAt: "",
     expiredAt: "",
+    // Keep a durable resume marker until Docker confirms the container is
+    // running again. The periodic billing sweep retries it after host outages.
+    suspensionEnforcedAt: request?.containerName ? (tenant.suspensionEnforcedAt || now.toISOString()) : "",
     pendingPlan: "",
     pendingAmount: 0,
     pendingBillingCycle: "",
@@ -6830,9 +6851,12 @@ async function confirmPaymentLocked(paymentId, session) {
 
   // Start/resume the tenant's container if one is provisioned, and resize to plan.
   let container = null;
-  const request = (data.provisioning?.requests || []).find((item) => item.tenantId === payment.tenantId && item.containerName);
   if (request?.containerName) {
-    await controlContainerLifecycle(request.containerName, "start").catch(() => {});
+    const resumed = await controlContainerLifecycle(request.containerName, "start").catch(() => null);
+    if (resumed?.ok) {
+      data.tenants[tenantIndex].suspensionEnforcedAt = "";
+      await writeDatabase(data);
+    }
     container = await resizeContainer(request.containerName, { memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit }).catch(() => null);
   }
 
@@ -6873,6 +6897,7 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
   const cycleDays = billingCycleConfig.monthly.months * 30;
   const renewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000).toISOString();
   const profile = resourceProfileForPlan(planName);
+  const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenant.id && item.containerName);
 
   const payment = {
     id: `pay_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
@@ -6917,6 +6942,7 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     renewalReminder: 99,
     overdueAt: "",
     expiredAt: "",
+    suspensionEnforcedAt: request?.containerName ? (tenant.suspensionEnforcedAt || now.toISOString()) : "",
     pendingPlan: "",
     pendingAmount: 0,
     pendingBillingCycle: "",
@@ -6945,9 +6971,12 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
   sendTagiooPurchaseToMetaCapi(tenant, payment, purchaseEventId).catch(() => {});
 
   let container = null;
-  const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenant.id && item.containerName);
   if (request?.containerName) {
-    await controlContainerLifecycle(request.containerName, "start").catch(() => {});
+    const resumed = await controlContainerLifecycle(request.containerName, "start").catch(() => null);
+    if (resumed?.ok) {
+      data.tenants[tenantIndex].suspensionEnforcedAt = "";
+      await writeDatabase(data);
+    }
     container = await resizeContainer(request.containerName, { memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit }).catch(() => null);
   }
 
@@ -6957,8 +6986,8 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
 }
 
 // Paddle subscription canceled or a renewal payment failed: release the tenant
-// the same way an unpaid manual signup is released — back to Free, keeping
-// whatever's left of their current cycle window. Paddle owns dunning/retries
+// the same way an unpaid manual signup is released — back to a fresh Free
+// window. Paddle owns dunning/retries
 // on its side; by the time this fires, Paddle has given up on collecting.
 async function deactivatePaddleTenant(paddleSubscriptionId) {
   return withDbLock(() => deactivatePaddleTenantLocked(paddleSubscriptionId));
@@ -6985,8 +7014,10 @@ async function deactivatePaddleTenantLocked(paddleSubscriptionId) {
     subscriptionStatus: "free",
     paymentStatus: "free",
     paymentProvider: "",
-    cycleStart: tenant.cycleStart || now.toISOString(),
-    cycleEnd: tenant.cycleEnd || new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString(),
+    cycleStart: now.toISOString(),
+    cycleEnd: new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString(),
+    cycleBaseline: tenantRequestBaselineNow(data, tenant.id, now),
+    suspensionEnforcedAt: tenant.suspensionEnforcedAt || "",
     updatedAt: now.toISOString()
   };
   await writeDatabase(data);
@@ -7347,6 +7378,7 @@ async function syncShopifySubscription(tenantId, containerId, billingState) {
     const effective = highestActiveShopifyPlan(activeShopifyPlans, planRankFor);
     const hasConnectedShopify = scopedTrackingEntries(tenant, data.customerSetupRequests || [])
       .some((entry) => entry.tracking?.shopify?.shop);
+    const managedContainerName = tenantContainerName(data, tenantId);
     let lifecycleAction = "";
     let profile = null;
 
@@ -7354,7 +7386,8 @@ async function syncShopifySubscription(tenantId, containerId, billingState) {
       profile = resourceProfileForPlan(effective.plan);
       const activateContainer = tenant.plan !== effective.plan
         || tenant.paymentProvider !== "shopify"
-        || tenant.subscriptionStatus !== "active";
+        || tenant.subscriptionStatus !== "active"
+        || Boolean(tenant.suspensionEnforcedAt);
       data.tenants[tenantIndex] = {
         ...tenant,
         plan: effective.plan,
@@ -7377,6 +7410,9 @@ async function syncShopifySubscription(tenantId, containerId, billingState) {
         renewalReminder: 99,
         overdueAt: "",
         expiredAt: "",
+        suspensionEnforcedAt: managedContainerName && activateContainer
+          ? (tenant.suspensionEnforcedAt || now.toISOString())
+          : "",
         pendingPlan: "",
         pendingAmount: 0,
         pendingBillingCycle: "",
@@ -7416,9 +7452,13 @@ async function syncShopifySubscription(tenantId, containerId, billingState) {
         cycleEnd: resetFreeCycle
           ? new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString()
           : (tenant.cycleEnd || new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString()),
+        cycleBaseline: resetFreeCycle
+          ? tenantRequestBaselineNow(data, tenant.id, now)
+          : Number(tenant.cycleBaseline || 0),
         nudgedAt: resetFreeCycle ? "" : (tenant.nudgedAt || ""),
         cycleNudge: resetFreeCycle ? 0 : Number(tenant.cycleNudge || 0),
         cappedAt: resetFreeCycle ? "" : (tenant.cappedAt || ""),
+        suspensionEnforcedAt: tenant.suspensionEnforcedAt || "",
         updatedAt: now.toISOString()
       };
       lifecycleAction = resizeForFree ? "free" : "";
@@ -7432,14 +7472,15 @@ async function syncShopifySubscription(tenantId, containerId, billingState) {
       tenant: data.tenants[tenantIndex],
       lifecycleAction,
       profile,
-      containerName: tenantContainerName(data, tenantId)
+      containerName: managedContainerName
     };
   });
 
   if (!result.ok) return result;
   const containerName = result.containerName;
   if (containerName && result.lifecycleAction === "activate") {
-    await controlContainerLifecycle(containerName, "start").catch(() => {});
+    const resumed = await controlContainerLifecycle(containerName, "start").catch(() => null);
+    if (resumed?.ok) await clearTenantSuspensionMarker(result.tenant.id).catch(() => false);
     await resizeContainer(containerName, { memoryMb: result.profile.memoryMb, cpuLimit: result.profile.cpuLimit }).catch(() => null);
   } else if (containerName && result.lifecycleAction === "free") {
     await resizeContainer(containerName, { memoryMb: result.profile.memoryMb, cpuLimit: result.profile.cpuLimit }).catch(() => null);
@@ -9513,7 +9554,7 @@ const FREE_CYCLE_DAYS = 30;
 
 // Sum a tenant's stored daily request counts inside the active rolling cycle.
 // Counts are persisted by Dhaka calendar day, so compare with Dhaka date keys.
-function tenantUsageInCycle(data, tenantId, cycleStart, cycleEnd) {
+function tenantUsageInCycle(data, tenantId, cycleStart, cycleEnd, cycleBaseline = 0) {
   const days = data.tenantDailyRequests?.[tenantId] || {};
   const start = validDate(cycleStart);
   const end = validDate(cycleEnd);
@@ -9524,7 +9565,11 @@ function tenantUsageInCycle(data, tenantId, cycleStart, cycleEnd) {
   for (const [dateKey, count] of Object.entries(days)) {
     if (dateKey >= startKey && dateKey <= endKey) total += Number(count || 0);
   }
-  return total;
+  return Math.max(0, total - Number(cycleBaseline || 0));
+}
+
+function tenantRequestBaselineNow(data, tenantId, now = new Date()) {
+  return Number(data.tenantDailyRequests?.[tenantId]?.[localDateKey(now)] || 0);
 }
 
 // Sum a tenant's tracked purchases + revenue within the current cycle window.
@@ -9567,6 +9612,7 @@ async function enforceFreeTierUsage(data) {
     if (!tenant.cycleStart || !tenant.cycleEnd) {
       tenant.cycleStart = now.toISOString();
       tenant.cycleEnd = new Date(now.getTime() + cycleMs).toISOString();
+      tenant.cycleBaseline = tenantRequestBaselineNow(data, tenant.id, now);
       tenant.nudgedAt = "";
       tenant.cycleNudge = 0;
     }
@@ -9575,29 +9621,44 @@ async function enforceFreeTierUsage(data) {
     if (now >= new Date(tenant.cycleEnd)) {
       tenant.cycleStart = now.toISOString();
       tenant.cycleEnd = new Date(now.getTime() + cycleMs).toISOString();
+      tenant.cycleBaseline = tenantRequestBaselineNow(data, tenant.id, now);
       tenant.nudgedAt = "";
       tenant.cycleNudge = 0;
       if (status === "free_capped") {
         tenant.subscriptionStatus = "free";
         tenant.cappedAt = "";
         const name = tenantContainerName(data, tenant.id);
-        if (name) await controlContainerLifecycle(name, "start").catch(() => {});
+        const resumed = name ? await controlContainerLifecycle(name, "start").catch(() => null) : { ok: true };
+        if (resumed?.ok) tenant.suspensionEnforcedAt = "";
       }
       continue;
     }
 
     const startKey = localDateKey(new Date(tenant.cycleStart));
-    const used = tenantUsageInCycle(data, tenant.id, tenant.cycleStart, tenant.cycleEnd);
+    const used = tenantUsageInCycle(data, tenant.id, tenant.cycleStart, tenant.cycleEnd, tenant.cycleBaseline);
     const account = (data.customerAccounts || []).find((a) => a.tenantId === tenant.id);
     const toEmail = account?.email || account?.username || "";
 
+    // A previous resume attempt may have happened while Docker was unavailable.
+    // Keep retrying until the restart policy and start action both succeed.
+    if (tenant.suspensionEnforcedAt && status !== "free_capped") {
+      const name = tenantContainerName(data, tenant.id);
+      const resumed = name ? await controlContainerLifecycle(name, "start").catch(() => null) : { ok: true };
+      if (resumed?.ok) tenant.suspensionEnforcedAt = "";
+    }
+
     // Hard cap: stop the container once, on the transition to capped.
     if (used >= FREE_HARD_CAP) {
-      if (status !== "free_capped") {
+      if (status !== "free_capped" || !tenant.suspensionEnforcedAt) {
+        const name = tenantContainerName(data, tenant.id);
+        const stopped = name ? await controlContainerLifecycle(name, "stop").catch(() => null) : { ok: true };
+        if (!stopped?.ok) {
+          console.error(`[free-tier] could not suspend ${tenant.id}; will retry next tick`);
+          continue;
+        }
         tenant.subscriptionStatus = "free_capped";
         tenant.cappedAt = now.toISOString();
-        const name = tenantContainerName(data, tenant.id);
-        if (name) await controlContainerLifecycle(name, "stop").catch(() => {});
+        tenant.suspensionEnforcedAt = now.toISOString();
         emailFreeTierCapped(toEmail, tenant, cyclePurchaseStats(data, tenant.id, startKey, todayKey)).catch(() => {});
       }
       continue;
@@ -9614,16 +9675,24 @@ async function enforceFreeTierUsage(data) {
 }
 
 const RENEWAL_REMINDER_DAYS = [7, 3, 1];
-const RENEWAL_GRACE_DAYS = 7;
 
-// Evaluate paid plans against their 30-day window: send T-7/T-3/T-1 renewal
-// reminders (once each), flip to `overdue` once the renewal date passes (grace
-// period — container keeps running), then to `expired` + stop the container once
-// the grace period ends. Mutates `data`; side-effects are best-effort.
+// Evaluate manual paid plans against their paid-through date. Send T-7/T-3/T-1
+// reminders, then move an unpaid tenant onto a fresh Free allowance as soon as
+// the paid window ends. Legacy overdue/expired rows are migrated on the next
+// sweep. Paddle/Shopify keep their provider-owned renewal behavior.
 async function enforcePaidRenewals(data) {
   const now = new Date();
+  const renewalActions = [];
   for (const tenant of (data.tenants || [])) {
     if (!tenant?.id) continue;
+    // Any paid activation can race with a temporary Docker outage. Retry its
+    // durable resume marker even for lifetime and provider-managed tenants.
+    if (tenant.plan !== "Free" && tenant.subscriptionStatus === "active" && tenant.suspensionEnforcedAt
+      && (tenant.lifetimeAccess || ["paddle", "shopify"].includes(tenant.paymentProvider))) {
+      const name = tenantContainerName(data, tenant.id);
+      if (name) renewalActions.push({ type: "resume", tenantId: tenant.id, containerName: name });
+      else tenant.suspensionEnforcedAt = "";
+    }
     if (tenant.lifetimeAccess) {
       tenant.subscriptionStatus = "active";
       tenant.renewalDate = "";
@@ -9659,7 +9728,7 @@ async function enforcePaidRenewals(data) {
     }
 
     const status = tenant.subscriptionStatus;
-    if (!["active", "overdue"].includes(status)) continue;
+    if (!["active", "overdue", "expired"].includes(status)) continue;
     if (tenant.plan === "Free" || !tenant.renewalDate) continue;
 
     const renewal = new Date(tenant.renewalDate);
@@ -9669,6 +9738,11 @@ async function enforcePaidRenewals(data) {
 
     // Pre-expiry reminders.
     if (now < renewal) {
+      if (tenant.suspensionEnforcedAt) {
+        const name = tenantContainerName(data, tenant.id);
+        if (name) renewalActions.push({ type: "resume", tenantId: tenant.id, containerName: name });
+        else tenant.suspensionEnforcedAt = "";
+      }
       const daysLeft = Math.ceil((renewal.getTime() - now.getTime()) / 86400000);
       let toSend = null;
       for (const mark of RENEWAL_REMINDER_DAYS) {
@@ -9681,33 +9755,53 @@ async function enforcePaidRenewals(data) {
       continue;
     }
 
-    // Past the renewal date.
-    const daysOver = Math.floor((now.getTime() - renewal.getTime()) / 86400000);
-    if (status !== "overdue") {
-      // A scheduled downgrade takes effect now: the renewal the customer pays is for
-      // the lower plan, not the current one. Stage it as the pending plan so the
-      // "Renew" flow charges the downgraded price and confirmPayment applies it.
-      if (tenant.scheduledPlan && planResourceProfiles[tenant.scheduledPlan]) {
-        const cyc = billingCycleConfig[tenant.scheduledPlanCycle] ? tenant.scheduledPlanCycle : "monthly";
-        tenant.pendingPlan = tenant.scheduledPlan;
-        tenant.pendingBillingCycle = cyc;
-        tenant.pendingAmount = computeCycleAmount(tenant.scheduledPlan, cyc);
-        tenant.pendingInvoiceNo = tenant.pendingInvoiceNo || nextInvoiceNo(data, tenant.id);
-        tenant.scheduledPlan = "";
-        tenant.scheduledPlanCycle = "";
-      }
-      tenant.subscriptionStatus = "overdue";
-      tenant.overdueAt = now.toISOString();
-      emailOverdue(toEmail, tenant, data, RENEWAL_GRACE_DAYS).catch(() => {});
+    // Paid window ended without a confirmed renewal. A scheduled downgrade is
+    // still staged for payment, but service immediately continues on Free.
+    if (tenant.scheduledPlan && tenant.scheduledPlan !== "Free" && planResourceProfiles[tenant.scheduledPlan]) {
+      const cyc = billingCycleConfig[tenant.scheduledPlanCycle] ? tenant.scheduledPlanCycle : "monthly";
+      tenant.pendingPlan = tenant.scheduledPlan;
+      tenant.pendingBillingCycle = cyc;
+      tenant.pendingAmount = computeCycleAmount(tenant.scheduledPlan, cyc);
+      tenant.pendingInvoiceNo = tenant.pendingInvoiceNo || nextInvoiceNo(data, tenant.id);
+    } else if (tenant.scheduledPlan === "Free") {
+      tenant.pendingPlan = "";
+      tenant.pendingBillingCycle = "";
+      tenant.pendingAmount = 0;
+      tenant.pendingInvoiceNo = "";
     }
-    if (daysOver >= RENEWAL_GRACE_DAYS) {
-      tenant.subscriptionStatus = "expired";
-      tenant.expiredAt = now.toISOString();
-      const name = tenantContainerName(data, tenant.id);
-      if (name) await controlContainerLifecycle(name, "stop").catch(() => {});
-      emailExpiredSuspended(toEmail, tenant, data).catch(() => {});
+    const previousPlan = tenant.plan;
+    const profile = resourceProfileForPlan("Free");
+    tenant.plan = "Free";
+    tenant.requestLimit = profile.monthlyRequestLimit;
+    tenant.containerLimit = profile.containerLimit;
+    tenant.domainLimit = profile.domainLimit;
+    tenant.extraContainers = 0;
+    tenant.monthlyAmount = 0;
+    tenant.resourceLimits = { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit };
+    tenant.subscriptionStatus = "free";
+    tenant.paymentStatus = "free";
+    tenant.renewalDate = "";
+    tenant.renewalReminder = 99;
+    tenant.overdueAt = "";
+    tenant.expiredAt = "";
+    tenant.scheduledPlan = "";
+    tenant.scheduledPlanCycle = "";
+    tenant.cycleStart = now.toISOString();
+    tenant.cycleEnd = new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString();
+    tenant.cycleBaseline = tenantRequestBaselineNow(data, tenant.id, now);
+    tenant.nudgedAt = "";
+    tenant.cycleNudge = 0;
+    tenant.cappedAt = "";
+    const name = tenantContainerName(data, tenant.id);
+    tenant.suspensionEnforcedAt = name ? (tenant.suspensionEnforcedAt || now.toISOString()) : "";
+    tenant.updatedAt = now.toISOString();
+    if (name) {
+      renewalActions.push({ type: "fallback", tenantId: tenant.id, containerName: name, profile, toEmail, previousPlan });
+    } else {
+      renewalActions.push({ type: "email", tenantId: tenant.id, toEmail, previousPlan });
     }
   }
+  return renewalActions;
 }
 
 // The whole tick is one read→mutate→write cycle holding data across slow awaits
@@ -9819,10 +9913,35 @@ async function persistDailySummaryLocked(summary) {
 
   // Phase 2: evaluate Free-tier usage cycles (nudges + hard cap) before persisting.
   await enforceFreeTierUsage(data).catch((e) => console.error("[free-tier] enforcement error:", e.message));
-  await enforcePaidRenewals(data).catch((e) => console.error("[renewal] enforcement error:", e.message));
+  const renewalActions = await enforcePaidRenewals(data).catch((e) => {
+    console.error("[renewal] enforcement error:", e.message);
+    return [];
+  });
 
   try {
     await writeDatabase(data);
+    let lifecycleStateChanged = false;
+    for (const action of renewalActions) {
+      let resumed = null;
+      if (action.containerName) {
+        resumed = await controlContainerLifecycle(action.containerName, "start").catch(() => null);
+        if (resumed?.ok) {
+          const tenant = (data.tenants || []).find((item) => item.id === action.tenantId);
+          if (tenant?.suspensionEnforcedAt) {
+            tenant.suspensionEnforcedAt = "";
+            lifecycleStateChanged = true;
+          }
+        }
+      }
+      if (action.type === "fallback" && action.profile) {
+        await resizeContainer(action.containerName, { memoryMb: action.profile.memoryMb, cpuLimit: action.profile.cpuLimit }).catch(() => null);
+      }
+      if (action.type === "fallback" || action.type === "email") {
+        const tenant = (data.tenants || []).find((item) => item.id === action.tenantId);
+        emailRenewalMovedToFree(action.toEmail, tenant, action.previousPlan).catch(() => {});
+      }
+    }
+    if (lifecycleStateChanged) await writeDatabase(data);
     return {
       available: true,
       path: databasePath,
@@ -10939,10 +11058,13 @@ function tenantBillingUsageMap(data, tenants = []) {
       if (d < startKey || d > todayKey) continue;
       accumulatedCount += Math.max(Number(tenantDailyReqs[d] || 0), Number(sqliteSnaps[d]?.total || 0));
     }
+    const isFreeCycle = tenant.plan === "Free" || ["free", "free_capped", "pending_payment"].includes(String(tenant.subscriptionStatus || ""));
+    const rawCount = Math.max(accumulatedCount, Number(tenant.requestsMonth || 0));
+    const cycleCount = Math.max(0, rawCount - (isFreeCycle ? Number(tenant.cycleBaseline || 0) : 0));
     return [tenant.id, {
-      requestsMonth: Math.max(accumulatedCount, Number(tenant.requestsMonth || 0)),
+      requestsMonth: isFreeCycle ? cycleCount : rawCount,
       period: period.label,
-      available: accumulatedCount > 0
+      available: cycleCount > 0
     }];
   });
   return Object.fromEntries(entries);
@@ -11118,7 +11240,9 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
   const accumulatedCount = historicCount + accountTodayCount;
   // Keep whichever is higher: accumulated (rotation-safe) vs live log period scan
   const livePeriodCount = tenantPeriodSummary.available ? Number(tenantPeriodSummary.count || 0) : 0;
-  const requestsMonth = Math.max(accumulatedCount, livePeriodCount);
+  const rawRequestsMonth = Math.max(accumulatedCount, livePeriodCount);
+  const isFreeCycle = tenant?.plan === "Free" || ["free", "free_capped", "pending_payment"].includes(String(tenant?.subscriptionStatus || ""));
+  const requestsMonth = Math.max(0, rawRequestsMonth - (isFreeCycle ? Number(tenant?.cycleBaseline || 0) : 0));
   const usagePercent = requestLimit ? Math.min(100, Math.round((requestsMonth / requestLimit) * 1000) / 10) : 0;
   const containerHistoricCount = Object.entries(retainedSnapshotsByDate)
     .filter(([dateKey]) => dateKey >= billingStartKey && dateKey < todayKey)

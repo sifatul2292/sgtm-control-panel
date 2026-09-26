@@ -5,6 +5,20 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-26.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-09-26 — Unpaid renewal fallback and durable suspension
+
+- Manual paid subscriptions now move directly to a fresh Free 15K/30-day cycle
+  when their paid-through date passes without a confirmed renewal. Existing
+  `overdue` and `expired` tenants self-heal to Free on the next enforcement tick.
+- Free-cycle baselines prevent paid traffic from earlier on the transition day
+  consuming the new Free allowance. Owner and customer usage totals subtract the
+  same baseline.
+- Intentional container stops set Docker restart policy to `no`; starts and
+  payment reactivations restore `unless-stopped`. The host watchdog now skips
+  intentionally stopped containers, so it cannot resurrect Free-capped tenants.
+- Docker failures leave a durable retry marker: failed stops are not recorded as
+  capped, and failed payment/free-cycle resumes are retried by later sweeps.
+
 ## 2026-09-26 — Owner-managed lifetime access
 
 - Added an owner-only lifetime auto-renew control for internal and partner

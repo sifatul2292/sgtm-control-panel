@@ -41,8 +41,10 @@ Public tiers (PixelFly-aligned, set 2026-06-27 — issue #1 resolved):
 | `free_capped`      | On Free tier, hit 15K this cycle                              | **Stopped** until cycle reset or upgrade |
 | `pending_payment`  | Chose a paid plan, awaiting manual payment + owner confirm     | Running on Free limits until confirmed (see issue #2) |
 | `active`           | Paid plan confirmed by owner, within 30-day paid window        | Running   |
-| `overdue`          | Paid 30-day window ended, not yet renewed                      | Running (grace) |
-| `expired`          | Overdue past grace → suspended                                 | **Stopped** |
+
+Manual paid tenants move directly back to `free` when their paid-through date
+passes without a confirmed renewal. Legacy `overdue` / `expired` records are
+migrated to a fresh Free cycle by the enforcement sweep.
 
 `paymentStatus`: `free` · `pending` · `paid` · `rejected`.
 
@@ -92,9 +94,9 @@ Owner may also **Reject** a claim (wrong/duplicate TxnID) → `paymentStatus = r
 customer emailed to resubmit.
 
 ### Renewal
-- 30-day window ends → `overdue` (grace, container still running).
-- Cron sends renewal reminders at T-7 / T-3 / T-1 before `renewalDate`, and on overday.
-- Overdue + N days unpaid → `expired` → stop container.
+- Cron sends renewal reminders at T-7 / T-3 / T-1 before `renewalDate`.
+- An unpaid renewal moves immediately to a fresh Free cycle (15,000 requests / 30 days).
+- Reaching the Free cap stops the container; a confirmed paid renewal starts it again.
 - Renewal repeats the exact same claim→confirm loop.
 
 ---
@@ -173,7 +175,8 @@ or the existing `tagioo-watchdog.sh` cron host). Each tick, per tenant:
 2. Free tenant usage ≥ 12K and not yet nudged this cycle → send nudge, set `nudgedAt`.
 3. Free tenant usage ≥ 15K → `free_capped`, stop container, set `cappedAt`, email/WhatsApp.
 4. Paid tenant `renewalDate` within 7/3/1 days → reminder.
-5. Paid tenant past `renewalDate` → `overdue`; past grace (e.g. +7d) → `expired`, stop container.
+5. Manual paid tenant past `renewalDate` → start a fresh Free cycle immediately;
+   stop only if that Free cycle reaches 15K requests.
 
 ---
 
@@ -226,10 +229,9 @@ or the existing `tagioo-watchdog.sh` cron host). Each tick, per tenant:
 - **Phase 3 — Full email system.** Generalize `sendEmail`; all templates in §6.
 - **Phase 4 — Renewal + dunning. ✅ DONE 2026-06-27.** `enforcePaidRenewals(data)` in the
   `persistDailySummary` tick: T-7/T-3/T-1 reminders (deduped via `renewalReminder`, show
-  plan+amount+bKash/Nagad numbers); past `renewalDate` → `overdue` (grace, container runs)
-  + email; overdue + `RENEWAL_GRACE_DAYS` (7) → `expired` + stop container + email.
-  `confirmPayment` resets reminder/overdue/expired flags so a renewal resumes service.
-  Verified: T-3 reminder, overdue, expiry+suspend.
+  plan+amount+bKash/Nagad numbers); past `renewalDate` → a fresh Free 15K/30-day cycle
+  + email. Free-cap suspension is durable across the host watchdog, and payment
+  confirmation restores Docker auto-restart before starting the container.
 - **Phase 5 — Landing polish. ~PARTLY DONE 2026-06-27.** Hero rewritten signal-recovery /
   Brave-bypass moat-forward; badge "Brave & ad-blocker proof"; pricing footer = manual
   bKash/Nagad reality (no card). Welcome email on signup added (Phase 3 remainder).

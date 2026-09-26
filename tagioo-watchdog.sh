@@ -3,7 +3,7 @@
 # Restarts crashed Docker sGTM containers, nginx, and pm2 panel.
 # Sends an email alert (throttled) whenever it has to take action.
 
-LOG="/var/log/tagioo-watchdog.log"
+LOG="${TAGIOO_WATCHDOG_LOG:-/var/log/tagioo-watchdog.log}"
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
 # ── Alert config (Resend HTTP API) ───────────────────────────────────────────
@@ -80,6 +80,11 @@ STOPPED=$(docker ps -a --filter "name=sgtm-" --filter "status=exited" --filter "
 RESTARTING=$(docker ps -a --filter "name=sgtm-" --filter "status=restarting" --format "{{.Names}}" 2>/dev/null)
 
 for container in $STOPPED; do
+  RESTART_POLICY=$(docker inspect --format='{{.HostConfig.RestartPolicy.Name}}' "$container" 2>/dev/null)
+  if [ "$RESTART_POLICY" = "no" ]; then
+    log "INFO: container $container is intentionally stopped — skipping restart"
+    continue
+  fi
   log "ALERT: container $container is stopped — restarting"
   docker start "$container" >> "$LOG" 2>&1
   sleep 3
