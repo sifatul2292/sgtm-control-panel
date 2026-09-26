@@ -7,6 +7,16 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-26.
 
 ## 2026-09-26 — Transactional email deliverability hardening
 
+- Created and verified the dedicated Resend sending subdomain
+  `mail.tagioo.com`. Cloudflare now serves its Resend DKIM record and both
+  DNS-only return-path CNAMEs; public DNS resolution and Resend verification
+  passed.
+- Production now sends from `accounts@mail.tagioo.com` while replies continue
+  to `support@tagioo.com`. PM2 was reloaded from the ecosystem file and saved;
+  the app stayed online and both local and public HTTP checks returned 200.
+  Rollback is limited to restoring `EMAIL_FROM=support@tagioo.com` (or removing
+  the override to use the existing support fallback) and reloading PM2. The
+  subdomain DNS records can remain without affecting the root-domain sender.
 - Decoupled the verified Resend sender (`notifications@tagioo.com`) from the
   customer support inbox and added an explicit Reply-To address for both Resend
   and the dormant Brevo fallback. Plain-text email alternatives now retain CTA
