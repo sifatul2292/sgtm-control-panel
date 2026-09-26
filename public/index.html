@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=52" />
+    <link rel="stylesheet" href="/styles.css?v=53" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -2330,6 +2330,7 @@ window.dataLayer.push({
                 <select id="manageCustomersFilter">
                   <option value="all">All customers</option>
                   <option value="paying">Current subscriptions</option>
+                  <option value="lifetime">Lifetime access</option>
                   <option value="trial">Trial</option>
                   <option value="attention">Needs attention</option>
                   <option value="nonpaying">Free / non-paying</option>
@@ -2585,6 +2586,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=79" type="module"></script>
+    <script src="/app.js?v=85" type="module"></script>
   </body>
 </html>

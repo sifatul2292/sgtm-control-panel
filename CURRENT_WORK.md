@@ -1,9 +1,27 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-09-25.
+Living status doc. Update after meaningful progress. Last updated: 2026-09-26.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
+
+## 2026-09-26 — Owner-managed lifetime access
+
+- Added an owner-only lifetime auto-renew control for internal and partner
+  accounts. It grants ongoing paid-plan access without creating a payment,
+  renewal reminders, overdue transitions, or expiry; disabling it restores the
+  account's prior billing state. Pending plan claims are cancelled when lifetime
+  access is granted, and lifetime accounts are excluded from subscription/MRR
+  totals. Externally billed Paddle/Shopify and Free accounts stay under their
+  existing billing rules. Extra-container payments remain available; cancelled
+  plan claims cannot later be confirmed. Restoring an expired account also
+  restores its stopped-container state. A later Paddle or Shopify activation
+  becomes authoritative and clears the owner-granted lifetime override.
+- Fixed the owner customer payload so an overdue subscription no longer rewrites
+  a stored `paid` payment status to the misleading label `expired`. Subscription
+  health and payment state are now shown as separate facts.
+- Customer details now show the account creation date, time using Tagioo, and
+  last login when available. Customer billing also recognizes lifetime access.
 
 ## 2026-09-25 — Clearer owner customer workspace
 

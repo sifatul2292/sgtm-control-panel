@@ -445,6 +445,25 @@ function formatShortDate(value) {
   }).format(date);
 }
 
+function formatCalendarDate(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+}
+
+function formatCustomerTenure(value) {
+  const start = new Date(value);
+  if (!value || Number.isNaN(start.getTime())) return "—";
+  const now = new Date();
+  const days = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86400000));
+  if (days < 30) return `${days} ${days === 1 ? "day" : "days"}`;
+  const months = Math.max(1, Math.floor(days / 30.4375));
+  if (months < 12) return `${months} ${months === 1 ? "month" : "months"}`;
+  const years = Math.floor(months / 12);
+  const remainder = months % 12;
+  return `${years} ${years === 1 ? "year" : "years"}${remainder ? `, ${remainder} ${remainder === 1 ? "month" : "months"}` : ""}`;
+}
+
 function hostLabel(value) {
   if (!value) return "";
   try {
@@ -4403,16 +4422,18 @@ function renderCustomersView(data) {
   const q = (searchEl?.value || "").trim().toLowerCase();
   const filter = filterEl?.value || "all";
   const isCurrent = (c) => c.source !== "environment"
+    && !c.lifetimeAccess
     && ["active", "trial"].includes(c.subscriptionStatus)
     && !c.unpaid;
-  const needsAttention = (c) => c.unpaid
+  const needsAttention = (c) => !c.lifetimeAccess && (c.unpaid
     || ["pending", "pending_payment", "attention", "expired", "overdue", "suspended", "cancelled"].includes(c.subscriptionStatus)
-    || ["failed", "overdue", "unpaid", "expired"].includes(c.paymentStatus);
+    || ["failed", "overdue", "unpaid", "expired"].includes(c.paymentStatus));
   const matchesFilter = (c) => filter === "all"
     || (filter === "paying" && isCurrent(c))
+    || (filter === "lifetime" && c.lifetimeAccess)
     || (filter === "trial" && c.subscriptionStatus === "trial" && !c.unpaid)
     || (filter === "attention" && needsAttention(c))
-    || (filter === "nonpaying" && !isCurrent(c));
+    || (filter === "nonpaying" && !c.lifetimeAccess && !isCurrent(c));
   const matchedBySearch = q
     ? customers.filter((c) => [c.fullName, c.name, c.email, c.phone, c.id, c.plan]
         .some((v) => String(v || "").toLowerCase().includes(q)))
@@ -4436,12 +4457,12 @@ function renderCustomersView(data) {
     const current = Number(metrics.healthySubscriptions ?? customers.filter(isCurrent).length);
     const total = Number(metrics.totalCustomers ?? customers.length);
     const mrr = Number(metrics.mrr ?? customers.filter(isCurrent).reduce((sum, c) => sum + Number(c.monthlyAmount || 0), 0));
-    const nonpaying = Math.max(0, total - current);
+    const lifetime = Number(metrics.lifetimeCustomers ?? customers.filter((c) => c.lifetimeAccess).length);
     const stat = (label, value) => `<div class="cstat"><span>${label}</span><strong>${value}</strong></div>`;
     statsEl.innerHTML =
       stat("Current subscriptions", current.toLocaleString())
       + stat("Monthly revenue", `৳${mrr.toLocaleString()}`)
-      + stat("Free / non-paying", nonpaying.toLocaleString())
+      + stat("Lifetime access", lifetime.toLocaleString())
       + stat("Total customers", total.toLocaleString());
   }
 
@@ -4459,7 +4480,7 @@ function renderCustomersView(data) {
           </div>
           <div class="cr-meta">
             ${statusPill(c.subscriptionStatus || "unknown", lifecycleStatusClass(c.subscriptionStatus))}
-            <span>${escapeHtml(c.plan || "—")}${c.monthlyAmount ? ` · ৳${Number(c.monthlyAmount).toLocaleString()}` : ""}</span>
+            <span>${escapeHtml(c.plan || "—")}${c.lifetimeAccess ? " · Lifetime" : (c.monthlyAmount ? ` · ৳${Number(c.monthlyAmount).toLocaleString()}` : "")}</span>
           </div>
         </button>`).join("")
     : `<div class="customer-detail-empty customer-search-empty">
@@ -4504,21 +4525,25 @@ function renderCustomerDetail(customer) {
   const accountInfo = [
     ["Email", c.email || "—"],
     ["Phone", c.phone || "—"],
-    ["Tenant ID", c.id]
+    ["Tenant ID", c.id],
+    ["Customer since", formatCalendarDate(c.customerSince)],
+    ["Using Tagioo", formatCustomerTenure(c.customerSince)],
+    ["Last login", c.lastLoginAt ? formatShortDate(c.lastLoginAt) : "—"]
   ];
   const billingInfo = [
     ["Plan", c.plan || "—"],
-    ["Payment", c.paymentStatus || "—"],
-    ["Renews", c.renewalDate ? formatShortDate(c.renewalDate) : "—"],
-    ["Monthly", money(c.monthlyAmount)]
+    ["Payment", c.lifetimeAccess ? "Included" : (c.paymentStatus || "—")],
+    ["Renews", c.lifetimeAccess ? "Never" : (c.renewalDate ? formatShortDate(c.renewalDate) : "—")],
+    ["Monthly", c.lifetimeAccess ? "Lifetime access" : money(c.monthlyAmount)]
   ];
   const usagePercent = Math.max(0, Math.min(100, Number(c.usagePercent || 0)));
   const infoGrid = (items) => items.map(([k, v]) => `<div class="cd-cell"><span>${escapeHtml(k)}</span><strong>${escapeHtml(String(v))}</strong></div>`).join("");
   const canManage = !["environment", "provisioning"].includes(c.source);
+  const canManageLifetime = canManage && c.plan !== "Free" && !["paddle", "shopify"].includes(c.paymentProvider);
   const currentPlanOption = c.plan && !MANAGE_PLANS.includes(c.plan)
     ? `<option value="${escapeHtml(c.plan)}" selected disabled>${escapeHtml(c.plan)} (current)</option>`
     : "";
-  const planOpts = currentPlanOption + MANAGE_PLANS.map((p) => `<option value="${p}"${p === c.plan ? " selected" : ""}>${p}</option>`).join("");
+  const planOpts = currentPlanOption + MANAGE_PLANS.map((p) => `<option value="${p}"${p === c.plan ? " selected" : ""}${c.lifetimeAccess && p === "Free" ? " disabled" : ""}>${p}${c.lifetimeAccess && p === "Free" ? " (disable lifetime access first)" : ""}</option>`).join("");
   const planManagement = canManage
     ? `<div class="cd-plan-row">
         <div><h5>Change plan</h5><p>Choose a plan, then save. Container capacity may be resized.</p></div>
@@ -4529,6 +4554,12 @@ function renderCustomerDetail(customer) {
       </div>
       <div id="cdActionMsg" class="cd-msg" aria-live="polite"></div>`
     : `<div class="cd-readonly-note"><strong>Managed outside Customers</strong><span>${c.source === "environment" ? "This default account comes from the server configuration." : "Finish this account in Provisioning before managing its plan here."}</span></div>`;
+  const lifetimeControl = canManageLifetime
+    ? `<div class="cd-access-row">
+        <div><h5>Lifetime auto-renew ${c.lifetimeAccess ? '<span class="badge ok">Enabled</span>' : ""}</h5><p>Keep this account active indefinitely without renewal reminders or payment.</p></div>
+        <button class="button${c.lifetimeAccess ? " button-danger" : ""}" type="button" id="cdLifetimeToggle">${c.lifetimeAccess ? "Disable auto-renew" : "Enable auto-renew"}</button>
+      </div>`
+    : "";
   const dangerZone = canManage
     ? `<details class="cd-danger">
         <summary>Danger zone</summary>
@@ -4561,6 +4592,7 @@ function renderCustomerDetail(customer) {
         <div class="cd-usage-track" role="progressbar" aria-label="Monthly request usage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${usagePercent}"><span style="--usage-width:${usagePercent}%"></span></div>
         <div class="cd-usage-foot"><span>${usagePercent}% used</span><span>${Number(c.requestsToday || 0).toLocaleString()} today</span></div>
       </div>
+      ${lifetimeControl}
       ${planManagement}
     </section>
     <section class="cd-section" aria-labelledby="cdContainersHeading">
@@ -4572,6 +4604,44 @@ function renderCustomerDetail(customer) {
   if (!canManage) return;
 
   const msg = pane.querySelector("#cdActionMsg");
+  const lifetimeButton = pane.querySelector("#cdLifetimeToggle");
+  if (lifetimeButton) lifetimeButton.onclick = async () => {
+    const enabled = !c.lifetimeAccess;
+    lifetimeButton.disabled = true;
+    lifetimeButton.textContent = enabled ? "Enabling…" : "Disabling…";
+    msg.className = "cd-msg";
+    msg.textContent = enabled ? "Enabling lifetime access…" : "Disabling lifetime access…";
+    try {
+      const r = await fetch(`/api/admin/customers/${encodeURIComponent(c.id)}/lifetime-access`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || "Access update failed.");
+      Object.assign(c, j.tenant || {}, { lifetimeAccess: enabled });
+      c.expired = !enabled && Boolean(c.renewalDate) && Date.parse(c.renewalDate) < Date.now() && ["active", "trial"].includes(c.subscriptionStatus);
+      c.unpaid = !enabled && (["unpaid", "overdue", "expired"].includes(c.paymentStatus) || ["overdue", "expired"].includes(c.subscriptionStatus) || c.expired);
+      const owner = latestData?.owner;
+      if (owner?.metrics && Array.isArray(owner.customers)) {
+        const current = owner.customers.filter((customer) => customer.source !== "environment" && !customer.lifetimeAccess && ["active", "trial"].includes(customer.subscriptionStatus) && !customer.unpaid);
+        owner.metrics.healthySubscriptions = current.length;
+        owner.metrics.lifetimeCustomers = owner.customers.filter((customer) => customer.lifetimeAccess).length;
+        owner.metrics.mrr = current.reduce((sum, customer) => sum + Number(customer.monthlyAmount || 0), 0);
+      }
+      renderCustomersView(latestData);
+      const updatedMsg = pane.querySelector("#cdActionMsg");
+      if (updatedMsg) {
+        updatedMsg.textContent = enabled ? "Lifetime access enabled." : "Lifetime access disabled; the previous billing state was restored.";
+        updatedMsg.classList.add("is-success");
+      }
+    } catch (e) {
+      msg.textContent = e.message;
+      msg.classList.add("is-error");
+      lifetimeButton.disabled = false;
+      lifetimeButton.textContent = enabled ? "Enable auto-renew" : "Disable auto-renew";
+    }
+  };
   const planSelect = pane.querySelector("#cdPlanSelect");
   const planSave = pane.querySelector("#cdPlanSave");
   planSelect.onchange = () => { planSave.disabled = planSelect.value === c.plan; };
@@ -5165,7 +5235,11 @@ function renderPaymentStatusCard(billing) {
 
   let tone = "", icon = "", title = "", sub = "", action = "", invoiceRow = "";
 
-  if (openClaim) {
+  if (billing.lifetimeAccess) {
+    tone = "is-active"; icon = "∞";
+    title = `${escapeHtml(billing.plan)} lifetime access`;
+    sub = "Your account renews automatically with no payment or expiry date.";
+  } else if (openClaim) {
     tone = "is-verifying"; icon = "⏳";
     title = "We're verifying your payment";
     sub = `Transaction <strong>${escapeHtml(openClaim.txnId)}</strong> for ${escapeHtml(openClaim.plan)} (${money(openClaim.amount)}) is under review. Your plan activates as soon as we confirm it — usually within a few hours.`;
@@ -6750,7 +6824,7 @@ function renderAccountOverview(data, account) {
   const requestsMonth = Number(usage.requestsMonth || 0);
   const requestLimit = Number(usage.requestLimit || 0);
   const usagePercent = Number(usage.usagePercent || 0);
-  const renewal = usage.renewalDate || usage.periodEnd;
+  const renewal = usage.lifetimeAccess ? "" : (usage.renewalDate || usage.periodEnd);
   const webhookConfigured = Boolean(data?.webhookSecret) || Boolean(data?.orders?.configured);
 
   if (els.accountIdentityName) els.accountIdentityName.textContent = name;
@@ -6766,8 +6840,8 @@ function renderAccountOverview(data, account) {
 
   const statusTone = subStatus === "active" ? "healthy" : subStatus === "trial" ? "warn" : "bad";
   const cards = [
-    { label: "Plan", value: plan, detail: payStatus ? `Payment: ${payStatus}` : "Subscription plan", tone: "accent" },
-    { label: "Subscription", value: subStatus.charAt(0).toUpperCase() + subStatus.slice(1), detail: renewal ? `Renews ${formatDate(renewal).split(",")[0]}` : "—", tone: statusTone },
+    { label: "Plan", value: plan, detail: usage.lifetimeAccess ? "Owner-granted · no payment required" : (payStatus ? `Payment: ${payStatus}` : "Subscription plan"), tone: "accent" },
+    { label: "Subscription", value: usage.lifetimeAccess ? "Lifetime access" : subStatus.charAt(0).toUpperCase() + subStatus.slice(1), detail: usage.lifetimeAccess ? "Auto-renews · no payment required" : (renewal ? `Renews ${formatDate(renewal).split(",")[0]}` : "—"), tone: statusTone },
     { label: "Usage this period", value: requestLimit ? `${usagePercent}%` : requestsMonth.toLocaleString(), detail: requestLimit ? `${requestsMonth.toLocaleString()} / ${requestLimit.toLocaleString()} requests` : "Requests this period", tone: usagePercent >= 90 ? "bad" : usagePercent >= 75 ? "warn" : "healthy" },
     { label: "Tracking domain", value: domain, detail: "Your first-party endpoint", tone: domain.includes(".") ? "healthy" : "warn", mono: true },
     { label: "Order webhook", value: webhookConfigured ? "Connected" : "Not connected", detail: webhookConfigured ? "Server-side purchase recovery active" : "Set up in Setup Assistant", tone: webhookConfigured ? "healthy" : "warn" },

@@ -3129,6 +3129,9 @@ async function changeTenantPlan(tenantId, planName) {
   }
 
   const previousPlan = data.tenants[index].plan;
+  if (data.tenants[index].lifetimeAccess && planName === "Free") {
+    return { ok: false, status: 409, error: "Disable lifetime access before moving this customer to Free." };
+  }
   const profile = resourceProfileForPlan(planName);
   data.tenants[index] = {
     ...data.tenants[index],
@@ -3157,6 +3160,81 @@ async function changeTenantPlan(tenantId, planName) {
     resize = await resizeContainer(request.containerName, { memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit });
   }
   return { ok: true, tenantId, plan: planName, requestLimit: profile.monthlyRequestLimit, resize };
+}
+
+// Owner-only access override for internal/partner accounts. This is deliberately
+// separate from billing: no payment is recorded and no renewal email is sent.
+async function setTenantLifetimeAccess(tenantId, enabled, session) {
+  if (session?.role !== "owner") return { ok: false, status: 403, error: "Owner access required." };
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 503, error: "Database unavailable." };
+    const data = loaded.data;
+    const index = (data.tenants || []).findIndex((tenant) => tenant.id === tenantId);
+    if (index === -1) return { ok: false, status: 404, error: "Customer not found." };
+    const tenant = data.tenants[index];
+    if (tenant.plan === "Free") return { ok: false, status: 400, error: "Free plans already have ongoing access." };
+    if (["paddle", "shopify"].includes(tenant.paymentProvider)) {
+      return { ok: false, status: 409, error: "This subscription is managed by its billing provider." };
+    }
+    if (Boolean(tenant.lifetimeAccess) === Boolean(enabled)) {
+      return { ok: true, tenant, unchanged: true, container: null };
+    }
+
+    const now = new Date();
+    const previousBilling = tenant.lifetimePreviousBilling || {};
+    const hasPreviousBilling = Boolean(tenant.lifetimePreviousBilling && typeof tenant.lifetimePreviousBilling === "object");
+    const restoringRenewal = hasPreviousBilling ? (previousBilling.renewalDate || "") : "";
+    const restoringStatus = hasPreviousBilling ? (previousBilling.subscriptionStatus || "overdue") : "overdue";
+    data.tenants[index] = {
+      ...tenant,
+      lifetimeAccess: Boolean(enabled),
+      subscriptionStatus: enabled ? "active" : restoringStatus,
+      paymentStatus: enabled ? tenant.paymentStatus : (previousBilling.paymentStatus || tenant.paymentStatus),
+      renewalDate: enabled ? "" : restoringRenewal,
+      renewalReminder: 99,
+      overdueAt: enabled ? "" : (hasPreviousBilling ? (previousBilling.overdueAt || "") : now.toISOString()),
+      expiredAt: enabled ? "" : (hasPreviousBilling ? (previousBilling.expiredAt || "") : ""),
+      pendingPlan: enabled ? "" : (tenant.pendingPlan || ""),
+      pendingAmount: enabled ? 0 : Number(tenant.pendingAmount || 0),
+      pendingBillingCycle: enabled ? "" : (tenant.pendingBillingCycle || ""),
+      pendingInvoiceNo: enabled ? "" : (tenant.pendingInvoiceNo || ""),
+      scheduledPlan: enabled ? "" : (tenant.scheduledPlan || ""),
+      scheduledPlanCycle: enabled ? "" : (tenant.scheduledPlanCycle || ""),
+      lifetimePreviousBilling: enabled && !tenant.lifetimeAccess ? {
+        subscriptionStatus: tenant.subscriptionStatus || "",
+        paymentStatus: tenant.paymentStatus || "",
+        renewalDate: tenant.renewalDate || "",
+        overdueAt: tenant.overdueAt || "",
+        expiredAt: tenant.expiredAt || ""
+      } : (enabled ? previousBilling : null),
+      lifetimeGrantedAt: enabled ? (tenant.lifetimeGrantedAt || now.toISOString()) : "",
+      lifetimeGrantedBy: enabled ? (session.username || "owner") : "",
+      lifetimeRevokedAt: enabled ? "" : now.toISOString(),
+      updatedAt: now.toISOString()
+    };
+    if (enabled) {
+      for (const payment of (data.payments || [])) {
+        if (payment.tenantId !== tenantId || payment.status !== "pending" || payment.type === "addon_container") continue;
+        payment.status = "rejected";
+        payment.note = "Cancelled when lifetime access was granted.";
+        payment.confirmedBy = session.username || "owner";
+        payment.confirmedAt = now.toISOString();
+      }
+    }
+    await writeDatabase(data);
+
+    let container = null;
+    const restoredStatus = data.tenants[index].subscriptionStatus;
+    const containerAction = enabled ? "start" : (["expired", "suspended", "cancelled"].includes(restoredStatus) ? "stop" : "");
+    if (containerAction) {
+      const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenantId && item.containerName);
+      if (request?.containerName) {
+        container = await controlContainerLifecycle(request.containerName, containerAction).catch(() => null);
+      }
+    }
+    return { ok: true, tenant: data.tenants[index], container };
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6414,6 +6492,9 @@ async function selectCustomerPlanLocked(input, session) {
 
   const now = new Date();
   const current = data.tenants[tenantIndex];
+  if (current.lifetimeAccess) {
+    return { ok: false, status: 409, errors: ["This account has owner-managed lifetime access. Contact support to change its plan."] };
+  }
   if (current.paymentProvider === "shopify") {
     return { ok: false, status: 409, errors: ["Manage this subscription from the Tagioo app in Shopify Admin."] };
   }
@@ -6603,7 +6684,7 @@ async function submitExtraContainerClaimLocked(input, session) {
   data.payments ||= [];
   const tenant = (data.tenants || []).find((t) => t.id === session.tenantId);
   if (!tenant) return { ok: false, status: 404, errors: ["Customer account was not found."] };
-  if (!(tenant.subscriptionStatus === "active" && tenant.paymentStatus === "paid")) {
+  if (!(tenant.lifetimeAccess || (tenant.subscriptionStatus === "active" && tenant.paymentStatus === "paid"))) {
     return { ok: false, status: 400, errors: ["Activate a paid plan before buying extra containers."] };
   }
   if (data.payments.some((p) => p.txnId && p.txnId.toLowerCase() === txnId.toLowerCase())) {
@@ -6650,10 +6731,15 @@ async function confirmPaymentLocked(paymentId, session) {
   data.payments ||= [];
   const payment = data.payments.find((p) => p.id === paymentId);
   if (!payment) return { ok: false, status: 404, errors: ["Payment not found."] };
-  if (payment.status === "confirmed") return { ok: false, status: 409, errors: ["Payment already confirmed."] };
+  if (payment.status !== "pending") {
+    return { ok: false, status: 409, errors: [payment.status === "confirmed" ? "Payment already confirmed." : "Payment is no longer pending."] };
+  }
 
   const tenantIndex = (data.tenants || []).findIndex((t) => t.id === payment.tenantId);
   if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+  if (payment.type !== "addon_container" && data.tenants[tenantIndex].lifetimeAccess) {
+    return { ok: false, status: 409, errors: ["Disable lifetime access before confirming a plan payment."] };
+  }
 
   // Extra-container add-on: bump the tenant's container limit + monthly amount by
   // one unit, don't touch the plan/subscription window. Then start/resize handled
@@ -6819,6 +6905,11 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     subscriptionStatus: "active",
     paymentStatus: "paid",
     paymentProvider: "paddle",
+    lifetimeAccess: false,
+    lifetimePreviousBilling: null,
+    lifetimeGrantedAt: "",
+    lifetimeGrantedBy: "",
+    lifetimeRevokedAt: tenant.lifetimeAccess ? now.toISOString() : (tenant.lifetimeRevokedAt || ""),
     paddleSubscriptionId: paddleSubscriptionId || tenant.paddleSubscriptionId || "",
     paddleCustomerId: paddleCustomerId || tenant.paddleCustomerId || "",
     paidAt: now.toISOString(),
@@ -7052,6 +7143,7 @@ async function getCustomerBilling(session) {
       paymentStatus: tenant.paymentStatus || "free",
       monthlyAmount: Number(tenant.monthlyAmount || 0),
       renewalDate: tenant.renewalDate || "",
+      lifetimeAccess: Boolean(tenant.lifetimeAccess),
       requestLimit: Number(tenant.requestLimit || 0),
       containerLimit: Number(tenant.containerLimit || resourceProfileForPlan(tenant.plan || "Free").containerLimit),
       containersUsed: getTenantContainers(tenant.id, tenant, data.customerSetupRequests || [], data.provisioning?.requests || []).length,
@@ -7275,6 +7367,11 @@ async function syncShopifySubscription(tenantId, containerId, billingState) {
         subscriptionStatus: "active",
         paymentStatus: "paid",
         paymentProvider: "shopify",
+        lifetimeAccess: false,
+        lifetimePreviousBilling: null,
+        lifetimeGrantedAt: "",
+        lifetimeGrantedBy: "",
+        lifetimeRevokedAt: tenant.lifetimeAccess ? now.toISOString() : (tenant.lifetimeRevokedAt || ""),
         paidAt: effective.cycleStart || tenant.paidAt || now.toISOString(),
         renewalDate: effective.cycleEnd,
         renewalReminder: 99,
@@ -7305,6 +7402,11 @@ async function syncShopifySubscription(tenantId, containerId, billingState) {
         subscriptionStatus: "free",
         paymentStatus: "free",
         paymentProvider: hasConnectedShopify ? "shopify" : "",
+        lifetimeAccess: false,
+        lifetimePreviousBilling: null,
+        lifetimeGrantedAt: "",
+        lifetimeGrantedBy: "",
+        lifetimeRevokedAt: tenant.lifetimeAccess ? now.toISOString() : (tenant.lifetimeRevokedAt || ""),
         paidAt: "",
         renewalDate: "",
         renewalReminder: 99,
@@ -8449,8 +8551,9 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
     const subscriptionStatus = normalizeLifecycleStatus(customer.subscriptionStatus || customer.status || "active");
     const paymentStatus = normalizeLifecycleStatus(customer.paymentStatus || "paid");
     const renewalDate = customer.renewalDate || "";
-    const expired = isPastDate(renewalDate) && ["active", "trial"].includes(subscriptionStatus);
-    const unpaid = ["unpaid", "overdue", "expired"].includes(paymentStatus) || ["overdue", "expired"].includes(subscriptionStatus) || expired;
+    const lifetimeAccess = Boolean(customer.lifetimeAccess);
+    const expired = !lifetimeAccess && isPastDate(renewalDate) && ["active", "trial"].includes(subscriptionStatus);
+    const unpaid = !lifetimeAccess && (["unpaid", "overdue", "expired"].includes(paymentStatus) || ["overdue", "expired"].includes(subscriptionStatus) || expired);
     const isDefaultCustomer = customer.source === "environment";
     const brokenPurchaseTracking = isDefaultCustomer && ["undertracked", "overtracked", "waiting"].includes(reconciliation.status);
     const noTrackingToday = ["active", "trial"].includes(subscriptionStatus) && requestsToday === 0;
@@ -8476,9 +8579,12 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
       offlineLastStatus,
       cookieExtensionEnabled: safeTracking.cookieExtension.enabled,
       cookieExtensionDays: safeTracking.cookieExtension.days,
+      customerSince: customer.createdAt || account?.createdAt || customerContainers.map((container) => container.createdAt).filter(Boolean).sort()[0] || "",
+      lastLoginAt: account?.lastLoginAt || "",
+      lifetimeAccess,
       plan,
       subscriptionStatus,
-      paymentStatus: unpaid && paymentStatus === "paid" ? "expired" : paymentStatus,
+      paymentStatus,
       renewalDate,
       monthlyAmount: Number(customer.monthlyAmount || monthlyAmountForPlan(plan)),
       customerContainers,
@@ -8507,12 +8613,14 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
     return counts;
   }, {});
   // Count active + trial subscriptions toward MRR, but exclude the environment
-  // (Default) account — that's the owner's own tenant, not a paying customer.
+  // (Default) account and owner-granted lifetime access — neither pays monthly.
   const payingCustomers = enrichedCustomers.filter((customer) =>
     customer.source !== "environment" &&
+    !customer.lifetimeAccess &&
     ["active", "trial"].includes(customer.subscriptionStatus) &&
     !customer.unpaid
   );
+  const lifetimeCustomers = enrichedCustomers.filter((customer) => customer.lifetimeAccess);
   const mrr = payingCustomers.reduce((total, customer) => total + Number(customer.monthlyAmount || 0), 0);
   const unpaidCustomers = enrichedCustomers.filter((customer) => customer.unpaid);
   const noTrackingCustomers = enrichedCustomers.filter((customer) => customer.noTrackingToday);
@@ -8565,6 +8673,7 @@ function buildOwnerDashboard({ customers, docker, ssl, orders, requestSummary, u
       cancelledCustomers: lifecycleCounts.cancelled || 0,
       overdueCustomers: unpaidCustomers.length,
       healthySubscriptions: payingCustomers.length,
+      lifetimeCustomers: lifetimeCustomers.length,
       mrr,
       totalCustomerContainers,
       pendingCustomerContainers,
@@ -9515,6 +9624,13 @@ async function enforcePaidRenewals(data) {
   const now = new Date();
   for (const tenant of (data.tenants || [])) {
     if (!tenant?.id) continue;
+    if (tenant.lifetimeAccess) {
+      tenant.subscriptionStatus = "active";
+      tenant.renewalDate = "";
+      tenant.overdueAt = "";
+      tenant.expiredAt = "";
+      continue;
+    }
     // Paddle and Shopify own renewal billing, dunning, and cancellation on
     // their side —
     // this sweep is the manual bKash/Nagad flow's overdue/expire enforcement
@@ -11013,6 +11129,7 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
     plan: tenant?.plan || data.usage.plan,
     subscriptionStatus: tenant?.subscriptionStatus || data.usage.subscriptionStatus,
     paymentStatus: tenant?.paymentStatus || data.usage.paymentStatus,
+    lifetimeAccess: Boolean(tenant?.lifetimeAccess),
     renewalDate: tenant?.renewalDate || data.usage.renewalDate,
     monthlyAmount: tenant?.monthlyAmount ?? data.usage.monthlyAmount,
     containerLimit: tenant?.containerLimit || data.usage.containerLimit,
@@ -11029,7 +11146,7 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
     period: billingPeriod.label,
     periodStart: billingPeriod.start.toISOString(),
     periodEnd: billingPeriod.renewal.toISOString(),
-    renewalDate: tenant?.renewalDate || billingPeriod.renewal.toISOString(),
+    renewalDate: tenant?.lifetimeAccess ? "" : (tenant?.renewalDate || billingPeriod.renewal.toISOString()),
     periodSummary: tenantPeriodSummary,
     usagePercent,
     status: !requestLimit ? "unmetered" : usagePercent >= 100 ? "over_limit" : usagePercent >= 80 ? "warning" : "healthy"
@@ -13154,6 +13271,23 @@ const server = createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const result = await changeTenantPlan(decodeURIComponent(planChangeMatch[1]), String(body.plan || "").trim());
+      if (result.ok) invalidateOwnerDashboardCache();
+      jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { error: result.error });
+      return;
+    }
+
+    const lifetimeAccessMatch = pathname.match(/^\/api\/admin\/customers\/([^/]+)\/lifetime-access$/);
+    if (lifetimeAccessMatch && req.method === "POST") {
+      if (!isOwner(req)) {
+        jsonResponse(res, 403, { error: "Owner access required." });
+        return;
+      }
+      const body = await readJson(req);
+      if (typeof body.enabled !== "boolean") {
+        jsonResponse(res, 400, { error: "enabled must be true or false." });
+        return;
+      }
+      const result = await setTenantLifetimeAccess(decodeURIComponent(lifetimeAccessMatch[1]), body.enabled, getSession(req));
       if (result.ok) invalidateOwnerDashboardCache();
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok ? result : { error: result.error });
       return;
