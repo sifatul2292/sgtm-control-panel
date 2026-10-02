@@ -5762,6 +5762,10 @@ async function saveTenantTrackingConfig(tenantId, input, containerId = "") {
       if (apiSecret) tracking.apiSecret = apiSecret;
       if (domain) tracking.domain = domain;
       if (platform) tracking.platform = platform;
+      if (input.setupAssistantCompleted) {
+        tracking.setupAssistantCompletedAt = new Date().toISOString();
+        tracking.webGtmContainerId = String(input.webGtmContainerId || "").trim().toUpperCase();
+      }
       // Persist Meta CAPI creds so server-side offline conversion uploads can reuse them.
       if (metaPixelId || metaCapiToken || metaTestEventCode) {
         const meta = { ...(tracking.meta || {}) };
@@ -5808,6 +5812,8 @@ function publicTenantTracking(tenant, scopedTracking = null) {
     domain: tracking.domain || "",
     measurementId: tracking.measurementId || "",
     platform: tracking.platform || "",
+    setupAssistantCompletedAt: tracking.setupAssistantCompletedAt || "",
+    webGtmContainerId: tracking.webGtmContainerId || "",
     shopify: tracking.shopify?.shop ? {
       shop: String(tracking.shopify.shop),
       status: String(tracking.shopify.status || "connected"),
@@ -13154,7 +13160,7 @@ const server = createServer(async (req, res) => {
       const templates = buildSetupAssistantTemplates(body);
       // Persist GA4 creds + tracking origin so the order webhook can forward
       // server-side purchase recovery events to this tenant's sGTM.
-      await saveTenantTrackingConfig(session.tenantId, body, containerId);
+      await saveTenantTrackingConfig(session.tenantId, { ...body, setupAssistantCompleted: true }, containerId);
       jsonResponse(res, 200, templates);
       return;
     }

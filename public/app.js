@@ -216,7 +216,8 @@ let customerChartRange = "24h";
 let customerKpiRange = "24h";
 let purchaseRange = "day";
 let selectedCustomerContainerId = "";
-let setupAssistantContainerId = "";
+let setupAssistantContainerId = null;
+let setupAssistantCompleted = false;
 let selectedManageCustomerId = "";
 const MANAGE_PLANS = ["Free", "Starter", "Pro", "Enterprise"];
 let setupAssistantStep = 1;
@@ -484,6 +485,7 @@ function setView(name, options = {}) {
     (roleKnown && currentSession.role !== "customer" && customerOnlyViews.has(requested))
       ? "dashboard"
       : requested;
+  if (next === "setupAssistant" && currentViewName !== next && setupAssistantCompleted) setupAssistantStep = 4;
   currentViewName = next;
   els.views.forEach((view) => view.classList.toggle("is-active", view.dataset.view === next));
   els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.viewTarget === next));
@@ -3052,10 +3054,13 @@ function renderSetupAssistant(data) {
   const requests = (data.customerSetup?.requests || [])
     .filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()));
   const latest = requests.find((request) => request.id === data.activeContainer?.id) || requests[0];
-  const containerChanged = setupAssistantContainerId !== (latest?.id || "");
+  const assistantScope = `${data.session?.tenantId || currentSession.tenantId || ""}:${latest?.id || ""}`;
+  const containerChanged = setupAssistantContainerId !== assistantScope;
   if (containerChanged) {
-    setupAssistantContainerId = latest?.id || "";
-    setupAssistantStep = 1;
+    setupAssistantContainerId = assistantScope;
+    setupAssistantCompleted = Boolean(tenantTracking.setupAssistantCompletedAt
+      || (tenantTracking.platform && tenantTracking.domain && tenantTracking.measurementId));
+    setupAssistantStep = setupAssistantCompleted ? 4 : 1;
     els.setupAssistantForm.reset();
     generatedAssistantTemplates = null;
     if (els.downloadWebTemplate) els.downloadWebTemplate.disabled = true;
@@ -3077,6 +3082,7 @@ function renderSetupAssistant(data) {
   if (containerChanged) {
     const form = els.setupAssistantForm.elements;
     if (form.ga4MeasurementId) form.ga4MeasurementId.value = tenantTracking.measurementId || "";
+    if (form.webGtmContainerId) form.webGtmContainerId.value = tenantTracking.webGtmContainerId || "";
     if (form.metaPixelId) form.metaPixelId.value = tenantTracking.meta?.pixelId || "";
     if (form.metaTestEventCode) form.metaTestEventCode.value = tenantTracking.meta?.testEventCode || "";
     if (form.platform && tenantTracking.platform) form.platform.value = tenantTracking.platform;
@@ -3336,6 +3342,9 @@ async function generateSetupAssistantTemplates() {
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Template generation failed."]).join(" "));
     generatedAssistantTemplates = result;
+    setupAssistantCompleted = true;
+    setupAssistantStep = 4;
+    updateSetupAssistantStep();
     if (els.downloadWebTemplate) els.downloadWebTemplate.disabled = false;
     if (els.downloadServerTemplate) els.downloadServerTemplate.disabled = false;
     const customPixel = String(result.shopifyCustomPixel || "");

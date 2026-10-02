@@ -7,6 +7,11 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-02.
 
 ## 2026-10-02 — Shopify-only release
 
+- Setup Assistant now remembers completion per container and reopens at Step 4.
+  Existing configurations with platform, domain, and GA4 ID resume at Step 4;
+  Back remains available and dashboard refreshes preserve in-progress editing.
+  Template generation saves completion and the Web GTM ID; asset version bumped.
+
 - Added the manual Shopify Custom Pixel generator, customer installation
   instructions, and Shopify-compatible Web GTM exports as a separate release.
 - Paddle changes remain local and are excluded from this release. No production
