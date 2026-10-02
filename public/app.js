@@ -77,6 +77,9 @@ const els = {
   generateTemplates: document.querySelector("#generateTemplates"),
   downloadWebTemplate: document.querySelector("#downloadWebTemplate"),
   downloadServerTemplate: document.querySelector("#downloadServerTemplate"),
+  copyShopifyCustomPixel: document.querySelector("#copyShopifyCustomPixel"),
+  shopifyCustomPixelPreview: document.querySelector("#shopifyCustomPixelPreview"),
+  shopifyCustomPixelMessage: document.querySelector("#shopifyCustomPixelMessage"),
   downloadPlugin: document.querySelector("#downloadPlugin"),
   verifyTrackingBtn: document.querySelector("#verifyTrackingBtn"),
   verifyTrackingResult: document.querySelector("#verifyTrackingResult"),
@@ -3057,6 +3060,13 @@ function renderSetupAssistant(data) {
     generatedAssistantTemplates = null;
     if (els.downloadWebTemplate) els.downloadWebTemplate.disabled = true;
     if (els.downloadServerTemplate) els.downloadServerTemplate.disabled = true;
+    if (els.copyShopifyCustomPixel) els.copyShopifyCustomPixel.disabled = true;
+    if (els.shopifyCustomPixelPreview) {
+      els.shopifyCustomPixelPreview.hidden = true;
+      const code = els.shopifyCustomPixelPreview.querySelector("code");
+      if (code) code.textContent = "";
+    }
+    if (els.shopifyCustomPixelMessage) els.shopifyCustomPixelMessage.textContent = "";
     if (els.setupAssistantResult) els.setupAssistantResult.textContent = "";
     if (els.verifyTrackingResult) els.verifyTrackingResult.hidden = true;
   }
@@ -3260,6 +3270,8 @@ function updateLaravelAssistantFields() {
   const isShopify = els.setupAssistantForm.elements.platform?.value === "shopify";
   const settings = els.setupAssistantForm.querySelector("[data-laravel-settings]");
   if (settings) settings.hidden = !isLaravel;
+  const shopifyManualCard = document.querySelector("#shopifyManualPixelCard");
+  if (shopifyManualCard) shopifyManualCard.hidden = !isShopify;
   const shopifyCard = document.querySelector("#shopifyAppConnectCard");
   if (shopifyCard) shopifyCard.hidden = !isShopify;
   if (!isLaravel) updateLaravelSelfServicePolling(false);
@@ -3326,6 +3338,18 @@ async function generateSetupAssistantTemplates() {
     generatedAssistantTemplates = result;
     if (els.downloadWebTemplate) els.downloadWebTemplate.disabled = false;
     if (els.downloadServerTemplate) els.downloadServerTemplate.disabled = false;
+    const customPixel = String(result.shopifyCustomPixel || "");
+    if (els.copyShopifyCustomPixel) els.copyShopifyCustomPixel.disabled = !customPixel;
+    if (els.shopifyCustomPixelPreview) {
+      els.shopifyCustomPixelPreview.hidden = !customPixel;
+      const code = els.shopifyCustomPixelPreview.querySelector("code");
+      if (code) code.textContent = customPixel;
+    }
+    if (els.shopifyCustomPixelMessage) {
+      els.shopifyCustomPixelMessage.textContent = customPixel
+        ? "Custom Pixel code is ready. Copy it after publishing both GTM containers."
+        : (els.setupAssistantForm.elements.platform?.value === "shopify" ? "Enter a valid Web GTM ID, then regenerate." : "");
+    }
     if (els.setupAssistantResult) {
       const warnings = (result.warnings || []).join(" ");
       els.setupAssistantResult.textContent = `Templates are ready. ${warnings}`;
@@ -6673,6 +6697,16 @@ els.assistantNext?.addEventListener("click", () => {
 els.generateTemplates?.addEventListener("click", generateSetupAssistantTemplates);
 els.downloadWebTemplate?.addEventListener("click", () => downloadGeneratedTemplate("web"));
 els.downloadServerTemplate?.addEventListener("click", () => downloadGeneratedTemplate("server"));
+els.copyShopifyCustomPixel?.addEventListener("click", async () => {
+  const code = generatedAssistantTemplates?.shopifyCustomPixel || "";
+  if (!code) return;
+  try {
+    await navigator.clipboard.writeText(code);
+    if (els.shopifyCustomPixelMessage) els.shopifyCustomPixelMessage.textContent = "Custom Pixel code copied. Paste it into Shopify Customer events.";
+  } catch {
+    if (els.shopifyCustomPixelMessage) els.shopifyCustomPixelMessage.textContent = "Copy was blocked. Select the code below and copy it manually.";
+  }
+});
 function playSetupVideo(trigger) {
   const preview = trigger.closest("[data-setup-video-card]")?.querySelector("[data-setup-video-preview]");
   if (!preview || preview.querySelector("iframe")) return;

@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=53" />
+    <link rel="stylesheet" href="/styles.css?v=54" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -1114,6 +1114,10 @@
                       <input name="ga4MeasurementId" placeholder="G-XXXXXXXXXX" />
                     </label>
                     <label>
+                      Web GTM Container ID <span class="label-optional">required for Shopify manual pixel</span>
+                      <input name="webGtmContainerId" placeholder="GTM-XXXXXXX" autocomplete="off" />
+                    </label>
+                    <label>
                       GA4 API Secret <span class="label-optional">enables purchase recovery</span>
                       <input name="ga4ApiSecret" placeholder="Required for server-side purchase recovery" />
                     </label>
@@ -1168,9 +1172,25 @@
                     </div>
                     <p id="setupAssistantResult" class="form-message" role="status" aria-live="polite"></p>
                   </div>
+                  <div id="shopifyManualPixelCard" class="assistant-download-card" hidden>
+                    <span class="assistant-download-icon" aria-hidden="true">M</span>
+                    <h2>Install manually with Shopify Custom Pixel</h2>
+                    <p>No App Store approval is required. Import and publish <strong>web.json</strong> and <strong>server.json</strong>, then paste the generated code into Shopify Admin → Settings → Customer events → Add custom pixel.</p>
+                    <div class="assistant-download-actions">
+                      <button id="copyShopifyCustomPixel" class="button button-primary" type="button" disabled>Copy custom pixel code</button>
+                    </div>
+                    <pre id="shopifyCustomPixelPreview" class="assistant-code-preview" hidden><code></code></pre>
+                    <p id="shopifyCustomPixelMessage" class="form-message" role="status" aria-live="polite"></p>
+                    <ol class="assistant-inline-steps">
+                      <li>Set the pixel permission to require <strong>Analytics</strong> and <strong>Marketing</strong> consent where applicable.</li>
+                      <li>Save and connect the pixel, then test it with Shopify Pixel Helper.</li>
+                      <li>Do not connect this manual pixel and the Tagioo Shopify app pixel at the same time.</li>
+                    </ol>
+                    <p class="assistant-laravel-note">The manual path tracks Shopify browser and checkout events. The app remains recommended because it also supplies reliable backend <code>orders/paid</code> Purchase recovery.</p>
+                  </div>
                   <div id="shopifyAppConnectCard" class="assistant-download-card" hidden>
                     <span class="assistant-download-icon" aria-hidden="true">S</span>
-                    <h2>Connect the Tagioo Shopify app</h2>
+                    <h2>Or connect the Tagioo Shopify app</h2>
                     <p>Generate a one-time code, then paste it into the Tagioo Tracking app in Shopify Admin. The code expires after 30 minutes.</p>
                     <div class="assistant-download-actions">
                       <button id="generateShopifyConnectCode" class="button button-primary" type="button">Generate connection code</button>
@@ -1550,36 +1570,17 @@ window.dataLayer.push({
                 <div class="event-group">
                   <div class="event-group-header">
                     <span class="event-label">purchase</span>
-                    <span class="event-trigger">Settings → Checkout → Additional scripts (all plans) or order_status.liquid (Plus)</span>
+                    <span class="event-trigger">Shopify Customer Events custom pixel</span>
                   </div>
-<pre class="instructions-code"><code>// Paste in Shopify Admin → Settings → Checkout → Additional scripts
-// Shopify renders this on the Thank You page after purchase
-{% if first_time_accessed %}
-window.dataLayer = window.dataLayer || [];
-window.dataLayer.push({ ecommerce: null });
-window.dataLayer.push({
-  event:    'purchase',
-  event_id: '{{ order.order_number }}-purchase',   // order number as event_id
-  user_data: {
-    email_address: '{{ customer.email | downcase }}',
-    phone_number:  '{{ customer.phone }}',
-    first_name:    '{{ customer.first_name | downcase }}',
-    last_name:     '{{ customer.last_name | downcase }}',
-    external_id:   '{{ customer.id }}'
-  },
-  ecommerce: {
-    currency:       '{{ order.currency }}',
-    value:          {{ order.total_price | money_without_currency | remove: ',' }},
-    transaction_id: '{{ order.order_number }}',
-    items: [{% for item in order.line_items %}{
-      item_id:   '{{ item.sku | default: item.product_id }}',
-      item_name: '{{ item.title | escape }}',
-      price:     {{ item.price | money_without_currency | remove: ',' }},
-      quantity:  {{ item.quantity }}
-    }{% unless forloop.last %},{% endunless %}{% endfor %}]
-  }
-});
-{% endif %}</code></pre>
+<pre class="instructions-code"><code>Use Setup Assistant → Platform: Shopify → Generate templates.
+
+Tagioo generates one supported Shopify Custom Pixel that subscribes to:
+page_viewed, collection_viewed, product_viewed, cart_viewed,
+product_added_to_cart, product_removed_from_cart, search_submitted,
+checkout_started, checkout_address_info_submitted, payment_info_submitted,
+and checkout_completed.
+
+Do not use Checkout “Additional scripts”; Shopify retired that integration path.</code></pre>
                 </div>
 
               </div><!-- /shopify tab -->
@@ -2586,6 +2587,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=86" type="module"></script>
+    <script src="/app.js?v=87" type="module"></script>
   </body>
 </html>

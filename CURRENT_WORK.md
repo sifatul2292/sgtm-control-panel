@@ -1,9 +1,18 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-09-26.
+Living status doc. Update after meaningful progress. Last updated: 2026-10-02.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
+
+## 2026-10-02 — Shopify-only release
+
+- Added the manual Shopify Custom Pixel generator, customer installation
+  instructions, and Shopify-compatible Web GTM exports as a separate release.
+- Paddle changes remain local and are excluded from this release. No production
+  billing configuration, Nginx, or container lifecycle changes are included.
+- Next: pull the release on the VPS, reload the panel, and test a Shopify order
+  through Customer Events, Tagioo, GA4, and Meta before advertising.
 
 ## 2026-09-26 — Transactional email deliverability hardening
 

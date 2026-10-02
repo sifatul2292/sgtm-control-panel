@@ -1841,6 +1841,9 @@ function buildWebGtmTemplate(input) {
     gtmDataLayerVariable(23, "dlv - ecommerce.coupon", "ecommerce.coupon"),
     gtmDataLayerVariable(24, "dlv - ecommerce.shipping", "ecommerce.shipping"),
     gtmDataLayerVariable(25, "dlv - ecommerce.tax", "ecommerce.tax"),
+    gtmDataLayerVariable(34, "dlv - page_location", "page_location"),
+    gtmDataLayerVariable(35, "dlv - page_title", "page_title"),
+    gtmDataLayerVariable(36, "dlv - search_term", "search_term"),
     gtmDataLayerVariable(33, "dlv - gtm.uniqueEventId", "gtm.uniqueEventId"),
     gtmDataLayerVariable(14, "dlv - user_data.email_address", "user_data.email_address"),
     gtmDataLayerVariable(15, "dlv - user_data.phone_number", "user_data.phone_number"),
@@ -1866,7 +1869,13 @@ function buildWebGtmTemplate(input) {
     {
       accountId: "0", containerId: "0", variableId: "31",
       name: "Tagioo - page_title", type: "jsm",
-      parameter: [gtmTemplateParam("javascript", "function(){return document.title;}")],
+      parameter: [gtmTemplateParam("javascript", "function(){var v={{dlv - page_title}};return v||document.title;}")],
+      fingerprint: String(Date.now()), parentFolderId: "2"
+    },
+    {
+      accountId: "0", containerId: "0", variableId: "37",
+      name: "Tagioo - page_location", type: "jsm",
+      parameter: [gtmTemplateParam("javascript", "function(){var v={{dlv - page_location}};return v||location.href;}")],
       fingerprint: String(Date.now()), parentFolderId: "2"
     },
     // Single dedup key for every destination. Resolves, in order: the event_id
@@ -1889,14 +1898,19 @@ function buildWebGtmTemplate(input) {
     }
   ];
   const triggers = [
-    { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - DOM Ready PageView", type: "DOM_READY", fingerprint: String(Date.now()) },
+    payload.platform === "shopify"
+      ? gtmTrigger(1, "Tagioo - Shopify page_view", "page_view")
+      : { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - DOM Ready PageView", type: "DOM_READY", fingerprint: String(Date.now()) },
     gtmTrigger(2, "Tagioo - view_item", "view_item"),
     gtmTrigger(3, "Tagioo - add_to_cart", "add_to_cart"),
     gtmTrigger(4, "Tagioo - begin_checkout", "begin_checkout"),
     gtmTrigger(5, "Tagioo - purchase", "purchase"),
     gtmTrigger(6, "Tagioo - add_payment_info", "add_payment_info"),
     gtmTrigger(7, "Tagioo - add_shipping_info", "add_shipping_info"),
-    gtmTrigger(8, "Tagioo - view_item_list", "view_item_list")
+    gtmTrigger(8, "Tagioo - view_item_list", "view_item_list"),
+    gtmTrigger(9, "Tagioo - remove_from_cart", "remove_from_cart"),
+    gtmTrigger(10, "Tagioo - view_cart", "view_cart"),
+    gtmTrigger(11, "Tagioo - search", "search")
   ];
   const tags = [];
   if (payload.businessType === "ecommerce" && payload.platform === "laravel") {
@@ -1915,11 +1929,12 @@ function buildWebGtmTemplate(input) {
     const eventMap = [
       ["page_view", "1"], ["view_item", "2"], ["add_to_cart", "3"],
       ["begin_checkout", "4"], ["purchase", "5"],
-      ["add_payment_info", "6"], ["add_shipping_info", "7"], ["view_item_list", "8"]
+      ["add_payment_info", "6"], ["add_shipping_info", "7"], ["view_item_list", "8"],
+      ["remove_from_cart", "9"], ["view_cart", "10"], ["search", "11"]
     ];
     for (const [eventName, triggerId] of eventMap) {
       const eventSettingsRows = [
-        { parameter: "page_location", parameterValue: "{{Page URL}}" },
+        { parameter: "page_location", parameterValue: "{{Tagioo - page_location}}" },
         { parameter: "page_title", parameterValue: "{{Tagioo - page_title}}" },
         { parameter: "event_id", parameterValue: "{{Tagioo - event_id}}" },
         { parameter: "user_data.email_address", parameterValue: "{{dlv - user_data.email_address}}" },
@@ -1940,7 +1955,7 @@ function buildWebGtmTemplate(input) {
       if (payload.platform === "woocommerce") {
         eventSettingsRows.push({ parameter: "tagioo_transport", parameterValue: "browser" });
       }
-      if (["view_item", "add_to_cart", "begin_checkout", "add_payment_info", "add_shipping_info"].includes(eventName)) {
+      if (["view_item", "add_to_cart", "remove_from_cart", "view_cart", "begin_checkout", "add_payment_info", "add_shipping_info"].includes(eventName)) {
         eventSettingsRows.push(
           { parameter: "currency", parameterValue: "{{dlv - ecommerce.currency}}" },
           { parameter: "value", parameterValue: "{{dlv - ecommerce.value}}" },
@@ -1951,6 +1966,9 @@ function buildWebGtmTemplate(input) {
         eventSettingsRows.push(
           { parameter: "items", parameterValue: "{{dlv - ecommerce.items}}" }
         );
+      }
+      if (eventName === "search") {
+        eventSettingsRows.push({ parameter: "search_term", parameterValue: "{{dlv - search_term}}" });
       }
       if (eventName === "purchase") {
         eventSettingsRows.push(
@@ -1974,14 +1992,14 @@ function buildWebGtmTemplate(input) {
       // Livewire/Inertia and WooCommerce AJAX storefronts can legitimately push
       // the same event type several times without a page load. Keep other legacy
       // templates unchanged, but let those platforms fire per dataLayer event.
-      if (!["laravel", "woocommerce"].includes(payload.platform)) tagObj.tagFiringOption = "ONCE_PER_LOAD";
+      if (!["laravel", "woocommerce", "shopify"].includes(payload.platform)) tagObj.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tagObj);
     }
   }
   if (destinations.includes("meta")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo Meta - Pixel Base", "html", [
       gtmTemplateParam("html", metaPixelBaseScript())
-    ], ["2147479553"], "4"));
+    ], [payload.platform === "shopify" ? "1" : "2147479553"], "4"));
     // Browser pixel events, deduped with server CAPI via event_id.
     const metaEventMap = [
       ["view_item", "ViewContent", "2"],
@@ -1994,14 +2012,14 @@ function buildWebGtmTemplate(input) {
       const metaTag = gtmTag(tags.length + 1, `Tagioo Meta - ${metaEventName}`, "html", [
         gtmTemplateParam("html", metaPixelEventScript(metaEventName))
       ], [triggerId], "4");
-      if (!["laravel", "woocommerce"].includes(payload.platform)) metaTag.tagFiringOption = "ONCE_PER_LOAD";
+      if (!["laravel", "woocommerce", "shopify"].includes(payload.platform)) metaTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(metaTag);
     }
   }
   if (destinations.includes("tiktok")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo TikTok - Pixel Base", "html", [
       gtmTemplateParam("html", "<script>!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=['page','track','identify','instances','debug','on','off','once','ready','alias','group','enableCookie','disableCookie'];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.load=function(e){var i='https://analytics.tiktok.com/i18n/pixel/events.js';ttq._i=ttq._i||{};ttq._i[e]=[];var n=d.createElement('script');n.type='text/javascript';n.async=!0;n.src=i;var a=d.getElementsByTagName('script')[0];a.parentNode.insertBefore(n,a)};ttq.load('{{Tagioo - tiktok_pixel_id}}');ttq.page();}(window,document,'ttq');</script>")
-    ], ["2147479553"], "6"));
+    ], [payload.platform === "shopify" ? "1" : "2147479553"], "6"));
     // Browser pixel events, deduped with server Events API via event_id.
     const tiktokEventMap = [
       ["view_item", "ViewContent", "2"],
@@ -2014,7 +2032,7 @@ function buildWebGtmTemplate(input) {
       const tiktokTag = gtmTag(tags.length + 1, `Tagioo TikTok - ${tiktokEventName}`, "html", [
         gtmTemplateParam("html", tiktokPixelEventScript(tiktokEventName))
       ], [triggerId], "6");
-      if (!["laravel", "woocommerce"].includes(payload.platform)) tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
+      if (!["laravel", "woocommerce", "shopify"].includes(payload.platform)) tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tiktokTag);
     }
   }
@@ -2207,10 +2225,160 @@ function buildServerGtmTemplate(input) {
   return gtmExport("server", "Tagioo Server GTM Template", payload, content);
 }
 
+// Shopify's supported app-free install path. This code is pasted into
+// Settings > Customer events as a Custom Pixel, where it loads the merchant's
+// Web GTM container inside Shopify's lax sandbox and translates Shopify's
+// standard events into the GA4-style dataLayer contract used by web.json.
+//
+// Do not include the tracking-domain credentials here: web.json owns those, so
+// the same generated pixel can never expose server-only destination secrets.
+function buildShopifyCustomPixel(input) {
+  const gtmId = String(input.webGtmContainerId || "").trim().toUpperCase();
+  if (!/^GTM-[A-Z0-9]+$/.test(gtmId)) return "";
+
+  return `// Tagioo Shopify Custom Pixel — generated by the Setup Assistant.
+// Install in Shopify Admin > Settings > Customer events > Add custom pixel.
+// Import and publish Tagioo web.json before connecting this pixel.
+window.dataLayer = window.dataLayer || [];
+function gtag(){window.dataLayer.push(arguments);}
+gtag('consent', 'update', {
+  ad_storage: 'granted',
+  analytics_storage: 'granted',
+  ad_user_data: 'granted',
+  ad_personalization: 'granted'
+});
+(function(w,d,s,l,i){
+  w[l]=w[l]||[];
+  w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});
+  var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';
+  j.async=true;
+  j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;
+  f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer',${JSON.stringify(gtmId)});
+
+function amount(value){
+  var n=Number(value && typeof value==='object' ? value.amount : value);
+  return Number.isFinite(n) ? n : 0;
+}
+function shopifyId(value, type){
+  return String(value || '').replace(new RegExp('^gid://shopify/'+type+'/'), '');
+}
+function itemFromVariant(variant, quantity, cost){
+  variant=variant||{};
+  var product=variant.product||{};
+  var price=cost||variant.price||{};
+  return {
+    item_id:String(variant.sku||shopifyId(variant.id,'ProductVariant')||shopifyId(product.id,'Product')),
+    item_name:String(product.title||variant.title||''),
+    item_variant:String(variant.title||''),
+    price:amount(price),
+    quantity:Number(quantity||1)
+  };
+}
+function itemFromLine(line){
+  line=line||{};
+  var cost=line.cost||{};
+  var total=cost.totalAmount||{};
+  var quantity=Number(line.quantity||1);
+  var unit=cost.amountPerQuantity||{amount:quantity?amount(total)/quantity:amount(total),currencyCode:total.currencyCode};
+  return itemFromVariant(line.merchandise, quantity, unit);
+}
+function addressData(address){
+  address=address||{};
+  return {
+    email_address:'',
+    phone_number:String(address.phone||''),
+    first_name:String(address.firstName||''),
+    last_name:String(address.lastName||''),
+    city:String(address.city||''),
+    region:String(address.provinceCode||address.province||''),
+    postal_code:String(address.zip||''),
+    country:String(address.countryCode||address.country||'')
+  };
+}
+function checkoutData(event){
+  var checkout=(event.data&&event.data.checkout)||{};
+  var total=checkout.totalPrice||checkout.subtotalPrice||{};
+  var user=addressData(checkout.shippingAddress||checkout.billingAddress);
+  user.email_address=String(checkout.email||'');
+  user.phone_number=String(checkout.phone||user.phone_number||'');
+  return {
+    ecommerce:{
+      currency:String(checkout.currencyCode||total.currencyCode||''),
+      value:amount(total),
+      coupon:(checkout.discountApplications||[]).map(function(row){return row&&row.title;}).filter(Boolean).join(','),
+      shipping:amount(checkout.shippingLine&&checkout.shippingLine.price),
+      tax:amount(checkout.totalTax),
+      items:(checkout.lineItems||[]).map(itemFromLine)
+    },
+    user_data:user,
+    checkout:checkout
+  };
+}
+function pushEvent(name, event, details){
+  details=details||{};
+  var context=(event&&event.context)||{};
+  var initial=(typeof init!=='undefined'&&init&&init.context)||{};
+  var doc=context.document||initial.document||{};
+  var payload={
+    event:name,
+    event_id:String(details.event_id||(event&&event.id)||''),
+    shopify_client_id:String((event&&event.clientId)||''),
+    page_location:String((doc.location&&doc.location.href)||''),
+    page_title:String(doc.title||'')
+  };
+  if(details.ecommerce){window.dataLayer.push({ecommerce:null});payload.ecommerce=details.ecommerce;}
+  if(details.user_data)payload.user_data=details.user_data;
+  if(details.search_term)payload.search_term=String(details.search_term);
+  window.dataLayer.push(payload);
+}
+
+analytics.subscribe('page_viewed', function(event){pushEvent('page_view',event);});
+analytics.subscribe('product_viewed', function(event){
+  var variant=event.data&&event.data.productVariant;
+  var price=(variant&&variant.price)||{};
+  pushEvent('view_item',event,{ecommerce:{currency:String(price.currencyCode||''),value:amount(price),items:[itemFromVariant(variant,1,price)]}});
+});
+analytics.subscribe('product_added_to_cart', function(event){
+  var line=event.data&&event.data.cartLine;
+  var total=line&&line.cost&&line.cost.totalAmount;
+  pushEvent('add_to_cart',event,{ecommerce:{currency:String((total&&total.currencyCode)||''),value:amount(total),items:[itemFromLine(line)]}});
+});
+analytics.subscribe('product_removed_from_cart', function(event){
+  var line=event.data&&event.data.cartLine;
+  var total=line&&line.cost&&line.cost.totalAmount;
+  pushEvent('remove_from_cart',event,{ecommerce:{currency:String((total&&total.currencyCode)||''),value:amount(total),items:[itemFromLine(line)]}});
+});
+analytics.subscribe('cart_viewed', function(event){
+  var cart=(event.data&&event.data.cart)||{};
+  var total=cart.cost&&cart.cost.totalAmount;
+  pushEvent('view_cart',event,{ecommerce:{currency:String((total&&total.currencyCode)||''),value:amount(total),items:(cart.lines||[]).map(itemFromLine)}});
+});
+analytics.subscribe('collection_viewed', function(event){
+  var collection=(event.data&&event.data.collection)||{};
+  var variants=collection.productVariants||[];
+  pushEvent('view_item_list',event,{ecommerce:{item_list_id:shopifyId(collection.id,'Collection'),item_list_name:String(collection.title||''),items:variants.map(function(variant){return itemFromVariant(variant,1,variant&&variant.price);})}});
+});
+analytics.subscribe('checkout_started', function(event){var d=checkoutData(event);pushEvent('begin_checkout',event,d);});
+analytics.subscribe('checkout_address_info_submitted', function(event){var d=checkoutData(event);pushEvent('add_shipping_info',event,d);});
+analytics.subscribe('payment_info_submitted', function(event){var d=checkoutData(event);pushEvent('add_payment_info',event,d);});
+analytics.subscribe('search_submitted', function(event){
+  pushEvent('search',event,{search_term:String((event.data&&event.data.searchResult&&event.data.searchResult.query)||(event.data&&event.data.query)||'')});
+});
+analytics.subscribe('checkout_completed', function(event){
+  var d=checkoutData(event),checkout=d.checkout||{},order=checkout.order||{};
+  var orderId=shopifyId(order.id,'Order')||String(order.name||checkout.token||event.id||'');
+  d.ecommerce.transaction_id=orderId;
+  d.event_id=orderId;
+  pushEvent('purchase',event,d);
+});`;
+}
+
 function buildSetupAssistantTemplates(input) {
   const destinations = selectedDestinations(input);
   const web = buildWebGtmTemplate({ ...input, destinations });
   const server = buildServerGtmTemplate({ ...input, destinations });
+  const shopifyCustomPixel = buildShopifyCustomPixel(input);
   const warnings = [];
   if (destinations.includes("tiktok")) {
     warnings.push("TikTok Pixel and Events API tags are included in web.json and server.json.");
@@ -2221,6 +2389,13 @@ function buildSetupAssistantTemplates(input) {
   if (String(input.platform || "") === "laravel") {
     warnings.push("Laravel browser funnel tracking is included in web.json. Request Complete Managed Setup in Tagioo for reliable backend Purchase tracking, then verify one test order before publishing.");
   }
+  if (String(input.platform || "") === "shopify") {
+    if (shopifyCustomPixel) {
+      warnings.push("Shopify Custom Pixel code is ready. Use either the manual pixel or the Tagioo Shopify app, never both at the same time.");
+    } else {
+      warnings.push("Enter a Web GTM container ID such as GTM-XXXXXXX to generate the manual Shopify Custom Pixel code.");
+    }
+  }
   return {
     fileNames: {
       web: "tagioo-web-template.json",
@@ -2228,6 +2403,7 @@ function buildSetupAssistantTemplates(input) {
     },
     web,
     server,
+    shopifyCustomPixel,
     warnings
   };
 }

@@ -1560,6 +1560,29 @@ h2 {
   text-align: left;
 }
 
+.assistant-code-preview {
+  width: min(100%, 820px);
+  max-height: 300px;
+  margin: 0;
+  padding: var(--space-md);
+  overflow: auto;
+  border: var(--rule-thin) solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: left;
+  white-space: pre;
+}
+
+.assistant-inline-steps {
+  width: min(100%, 720px);
+  margin: 0;
+  display: grid;
+  gap: var(--space-xs);
+  color: var(--color-muted);
+  text-align: left;
+}
+
 .assistant-actions {
   justify-content: space-between;
   padding: var(--space-lg);
