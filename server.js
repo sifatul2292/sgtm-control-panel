@@ -12,6 +12,7 @@ import { removeShopifyOrders, shopifyCustomerOrders } from "./shopify-privacy.js
 import { parseDataProtectionKey, parseProtectedJson, serializeProtectedJson } from "./data-protection.js";
 import { appendProtectedDataAudit } from "./protected-data-audit.js";
 import { staffPasswordPolicyErrors } from "./staff-password-policy.js";
+import { paddleCheckoutMatchesTenant, paddlePlanNameFromItems, paddleRenewalDate, verifyPaddleSignature } from "./paddle-billing.js";
 
 const gzipAsync = promisify(gzip);
 
@@ -2920,7 +2921,11 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           btn.addEventListener("click", function () {
             Paddle.Checkout.open({
               items: [{ priceId: ${JSON.stringify(paddle.priceId)}, quantity: 1 }],
-              customData: { tenantId: ${JSON.stringify(paddle.tenantId)}, planName: ${JSON.stringify(paddle.planName)} }
+              customData: {
+                tenantId: ${JSON.stringify(paddle.tenantId)},
+                planName: ${JSON.stringify(paddle.planName)},
+                invoiceNo: ${JSON.stringify(paddle.invoiceNo)}
+              }
             });
           });
         }
@@ -5032,15 +5037,11 @@ function shopifyPrivacyEmailBody(shop, payload, orders) {
 // Paddle signs "ts:body" (colon-joined) with the webhook secret, sent as
 // "Paddle-Signature: ts=<unix>;h1=<hex>". https://developer.paddle.com/webhooks/signature-verification
 function isPaddleWebhookAuthorized(req, rawBody) {
-  if (!config.paddleWebhookSecret) return false;
-  const header = String(req.headers["paddle-signature"] || "");
-  const parts = Object.fromEntries(header.split(";").map((kv) => kv.split("=")));
-  const ts = parts.ts;
-  const h1 = parts.h1;
-  if (!ts || !h1) return false;
-  const signedPayload = `${ts}:${rawBody.toString("utf8")}`;
-  const expected = createHmac("sha256", config.paddleWebhookSecret).update(signedPayload).digest("hex");
-  return safeEqual(h1, expected);
+  return verifyPaddleSignature({
+    header: req.headers["paddle-signature"],
+    rawBody,
+    secret: config.paddleWebhookSecret
+  });
 }
 
 // WooCommerce sends date_created_gmt as "2026-06-12T08:00:00" with no timezone
@@ -6631,6 +6632,15 @@ function currencyForCountry(countryCode) {
   return countryCode === "BD" ? "BDT" : "USD";
 }
 
+function paddleCatalogReady() {
+  return Boolean(config.paddleClientToken
+    && config.paddleApiKey
+    && config.paddleWebhookSecret
+    && config.paddlePriceIds.Starter
+    && config.paddlePriceIds.Pro
+    && config.paddlePriceIds.Enterprise);
+}
+
 // Card-checkout config for the pending plan, shown only to a non-BD tenant
 // (currencyForCountry) with a mapped Paddle price and PADDLE_CLIENT_TOKEN set.
 // A BD tenant never sees this — bKash/Nagad is the only rail for BDT.
@@ -6638,7 +6648,7 @@ function paddleCheckoutConfigFor(tenant) {
   if (currencyForCountry(tenant.country) !== "USD") return { enabled: false };
   const planName = tenant.pendingPlan || "";
   const priceId = config.paddlePriceIds[planName] || "";
-  if (!config.paddleClientToken || !priceId) return { enabled: false };
+  if (!paddleCatalogReady() || !priceId) return { enabled: false };
   return {
     enabled: true,
     clientToken: config.paddleClientToken,
@@ -6646,6 +6656,7 @@ function paddleCheckoutConfigFor(tenant) {
     priceId,
     planName,
     tenantId: tenant.id,
+    invoiceNo: tenant.pendingInvoiceNo || "",
     usdAmount: paddleUsdMonthly[planName] || 0
   };
 }
@@ -7169,8 +7180,10 @@ async function activatePaddleTenant(paddleEvent) {
   return withDbLock(() => activatePaddleTenantLocked(paddleEvent));
 }
 
-async function activatePaddleTenantLocked({ tenantId, planName, amount, currency, paddleTransactionId, paddleSubscriptionId, paddleCustomerId }) {
-  if (!tenantId) return { ok: false, status: 400, errors: ["Missing tenant id in Paddle custom_data."] };
+async function activatePaddleTenantLocked({ tenantId, planName, amount, currency, paddleTransactionId, paddleSubscriptionId, paddleCustomerId, paddleNextBilledAt, paddleInvoiceNo }) {
+  if (!tenantId && !paddleSubscriptionId && !paddleCustomerId) {
+    return { ok: false, status: 400, errors: ["Paddle transaction is not linked to a Tagioo customer."] };
+  }
   if (!planResourceProfiles[planName] || planName === "Customer" || planName === "Free") {
     return { ok: false, status: 400, errors: [`Unknown plan "${planName}" in Paddle price mapping.`] };
   }
@@ -7185,13 +7198,22 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
   const existing = data.payments.find((p) => p.paddleTransactionId === paddleTransactionId);
   if (existing) return { ok: true, payment: existing, duplicate: true };
 
-  const tenantIndex = (data.tenants || []).findIndex((t) => t.id === tenantId);
+  const tenantIndex = (data.tenants || []).findIndex((tenant) =>
+    (tenantId && tenant.id === tenantId)
+    || (paddleSubscriptionId && tenant.paddleSubscriptionId === paddleSubscriptionId)
+    || (paddleCustomerId && tenant.paddleCustomerId === paddleCustomerId)
+  );
   if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
 
   const now = new Date();
   const tenant = data.tenants[tenantIndex];
-  const cycleDays = billingCycleConfig.monthly.months * 30;
-  const renewalDate = new Date(now.getTime() + cycleDays * 24 * 60 * 60 * 1000).toISOString();
+  const checkoutMatch = paddleCheckoutMatchesTenant(tenant, {
+    subscriptionId: paddleSubscriptionId,
+    invoiceNo: paddleInvoiceNo,
+    planName
+  });
+  if (!checkoutMatch.ok) return { ok: false, status: 409, errors: [checkoutMatch.error] };
+  const renewalDate = paddleRenewalDate(paddleNextBilledAt, now.getTime());
   const profile = resourceProfileForPlan(planName);
   const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenant.id && item.containerName);
 
@@ -7200,7 +7222,7 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     invoiceNo: tenant.pendingInvoiceNo || nextInvoiceNo(data, tenant.id),
     tenantId: tenant.id,
     plan: planName,
-    amount: Number(amount || monthlyAmountForPlan(planName)),
+    amount: Number(amount ?? paddleUsdMonthly[planName] ?? 0),
     currency: currency || "USD",
     provider: "paddle",
     method: "paddle",
@@ -7221,7 +7243,7 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     requestLimit: profile.monthlyRequestLimit,
     containerLimit: profile.containerLimit + Number(tenant.extraContainers || 0),
     domainLimit: profile.domainLimit,
-    monthlyAmount: monthlyAmountForPlan(planName) + Number(tenant.extraContainers || 0) * EXTRA_CONTAINER_PRICE,
+    monthlyAmount: paddleUsdMonthly[planName] || 0,
     resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
     subscriptionStatus: "active",
     paymentStatus: "paid",
@@ -7233,6 +7255,8 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     lifetimeRevokedAt: tenant.lifetimeAccess ? now.toISOString() : (tenant.lifetimeRevokedAt || ""),
     paddleSubscriptionId: paddleSubscriptionId || tenant.paddleSubscriptionId || "",
     paddleCustomerId: paddleCustomerId || tenant.paddleCustomerId || "",
+    paddleSubscriptionStatus: "active",
+    paddleScheduledChange: null,
     paidAt: now.toISOString(),
     renewalDate,
     renewalReminder: 99,
@@ -7298,6 +7322,9 @@ async function deactivatePaddleTenantLocked(paddleSubscriptionId) {
   if (tenantIndex === -1) return { ok: true, skipped: true };
 
   const tenant = data.tenants[tenantIndex];
+  if (tenant.paymentProvider !== "paddle" || tenant.plan === "Free") {
+    return { ok: true, unchanged: true };
+  }
   const now = new Date();
   const profile = resourceProfileForPlan("Free");
   data.tenants[tenantIndex] = {
@@ -7310,6 +7337,9 @@ async function deactivatePaddleTenantLocked(paddleSubscriptionId) {
     subscriptionStatus: "free",
     paymentStatus: "free",
     paymentProvider: "",
+    paddleSubscriptionStatus: "canceled",
+    lastPaddleSubscriptionId: paddleSubscriptionId,
+    paddleSubscriptionId: "",
     cycleStart: now.toISOString(),
     cycleEnd: new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString(),
     cycleBaseline: tenantRequestBaselineNow(data, tenant.id, now),
@@ -7323,7 +7353,7 @@ async function deactivatePaddleTenantLocked(paddleSubscriptionId) {
 // Reverse of config.paddlePriceIds — maps a Paddle price id back to our plan
 // name. Used to interpret subscription.updated webhook payloads.
 function planNameForPaddlePriceId(priceId) {
-  return Object.entries(config.paddlePriceIds).find(([, id]) => id && id === priceId)?.[0] || "";
+  return paddlePlanNameFromItems([{ price: { id: priceId } }], config.paddlePriceIds);
 }
 
 // Bearer-authed call to Paddle's REST API (subscription updates/cancels —
@@ -7334,6 +7364,7 @@ async function callPaddleApi(path, method, body) {
   try {
     const res = await fetch(`${config.paddleApiBase}${path}`, {
       method,
+      signal: AbortSignal.timeout(30_000),
       headers: {
         authorization: `Bearer ${config.paddleApiKey}`,
         "content-type": "application/json"
@@ -7350,7 +7381,7 @@ async function callPaddleApi(path, method, body) {
 
 // Customer-initiated plan change for a Paddle (USD) tenant. Mirrors the BDT
 // flow's policy: upgrade charges the prorated difference immediately and
-// applies now; downgrade applies at the next renewal, no charge today. The
+// applies now; downgrade applies now with prorated credit on the next bill. The
 // tenant's plan/limits in our DB are NOT updated here — the subscription.updated
 // webhook is the source of truth, same pattern as activatePaddleTenant.
 async function updatePaddleSubscriptionPlan(tenant, newPlanName) {
@@ -7361,8 +7392,8 @@ async function updatePaddleSubscriptionPlan(tenant, newPlanName) {
   const isUpgrade = planRankFor(newPlanName) > planRankFor(tenant.plan);
   return callPaddleApi(`/subscriptions/${tenant.paddleSubscriptionId}`, "PATCH", {
     items: [{ price_id: priceId, quantity: 1 }],
-    proration_billing_mode: isUpgrade ? "prorated_immediately" : "do_not_bill",
-    effective_from: isUpgrade ? "immediately" : "next_billing_period"
+    proration_billing_mode: isUpgrade ? "prorated_immediately" : "prorated_next_billing_period",
+    on_payment_failure: "prevent_change"
   });
 }
 
@@ -7376,17 +7407,34 @@ async function cancelPaddleSubscription(tenant) {
   });
 }
 
+async function createPaddlePortalSession(tenant) {
+  if (!tenant.paddleCustomerId) return { ok: false, status: 400, errors: ["No Paddle customer is linked to this account."] };
+  const body = tenant.paddleSubscriptionId ? { subscription_ids: [tenant.paddleSubscriptionId] } : {};
+  const result = await callPaddleApi(`/customers/${tenant.paddleCustomerId}/portal-sessions`, "POST", body);
+  if (!result.ok) return result;
+  const portalUrl = String(result.data?.urls?.general?.overview || "");
+  try {
+    const parsed = new URL(portalUrl);
+    if (parsed.protocol !== "https:" || !/(^|\.)paddle\.com$/i.test(parsed.hostname)) throw new Error("Unexpected Paddle portal URL.");
+  } catch {
+    return { ok: false, status: 502, errors: ["Paddle did not return a valid customer portal link."] };
+  }
+  return { ok: true, portalUrl };
+}
+
 // subscription.updated webhook: sync our plan/limits to whatever Paddle
 // reports as the CURRENT active price on the subscription. Deliberately
 // naive about scheduled-vs-applied — Paddle fires this again when a
 // next_billing_period change actually takes effect, and re-reading "current
 // items" each time is simpler and more robust than trying to interpret
 // Paddle's scheduled_change payload shape.
-async function syncPaddleSubscriptionPlan(paddleSubscriptionId, items) {
-  return withDbLock(() => syncPaddleSubscriptionPlanLocked(paddleSubscriptionId, items));
+async function syncPaddleSubscriptionPlan(paddleSubscription) {
+  return withDbLock(() => syncPaddleSubscriptionPlanLocked(paddleSubscription));
 }
 
-async function syncPaddleSubscriptionPlanLocked(paddleSubscriptionId, items) {
+async function syncPaddleSubscriptionPlanLocked(paddleSubscription = {}) {
+  const paddleSubscriptionId = String(paddleSubscription.id || "");
+  const items = paddleSubscription.items || [];
   if (!paddleSubscriptionId) return { ok: false, status: 400, errors: ["Missing Paddle subscription id."] };
   const activePriceId = (items || []).find((item) => item.status !== "inactive")?.price?.id || items?.[0]?.price?.id;
   const planName = planNameForPaddlePriceId(activePriceId);
@@ -7399,10 +7447,20 @@ async function syncPaddleSubscriptionPlanLocked(paddleSubscriptionId, items) {
   if (tenantIndex === -1) return { ok: true, skipped: true };
 
   const tenant = data.tenants[tenantIndex];
-  if (tenant.plan === planName) return { ok: true, unchanged: true };
-
   const now = new Date();
   const profile = resourceProfileForPlan(planName);
+  const nextBilledAt = String(paddleSubscription.next_billed_at || "");
+  const nextBilledTime = Date.parse(nextBilledAt);
+  const scheduledChange = paddleSubscription.scheduled_change || null;
+  const nextScheduledChange = scheduledChange ? {
+    action: String(scheduledChange.action || ""),
+    effectiveAt: String(scheduledChange.effective_at || "")
+  } : null;
+  const unchanged = tenant.plan === planName
+    && tenant.paddleSubscriptionStatus === String(paddleSubscription.status || "active")
+    && (!Number.isFinite(nextBilledTime) || tenant.renewalDate === new Date(nextBilledTime).toISOString())
+    && JSON.stringify(tenant.paddleScheduledChange || null) === JSON.stringify(nextScheduledChange);
+  if (unchanged) return { ok: true, unchanged: true };
   data.tenants[tenantIndex] = {
     ...tenant,
     plan: planName,
@@ -7411,6 +7469,11 @@ async function syncPaddleSubscriptionPlanLocked(paddleSubscriptionId, items) {
     domainLimit: profile.domainLimit,
     monthlyAmount: paddleUsdMonthly[planName] || 0,
     resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
+    paddleSubscriptionStatus: String(paddleSubscription.status || "active"),
+    renewalDate: Number.isFinite(nextBilledTime) && nextBilledTime > now.getTime()
+      ? new Date(nextBilledTime).toISOString()
+      : tenant.renewalDate,
+    paddleScheduledChange: nextScheduledChange,
     updatedAt: now.toISOString()
   };
   await writeDatabase(data);
@@ -11624,6 +11687,10 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
     // USD pricing, Shopify plans are managed in Shopify Admin, and everyone
     // else sees the BDT bKash/Nagad catalog.
     paymentProvider: tenant?.paymentProvider || "",
+    billingCurrency: ["paddle", "shopify"].includes(tenant?.paymentProvider)
+      || (currencyForCountry(tenant?.country) === "USD" && paddleCatalogReady())
+      ? "USD"
+      : "BDT",
     shopifyPlanSelectionUrl: connectedShopifyHandle
       ? `https://admin.shopify.com/store/${encodeURIComponent(connectedShopifyHandle)}/charges/tagioo-tracking/pricing_plans`
       : "",
@@ -12919,10 +12986,16 @@ const server = createServer(async (req, res) => {
       const eventType = String(payload.event_type || "");
       const eventData = payload.data || {};
 
-      if (eventType === "transaction.completed" || eventType === "transaction.paid") {
+      if (eventType === "transaction.completed") {
         const customData = eventData.custom_data || {};
         const tenantId = String(customData.tenantId || "").trim();
-        const planName = String(customData.planName || "").trim();
+        // Price IDs come from Paddle's signed payload and are the billing
+        // authority. Never trust planName in browser-controlled custom_data.
+        const planName = paddlePlanNameFromItems(eventData.items, config.paddlePriceIds);
+        if (!planName) {
+          jsonResponse(res, 400, { errors: ["Paddle transaction does not contain a configured Tagioo price."] });
+          return;
+        }
         const totalMinor = Number(eventData.details?.totals?.total || 0);
         const result = await activatePaddleTenant({
           tenantId,
@@ -12931,14 +13004,17 @@ const server = createServer(async (req, res) => {
           currency: eventData.currency_code || "USD",
           paddleTransactionId: eventData.id,
           paddleSubscriptionId: eventData.subscription_id || "",
-          paddleCustomerId: eventData.customer_id || ""
+          paddleCustomerId: eventData.customer_id || "",
+          paddleNextBilledAt: eventData.billing_period?.ends_at || "",
+          paddleInvoiceNo: String(customData.invoiceNo || "")
         });
         if (result.ok) invalidateOwnerDashboardCache();
         jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { activated: true, duplicate: Boolean(result.duplicate) } : { errors: result.errors });
         return;
       }
 
-      if (eventType === "subscription.canceled" || eventType === "subscription.paused") {
+      if (eventType === "subscription.canceled" || eventType === "subscription.paused"
+        || (eventType === "subscription.updated" && ["canceled", "paused"].includes(String(eventData.status || "")))) {
         const result = await deactivatePaddleTenant(eventData.id);
         if (result.ok) invalidateOwnerDashboardCache();
         jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { deactivated: true } : { errors: result.errors });
@@ -12948,8 +13024,8 @@ const server = createServer(async (req, res) => {
       // Fires on any subscription change — the customer-initiated plan-change
       // path (POST /api/customer/subscription/paddle below) only calls
       // Paddle's API; this webhook is what actually applies the new plan/limits.
-      if (eventType === "subscription.updated") {
-        const result = await syncPaddleSubscriptionPlan(eventData.id, eventData.items);
+      if (["subscription.updated", "subscription.activated", "subscription.resumed", "subscription.past_due"].includes(eventType)) {
+        const result = await syncPaddleSubscriptionPlan(eventData);
         if (result.ok && !result.skipped && !result.unchanged) invalidateOwnerDashboardCache();
         jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { synced: true } : { errors: result.errors });
         return;
@@ -13407,7 +13483,15 @@ const server = createServer(async (req, res) => {
         }
       }
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
-        ? { tenant: result.tenant, payment: result.payment || null, scheduled: Boolean(result.scheduled), scheduledCancelled: Boolean(result.scheduledCancelled), scheduledPlan: result.scheduledPlan || "", effectiveDate: result.effectiveDate || "" }
+        ? {
+          tenant: result.tenant,
+          payment: result.payment || null,
+          checkoutProvider: result.payment && paddleCheckoutConfigFor(result.tenant).enabled ? "paddle" : "manual",
+          scheduled: Boolean(result.scheduled),
+          scheduledCancelled: Boolean(result.scheduledCancelled),
+          scheduledPlan: result.scheduledPlan || "",
+          effectiveDate: result.effectiveDate || ""
+        }
         : { errors: result.errors });
       return;
     }
@@ -13434,6 +13518,22 @@ const server = createServer(async (req, res) => {
         ? await cancelPaddleSubscription(tenant)
         : await updatePaddleSubscriptionPlan(tenant, planName);
       jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { accepted: true } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/customer/paddle/portal" && req.method === "POST") {
+      if (!checkRateLimit(req, "paddle-portal", 10, 60 * 60 * 1000)) { tooManyRequests(res); return; }
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const loaded = await readDatabase();
+      const tenant = loaded.available ? (loaded.data.tenants || []).find((item) => item.id === session.tenantId) : null;
+      if (!tenant) { jsonResponse(res, 404, { error: "Customer account was not found." }); return; }
+      if (tenant.paymentProvider !== "paddle") { jsonResponse(res, 400, { error: "This account is not on a card subscription." }); return; }
+      const result = await createPaddlePortalSession(tenant);
+      jsonResponse(res, result.ok ? 200 : (result.status || 400), result.ok ? { portalUrl: result.portalUrl } : { errors: result.errors });
       return;
     }
 

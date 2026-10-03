@@ -1,9 +1,22 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-10-02.
+Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
+
+## 2026-10-03 — Global Paddle billing preparation
+
+- Completed the existing Paddle integration and corrected subscription item
+  updates to use documented proration fields. Paid downgrades apply immediately
+  with credit on the next bill; Free cancellation remains at period end.
+- Checkout stays disabled until API key, client token, webhook secret, and all
+  price mappings are present. Added API timeout and preserved zero-value payments.
+- Local tests cover signed payloads, invoice binding, purchase activation,
+  duplicate delivery, subscription renewal, cancellation replay, and plan updates.
+- Owner confirmed Paddle sandbox is not configured. Real checkout, webhook
+  delivery, portal, and subscription tests remain pending account setup. SSH to
+  the production VPS remains unavailable; production billing was not enabled.
 
 ## 2026-10-02 — Shopify-only release
 
@@ -12,12 +25,61 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-02.
   Back remains available and dashboard refreshes preserve in-progress editing.
   Template generation saves completion and the Web GTM ID; asset version bumped.
 
-- Added the manual Shopify Custom Pixel generator, customer installation
+- Shopify disconnect follow-up: the sibling app now permits local cleanup when
+  the panel rejects a revoked/stale integration token with HTTP 401. Other
+  billing/network failures still abort for retry; remote signature checks remain
+  enforced. Live credential diagnosis is pending VPS access (SSH denied).
+- Follow-up loader fix: Shopify billing refresh now runs in the background,
+  coalesces concurrent refreshes, and backs off failed attempts. Pixel deletion
+  retries within an eight-second deadline and requires confirmed removal.
+  Persistent Shopify fetch failures still need VPS connectivity diagnostics.
+
+- Published the manual Shopify Custom Pixel generator, customer installation
   instructions, and Shopify-compatible Web GTM exports as a separate release.
 - Paddle changes remain local and are excluded from this release. No production
   billing configuration, Nginx, or container lifecycle changes are included.
 - Next: pull the release on the VPS, reload the panel, and test a Shopify order
   through Customer Events, Tagioo, GA4, and Meta before advertising.
+
+## 2026-09-29 — Manual Shopify pixel and Paddle launch completion
+
+- Added an app-free Shopify setup path while preserving the submitted Tagioo
+  Shopify app. Setup Assistant now accepts a Web GTM container ID and generates
+  supported Shopify Customer Events Custom Pixel code. The pixel loads GTM in
+  Shopify's sandbox and maps storefront, cart, checkout, search, and Purchase
+  events into Tagioo's existing GA4-style dataLayer contract. Shopify-specific
+  Web GTM exports now use the custom `page_view` event, preserve Shopify's real
+  page URL/title, and allow multiple ecommerce events per sandbox lifetime.
+- Added a copy/install guide beside the existing app connection flow and removed
+  the obsolete Checkout Additional Scripts Purchase instructions. The UI warns
+  merchants to run either the manual pixel or app pixel, never both. `app.js`
+  and `styles.css` asset versions were bumped.
+- Normalized the submitted Shopify app pixel's GraphQL Order GID to the same
+  numeric order ID used by the `orders/paid` backend recovery path, preserving
+  browser/server Purchase deduplication.
+- Completed Paddle lifecycle hardening: webhook signatures now reject stale
+  deliveries and support rotated signatures; signed Paddle item price IDs are
+  the plan authority; new purchases must match the tenant's pending invoice and
+  plan; renewals can resolve by Paddle subscription/customer ID; duplicate
+  cancellations cannot reset a Free cycle; provider status, scheduled changes,
+  and next billing dates sync from subscription webhooks; USD subscriptions now
+  store their USD monthly amount.
+- Added authenticated Paddle customer-portal sessions so card customers can
+  update payment methods and access Paddle invoices. Global customers who begin
+  on Free now see USD pricing and enter Paddle when upgrading instead of falling
+  into the Bangladesh manual-payment modal. Added focused native tests
+  for signatures, price mapping, renewal dates, and checkout binding, plus
+  `docs/paddle-launch.md` with dashboard configuration, sandbox acceptance, and
+  production rollback steps.
+- Verification passed: control-panel syntax, browser JS syntax, Paddle tests
+  (4), existing data-protection/security tests (6), generated Custom Pixel parse
+  smoke, and `git diff --check`. In the sibling Shopify app, Node 22 tests (5),
+  lint, typecheck, production client/SSR build, and diff check passed.
+- Production Paddle remains intentionally disabled: this checkout has no local
+  `.env`, and production activation requires owner-confirmed Paddle products,
+  price IDs, client token, scoped API key, webhook secret, and a full sandbox
+  purchase/upgrade/downgrade/portal/cancel run before setting
+  `PADDLE_ENV=production`.
 
 ## 2026-09-26 — Transactional email deliverability hardening
 

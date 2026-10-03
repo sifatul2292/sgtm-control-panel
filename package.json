@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "check": "node --check server.js",
+    "test:paddle": "node --test paddle-billing.test.js",
     "test:data-protection": "node --test test/data-protection.test.js test/protected-data-audit.test.js test/staff-password-policy.test.js"
   },
   "engines": {

@@ -164,6 +164,7 @@ const els = {
   billingGrid: document.querySelector("#billingGrid"),
   packageGrid: document.querySelector("#packageGrid"),
   subscriptionPlans: document.querySelector("#subscriptionPlans"),
+  managePaddleBilling: document.querySelector("#managePaddleBilling"),
   docsList: document.querySelector("#docsList"),
   allCustomersBadge: document.querySelector("#allCustomersBadge"),
   allCustomersMetrics: document.querySelector("#allCustomersMetrics"),
@@ -4995,9 +4996,10 @@ function renewalText(value) {
 function renderBilling(data) {
   const usage = data.usage || {};
   const billingProvider = externalBillingProvider(data);
-  const currency = billingProvider ? "USD" : "BDT";
+  const currency = usage.billingCurrency || (billingProvider ? "USD" : "BDT");
   const activePlanName = usage.plan || "Starter";
   customerActivePlanName = activePlanName;
+  if (els.managePaddleBilling) els.managePaddleBilling.hidden = billingProvider !== "paddle";
   const activePlan = subscriptionPlans.find((plan) => plan.name === activePlanName) || subscriptionPlans[1];
   const requestsMonth = Number(usage.requestsMonth || 0);
   const requestLimit = Number(usage.requestLimit || activePlan.requests || 0);
@@ -5152,6 +5154,10 @@ async function selectSubscriptionPlan(planName) {
       return;
     }
     if (result.scheduledCancelled) return;
+    if (result.payment && result.checkoutProvider === "paddle") {
+      window.location.assign("/checkout");
+      return;
+    }
     if (result.payment) openPaymentModal(result.payment);
   } catch (error) {
     window.alert(error.message);
@@ -5177,7 +5183,9 @@ async function selectPaddleSubscriptionPlan(planName) {
     if (!response.ok) throw new Error((result.errors || [result.error || "Plan update failed."]).join(" "));
     window.alert(isUpgrade
       ? "Upgrading — Paddle is charging the prorated difference now. This page will update in a few seconds."
-      : "Downgrade scheduled — takes effect at your next renewal, no charge today.");
+      : (planName === "Free"
+        ? "Cancellation scheduled — Free starts at your next renewal."
+        : "Downgrade requested — applies when Paddle confirms it, with prorated credit on your next bill."));
     setTimeout(() => loadDashboard(), 3000);
   } catch (error) {
     window.alert(error.message);
@@ -5185,6 +5193,23 @@ async function selectPaddleSubscriptionPlan(planName) {
     document.querySelectorAll(`[data-paddle-plan-select]`).forEach((b) => (b.disabled = false));
   }
 }
+
+els.managePaddleBilling?.addEventListener("click", async () => {
+  const button = els.managePaddleBilling;
+  button.disabled = true;
+  const previous = button.textContent;
+  button.textContent = "Opening Paddle…";
+  try {
+    const response = await fetch("/api/customer/paddle/portal", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error((result.errors || [result.error || "Could not open Paddle billing."]).join(" "));
+    window.location.assign(result.portalUrl);
+  } catch (error) {
+    window.alert(error.message);
+    button.disabled = false;
+    button.textContent = previous;
+  }
+});
 
 // Fetch billing state and render the top status card.
 async function loadBillingPayment() {
