@@ -5,6 +5,32 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-10-06 — Verification timeout and paid signup
+
+- Verification now creates the account, saves visitor attribution and stages the
+  selected paid plan under one database lock, with one read and one atomic write.
+  Failed plan staging cannot leave a partially-created Free account on disk.
+- Login preserves pending checkout; only the explicit checkout Skip action drops
+  the unpaid selection. Paid limits still require confirmed payment.
+- Added signup, storage-compatibility and owner-cache regression coverage;
+  all 15 native tests, syntax and whitespace checks pass.
+- Deployed isolated code commits through 49f9cb7 (VPS HEAD 6462511), keeping
+  production on fix/signup-memory-20261006 rather than the feature branch.
+- First full live HTTPS-origin test reached Pro checkout (HTTP 200), but verify
+  still took 42.6 seconds and the subsequent login timed out. Follow-up releases
+  old read-cache snapshots before fresh reads/serialization. Compact JSON keeps
+  the same fields, encryption and atomic writes; old readers remain compatible.
+  Pre-change backup: /var/backups/tagioo-history-before-compact-20261006.json.
+- Owner usage reads now reuse stored summaries instead of synchronously scanning
+  every tenant's raw events. Customer/background calculations are unchanged.
+  Latest direct-origin Pro test: signup 1.54s, verify 10.39s, checkout 6.41s,
+  login 3.07s. Checkout returns 200 and login preserves the pending paid plan.
+  Valid-TLS HTTPS test through Nginx also reaches Pro checkout: signup 2.82s,
+  verify 10.36s, checkout 5.83s (200); no proxy timeout.
+  Test accounts use reserved example.invalid addresses and real stored codes;
+  real inbox delivery and public Cloudflare browser flow remain unverified.
+  Paddle feature release remains excluded; this is not a card-payment test.
+
 ## 2026-10-06 — Signup 502 memory incident
 
 - VPS console confirms POST /signup upstream reset at 13:12:25 UTC and
@@ -22,6 +48,9 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
   accounts or tracking containers. Follow-up 958dae7 releases expired cache
   snapshots before parsing replacements; deployed as 23ceeda. Automated public
   requests receive Cloudflare 403, so browser/email completion remains unverified.
+  Final HTTPS-origin test through Nginx (valid TLS, local DNS override) returns
+  302 /verify in 0.17s after the final cache fix. No verification-code submission
+  was performed; real email delivery/account completion still needs browser retry.
   Production is on the isolated hotfix branch; do not blindly pull the feature
   branch there (it also includes the untested Paddle release).
 
