@@ -15,7 +15,11 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
   Restore validation/encryption and backup contents are unchanged.
 - Signup validation shares the existing read-only database cache/in-flight read.
 - Syntax, encryption round-trip, and backup no-payload-read regression tests pass.
-  Production deployment and signup verification remain pending.
+  Deployed code/test only via cherry-pick a414c15 on VPS branch
+  fix/signup-memory-20261006 (Paddle release excluded). Direct-origin signup
+  smoke test returns 302 /verify in 4.4s and verification page returns 200.
+  Reserved example.invalid test emails create pending records only, no customer
+  accounts or tracking containers. Public HTTPS verification pending final check.
 
 ## 2026-10-03 — Global Paddle billing preparation
 
