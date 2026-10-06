@@ -11503,7 +11503,7 @@ function tenantBillingUsageMap(data, tenants = []) {
     const billingTenant = tenantSetupRequests.length > 1
       ? { ...tenant, containerDomains: tenantSetupRequests.map((request) => request.trackingDomain).filter(Boolean) }
       : tenant;
-    const sqliteSnaps = sqliteSnapshotsForTenant(tenant.id, billingTenant);
+    const sqliteSnaps = sqliteSnapshotsForTenant(tenant.id, billingTenant, 30, { cachedOnly: true });
     // Per day in the billing period take the larger of the JSON-stored count and the
     // SQLite snapshot total, so a day missed/undercounted by one source is covered by
     // the other (rotation loss, un-persisted days). Matches customerDashboardData.
@@ -14165,12 +14165,24 @@ async function ingestLocalLogsTick() {
 // seconds, so reuse the result until new lines arrive for that tenant+day.
 const todaySnapshotCache = new Map();
 
-function sqliteSnapshotsForTenant(tenantId, tenant, days = 30, { source = "", cacheKey = tenantId } = {}) {
+function sqliteSnapshotsForTenant(tenantId, tenant, days = 30, { source = "", cacheKey = tenantId, cachedOnly = false } = {}) {
   if (!eventStore) return {};
   const fromKey = localDateKey(addDays(new Date(), -(days - 1)));
   const todayKey = localDateKey();
   const snapshots = {};
   try {
+    // Owner reads must not synchronously aggregate every tenant's raw events.
+    // The snapshot timer/customer reads populate these; JSON counts cover gaps.
+    if (cachedOnly) {
+      for (let offset = 0; offset < days; offset += 1) {
+        const dateKey = localDateKey(addDays(new Date(), -offset));
+        const cached = dateKey === todayKey
+          ? todaySnapshotCache.get(cacheKey)?.snapshot
+          : eventStore.getDailySummary(cacheKey, dateKey);
+        if (cached) snapshots[dateKey] = cached;
+      }
+      return snapshots;
+    }
     const lineCounts = eventStore.dateCountsForTenant(tenantId, fromKey, source);
     for (const dateKey of eventStore.tenantDates(tenantId, fromKey, source)) {
       if (dateKey !== todayKey) {
