@@ -84,7 +84,9 @@ export function unprotectText(value, keyText) {
 }
 
 export function serializeProtectedJson(value, keyText) {
-  const plaintext = `${JSON.stringify(value, null, 2)}\n`;
+  // Compact JSON reduces full-size serialization/encryption allocations.
+  // Existing indented snapshots remain readable by the same JSON parser.
+  const plaintext = `${JSON.stringify(value)}\n`;
   return protectText(plaintext, keyText);
 }
 

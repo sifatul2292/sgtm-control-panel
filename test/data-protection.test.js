@@ -24,6 +24,15 @@ test("existing plaintext JSON remains readable during migration", () => {
   assert.deepEqual(parseProtectedJson(JSON.stringify(value), ""), value);
 });
 
+test("compact snapshots preserve old encrypted snapshot contents and reader compatibility", () => {
+  const key = randomBytes(32).toString("base64");
+  const value = { tenants: [{ id: "test", tracking: { events: [1, 2, 3] } }], payments: [] };
+  const oldSnapshot = protectText(JSON.stringify(value, null, 2), key);
+  const compact = serializeProtectedJson(parseProtectedJson(oldSnapshot, key), key);
+  assert.deepEqual(JSON.parse(unprotectText(compact, key).toString()), value);
+  assert.ok(compact.length < oldSnapshot.length);
+});
+
 test("tampering and incorrect keys fail authentication", () => {
   const key = randomBytes(32).toString("base64");
   const otherKey = randomBytes(32).toString("base64");
