@@ -4573,6 +4573,9 @@ function serializeEventRow(item) {
 }
 
 async function readDatabase() {
+  // A fresh read allocates another complete snapshot. Do not keep the cached
+  // snapshot rooted while parsing it (especially on mutating auth/billing paths).
+  dbReadCacheEntry = null;
   const defaults = {
     version: 3,
     settings: {},
@@ -4657,6 +4660,9 @@ async function readDatabaseCached() {
 }
 
 async function writeDatabase(data) {
+  // Serialization/encryption also allocates full-size buffers; release the old
+  // read snapshot before those allocations, not only after the rename.
+  dbReadCacheEntry = null;
   await mkdir(config.dataDir, { recursive: true });
   // Random suffix, not just the timestamp: two writes landing in the same
   // millisecond would otherwise share one temp file, interleave their bytes and
