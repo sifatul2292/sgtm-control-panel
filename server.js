@@ -4704,12 +4704,10 @@ async function listBackups() {
     const path = join(backupsDir, name);
     const info = await stat(path).catch(() => null);
     if (!info) continue;
-    let meta = { createdAt: null, source: "manual" };
-    try {
-      const raw = parseProtectedJson(await readFile(path), config.dataEncryptionKey);
-      meta = { createdAt: raw.createdAt || info.mtime.toISOString(), source: raw.source || "manual" };
-    } catch { /* corrupt file: still list it so the owner can delete it */ }
-    backups.push({ id: name, createdAt: meta.createdAt, source: meta.source, sizeBytes: info.size });
+    // Listing (including the background backup-age check) must not decrypt and
+    // parse every full database snapshot. Large snapshots exhausted the heap
+    // alongside signup/dashboard reads. Restore still authenticates the payload.
+    backups.push({ id: name, createdAt: info.mtime.toISOString(), source: "snapshot", sizeBytes: info.size });
   }
   return backups;
 }
@@ -6495,7 +6493,9 @@ async function validateSignupInput(input) {
   if (password !== confirmPassword) errors.push("Passwords do not match.");
   if (errors.length) return { ok: false, errors };
 
-  const loaded = await readDatabase();
+  // Validation is read-only; share the dashboard's in-flight read instead of
+  // allocating another complete history database during a signup burst.
+  const loaded = await readDatabaseCached();
   if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
   if ((loaded.data.customerAccounts || []).some((a) => a.username === email)) {
     return { ok: false, errors: ["An account already exists with this email or username."] };

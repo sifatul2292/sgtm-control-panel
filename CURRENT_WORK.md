@@ -5,6 +5,18 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-10-06 — Signup 502 memory incident
+
+- VPS console confirms POST /signup upstream reset at 13:12:25 UTC and
+  repeated Node heap exhaustion at 2 GB during JSON parsing. history.json is
+  272 MB, with four 253–266 MB backups; production remains at 07930fb.
+- Removed full snapshot decryption/parsing from backup listing and scheduled
+  backup-age checks. Listing now uses file metadata; source is shown as snapshot.
+  Restore validation/encryption and backup contents are unchanged.
+- Signup validation shares the existing read-only database cache/in-flight read.
+- Syntax, encryption round-trip, and backup no-payload-read regression tests pass.
+  Production deployment and signup verification remain pending.
+
 ## 2026-10-03 — Global Paddle billing preparation
 
 - Completed the existing Paddle integration and corrected subscription item
