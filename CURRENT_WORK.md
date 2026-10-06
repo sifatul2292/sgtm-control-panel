@@ -26,7 +26,10 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
   Latest direct-origin Pro test: signup 1.54s, verify 10.39s, checkout 6.41s,
   login 3.07s. Checkout returns 200 and login preserves the pending paid plan.
   Valid-TLS HTTPS test through Nginx also reaches Pro checkout: signup 2.82s,
-  verify 10.36s, checkout 5.83s (200); no proxy timeout.
+  verify 10.36s, checkout 5.83s (200), login 20.67s with checkout preserved;
+  no proxy timeout. PM2 stayed online at PID 3926365 / restart count 38, but RSS
+  reached 2420 MB. Residual load-dependent latency/memory needs further work;
+  these smoke tests do not establish sustained capacity or eliminate all timeouts.
   Test accounts use reserved example.invalid addresses and real stored codes;
   real inbox delivery and public Cloudflare browser flow remain unverified.
   Paddle feature release remains excluded; this is not a card-payment test.
