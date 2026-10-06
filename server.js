@@ -14176,8 +14176,9 @@ function sqliteSnapshotsForTenant(tenantId, tenant, days = 30, { source = "", ca
     if (cachedOnly) {
       for (let offset = 0; offset < days; offset += 1) {
         const dateKey = localDateKey(addDays(new Date(), -offset));
+        const todayCached = todaySnapshotCache.get(cacheKey);
         const cached = dateKey === todayKey
-          ? todaySnapshotCache.get(cacheKey)?.snapshot
+          ? (todayCached?.dateKey === todayKey ? todayCached.snapshot : null)
           : eventStore.getDailySummary(cacheKey, dateKey);
         if (cached) snapshots[dateKey] = cached;
       }
