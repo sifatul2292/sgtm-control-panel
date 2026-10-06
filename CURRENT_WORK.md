@@ -19,7 +19,11 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
   fix/signup-memory-20261006 (Paddle release excluded). Direct-origin signup
   smoke test returns 302 /verify in 4.4s and verification page returns 200.
   Reserved example.invalid test emails create pending records only, no customer
-  accounts or tracking containers. Public HTTPS verification pending final check.
+  accounts or tracking containers. Follow-up 958dae7 releases expired cache
+  snapshots before parsing replacements; deployed as 23ceeda. Automated public
+  requests receive Cloudflare 403, so browser/email completion remains unverified.
+  Production is on the isolated hotfix branch; do not blindly pull the feature
+  branch there (it also includes the untested Paddle release).
 
 ## 2026-10-03 — Global Paddle billing preparation
 
