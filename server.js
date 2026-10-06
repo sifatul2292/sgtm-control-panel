@@ -4643,6 +4643,9 @@ async function readDatabaseCached() {
     return dbReadCacheEntry.loaded;
   }
   if (dbReadInFlight) return dbReadInFlight;
+  // Release an expired snapshot before allocating its replacement. Keeping
+  // both full parsed databases alive doubled peak heap during cache refreshes.
+  dbReadCacheEntry = null;
   dbReadInFlight = readDatabase()
     .then((loaded) => {
       if (loaded.available) dbReadCacheEntry = { at: Date.now(), loaded };
