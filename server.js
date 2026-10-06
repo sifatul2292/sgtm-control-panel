@@ -6319,7 +6319,7 @@ async function addCustomerAccountLocked(input, options = {}) {
   const validated = validateCustomerAccountInput(input);
   if (validated.errors.length) return { ok: false, errors: validated.errors };
 
-  const loaded = await readDatabase();
+  const loaded = options.loaded || await readDatabase();
   if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
 
   const data = loaded.data;
@@ -6381,7 +6381,7 @@ async function addCustomerAccountLocked(input, options = {}) {
   if (tenantIndex === -1) data.tenants.push({ ...tenant, createdAt: now });
   else data.tenants[tenantIndex] = { ...data.tenants[tenantIndex], ...tenant };
 
-  await writeDatabase(data);
+  if (options.persist !== false) await writeDatabase(data);
   return { ok: true, account: publicCustomerAccount(account) };
 }
 
@@ -6529,7 +6529,11 @@ async function emailVerificationCode(toEmail, fullName, code) {
   });
 }
 
-async function addCustomerSignup(input) {
+async function addCustomerSignup(input, visitor = null) {
+  return withDbLock(() => addCustomerSignupLocked(input, visitor));
+}
+
+async function addCustomerSignupLocked(input, visitor) {
   const loaded = await readDatabase();
   if (!loaded.available) return { ok: false, errors: [loaded.detail || loaded.message || "Database unavailable."] };
 
@@ -6562,7 +6566,7 @@ async function addCustomerSignup(input) {
   }
 
   const tenantId = uniqueTenantId(signupTenantBase(input), data);
-  const result = await addCustomerAccount({
+  const result = await addCustomerAccountLocked({
     tenantId,
     tenantName: fullName,
     fullName,
@@ -6578,7 +6582,26 @@ async function addCustomerSignup(input) {
     subscriptionStatus: "free",
     paymentStatus: "free",
     status: "active"
-  }, { allowUpdate: false });
+  }, { allowUpdate: false, loaded, persist: false });
+
+  if (!result.ok) return result;
+  const tenant = data.tenants.find((entry) => entry.id === tenantId);
+  if (visitor) {
+    tenant.tracking = { ...(tenant.tracking || {}), tagiooVisitor: { at: new Date().toISOString(), ...visitor } };
+  }
+  const chosenPlan = String(input.plan || "").trim();
+  if (["Starter", "Pro", "Enterprise"].includes(chosenPlan)) {
+    const staged = await selectCustomerPlanLocked(
+      { plan: chosenPlan, billingCycle: input.billingCycle || "monthly" },
+      { tenantId },
+      loaded
+    );
+    if (!staged.ok) return staged;
+    result.payment = staged.payment;
+    result.checkout = true;
+  } else {
+    await writeDatabase(data);
+  }
 
   if (result.ok) emailWelcome(email, fullName).catch(() => {});
   return result;
@@ -6796,7 +6819,7 @@ async function selectCustomerPlan(input, session) {
   return withDbLock(() => selectCustomerPlanLocked(input, session));
 }
 
-async function selectCustomerPlanLocked(input, session) {
+async function selectCustomerPlanLocked(input, session, existingDatabase = null) {
   if (!session?.tenantId) return { ok: false, status: 401, errors: ["Customer session required."] };
   const planName = String(input.plan || input.planName || "").trim();
   const cycleId = billingCycleConfig[String(input.billingCycle || "").trim()] ? String(input.billingCycle).trim() : "monthly";
@@ -6804,7 +6827,7 @@ async function selectCustomerPlanLocked(input, session) {
     return { ok: false, status: 400, errors: ["Choose a valid plan."] };
   }
 
-  const loaded = await readDatabase();
+  const loaded = existingDatabase || await readDatabase();
   if (!loaded.available) {
     return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
   }
@@ -12331,7 +12354,8 @@ const server = createServer(async (req, res) => {
 
       // Code confirmed — now create the account.
       const values = pending.values;
-      const result = await addCustomerSignup(values);
+      const signupVisitor = tagiooVisitorContext(req);
+      const result = await addCustomerSignup(values, signupVisitor);
       if (!result.ok) {
         htmlResponse(res, 400, signupPage((result.errors || ["Signup failed."]).join(" "), values));
         return;
@@ -12345,7 +12369,6 @@ const server = createServer(async (req, res) => {
       // with tg_vid (set on the GET /signup Lead hit) when present so GA4/Meta
       // tie this CompleteRegistration to the same visitor as the earlier Lead.
       const signupEventId = `signup_${result.account.id}`;
-      const signupVisitor = tagiooVisitorContext(req);
       forwardTagiooOwnEvent("sign_up", {
         seed: parseCookies(req.headers.cookie).tg_vid || result.account.tenantId,
         visitor: signupVisitor,
@@ -12360,7 +12383,6 @@ const server = createServer(async (req, res) => {
       sendTagiooSignupToMetaCapi(values, signupEventId, signupVisitor).catch(() => {});
       // Keep the snapshot: a paid upgrade is confirmed later in an owner session,
       // where the buyer's own request context is no longer available.
-      saveTagiooVisitorContext(result.account.tenantId, signupVisitor).catch(() => {});
 
       // If the visitor picked a paid plan on the pricing page, don't drop them
       // on the Free/trial dashboard — stage the upgrade as pending_payment
@@ -12373,11 +12395,7 @@ const server = createServer(async (req, res) => {
       const chosenPlan = String(values.plan || "").trim();
       let landing = "/#customerContainers";
       if (["Starter", "Pro", "Enterprise"].includes(chosenPlan)) {
-        const staged = await selectCustomerPlan(
-          { plan: chosenPlan, billingCycle: values.billingCycle || "monthly" },
-          { tenantId: result.account.tenantId }
-        );
-        if (staged.ok) {
+        if (result.checkout) {
           landing = "/checkout";
           // Paid plan staged at signup — the SaaS InitiateCheckout. Reuse this
           // request's own visitor context rather than the stored snapshot; it was
@@ -12385,8 +12403,8 @@ const server = createServer(async (req, res) => {
           trackTagiooCheckoutStep("initiate_checkout", {
             tenantId: result.account.tenantId,
             plan: chosenPlan,
-            amount: staged.payment?.amount,
-            orderId: staged.payment?.invoiceNo,
+            amount: result.payment?.amount,
+            orderId: result.payment?.invoiceNo,
             visitor: signupVisitor
           }).catch(() => {});
         }
@@ -12473,16 +12491,8 @@ const server = createServer(async (req, res) => {
         return;
       }
 
-      // Paid-plan signup that never paid: don't send them back to the checkout
-      // wall on every login. Drop the unpaid invoice and let them in on Free —
-      // they can re-pick a paid plan from Account & Billing whenever they want.
-      if (account.role === "customer" && account.tenantId && account.releaseUnpaidSignup) {
-        const released = await releaseUnpaidSignupToFree(account.tenantId).catch(() => ({ released: false }));
-        if (released.released) invalidateOwnerDashboardCache();
-      }
-
       res.writeHead(302, {
-        location: "/",
+        location: account.role === "customer" && account.releaseUnpaidSignup ? "/checkout" : "/",
         "set-cookie": `sgtm_session=${makeSessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`,
         "cache-control": "no-store"
       });
