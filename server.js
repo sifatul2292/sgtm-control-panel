@@ -2856,6 +2856,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           </div>
 
           ${paddle.enabled ? `
+          ${paddle.env === "sandbox" ? `<p class="lf-notice" role="status">Paddle sandbox test mode. No real payment will be collected. Use test card details only.</p>` : ""}
           <button type="button" id="coPayCard" class="co-card-btn su-anim" style="--d:70ms">Pay with card — $${paddle.usdAmount}/mo</button>
           <p class="co-card-note su-anim" style="--d:75ms">Instant activation. Visa, Mastercard, and more — billed in USD via Paddle.</p>
           ` : `
