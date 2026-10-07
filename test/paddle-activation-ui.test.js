@@ -11,12 +11,12 @@ test("completed checkout disables repeat payment and waits for server activation
   vm.runInContext(page, ctx);
   const html = ctx.checkoutPage({ instructions: { billingCycle: "monthly", plan: "Starter" }, paddle: { enabled: true, env: "sandbox", invoiceNo: "test" } });
   const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
-  const button = { addEventListener() {} }, status = {}, skip = {};
+  const button = { addEventListener() {} }, status = {}, skip = {}, localPayment = {};
   const storage = new Map(); let callback, timer, active = false;
   const window = { location: { href: "/checkout" } };
   const browser = vm.createContext({
     window, Date, JSON, AbortSignal,
-    document: { getElementById: id => id === "coPayCard" ? button : status, querySelector: () => skip },
+    document: { getElementById: id => id === "coPayCard" ? button : id === "coLocalPayment" ? localPayment : status, querySelector: () => skip },
     sessionStorage: { getItem: k => storage.get(k), setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) },
     Paddle: { Environment: { set() {} }, Initialize: o => { callback = o.eventCallback; }, Checkout: { open() {} } },
     fetch: async () => ({ status: 200, ok: true, json: async () => ({ active }) }),
@@ -27,6 +27,7 @@ test("completed checkout disables repeat payment and waits for server activation
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(button.disabled, true);
   assert.equal(skip.hidden, true);
+  assert.equal(localPayment.hidden, true);
   assert.match(status.textContent, /do not pay again/i);
   assert.equal(window.location.href, "/checkout");
   vm.runInContext(script, browser); // browser refresh restores receipt state

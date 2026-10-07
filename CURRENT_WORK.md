@@ -5,6 +5,18 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-10-07 — Country-independent USD checkout
+
+- Removed the Bangladesh-only Paddle exclusion. Every configured pending paid
+  plan offers its existing USD monthly Paddle price; Bangladesh accounts also
+  retain a separate BDT bKash/Nagad disclosure with their staged local amount
+  and billing cycle. No country, price IDs, credentials or entitlements changed.
+- Signup wording now describes the payment choice after verification. Completed
+  card payment hides the local form as well as repeat-card/Free actions while
+  server activation is pending, including after refresh.
+- Country/price/configuration/rendered-script regression tests and Paddle
+  activation/signature/lifecycle tests pass. Deployment pending verification.
+
 ## 2026-10-07 — Customer mobile workspace
 
 - Replaced the crowded phone/tablet icon rail with a labeled, expandable Menu

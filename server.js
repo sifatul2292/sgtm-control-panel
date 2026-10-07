@@ -2863,7 +2863,9 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           <button type="button" id="coPayCard" class="co-card-btn su-anim" style="--d:70ms">Pay with card — $${paddle.usdAmount}/mo</button>
           <p id="coActivationStatus" role="status" aria-live="polite" hidden></p>
           <p class="co-card-note su-anim" style="--d:75ms">Visa, Mastercard, and more — billed in USD via Paddle.</p>
-          ` : `
+          ` : ""}
+          ${!paddle.enabled || paddle.localPaymentEnabled ? `
+          ${paddle.enabled ? `<details id="coLocalPayment"${error ? " open" : ""}><summary>Or pay with bKash / Nagad — ${money(instructions.amount)} ${cycleLabel} (BDT)</summary><p class="co-card-note">Local payment requires owner confirmation. Choose one payment method only.</p>` : ""}
 
           ${numbers ? `<div class="co-numbers su-anim" style="--d:80ms">${numbers}</div>` : ""}
 
@@ -2880,7 +2882,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
             </div>
             <div class="lf-field su-anim" style="--d:140ms">
               <label for="coTxn">Transaction ID</label>
-              <input id="coTxn" name="txnId" type="text" placeholder="e.g. 9GH4K2LM7" value="${escapeHtml(values.txnId || "")}" required autofocus />
+              <input id="coTxn" name="txnId" type="text" placeholder="e.g. 9GH4K2LM7" value="${escapeHtml(values.txnId || "")}" required${paddle.enabled ? "" : " autofocus"} />
             </div>
             <div class="lf-field su-anim" style="--d:160ms">
               <label for="coSender">Your bKash / Nagad number</label>
@@ -2889,7 +2891,8 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
             <button type="submit" class="button button-primary full-width su-anim" style="--d:190ms">Submit payment &amp; continue</button>
           </form>
           <p class="lf-subtitle su-anim" style="--d:220ms;margin-top:14px;text-align:center">${instructions.ownerWhatsApp ? `Trouble paying? <a class="su-signin-link" href="https://wa.me/${escapeHtml(instructions.ownerWhatsApp.replace(/[^0-9]/g, ""))}" target="_blank" rel="noopener">Message us on WhatsApp →</a>` : ""}</p>
-          `}
+          ${paddle.enabled ? "</details>" : ""}
+          ` : ""}
           <form method="post" action="/checkout/skip" class="co-skip su-anim" style="--d:240ms">
             <button type="submit">Not now — continue on the Free plan</button>
             <small>15,000 events every 30 days. Upgrade any time from Account &amp; Billing.</small>
@@ -2919,6 +2922,8 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           checking = true;
           btn.disabled = true;
           document.querySelector(".co-skip").hidden = true;
+          var localPayment = document.getElementById("coLocalPayment");
+          if (localPayment) localPayment.hidden = true;
           status.hidden = false;
           status.textContent = "Payment received — activating your plan. Please do not pay again.";
           var started = Date.now();
@@ -3073,7 +3078,7 @@ function signupPage(error = "", values = {}, { leadEventId = "" } = {}) {
           <form method="post" action="/signup" class="lf-form" id="signupForm">
             <input type="hidden" name="plan" value="${escapeHtml(values.plan || "")}" />
             <input type="hidden" name="billingCycle" value="${escapeHtml(values.billingCycle || "")}" />
-            ${values.plan && values.plan !== "Free" ? `<div class="lf-plan-note su-anim" style="--d:60ms;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#5B21B6;font-size:14px">You're signing up for the <strong>${escapeHtml(values.plan)}</strong> plan. After creating your account, you'll pay via bKash or Nagad to activate it.</div>` : ""}
+            ${values.plan && values.plan !== "Free" ? `<div class="lf-plan-note su-anim" style="--d:60ms;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#5B21B6;font-size:14px">You're signing up for the <strong>${escapeHtml(values.plan)}</strong> plan. After email verification, choose a payment method to activate it. Card payments are billed in USD via Paddle; Bangladesh customers can also pay locally via bKash or Nagad.</div>` : ""}
 
             <div class="lf-field su-anim" style="--d:80ms">
               <label for="suFullName">Full name</label>
@@ -6708,16 +6713,15 @@ function paddleCatalogReady() {
     && config.paddlePriceIds.Enterprise);
 }
 
-// Card-checkout config for the pending plan, shown only to a non-BD tenant
-// (currencyForCountry) with a mapped Paddle price and PADDLE_CLIENT_TOKEN set.
-// A BD tenant never sees this — bKash/Nagad is the only rail for BDT.
+// USD card checkout is available in every country. BD tenants can also choose
+// their existing BDT manual invoice; selecting a country never hides Paddle.
 function paddleCheckoutConfigFor(tenant) {
-  if (currencyForCountry(tenant.country) !== "USD") return { enabled: false };
   const planName = tenant.pendingPlan || "";
   const priceId = config.paddlePriceIds[planName] || "";
   if (!paddleCatalogReady() || !priceId) return { enabled: false };
   return {
     enabled: true,
+    localPaymentEnabled: tenant.country === "BD",
     clientToken: config.paddleClientToken,
     env: config.paddleEnv,
     priceId,
