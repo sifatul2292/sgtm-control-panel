@@ -35,7 +35,7 @@ export function createPaddleReceiver(inbox, secret) {
   });
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.env.TAGIOO_PADDLE_RECEIVER === "1" || (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))) {
   if (!process.env.PADDLE_WEBHOOK_SECRET) throw new Error("PADDLE_WEBHOOK_SECRET is required.");
   const inbox = openPaddleInbox(process.env.DATA_DIR || "./data", process.env.TAGIOO_DATA_ENCRYPTION_KEY || "");
   const server = createPaddleReceiver(inbox, process.env.PADDLE_WEBHOOK_SECRET);

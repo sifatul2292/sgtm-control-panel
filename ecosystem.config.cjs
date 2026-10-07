@@ -30,7 +30,7 @@ module.exports = {
       restart_delay: 3000,
       out_file: "/var/log/tagioo-paddle-receiver.log",
       error_file: "/var/log/tagioo-paddle-receiver-error.log",
-      env: { NODE_ENV: "production" }
+      env: { NODE_ENV: "production", TAGIOO_PADDLE_RECEIVER: "1" }
     }
   ]
 };
