@@ -5,6 +5,44 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-10-07 — Paddle sandbox deployment and real checkout
+
+- Deployed only Paddle billing onto production's existing
+  `fix/signup-memory-20261006` branch (release `f7668c7`), preserving signup
+  fixes, manual payments and tracking. Protected env/database backup saved at
+  `/var/backups/tagioo-paddle-sandbox-20261007-79XOMA`; rollback ref
+  `codex/paddle-before-20261007` points to `6462511`. Do not blindly pull the
+  feature branch into production or restore the whole database over new payments.
+- Kept `PADDLE_ENV=sandbox`; all three active monthly USD prices verified as
+  30/50/100. Confirmed webhook secret matches its destination and subscribed
+  all seven billing events. Bangladesh accounts intentionally retain manual
+  bKash/Nagad; card checkout appears for non-Bangladesh accounts.
+- Added a visible sandbox warning (`c1ea804`). Real Paddle test-card purchase
+  on isolated tenant `paddle-sandbox-test-20261007` completed: USD 32.66
+  including test tax, exactly one confirmed Starter payment, active 500K limit.
+  Paddle replay delivered HTTP 202 with `duplicate: true`, no extra payment.
+- Actual browser Pro upgrade accepted, charged USD 21.77 prorated including
+  tax, and webhook applied active Pro/2M events/3 containers. Hosted sandbox
+  customer portal opened and displayed the original paid transaction.
+- Fixed USD invoice labels (legacy BDT defaults preserved), asset version 90,
+  native currency regression test (`1d78c29`, production cherry-pick `a713bb7`).
+- Origin webhook rejects invalid, modified and stale HMAC requests with HTTP
+  401. Seven Paddle tests, sixteen native smoke tests and syntax gates pass.
+- Real sandbox downgrade returned to Starter; Paddle portal showed the next
+  bill with prorated credit. Past-due simulation completed and retained paid
+  access. Card replacement completed in Paddle Test Mode but exposed a bug:
+  its zero-value transaction was recorded as a purchase. Fix `b47d861` is
+  committed and pushed, not yet deployed (Mac locked during VPS console work).
+- Initial provider deliveries showed empty HTTP 503 responses despite eventual
+  activation; replay succeeded. Production still has slow JSON-store reads and
+  this is not yet a clean live-payment launch sign-off. Remaining sandbox
+  checks: deploy/replay card-update fix, verify cancellation webhook locally and
+  invoice download. Hosted sandbox portal successfully scheduled cancellation
+  for Nov 7, 2026, retaining active access until then.
+  Sandbox notification destination temporarily has `traffic_source=all` for
+  simulation testing; restore `platform` when console access resumes.
+  No live payments or existing customer subscriptions changed.
+
 ## 2026-10-06 — Verification timeout and paid signup
 
 - Verification now creates the account, saves visitor attribution and stages the
