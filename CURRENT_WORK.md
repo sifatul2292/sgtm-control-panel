@@ -23,7 +23,11 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
   two-column creation and hides Menu. Native required-field validation, all
   creation inputs, location selection and submission/error recovery exercised
   through a read-only proxy (no real container provisioned). Four navigation
-  regression tests and syntax gates pass. VPS deployment not performed.
+  regression tests and syntax gates pass. Deployed to VPS as `06b869f`
+  (focused cherry-pick of `2798c8f`, preserving production hotfixes). VPS syntax
+  gates and all four mobile navigation tests pass; panel reloaded, both PM2
+  services online, origin login HTTP 200. Live 390px customer navigation and
+  Containers view verified without page overflow; assets styles v56/app v91.
 
 ## 2026-10-07 — Durable Paddle delivery and core database reads
 
