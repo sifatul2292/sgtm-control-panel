@@ -1,0 +1,21 @@
+import { readFile, writeFile, rename, copyFile } from "node:fs/promises";
+import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
+import { parseProtectedJson, serializeProtectedJson } from "../data-protection.js";
+import { archiveEventHistory, unpackEventHistory } from "../history-archive.js";
+if (!process.argv.includes("--panel-stopped")) throw new Error("Stop the panel first; pass --panel-stopped to confirm.");
+const path = join(process.env.DATA_DIR || "./data", "history.json");
+const key = process.env.TAGIOO_DATA_ENCRYPTION_KEY || "";
+const original = await readFile(path);
+const data = parseProtectedJson(original, key);
+if (data.tenantEventHistoryArchive) { console.log("Already archived."); process.exit(0); }
+const encoded = await archiveEventHistory(data);
+const restored = unpackEventHistory(encoded);
+if (!isDeepStrictEqual(data, restored)) throw new Error("Round-trip verification failed; original untouched.");
+const backup = `${path}.before-archive-${Date.now()}`;
+await copyFile(path, backup);
+const replacement = serializeProtectedJson(encoded, key);
+const temp = `${path}.archive-${Date.now()}.tmp`;
+await writeFile(temp, replacement, { mode: 0o600 });
+await rename(temp, path);
+console.log(JSON.stringify({ verified: true, beforeBytes: original.length, afterBytes: replacement.length, backup }));

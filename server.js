@@ -13,6 +13,9 @@ import { parseDataProtectionKey, parseProtectedJson, serializeProtectedJson } fr
 import { appendProtectedDataAudit } from "./protected-data-audit.js";
 import { staffPasswordPolicyErrors } from "./staff-password-policy.js";
 import { paddleCheckoutMatchesTenant, paddlePlanNameFromItems, paddleRenewalDate, verifyPaddleSignature } from "./paddle-billing.js";
+import { openPaddleInbox } from "./paddle-inbox.js";
+import { paddleEventIsStale } from "./paddle-billing.js";
+import { attachEventHistory, archiveEventHistory } from "./history-archive.js";
 
 const gzipAsync = promisify(gzip);
 
@@ -2829,7 +2832,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
         </a>
         <div class="lb-hero">
           <h2>One last step.<br>Activate your plan.</h2>
-          <p>${paddle.enabled ? "Pay by card — Visa, Mastercard, and more. Your plan activates instantly." : "Send the amount via bKash or Nagad, then enter your transaction ID. We verify it and activate your plan — usually within a few hours."}</p>
+          <p>${paddle.enabled ? "Pay by card — Visa, Mastercard, and more. We activate your plan after payment confirmation." : "Send the amount via bKash or Nagad, then enter your transaction ID. We verify it and activate your plan — usually within a few hours."}</p>
         </div>
         <div class="su-steps">
           <div class="su-step su-step--done"><span class="su-step-num">1</span>Create your account</div>
@@ -2858,7 +2861,8 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           ${paddle.enabled ? `
           ${paddle.env === "sandbox" ? `<p class="lf-notice" role="status">Paddle sandbox test mode. No real payment will be collected. Use test card details only.</p>` : ""}
           <button type="button" id="coPayCard" class="co-card-btn su-anim" style="--d:70ms">Pay with card — $${paddle.usdAmount}/mo</button>
-          <p class="co-card-note su-anim" style="--d:75ms">Instant activation. Visa, Mastercard, and more — billed in USD via Paddle.</p>
+          <p id="coActivationStatus" role="status" aria-live="polite" hidden></p>
+          <p class="co-card-note su-anim" style="--d:75ms">Visa, Mastercard, and more — billed in USD via Paddle.</p>
           ` : `
 
           ${numbers ? `<div class="co-numbers su-anim" style="--d:80ms">${numbers}</div>` : ""}
@@ -2906,18 +2910,49 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
     <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
     <script>
       (function () {
+        var btn = document.getElementById("coPayCard");
+        var status = document.getElementById("coActivationStatus");
+        var receiptKey = "tagioo-paddle-paid:" + ${JSON.stringify(paddle.invoiceNo)};
+        var checking = false;
+        function awaitActivation() {
+          if (checking) return;
+          checking = true;
+          btn.disabled = true;
+          document.querySelector(".co-skip").hidden = true;
+          status.hidden = false;
+          status.textContent = "Payment received — activating your plan. Please do not pay again.";
+          var started = Date.now();
+          async function poll() {
+            try {
+              var response = await fetch("/api/customer/payment-status", { credentials: "same-origin", signal: AbortSignal.timeout(30000) });
+              if (response.status === 401) { window.location.href = "/login"; return; }
+              if (!response.ok) throw new Error("Status unavailable");
+              var result = await response.json();
+              if (result.active) {
+                sessionStorage.removeItem(receiptKey);
+                window.location.href = "/";
+                return;
+              }
+            } catch (_) {}
+            if (Date.now() - started > 120000) {
+              status.textContent = "Payment received. Activation is taking longer than expected. Do not pay again. Refresh to check again or contact Tagioo support.";
+              return;
+            }
+            setTimeout(poll, 3000);
+          }
+          poll();
+        }
         if (${JSON.stringify(paddle.env)} === "sandbox" && Paddle.Environment) Paddle.Environment.set("sandbox");
         Paddle.Initialize({
           token: ${JSON.stringify(paddle.clientToken)},
           eventCallback: function (event) {
-            // Activation happens async via the Paddle webhook, not this callback —
-            // this just moves the customer off the checkout wall once Paddle
-            // confirms the transaction. checkoutRequired() re-checks on load;
-            // if the webhook hasn't landed yet the customer is safely back here.
-            if (event.name === "checkout.completed") window.location.href = "/";
+            if (event.name === "checkout.completed") {
+              try { sessionStorage.setItem(receiptKey, "1"); } catch (_) {}
+              awaitActivation();
+            }
           }
         });
-        var btn = document.getElementById("coPayCard");
+        try { if (sessionStorage.getItem(receiptKey)) awaitActivation(); } catch (_) {}
         if (btn) {
           btn.addEventListener("click", function () {
             Paddle.Checkout.open({
@@ -4599,13 +4634,12 @@ async function readDatabase() {
     return {
       available: true,
       path: databasePath,
-      data: {
+      data: attachEventHistory({
         ...defaults,
         ...parsed,
         settings: parsed.settings || {},
         daily: parsed.daily || {},
         tenantDailyRequests: parsed.tenantDailyRequests || {},
-        tenantEventHistory: parsed.tenantEventHistory || {},
         provisioning: parsed.provisioning || { requests: [] },
         workerNodes: parsed.workerNodes || [],
         orders: parsed.orders || [],
@@ -4615,7 +4649,7 @@ async function readDatabase() {
         payments: parsed.payments || [],
         alerts: parsed.alerts || [],
         integrations: parsed.integrations || []
-      }
+      }, parsed)
     };
   } catch (error) {
     if (error.code === "ENOENT") {
@@ -4669,7 +4703,7 @@ async function writeDatabase(data) {
   // millisecond would otherwise share one temp file, interleave their bytes and
   // rename a corrupted history.json into place.
   const tempPath = `${databasePath}.${Date.now()}.${randomBytes(4).toString("hex")}.tmp`;
-  await writeFile(tempPath, serializeProtectedJson(data, config.dataEncryptionKey), { encoding: "utf8", mode: 0o600 });
+  await writeFile(tempPath, serializeProtectedJson(await archiveEventHistory(data), config.dataEncryptionKey), { encoding: "utf8", mode: 0o600 });
   await rename(tempPath, databasePath);
   dbWriteGeneration += 1;
   dbReadCacheEntry = null;   // written data changed → drop the read cache
@@ -7213,7 +7247,7 @@ async function activatePaddleTenant(paddleEvent) {
   return withDbLock(() => activatePaddleTenantLocked(paddleEvent));
 }
 
-async function activatePaddleTenantLocked({ tenantId, planName, amount, currency, paddleTransactionId, paddleSubscriptionId, paddleCustomerId, paddleNextBilledAt, paddleInvoiceNo }) {
+async function activatePaddleTenantLocked({ tenantId, planName, amount, currency, paddleTransactionId, paddleSubscriptionId, paddleCustomerId, paddleNextBilledAt, paddleInvoiceNo, occurredAt }) {
   if (!tenantId && !paddleSubscriptionId && !paddleCustomerId) {
     return { ok: false, status: 400, errors: ["Paddle transaction is not linked to a Tagioo customer."] };
   }
@@ -7245,7 +7279,7 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     invoiceNo: paddleInvoiceNo,
     planName
   });
-  if (!checkoutMatch.ok) return { ok: false, status: 409, errors: [checkoutMatch.error] };
+  if (!checkoutMatch.ok && !paddleEventIsStale(tenant, paddleSubscriptionId, occurredAt)) return { ok: false, status: 409, errors: [checkoutMatch.error] };
   const renewalDate = paddleRenewalDate(paddleNextBilledAt, now.getTime());
   const profile = resourceProfileForPlan(planName);
   const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenant.id && item.containerName);
@@ -7269,6 +7303,13 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
   };
   data.payments.push(payment);
 
+  // Preserve the charge receipt, but never let an old payment resurrect a
+  // canceled subscription or undo a more recent plan/status update.
+  if (paddleEventIsStale(tenant, paddleSubscriptionId, occurredAt)) {
+    await writeDatabase(data);
+    return { ok: true, payment, stale: true };
+  }
+
   data.tenants[tenantIndex] = {
     ...tenant,
     plan: planName,
@@ -7289,6 +7330,7 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     paddleSubscriptionId: paddleSubscriptionId || tenant.paddleSubscriptionId || "",
     paddleCustomerId: paddleCustomerId || tenant.paddleCustomerId || "",
     paddleSubscriptionStatus: "active",
+    paddleStateOccurredAt: occurredAt || tenant.paddleStateOccurredAt || "",
     paddleScheduledChange: null,
     paidAt: now.toISOString(),
     renewalDate,
@@ -7342,20 +7384,25 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
 // the same way an unpaid manual signup is released — back to a fresh Free
 // window. Paddle owns dunning/retries
 // on its side; by the time this fires, Paddle has given up on collecting.
-async function deactivatePaddleTenant(paddleSubscriptionId) {
-  return withDbLock(() => deactivatePaddleTenantLocked(paddleSubscriptionId));
+async function deactivatePaddleTenant(paddleSubscriptionId, occurredAt, status = "canceled") {
+  return withDbLock(() => deactivatePaddleTenantLocked(paddleSubscriptionId, occurredAt, status));
 }
 
-async function deactivatePaddleTenantLocked(paddleSubscriptionId) {
+async function deactivatePaddleTenantLocked(paddleSubscriptionId, occurredAt, status = "canceled") {
   if (!paddleSubscriptionId) return { ok: false, status: 400, errors: ["Missing Paddle subscription id."] };
   const loaded = await readDatabase();
   if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
   const data = loaded.data;
-  const tenantIndex = (data.tenants || []).findIndex((t) => t.paddleSubscriptionId === paddleSubscriptionId);
-  if (tenantIndex === -1) return { ok: true, skipped: true };
+  const tenantIndex = (data.tenants || []).findIndex((t) => t.paddleSubscriptionId === paddleSubscriptionId || t.lastPaddleSubscriptionId === paddleSubscriptionId);
+  if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Subscription is not linked yet."] };
 
   const tenant = data.tenants[tenantIndex];
+  if (paddleEventIsStale(tenant, paddleSubscriptionId, occurredAt)) return { ok: true, stale: true };
   if (tenant.paymentProvider !== "paddle" || tenant.plan === "Free") {
+    if (occurredAt) {
+      tenant.paddleStateOccurredAt = occurredAt;
+      await writeDatabase(data);
+    }
     return { ok: true, unchanged: true };
   }
   const now = new Date();
@@ -7370,7 +7417,8 @@ async function deactivatePaddleTenantLocked(paddleSubscriptionId) {
     subscriptionStatus: "free",
     paymentStatus: "free",
     paymentProvider: "",
-    paddleSubscriptionStatus: "canceled",
+    paddleSubscriptionStatus: status,
+    paddleStateOccurredAt: occurredAt || tenant.paddleStateOccurredAt || "",
     lastPaddleSubscriptionId: paddleSubscriptionId,
     paddleSubscriptionId: "",
     cycleStart: now.toISOString(),
@@ -7461,11 +7509,11 @@ async function createPaddlePortalSession(tenant) {
 // next_billing_period change actually takes effect, and re-reading "current
 // items" each time is simpler and more robust than trying to interpret
 // Paddle's scheduled_change payload shape.
-async function syncPaddleSubscriptionPlan(paddleSubscription) {
-  return withDbLock(() => syncPaddleSubscriptionPlanLocked(paddleSubscription));
+async function syncPaddleSubscriptionPlan(paddleSubscription, occurredAt) {
+  return withDbLock(() => syncPaddleSubscriptionPlanLocked(paddleSubscription, occurredAt));
 }
 
-async function syncPaddleSubscriptionPlanLocked(paddleSubscription = {}) {
+async function syncPaddleSubscriptionPlanLocked(paddleSubscription = {}, occurredAt) {
   const paddleSubscriptionId = String(paddleSubscription.id || "");
   const items = paddleSubscription.items || [];
   if (!paddleSubscriptionId) return { ok: false, status: 400, errors: ["Missing Paddle subscription id."] };
@@ -7476,10 +7524,11 @@ async function syncPaddleSubscriptionPlanLocked(paddleSubscription = {}) {
   const loaded = await readDatabase();
   if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
   const data = loaded.data;
-  const tenantIndex = (data.tenants || []).findIndex((t) => t.paddleSubscriptionId === paddleSubscriptionId);
-  if (tenantIndex === -1) return { ok: true, skipped: true };
+  const tenantIndex = (data.tenants || []).findIndex((t) => t.paddleSubscriptionId === paddleSubscriptionId || t.lastPaddleSubscriptionId === paddleSubscriptionId);
+  if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Subscription is not linked yet."] };
 
   const tenant = data.tenants[tenantIndex];
+  if (paddleEventIsStale(tenant, paddleSubscriptionId, occurredAt)) return { ok: true, stale: true };
   const now = new Date();
   const profile = resourceProfileForPlan(planName);
   const nextBilledAt = String(paddleSubscription.next_billed_at || "");
@@ -7493,7 +7542,7 @@ async function syncPaddleSubscriptionPlanLocked(paddleSubscription = {}) {
     && tenant.paddleSubscriptionStatus === String(paddleSubscription.status || "active")
     && (!Number.isFinite(nextBilledTime) || tenant.renewalDate === new Date(nextBilledTime).toISOString())
     && JSON.stringify(tenant.paddleScheduledChange || null) === JSON.stringify(nextScheduledChange);
-  if (unchanged) return { ok: true, unchanged: true };
+  if (unchanged && !occurredAt) return { ok: true, unchanged: true };
   data.tenants[tenantIndex] = {
     ...tenant,
     plan: planName,
@@ -7503,6 +7552,10 @@ async function syncPaddleSubscriptionPlanLocked(paddleSubscription = {}) {
     monthlyAmount: paddleUsdMonthly[planName] || 0,
     resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
     paddleSubscriptionStatus: String(paddleSubscription.status || "active"),
+    ...(paddleSubscription.status === "active" ? {
+      paddleSubscriptionId, paymentProvider: "paddle", subscriptionStatus: "active", paymentStatus: "paid"
+    } : {}),
+    paddleStateOccurredAt: occurredAt || tenant.paddleStateOccurredAt || "",
     renewalDate: Number.isFinite(nextBilledTime) && nextBilledTime > now.getTime()
       ? new Date(nextBilledTime).toISOString()
       : tenant.renewalDate,
@@ -12064,6 +12117,85 @@ async function servePublicPage(res, filename) {
   }
 }
 
+let paddleInbox;
+function getPaddleInbox() {
+  return paddleInbox ||= openPaddleInbox(config.dataDir, config.dataEncryptionKey);
+}
+
+async function processPaddleWebhook(payload) {
+  const response = (status, body) => ({ status, body });
+  const eventType = String(payload.event_type || "");
+  const eventData = payload.data || {};
+
+  if (eventType === "transaction.completed") {
+    // Updating a card creates a zero-value transaction, not a plan purchase.
+    // Its items can reflect an older plan; never use it to change access.
+    if (eventData.origin === "subscription_payment_method_change") {
+      return response(200, { ignored: "subscription_payment_method_change" });
+    }
+    const customData = eventData.custom_data || {};
+    const tenantId = String(customData.tenantId || "").trim();
+    // Price IDs come from Paddle's signed payload and are the billing
+    // authority. Never trust planName in browser-controlled custom_data.
+    const planName = paddlePlanNameFromItems(eventData.items, config.paddlePriceIds);
+    if (!planName) {
+      return response(400, { errors: ["Paddle transaction does not contain a configured Tagioo price."] });
+    }
+    const totalMinor = Number(eventData.details?.totals?.total || 0);
+    const result = await activatePaddleTenant({
+      tenantId,
+      planName,
+      amount: totalMinor / 100,
+      currency: eventData.currency_code || "USD",
+      paddleTransactionId: eventData.id,
+      paddleSubscriptionId: eventData.subscription_id || "",
+      paddleCustomerId: eventData.customer_id || "",
+      occurredAt: payload.occurred_at,
+      paddleNextBilledAt: eventData.billing_period?.ends_at || "",
+      paddleInvoiceNo: String(customData.invoiceNo || "")
+    });
+    if (result.ok) invalidateOwnerDashboardCache();
+    return response(result.ok ? 202 : (result.status || 400), result.ok ? { activated: true, duplicate: Boolean(result.duplicate) } : { errors: result.errors });
+  }
+
+  if (eventType === "subscription.canceled" || eventType === "subscription.paused"
+    || (eventType === "subscription.updated" && ["canceled", "paused"].includes(String(eventData.status || "")))) {
+    const result = await deactivatePaddleTenant(eventData.id, payload.occurred_at, eventData.status || (eventType === "subscription.paused" ? "paused" : "canceled"));
+    if (result.ok) invalidateOwnerDashboardCache();
+    return response(result.ok ? 202 : (result.status || 400), result.ok ? { deactivated: true } : { errors: result.errors });
+  }
+
+  // Fires on any subscription change — the customer-initiated plan-change
+  // path (POST /api/customer/subscription/paddle below) only calls
+  // Paddle's API; this webhook is what actually applies the new plan/limits.
+  if (["subscription.updated", "subscription.activated", "subscription.resumed", "subscription.past_due"].includes(eventType)) {
+    const result = await syncPaddleSubscriptionPlan(eventData, payload.occurred_at);
+    if (result.ok && !result.skipped && !result.unchanged) invalidateOwnerDashboardCache();
+    return response(result.ok ? 202 : (result.status || 400), result.ok ? { synced: true } : { errors: result.errors });
+  }
+
+  // Unhandled event types: acknowledge so Paddle doesn't treat it as a
+  // failed delivery and keep retrying.
+  return response(200, { ignored: eventType });
+}
+
+let paddleInboxBusy = false;
+async function drainPaddleInbox() {
+  if (paddleInboxBusy || !config.paddleWebhookSecret) return;
+  paddleInboxBusy = true;
+  let job;
+  try {
+    job = getPaddleInbox().claim();
+    if (!job) return;
+    const result = await processPaddleWebhook(job.event);
+    if (result.status >= 300) throw new Error(JSON.stringify(result.body));
+    getPaddleInbox().complete(job.id);
+  } catch (error) {
+    if (job) getPaddleInbox().retry(job.id, job.attempts, error.message);
+    console.error("Paddle inbox processing failed:", job?.id || "storage", error.message);
+  } finally { paddleInboxBusy = false; }
+}
+
 const server = createServer(async (req, res) => {
   try {
     const reqUrl = new URL(req.url || "/", `http://${req.headers.host}`);
@@ -13003,72 +13135,29 @@ const server = createServer(async (req, res) => {
         return;
       }
 
-      const eventType = String(payload.event_type || "");
-      const eventData = payload.data || {};
-
-      if (eventType === "transaction.completed") {
-        // Updating a card creates a zero-value transaction, not a plan purchase.
-        // Its items can reflect an older plan; never use it to change access.
-        if (eventData.origin === "subscription_payment_method_change") {
-          jsonResponse(res, 200, { ignored: "subscription_payment_method_change" });
-          return;
-        }
-        const customData = eventData.custom_data || {};
-        const tenantId = String(customData.tenantId || "").trim();
-        // Price IDs come from Paddle's signed payload and are the billing
-        // authority. Never trust planName in browser-controlled custom_data.
-        const planName = paddlePlanNameFromItems(eventData.items, config.paddlePriceIds);
-        if (!planName) {
-          jsonResponse(res, 400, { errors: ["Paddle transaction does not contain a configured Tagioo price."] });
-          return;
-        }
-        const totalMinor = Number(eventData.details?.totals?.total || 0);
-        const result = await activatePaddleTenant({
-          tenantId,
-          planName,
-          amount: totalMinor / 100,
-          currency: eventData.currency_code || "USD",
-          paddleTransactionId: eventData.id,
-          paddleSubscriptionId: eventData.subscription_id || "",
-          paddleCustomerId: eventData.customer_id || "",
-          paddleNextBilledAt: eventData.billing_period?.ends_at || "",
-          paddleInvoiceNo: String(customData.invoiceNo || "")
-        });
-        if (result.ok) invalidateOwnerDashboardCache();
-        jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { activated: true, duplicate: Boolean(result.duplicate) } : { errors: result.errors });
-        return;
+      try {
+        jsonResponse(res, 200, { received: true, ...getPaddleInbox().accept(rawBody) });
+      } catch (error) {
+        jsonResponse(res, 503, { error: "Webhook storage unavailable." });
       }
-
-      if (eventType === "subscription.canceled" || eventType === "subscription.paused"
-        || (eventType === "subscription.updated" && ["canceled", "paused"].includes(String(eventData.status || "")))) {
-        const result = await deactivatePaddleTenant(eventData.id);
-        if (result.ok) invalidateOwnerDashboardCache();
-        jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { deactivated: true } : { errors: result.errors });
-        return;
-      }
-
-      // Fires on any subscription change — the customer-initiated plan-change
-      // path (POST /api/customer/subscription/paddle below) only calls
-      // Paddle's API; this webhook is what actually applies the new plan/limits.
-      if (["subscription.updated", "subscription.activated", "subscription.resumed", "subscription.past_due"].includes(eventType)) {
-        const result = await syncPaddleSubscriptionPlan(eventData);
-        if (result.ok && !result.skipped && !result.unchanged) invalidateOwnerDashboardCache();
-        jsonResponse(res, result.ok ? 202 : (result.status || 400), result.ok ? { synced: true } : { errors: result.errors });
-        return;
-      }
-
-      // Unhandled event types: acknowledge so Paddle doesn't treat it as a
-      // failed delivery and keep retrying.
-      jsonResponse(res, 200, { ignored: eventType });
       return;
     }
-
     if (pathname !== "/login" && pathname !== "/signup" && pathname !== "/tokens.css" && pathname !== "/login.css" && pathname !== "/favicon.svg" && pathname !== "/favicon.ico" && !isAuthenticated(req)) {
       if (pathname.startsWith("/api/")) {
         jsonResponse(res, 401, { error: "Authentication required." });
         return;
       }
       redirect(res, "/login");
+      return;
+    }
+
+    if (pathname === "/api/customer/payment-status" && req.method === "GET") {
+      const session = getSession(req);
+      if (session?.role !== "customer") { jsonResponse(res, 403, { error: "Customer access required." }); return; }
+      const loaded = await readDatabaseCached();
+      if (!loaded.available) { jsonResponse(res, 503, { error: "Billing status temporarily unavailable." }); return; }
+      const tenant = (loaded.data.tenants || []).find((t) => t.id === session.tenantId);
+      jsonResponse(res, 200, { active: Boolean(tenant?.paymentProvider === "paddle" && tenant.subscriptionStatus === "active" && !tenant.pendingPlan) });
       return;
     }
 
@@ -14296,3 +14385,5 @@ server.listen(config.port, config.host, () => {
     .catch(() => {})
     .finally(() => { runPersistenceCycle(); });
 });
+
+setInterval(drainPaddleInbox, 1000).unref();

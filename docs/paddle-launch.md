@@ -56,7 +56,28 @@ production:
 10. Confirm invalid, modified, and older-than-five-minutes webhook signatures
     are rejected.
 
-## Production switch
+## Durable webhook deployment and rollback
+
+- PM2 runs `tagioo-paddle-receiver` on loopback port 3101. Route only the exact
+  `/api/paddle/webhook` Nginx location there; do not change tracking locations.
+  Verify the receiver on a throwaway inbox before reloading a validated config.
+- Receipt verifies HMAC and commits to `data/paddle-inbox.db` (WAL, FULL sync)
+  before HTTP 200. The panel drains one job at a time under its existing billing
+  lock. Failed jobs retry with backoff; a 60-second lease recovers crashed jobs.
+  Pending payloads use the existing data-encryption key; completed payloads are
+  removed, retaining event IDs/digests for deduplication. Back up this inbox with
+  SQLite's backup API, not by copying a live database without its WAL.
+- Inspect `SELECT status,count(*) FROM paddle_inbox GROUP BY status` and PM2
+  error logs for backlog/failures. Never discard pending events during rollback.
+- `history.json` now retains lossless gzip-JSON event-history archives inside
+  the existing protected file. Core auth/billing reads do not inflate them.
+  The archive migration verifies full round-trip equality and backs up first.
+- Before reverting to old code: stop the panel, run
+  `node --env-file=.env scripts/unpack-event-history.mjs --panel-stopped`, then
+  revert code/start. Drain the inbox first or retain the new consumer until all
+  accepted jobs complete. Do not restore an old database over newer payments.
+
+## Live activation
 
 Production activation is an operator action, not a code deployment:
 

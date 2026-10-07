@@ -54,3 +54,14 @@ export function paddleCheckoutMatchesTenant(tenant, { subscriptionId, invoiceNo,
   }
   return { ok: true, renewal: false };
 }
+// Watermark is scoped to a subscription; a newly purchased subscription must
+// not inherit the cancellation watermark of a different subscription.
+export function paddleEventIsStale(tenant, subscriptionId, occurredAt) {
+  if (!occurredAt || !subscriptionId) return false;
+  if (tenant.paddleSubscriptionId && tenant.paddleSubscriptionId !== subscriptionId
+    && tenant.lastPaddleSubscriptionId === subscriptionId) return true;
+  if (![tenant.paddleSubscriptionId, tenant.lastPaddleSubscriptionId].includes(subscriptionId)) return false;
+  const incoming = Date.parse(occurredAt);
+  const previous = Date.parse(tenant.paddleStateOccurredAt || "");
+  return Number.isFinite(previous) && Number.isFinite(incoming) && incoming <= previous;
+}

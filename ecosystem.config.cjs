@@ -20,6 +20,17 @@ module.exports = {
       env: {
         NODE_ENV: "production"
       }
+    },
+    {
+      name: "tagioo-paddle-receiver",
+      script: "paddle-webhook-server.js",
+      interpreter: "node",
+      node_args: "--env-file=.env",
+      autorestart: true,
+      restart_delay: 3000,
+      out_file: "/var/log/tagioo-paddle-receiver.log",
+      error_file: "/var/log/tagioo-paddle-receiver-error.log",
+      env: { NODE_ENV: "production" }
     }
   ]
 };

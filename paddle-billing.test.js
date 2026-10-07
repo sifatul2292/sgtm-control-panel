@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
-import { paddleCheckoutMatchesTenant, paddlePlanNameFromItems, paddleRenewalDate, verifyPaddleSignature } from "./paddle-billing.js";
+import { paddleCheckoutMatchesTenant, paddleEventIsStale, paddlePlanNameFromItems, paddleRenewalDate, verifyPaddleSignature } from "./paddle-billing.js";
 
 test("Paddle signatures require a valid recent HMAC and support rotated signatures", () => {
   const secret = "pdl_ntfset_test";
@@ -39,8 +39,8 @@ test("new Paddle purchases must match the pending invoice and signed price plan"
 
 test("card-update transactions do not activate plans or create purchase invoices", async () => {
   const source = readFileSync(new URL("./server.js", import.meta.url), "utf8");
-  const start = source.indexOf('      if (eventType === "transaction.completed")');
-  const handler = source.slice(start, source.indexOf('      if (eventType === "subscription.canceled"', start));
+  const start = source.indexOf('  if (eventType === "transaction.completed")');
+  const handler = source.slice(start, source.indexOf('  if (eventType === "subscription.canceled"', start));
   let activations = 0;
   let response;
   const context = vm.createContext({
@@ -48,10 +48,10 @@ test("card-update transactions do not activate plans or create purchase invoices
     paddlePlanNameFromItems: () => "Starter",
     activatePaddleTenant: async () => { activations += 1; return { ok: true }; },
     invalidateOwnerDashboardCache() {},
-    jsonResponse: (_res, status, body) => { response = { status, body }; },
+    response: (status, body) => { response = { status, body }; return response; },
   });
   vm.runInContext(`async function handle(eventData) {
-    const eventType = "transaction.completed", res = {};
+    const eventType = "transaction.completed", payload = {};
     ${handler}
   }`, context);
   await context.handle({ origin: "subscription_payment_method_change" });
@@ -73,7 +73,7 @@ test("Paddle activation, replay, renewal, and cancellation preserve tenant state
   const data = { tenants: [{ id: "test", plan: "Free", pendingPlan: "Starter", pendingInvoiceNo: "test-001" }], payments: [] };
   const profile = { monthlyRequestLimit: 500000, containerLimit: 1, domainLimit: 1, memoryMb: 256, cpuLimit: 1 };
   const context = vm.createContext({
-    paddleCheckoutMatchesTenant, paddleRenewalDate,
+    paddleCheckoutMatchesTenant, paddleRenewalDate, paddleEventIsStale,
     planResourceProfiles: { Starter: profile }, resourceProfileForPlan: () => profile,
     paddleUsdMonthly: { Starter: 30 }, FREE_CYCLE_DAYS: 30,
     readDatabase: async () => ({ available: true, data }), writeDatabase: async () => {},
@@ -83,7 +83,7 @@ test("Paddle activation, replay, renewal, and cancellation preserve tenant state
     tenantRequestBaselineNow: () => 0,
   });
   vm.runInContext(extract("activatePaddleTenantLocked") + extract("deactivatePaddleTenantLocked"), context);
-  const event = { tenantId: "test", planName: "Starter", amount: 0, currency: "USD", paddleTransactionId: "txn_test", paddleSubscriptionId: "sub_test", paddleInvoiceNo: "test-001" };
+  const event = { tenantId: "test", planName: "Starter", amount: 0, currency: "USD", paddleTransactionId: "txn_test", paddleSubscriptionId: "sub_test", paddleInvoiceNo: "test-001", occurredAt: "2026-10-07T01:00:00Z" };
   assert.equal((await context.activatePaddleTenantLocked({ ...event, paddleInvoiceNo: "wrong" })).ok, false);
   assert.equal(data.payments.length, 0);
   assert.equal((await context.activatePaddleTenantLocked(event)).ok, true);
@@ -91,13 +91,16 @@ test("Paddle activation, replay, renewal, and cancellation preserve tenant state
   assert.equal(data.payments[0].amount, 0);
   assert.equal((await context.activatePaddleTenantLocked(event)).duplicate, true);
   assert.equal(data.payments.length, 1);
-  assert.equal((await context.activatePaddleTenantLocked({ ...event, tenantId: "", paddleTransactionId: "txn_renew", amount: 30 })).ok, true);
+  assert.equal((await context.activatePaddleTenantLocked({ ...event, tenantId: "", paddleTransactionId: "txn_renew", amount: 30, occurredAt: "2026-10-07T02:00:00Z" })).ok, true);
   assert.equal(data.payments.length, 2);
-  assert.equal((await context.deactivatePaddleTenantLocked("sub_test")).ok, true);
+  assert.equal((await context.deactivatePaddleTenantLocked("sub_test", "2026-10-07T03:00:00Z")).ok, true);
   assert.equal(data.tenants[0].plan, "Free");
   const cycleStart = data.tenants[0].cycleStart;
-  assert.equal((await context.deactivatePaddleTenantLocked("sub_test")).skipped, true);
+  assert.equal((await context.deactivatePaddleTenantLocked("sub_test")).unchanged, true);
   assert.equal(data.tenants[0].cycleStart, cycleStart);
+  assert.equal((await context.activatePaddleTenantLocked({ ...event, paddleTransactionId: "txn_late" })).stale, true);
+  assert.equal(data.tenants[0].plan, "Free");
+  assert.equal(data.payments.length, 3); // retain historical receipt, not access
 });
 
 test("Paddle plan changes use supported proration fields", async () => {

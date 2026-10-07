@@ -5,6 +5,27 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-10-07 — Durable Paddle delivery and core database reads
+
+- Read-only diagnosis correlated provider empty HTTP 503 attempts with origin
+  HTTP 499 disconnects. Core DB was 245 MB, with 244 MB of tenantEventHistory;
+  a duplicate webhook took 3.95s before even doing a write.
+- Added a separate loopback Paddle receiver with encrypted SQLite durable inbox,
+  HMAC verification before persistence/HTTP 200, deduplication, crash leases and
+  indefinite processing retries. Main panel remains sole billing state writer.
+- Provider occurred_at watermarks prevent older events reverting paid state;
+  stale payment receipts remain recorded without resurrecting canceled access.
+- Checkout now waits for authenticated server activation, disables another
+  payment and Free skip, and retains waiting state across refresh.
+- Lossless lazy gzip event-history archive preserves all history inside the
+  existing protected atomic JSON file while keeping auth/billing reads small.
+  Legacy snapshots remain readable; rollback requires stopped-panel unpack tool.
+- Local syntax, seven Paddle tests and 23 native tests pass, including ingress
+  under a 5.5s panel stall, restart recovery, failed storage/retry, event ordering,
+  UI waiting, archive preservation and legacy unpacking. VPS rollout pending.
+- Live credentials/switch remain operator-controlled and excluded from this
+  sandbox fix. No new dependencies or customer tracking changes.
+
 ## 2026-10-07 — Paddle sandbox deployment and real checkout
 
 - Deployed only Paddle billing onto production's existing
