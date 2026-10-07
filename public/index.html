@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=56" />
+    <link rel="stylesheet" href="/styles.css?v=57" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -739,7 +739,7 @@
                   <span class="field-help">Paste the full value exactly from GTM, including any ending = or == characters. Tagioo checks it before Docker starts.</span>
                 </label>
                 <button class="button button-primary form-wide" type="submit">Create Container</button>
-                <p id="customerSetupFormMessage" class="form-message form-wide"></p>
+                <p id="customerSetupFormMessage" role="status" aria-live="polite" class="form-message form-wide"></p>
               </form>
             </article>
 
@@ -1111,7 +1111,7 @@
                     </div>
                   </div>
                   <div class="assistant-form-grid">
-                    <label>
+                    <label data-assistant-destination="ga4">
                       GA4 Measurement ID
                       <input name="ga4MeasurementId" placeholder="G-XXXXXXXXXX" />
                     </label>
@@ -1119,43 +1119,43 @@
                       Web GTM Container ID <span class="label-optional">required for Shopify manual pixel</span>
                       <input name="webGtmContainerId" placeholder="GTM-XXXXXXX" autocomplete="off" />
                     </label>
-                    <label>
+                    <label data-assistant-destination="ga4">
                       GA4 API Secret <span class="label-optional">enables purchase recovery</span>
                       <input name="ga4ApiSecret" placeholder="Required for server-side purchase recovery" />
                     </label>
-                    <label>
+                    <label data-assistant-destination="meta">
                       Meta Pixel ID
                       <input name="metaPixelId" placeholder="1234567890" />
                     </label>
-                    <label>
+                    <label data-assistant-destination="meta">
                       Meta CAPI Access Token
                       <input name="metaAccessToken" placeholder="EAAB..." />
                     </label>
-                    <label>
+                    <label data-assistant-destination="meta">
                       Meta Test Event Code
                       <input name="metaTestEventCode" placeholder="TEST12345" />
                     </label>
-                    <label>
+                    <label data-assistant-destination="googleAds">
                       Google Ads Conversion ID
                       <input name="googleAdsConversionId" placeholder="AW-123456789" />
                     </label>
-                    <label>
+                    <label data-assistant-destination="googleAds">
                       Google Ads Purchase Label
                       <input name="googleAdsPurchaseLabel" placeholder="Purchase conversion label" />
                     </label>
-                    <label>
+                    <label data-assistant-destination="googleAds">
                       Google Ads Add to Cart Label <span class="label-optional">optional</span>
                       <input name="googleAdsAddToCartLabel" placeholder="Add to cart conversion label" />
                     </label>
-                    <label>
+                    <label data-assistant-destination="googleAds">
                       Google Ads Begin Checkout Label <span class="label-optional">optional</span>
                       <input name="googleAdsBeginCheckoutLabel" placeholder="Begin checkout conversion label" />
                     </label>
-                    <label>
+                    <label data-assistant-destination="tiktok">
                       TikTok Pixel ID
                       <input name="tiktokPixelId" placeholder="CXXXXXXXXXXXX" />
                     </label>
-                    <label>
+                    <label data-assistant-destination="tiktok">
                       TikTok Access Token
                       <input name="tiktokAccessToken" placeholder="TikTok Events API token" />
                     </label>
@@ -1227,7 +1227,7 @@
           </section>
 
           <!-- ── Website DataLayer Instructions ─────────────────────────── -->
-          <section class="assistant-instructions panel">
+          <section class="assistant-instructions panel" data-assistant-final-only hidden>
             <div class="panel-header">
               <div>
                 <h2>Website DataLayer Setup</h2>
@@ -2590,6 +2590,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=91" type="module"></script>
+    <script src="/app.js?v=95" type="module"></script>
   </body>
 </html>

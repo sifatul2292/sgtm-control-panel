@@ -363,7 +363,7 @@ const powerUps = [
     category: "Utilities",
     icon: "⌘",
     minimumPlan: "Pro",
-    defaultState: "upgrade",
+    defaultState: "coming",
     description: "Use one container with multiple first-party tagging domains."
   },
   {
@@ -372,7 +372,7 @@ const powerUps = [
     category: "Utilities",
     icon: "■",
     minimumPlan: "Pro",
-    defaultState: "upgrade",
+    defaultState: "coming",
     description: "Block known bad IPs before they reach your server-side GTM container."
   },
   {
@@ -381,7 +381,7 @@ const powerUps = [
     category: "CDN",
     icon: "⬢",
     minimumPlan: "Enterprise",
-    defaultState: "upgrade",
+    defaultState: "coming",
     description: "Reserve a static outbound IP for enterprise security and partner allowlists."
   },
   {
@@ -390,7 +390,7 @@ const powerUps = [
     category: "Data enrich",
     icon: "▣",
     minimumPlan: "Enterprise",
-    defaultState: "upgrade",
+    defaultState: "coming",
     description: "Send selected server-side events into BigQuery for reporting and retention."
   },
   {
@@ -408,7 +408,7 @@ const powerUps = [
     category: "Popular",
     icon: "☺",
     minimumPlan: "Pro",
-    defaultState: "configure",
+    defaultState: "coming",
     description: "Request guided setup, tracking review, and migration help from the Tagioo team."
   }
 ];
@@ -487,7 +487,6 @@ function setView(name, options = {}) {
     (roleKnown && currentSession.role !== "customer" && customerOnlyViews.has(requested))
       ? "dashboard"
       : requested;
-  if (next === "setupAssistant" && currentViewName !== next && setupAssistantCompleted) setupAssistantStep = 4;
   currentViewName = next;
   els.views.forEach((view) => view.classList.toggle("is-active", view.dataset.view === next));
   els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.viewTarget === next));
@@ -2544,6 +2543,11 @@ function customerContainerDetail(request, data, dnsTarget) {
   const canDelete = !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase());
   const isLive = meta.className === "healthy";
   return `<section class="container-detail-view">
+    <article class="panel container-detail-panel">
+      <h2>Finish your container setup</h2>
+      <p>Your container is listed below with its current status. Use Setup Assistant to connect your website, configure tracking, and verify events.</p>
+      <button class="button button-primary" type="button" data-view-shortcut="setupAssistant">Finish setup in Setup Assistant</button>
+    </article>
     <article class="panel container-detail-hero">
       <div>
         <div class="detail-pill-row">
@@ -2694,9 +2698,9 @@ function powerUpState(item, planName) {
 }
 
 function powerUpActionLabel(state, isOwner) {
-  if (state === "active") return "✓ Active";
-  if (state === "enabled") return "Enabled";
-  if (state === "configure") return "Configure";
+  if (state === "active") return "✓ Enabled";
+  if (state === "enabled") return "✓ Enabled";
+  if (state === "configure") return "✓ Enabled · Setup";
   if (state === "needs-init") return isOwner ? "Setup Required" : "Pending";
   if (state === "upgrade") return "Upgrade to use";
   return "Coming soon";
@@ -3048,6 +3052,14 @@ async function renderPowerUps(data) {
   });
 }
 
+function savedSetupAssistantStep(scope, fallback) {
+  try {
+    const step = Number(window.localStorage.getItem(`tagioo_assistant_step_${scope}`));
+    if (Number.isInteger(step) && step >= 1 && step <= 4) return step;
+  } catch { /* Storage may be unavailable. */ }
+  return fallback;
+}
+
 function renderSetupAssistant(data) {
   if (!els.setupAssistantForm) return;
   const tenantTracking = data.tracking || data.customers?.tenants?.[0]?.tracking || {};
@@ -3062,7 +3074,7 @@ function renderSetupAssistant(data) {
     setupAssistantContainerId = assistantScope;
     setupAssistantCompleted = Boolean(tenantTracking.setupAssistantCompletedAt
       || (tenantTracking.platform && tenantTracking.domain && tenantTracking.measurementId));
-    setupAssistantStep = setupAssistantCompleted ? 4 : 1;
+    setupAssistantStep = savedSetupAssistantStep(assistantScope, setupAssistantCompleted ? 4 : 1);
     els.setupAssistantForm.reset();
     generatedAssistantTemplates = null;
     if (els.downloadWebTemplate) els.downloadWebTemplate.disabled = true;
@@ -3296,8 +3308,28 @@ function setWooWebhookSecret(secret) {
   if (generateButton) generateButton.textContent = secret ? "Regenerate secret" : "Generate secret";
 }
 
+function updateSetupAssistantDestinationFields() {
+  const form = els.setupAssistantForm;
+  if (!form) return;
+  const selected = new Set([...form.querySelectorAll("input[name='destinations']:checked")].map((input) => input.value));
+  form.querySelectorAll("[data-assistant-destination]").forEach((field) => {
+    const enabled = selected.has(field.dataset.assistantDestination);
+    field.hidden = !enabled;
+    field.querySelectorAll("input").forEach((input) => { input.disabled = !enabled; });
+  });
+}
+
 let prevAssistantStep = 1;
 function updateSetupAssistantStep() {
+  updateSetupAssistantDestinationFields();
+  if (setupAssistantContainerId) {
+    try {
+      window.localStorage.setItem(`tagioo_assistant_step_${setupAssistantContainerId}`, String(setupAssistantStep));
+    } catch { /* Navigation still works when storage is unavailable. */ }
+  }
+  document.querySelectorAll("[data-assistant-final-only]").forEach((panel) => {
+    panel.hidden = setupAssistantStep !== 4;
+  });
   const direction = setupAssistantStep > prevAssistantStep ? "forward" : "back";
   document.querySelectorAll("[data-assistant-step-label]").forEach((item) => {
     const step = Number(item.dataset.assistantStepLabel);
@@ -6748,6 +6780,9 @@ document.querySelector("#saveLaravelMapping")?.addEventListener("click", (event)
     successText: "Mapping saved. The next Cron run will detect the selected fields automatically."
   });
 });
+els.setupAssistantForm?.addEventListener("change", (event) => {
+  if (event.target.name === "destinations") updateSetupAssistantDestinationFields();
+});
 els.assistantNext?.addEventListener("click", () => {
   if (setupAssistantStep < 4) {
     setupAssistantStep += 1;
@@ -7035,7 +7070,12 @@ els.customerSetupForm.addEventListener("submit", async (event) => {
     setView("billing");
     return;
   }
-  els.customerSetupFormMessage.textContent = "Submitting setup request...";
+  const submitButton = els.customerSetupForm.querySelector('[type="submit"]');
+  if (submitButton.disabled) return;
+  submitButton.disabled = true;
+  submitButton.innerHTML = '<span class="container-create-spinner" aria-hidden="true"></span> Creating Container';
+  els.customerSetupForm.setAttribute("aria-busy", "true");
+  els.customerSetupFormMessage.textContent = "Creating Container… Please wait.";
   const payload = Object.fromEntries(new FormData(els.customerSetupForm).entries());
   try {
     const response = await fetch("/api/customer/setup", {
@@ -7049,16 +7089,23 @@ els.customerSetupForm.addEventListener("submit", async (event) => {
     selectedCustomerContainerId = result.request.id || selectedCustomerContainerId;
     setupAssistantContainerId = "";
     await loadDashboard();
-    // Prefill the Setup Assistant tracking domain from the new container, then
-    // send the user straight there to finish wiring GA4 / Meta / etc.
+    // Prefill Setup Assistant while showing the new container and its next step.
     if (els.setupAssistantForm) {
       const td = els.setupAssistantForm.elements.trackingDomain;
       if (td) td.value = result.request.trackingDomain ? `https://${result.request.trackingDomain}` : "";
     }
-    setView("setupAssistant");
-    document.querySelector("#setupAssistantView")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!latestData?.customerSetup?.requests?.some((request) => request.id === result.request.id)) {
+      latestData = { ...(latestData || {}), customerSetup: { ...(latestData?.customerSetup || {}), requests: [result.request, ...(latestData?.customerSetup?.requests || [])] } };
+      renderCustomerContainers(latestData);
+    }
+    setView("customerContainers");
+    document.querySelector("#customerContainerDetail")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
     els.customerSetupFormMessage.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = "Create Container";
+    els.customerSetupForm.removeAttribute("aria-busy");
   }
 });
 window.addEventListener("hashchange", () => setView(window.location.hash.replace("#", "") || "dashboard"));

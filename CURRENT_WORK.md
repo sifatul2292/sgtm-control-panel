@@ -2,6 +2,55 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 
+## 2026-10-07 — Honest Power-Up availability labels
+
+- Marked Multi-Domains, IP blocking, Dedicated IP, BigQuery Export and Tagioo
+  Care as Coming soon; their cards have no implemented configuration workflow.
+  File Proxy retains Coming soon regardless of plan.
+- Implemented feature labels now read ✓ Enabled. Custom Loader reads
+  ✓ Enabled · Setup and retains its snippet dialog; missing infrastructure
+  initialization still shows Pending/Setup Required and plan gates remain.
+- Bumped app asset to v92. Local syntax and focused state assertions pass.
+  No deployment or live tracking/configuration changes performed. Per-container
+  runtime verification remains a separate follow-up.
+
+## 2026-10-07 — Checkout and container creation journey
+
+- Removed the Free-plan skip button and its allowance text from checkout;
+  Paddle activation waiting no longer references the removed element.
+- Container submission displays Creating Container with a spinner, live status
+  and busy semantics; repeat submits are blocked and failures restore the button.
+- Successful creation displays the selected container and its actual status,
+  with a Finish setup in Setup Assistant action and prefilled tracking domain.
+  A failed dashboard refresh still shows the returned container.
+- App/styles assets bumped to v93/v57. Syntax gates and six focused checkout,
+  activation, creation and assistant tests pass. No live provisioning changes
+  or deployment performed.
+
+## 2026-10-07 — Setup Assistant progressive instructions and resume
+
+- Steps 1–3 retain the header, introductory guide, video and wizard; the
+  additional platform installation instructions are revealed only at step 4.
+- Persist the current step in browser localStorage per tenant/container; restore
+  it across reload/login and container switching, with existing completion-based
+  defaults when no valid preference exists. Removed forced step-4 navigation
+  so returning to a completed setup preserves the customer's editing step.
+- Step persistence stores no credentials or form values and applies in the same
+  browser. App asset bumped to v94. Two assistant regressions and syntax gates
+  pass; not deployed.
+
+## 2026-10-07 — Destination-specific Setup Assistant details
+
+- Step 3 now shows GA4, Meta, Google Ads and TikTok fields only when their
+  destination is checked in step 2. Web GTM Container ID stays visible.
+- Recompute on checkbox changes and step rendering; hidden inputs are disabled
+  so they are excluded from generated requests, preserving entered values if
+  the customer selects the destination again. Existing optional fields and
+  placeholder generation remain supported.
+- App asset bumped to v95. All 16 destination combinations verified along with
+  the existing assistant, checkout and creation regressions; syntax gates pass.
+  Not deployed.
+
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 

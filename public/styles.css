@@ -5860,3 +5860,19 @@ body.modal-open { overflow: hidden; }
   .payment-modal, .powerup-modal { padding: 20px 16px; }
   .filter-row { flex-wrap: wrap; }
 }
+
+.container-create-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 8px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: container-create-spin .8s linear infinite;
+}
+@keyframes container-create-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .container-create-spinner { animation: none; }
+}

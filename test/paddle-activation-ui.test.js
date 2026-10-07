@@ -26,7 +26,7 @@ test("completed checkout disables repeat payment and waits for server activation
   callback({ name: "checkout.completed" });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(button.disabled, true);
-  assert.equal(skip.hidden, true);
+  assert.doesNotMatch(html, /action="\/checkout\/skip"|Not now — continue/);
   assert.equal(localPayment.hidden, true);
   assert.match(status.textContent, /do not pay again/i);
   assert.equal(window.location.href, "/checkout");

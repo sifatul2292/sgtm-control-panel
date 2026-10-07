@@ -2893,10 +2893,6 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           <p class="lf-subtitle su-anim" style="--d:220ms;margin-top:14px;text-align:center">${instructions.ownerWhatsApp ? `Trouble paying? <a class="su-signin-link" href="https://wa.me/${escapeHtml(instructions.ownerWhatsApp.replace(/[^0-9]/g, ""))}" target="_blank" rel="noopener">Message us on WhatsApp →</a>` : ""}</p>
           ${paddle.enabled ? "</details>" : ""}
           ` : ""}
-          <form method="post" action="/checkout/skip" class="co-skip su-anim" style="--d:240ms">
-            <button type="submit">Not now — continue on the Free plan</button>
-            <small>15,000 events every 30 days. Upgrade any time from Account &amp; Billing.</small>
-          </form>
         </div>
       </main>
     </div>
@@ -2921,7 +2917,6 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           if (checking) return;
           checking = true;
           btn.disabled = true;
-          document.querySelector(".co-skip").hidden = true;
           var localPayment = document.getElementById("coLocalPayment");
           if (localPayment) localPayment.hidden = true;
           status.hidden = false;
