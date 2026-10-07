@@ -5,6 +5,26 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-10-07 — Customer mobile workspace
+
+- Replaced the crowded phone/tablet icon rail with a labeled, expandable Menu
+  below 860px; section selection, Escape and breakpoint changes close it, with
+  focus restored when a navigation item would become hidden. Desktop sidebar
+  remains unchanged.
+- Container creation stacks into one column, with 44px controls, 16px input
+  text, URL keyboards and no auto-capitalization of domains/config. Backend
+  provisioning and live tracking are unchanged.
+- Constrained tables and setup code to their own horizontal scroll areas,
+  wrapped instruction/billing tabs, long domains and small-screen notices, and
+  bounded payment/Power-Up dialogs by the dynamic viewport. Asset versions
+  bumped to styles 56 / app 91.
+- Isolated customer preview checked Dashboard, Event Logs, Containers, Power-Ups,
+  Setup Assistant, Account and Billing at 320/390/768px; desktop 1280px retains
+  two-column creation and hides Menu. Native required-field validation, all
+  creation inputs, location selection and submission/error recovery exercised
+  through a read-only proxy (no real container provisioned). Four navigation
+  regression tests and syntax gates pass. VPS deployment not performed.
+
 ## 2026-10-07 — Durable Paddle delivery and core database reads
 
 - VPS rollout completed on the preserved `fix/signup-memory-20261006` branch:

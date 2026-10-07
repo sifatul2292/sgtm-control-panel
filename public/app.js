@@ -479,6 +479,7 @@ function hostLabel(value) {
 }
 
 function setView(name, options = {}) {
+  closeMobileMenu();
   const requested = viewTitles[name] ? name : "dashboard";
   const roleKnown = currentSession.role === "customer" || currentSession.role === "owner";
   const next =
@@ -6463,6 +6464,27 @@ async function selectCustomerContainer(containerId) {
 }
 
 els.customerActiveContainer?.addEventListener("change", (event) => selectCustomerContainer(event.currentTarget.value));
+
+const mobileMenuToggle = document.querySelector("#mobileMenuToggle");
+const mobileSidebar = document.querySelector(".sidebar");
+const mobileLayout = window.matchMedia("(max-width: 860px)");
+
+function closeMobileMenu() {
+  const toggle = document.querySelector("#mobileMenuToggle");
+  const sidebar = document.querySelector(".sidebar");
+  if (sidebar?.classList.contains("is-menu-open") && sidebar.contains(document.activeElement)) toggle?.focus();
+  sidebar?.classList.remove("is-menu-open");
+  toggle?.setAttribute("aria-expanded", "false");
+}
+
+mobileMenuToggle?.addEventListener("click", () => {
+  const open = mobileSidebar.classList.toggle("is-menu-open");
+  mobileMenuToggle.setAttribute("aria-expanded", String(open));
+});
+mobileLayout.addEventListener("change", closeMobileMenu);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeMobileMenu();
+});
 
 els.navItems.forEach((item) => {
   item.addEventListener("click", () => setView(item.dataset.viewTarget));

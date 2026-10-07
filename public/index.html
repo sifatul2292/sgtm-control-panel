@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=54" />
+    <link rel="stylesheet" href="/styles.css?v=56" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -41,8 +41,10 @@
           <span>Tagioo</span>
         </a>
 
+        <button id="mobileMenuToggle" class="button mobile-menu-toggle" type="button" aria-controls="workspaceNavigation" aria-expanded="false">☰ Menu</button>
+
         <p class="nav-section-label">Workspace</p>
-        <nav class="nav-stack" aria-label="Dashboard sections">
+        <nav id="workspaceNavigation" class="nav-stack" aria-label="Dashboard sections">
           <button class="nav-item is-active" type="button" data-view-target="dashboard" aria-label="Dashboard" title="Dashboard">
             <span class="nav-icon" aria-hidden="true">▦</span>
             <span>Dashboard</span>
@@ -716,11 +718,11 @@
                 </label>
                 <label>
                   Website domain
-                  <input name="websiteUrl" placeholder="https://example.com" required />
+                  <input name="websiteUrl" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://example.com" required />
                 </label>
                 <label>
                   Tracking subdomain
-                  <input name="trackingDomain" placeholder="server.example.com" required />
+                  <input name="trackingDomain" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="server.example.com" required />
                 </label>
                 <label>
                   Server Location
@@ -733,7 +735,7 @@
                 <input name="platform" type="hidden" value="custom" />
                 <label class="form-wide">
                   Container Config
-                  <textarea name="containerConfig" placeholder="Paste the Container Config from Google Tag Manager > Admin > Container Settings > Manually provision tagging server" required></textarea>
+                  <textarea name="containerConfig" autocapitalize="none" spellcheck="false" placeholder="Paste the Container Config from Google Tag Manager > Admin > Container Settings > Manually provision tagging server" required></textarea>
                   <span class="field-help">Paste the full value exactly from GTM, including any ending = or == characters. Tagioo checks it before Docker starts.</span>
                 </label>
                 <button class="button button-primary form-wide" type="submit">Create Container</button>
@@ -2588,6 +2590,6 @@ window.dataLayer.push({
       </main>
     </div>
 
-    <script src="/app.js?v=90" type="module"></script>
+    <script src="/app.js?v=91" type="module"></script>
   </body>
 </html>
