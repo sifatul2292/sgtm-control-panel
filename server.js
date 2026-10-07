@@ -13007,6 +13007,12 @@ const server = createServer(async (req, res) => {
       const eventData = payload.data || {};
 
       if (eventType === "transaction.completed") {
+        // Updating a card creates a zero-value transaction, not a plan purchase.
+        // Its items can reflect an older plan; never use it to change access.
+        if (eventData.origin === "subscription_payment_method_change") {
+          jsonResponse(res, 200, { ignored: "subscription_payment_method_change" });
+          return;
+        }
         const customData = eventData.custom_data || {};
         const tenantId = String(customData.tenantId || "").trim();
         // Price IDs come from Paddle's signed payload and are the billing

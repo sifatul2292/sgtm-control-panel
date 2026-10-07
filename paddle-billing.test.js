@@ -37,6 +37,33 @@ test("new Paddle purchases must match the pending invoice and signed price plan"
   assert.deepEqual(paddleCheckoutMatchesTenant(tenant, { subscriptionId: "sub_existing", invoiceNo: "old", planName: "Starter" }), { ok: true, renewal: true });
 });
 
+test("card-update transactions do not activate plans or create purchase invoices", async () => {
+  const source = readFileSync(new URL("./server.js", import.meta.url), "utf8");
+  const start = source.indexOf('      if (eventType === "transaction.completed")');
+  const handler = source.slice(start, source.indexOf('      if (eventType === "subscription.canceled"', start));
+  let activations = 0;
+  let response;
+  const context = vm.createContext({
+    config: { paddlePriceIds: {} },
+    paddlePlanNameFromItems: () => "Starter",
+    activatePaddleTenant: async () => { activations += 1; return { ok: true }; },
+    invalidateOwnerDashboardCache() {},
+    jsonResponse: (_res, status, body) => { response = { status, body }; },
+  });
+  vm.runInContext(`async function handle(eventData) {
+    const eventType = "transaction.completed", res = {};
+    ${handler}
+  }`, context);
+  await context.handle({ origin: "subscription_payment_method_change" });
+  assert.equal(activations, 0);
+  assert.equal(response.status, 200);
+  assert.equal(response.body.ignored, "subscription_payment_method_change");
+  // A real checkout discounted to zero still counts; don't filter by amount.
+  await context.handle({ origin: "web", details: { totals: { total: "0" } } });
+  assert.equal(activations, 1);
+  assert.equal(response.status, 202);
+});
+
 test("Paddle activation, replay, renewal, and cancellation preserve tenant state", async () => {
   const source = readFileSync(new URL("./server.js", import.meta.url), "utf8");
   const extract = (name) => {
