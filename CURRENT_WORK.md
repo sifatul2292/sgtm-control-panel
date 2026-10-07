@@ -32,15 +32,20 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
   bill with prorated credit. Past-due simulation completed and retained paid
   access. Card replacement completed in Paddle Test Mode but exposed a bug:
   its zero-value transaction was recorded as a purchase. Fix `b47d861` is
-  committed and pushed, not yet deployed (Mac locked during VPS console work).
+  committed and pushed; deployed after unlock as production `bb9de41`.
+  Signed replay using the real sandbox transaction returned HTTP 200 ignored;
+  no additional invoice was created. The pre-fix zero invoice remains on the
+  isolated test tenant only, preserved as test evidence.
 - Initial provider deliveries showed empty HTTP 503 responses despite eventual
   activation; replay succeeded. Production still has slow JSON-store reads and
   this is not yet a clean live-payment launch sign-off. Remaining sandbox
-  checks: deploy/replay card-update fix, verify cancellation webhook locally and
-  invoice download. Hosted sandbox portal successfully scheduled cancellation
-  for Nov 7, 2026, retaining active access until then.
-  Sandbox notification destination temporarily has `traffic_source=all` for
-  simulation testing; restore `platform` when console access resumes.
+  launch prerequisite: resolve initial webhook delivery latency/retries before
+  live sign-off. Hosted sandbox portal successfully scheduled cancellation
+  for Nov 7, 2026; local protected DB confirms the same scheduled change while
+  keeping Starter active. Generated paid USD 32.66 PDF invoice opened correctly.
+  Sandbox notification destination restored to `traffic_source=platform`
+  (HTTP 200), excluding future simulation traffic. Production syntax and all
+  seven Paddle tests passed; PM2 online after reload, origin login HTTP 200.
   No live payments or existing customer subscriptions changed.
 
 ## 2026-10-06 — Verification timeout and paid signup
