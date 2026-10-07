@@ -5,6 +5,15 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
+## 2026-10-07 — Paid signup email correction
+
+- Verified paid signups no longer receive the Free-plan welcome email while
+  waiting for checkout. Free signups retain it; verification codes remain
+  unchanged. Existing successful manual/Paddle activation sends the selected
+  plan confirmation, with transaction replay deduplication unchanged.
+- Signup regression assertions cover zero welcome emails for Starter, Pro and
+  Enterprise and exactly one for Free. Deployment pending.
+
 ## 2026-10-07 — Country-independent USD checkout
 
 - Removed the Bangladesh-only Paddle exclusion. Every configured pending paid

@@ -15,7 +15,7 @@ const functions = [
 
 for (const plan of ["Free", "Starter", "Pro", "Enterprise"]) {
   test(`${plan} verified signup commits account, attribution and plan in one read/write`, async () => {
-    let reads = 0, writes = 0, locks = 0, saved;
+    let reads = 0, writes = 0, locks = 0, welcomes = 0, saved;
     const context = {
       randomBytes,
       withDbLock: async (fn) => { locks++; return fn(); },
@@ -26,7 +26,7 @@ for (const plan of ["Free", "Starter", "Pro", "Enterprise"]) {
       resourceProfileForPlan: () => ({ monthlyRequestLimit: 15000, containerLimit: 1, domainLimit: 1 }),
       monthlyAmountForPlan: () => 0,
       sanitizeId: (value) => value.toLowerCase().replace(/\s/g, "-"),
-      emailWelcome: async () => {},
+      emailWelcome: async () => { welcomes++; },
       billingCycleConfig: { monthly: { months: 1 } },
       planResourceProfiles: { Free: {}, Starter: {}, Pro: {}, Enterprise: {} },
       planRankFor: (value) => ["Free", "Starter", "Pro", "Enterprise"].indexOf(value),
@@ -47,6 +47,7 @@ for (const plan of ["Free", "Starter", "Pro", "Enterprise"]) {
     assert.equal(tenant.tracking.tagiooVisitor.userAgent, "smoke");
     assert.equal(tenant.pendingPlan, plan === "Free" ? undefined : plan);
     assert.equal(Boolean(result.checkout), plan !== "Free");
+    assert.equal(welcomes, plan === "Free" ? 1 : 0, "paid signups wait for the payment activation email");
     assert.equal(tenant.paymentStatus, plan === "Free" ? "free" : "pending");
   });
 }

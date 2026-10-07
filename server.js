@@ -6649,7 +6649,9 @@ async function addCustomerSignupLocked(input, visitor) {
     await writeDatabase(data);
   }
 
-  if (result.ok) emailWelcome(email, fullName).catch(() => {});
+  // Paid signups receive their plan email only after payment activation.
+  // Their temporary Free entitlement is not the plan they chose.
+  if (result.ok && !result.checkout) emailWelcome(email, fullName).catch(() => {});
   return result;
 }
 
