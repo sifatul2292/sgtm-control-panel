@@ -7,6 +7,26 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 
 ## 2026-10-07 — Durable Paddle delivery and core database reads
 
+- VPS rollout completed on the preserved `fix/signup-memory-20261006` branch:
+  durable billing cherry-pick `60edae4`, test harness correction, and PM2
+  receiver-entry fix `f0f774b`. Both PM2 services are online; process list saved.
+  Only the exact Paddle webhook Nginx location changed to loopback 3101; config
+  passed `nginx -t` before reload. Tracking/container locations unchanged.
+- Protected rollback backup: `/var/backups/tagioo-paddle-durable-ClGo0e`.
+  Migration verified full record equality: 256,938,662 → 18,532,807 bytes.
+  Measured core read + parse: 145 ms, previously 3,566 ms. Event history was
+  compressed, not deleted; unpack is required before reverting to old code.
+- Real Paddle sandbox transaction replay delivered HTTP 200 on its first
+  attempt, finished in the durable inbox, and preserved the 17-payment count.
+  Latest subscription replay also applied, retaining active Starter. Public
+  signed receipt measured 43 ms; duplicate receipt 20 ms; unsigned request 401.
+  VPS syntax, seven billing tests and 22 native tests pass. Customer billing
+  page shows active Starter / USD 30 / 500K events after replay.
+- Checkout waiting/refresh, restart recovery, stale-event ordering, renewal and
+  cancellation are covered by native regression fixtures; no new live charge
+  or real month-end renewal was performed. Paddle remains sandbox. Production
+  approval and environment-specific live credentials still require the owner.
+
 - Read-only diagnosis correlated provider empty HTTP 503 attempts with origin
   HTTP 499 disconnects. Core DB was 245 MB, with 244 MB of tenantEventHistory;
   a duplicate webhook took 3.95s before even doing a write.
