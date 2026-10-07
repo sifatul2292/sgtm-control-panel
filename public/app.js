@@ -5229,6 +5229,11 @@ async function loadBillingPayment() {
 
 // Billing history. Confirmed payments are paid invoices; pending claims show as
 // awaiting verification. Each row opens a clean printable invoice.
+function invoiceMoney(amount, currency = "BDT") {
+  const prefix = currency === "USD" ? "$" : "৳";
+  return `${prefix}${Number(amount || 0).toLocaleString()}`;
+}
+
 function renderInvoices(billing) {
   const list = document.getElementById("invoicesList");
   if (!list) return;
@@ -5237,7 +5242,6 @@ function renderInvoices(billing) {
     list.innerHTML = `<div class="invoices-empty">No invoices yet. They appear here after your first payment.</div>`;
     return;
   }
-  const money = (n) => `৳${Number(n || 0).toLocaleString()}`;
   const statusTag = (s) => s === "confirmed"
     ? `<span class="inv-tag is-paid">Paid</span>`
     : s === "rejected" ? `<span class="inv-tag is-rejected">Rejected</span>`
@@ -5250,7 +5254,7 @@ function renderInvoices(billing) {
       </div>
       <div class="inv-meta">
         ${statusTag(c.status)}
-        <span class="inv-amount">${money(c.amount)}</span>
+        <span class="inv-amount">${invoiceMoney(c.amount, c.currency)}</span>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
     </button>`).join("");
@@ -5263,7 +5267,7 @@ function openInvoice(payment, billing) {
   const overlay = document.getElementById("invoiceOverlay");
   const doc = document.getElementById("invoiceDoc");
   if (!overlay || !doc || !payment) return;
-  const money = (n) => `৳${Number(n || 0).toLocaleString()}`;
+  const money = (n) => invoiceMoney(n, payment.currency);
   const issued = payment.confirmedAt || payment.claimedAt;
   const paidStatus = payment.status === "confirmed" ? "PAID" : payment.status === "rejected" ? "REJECTED" : "PENDING";
   const lineLabel = payment.type === "addon_container"
