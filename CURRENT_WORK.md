@@ -12,7 +12,10 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
   unchanged. Existing successful manual/Paddle activation sends the selected
   plan confirmation, with transaction replay deduplication unchanged.
 - Signup regression assertions cover zero welcome emails for Starter, Pro and
-  Enterprise and exactly one for Free. Deployment pending.
+  Enterprise and exactly one for Free. All five signup tests, seven Paddle
+  tests and `npm run check` passed locally and on the VPS. Deployed as
+  `28e2e32` (source `e5a9c7e`), main service reloaded; both PM2 services online
+  and origin login returned HTTP 200. No credentials or tracking changes.
 
 ## 2026-10-07 — Country-independent USD checkout
 
