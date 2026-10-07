@@ -51,6 +51,17 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
   the existing assistant, checkout and creation regressions; syntax gates pass.
   Not deployed.
 
+## 2026-10-08 — Customer journey changes pushed; deployment blocked
+
+- Pushed the requested Power-Up, checkout, container-creation and assistant UI
+  changes as 19f2f02 on feat/saas-phase1-payments. All 33 native tests,
+  server/frontend syntax checks and diff whitespace checks passed.
+- Deployment not performed: SSH to the documented VPS as root was rejected
+  (publickey/password authentication); no attached app terminal is available.
+  Resume with the working VPS SSH connection, preserve its hotfix branch and
+  cherry-pick 19f2f02, then run gates and reload only the panel service.
+- Event-history contamination remains an investigation, with no fix included.
+
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 
