@@ -77,7 +77,15 @@ test("independent receiver answers while the panel event loop is blocked", async
     s.listen(0,'127.0.0.1',()=>console.log(s.address().port));
   `], { cwd: new URL("..", import.meta.url), env: { ...process.env, DATA_DIR: dir }, stdio: ["ignore", "pipe", "pipe"] });
   try {
-    const [output] = await once(child.stdout, "data");
+    const readOutput = (process) => {
+      let stderr = "";
+      process.stderr.on("data", chunk => { stderr += chunk; });
+      return Promise.race([
+        once(process.stdout, "data", { signal: AbortSignal.timeout(15000) }),
+        once(process, "exit").then(([code]) => { throw new Error(`Child exited ${code}: ${stderr}`); })
+      ]);
+    };
+    const [output] = await readOutput(child);
     const port = Number(output.toString().trim());
     const ts = Math.floor(Date.now() / 1000);
     const body = JSON.stringify({ event_id: "evt_isolation", occurred_at: new Date().toISOString(), data: {} });
@@ -89,12 +97,19 @@ test("independent receiver answers while the panel event loop is blocked", async
       const r=await fetch('http://127.0.0.1:${port}/api/paddle/webhook',{method:'POST',headers:{'Paddle-Signature':${JSON.stringify(`ts=${ts};h1=${sig}`)}},body:${JSON.stringify(body)}});
       console.log(JSON.stringify({status:r.status,ms:performance.now()-start}));
     `], { stdio: ["ignore", "pipe", "pipe"] });
-    const resultPromise = once(sender.stdout, "data");
+    const resultPromise = readOutput(sender);
     const end = Date.now() + 5500;
     while (Date.now() < end) {} // models the old panel's synchronous JSON work
     const [result] = await resultPromise;
     const timing = JSON.parse(result.toString());
     assert.equal(timing.status, 200);
     assert.ok(timing.ms < 1000, `receiver took ${timing.ms}ms`);
-  } finally { child.kill(); await once(child, "exit"); rmSync(dir, { recursive: true }); }
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) {
+      const stopped = once(child, "exit");
+      child.kill();
+      await stopped;
+    }
+    rmSync(dir, { recursive: true });
+  }
 });
