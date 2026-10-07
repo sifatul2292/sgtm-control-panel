@@ -14,8 +14,11 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 - Signup wording now describes the payment choice after verification. Completed
   card payment hides the local form as well as repeat-card/Free actions while
   server activation is pending, including after refresh.
-- Country/price/configuration/rendered-script regression tests and Paddle
-  activation/signature/lifecycle tests pass. Deployment pending verification.
+- All 29 native tests and seven Paddle tests pass. Pushed `b42b59b` and deployed
+  its focused cherry-pick as `7904fd8`; production syntax and ten focused billing
+  tests pass, both PM2 services online, origin login HTTP 200. Refreshed the
+  customer's existing Pro checkout and verified the $50 Paddle button plus
+  optional ৳2,900 BDT local payment. Sandbox remains enabled; no payment submitted.
 
 ## 2026-10-07 — Customer mobile workspace
 
