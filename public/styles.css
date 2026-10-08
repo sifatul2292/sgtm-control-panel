@@ -5876,3 +5876,63 @@ body.modal-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .container-create-spinner { animation: none; }
 }
+
+/* Hallmark · component: setup callout · existing Tagioo tokens
+ * pre-emit critique: P4 H5 E4 S4 R5 V4 */
+.container-setup-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 32px;
+  border: 1px solid var(--color-accent-line);
+  background: var(--color-surface);
+}
+.container-setup-copy { min-width: 0; }
+.container-setup-eyebrow {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--color-accent-deep);
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.container-setup-callout h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(20px, 2vw, 24px);
+  line-height: 1.3;
+  letter-spacing: -.025em;
+}
+.container-setup-callout p {
+  max-width: 60ch;
+  margin: 8px 0 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.container-setup-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 14px;
+  min-height: 46px;
+  padding: 12px 20px;
+  white-space: nowrap;
+}
+.container-setup-action:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
+}
+@media (max-width: 640px) {
+  .container-setup-callout {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 20px;
+    padding: 22px;
+  }
+  .container-setup-action { width: 100%; }
+}

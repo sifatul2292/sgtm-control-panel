@@ -2543,10 +2543,15 @@ function customerContainerDetail(request, data, dnsTarget) {
   const canDelete = !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase());
   const isLive = meta.className === "healthy";
   return `<section class="container-detail-view">
-    <article class="panel container-detail-panel">
-      <h2>Finish your container setup</h2>
-      <p>Your container is listed below with its current status. Use Setup Assistant to connect your website, configure tracking, and verify events.</p>
-      <button class="button button-primary" type="button" data-view-shortcut="setupAssistant">Finish setup in Setup Assistant</button>
+    <article class="panel container-setup-callout" aria-labelledby="containerSetupTitle">
+      <div class="container-setup-copy">
+        <span class="container-setup-eyebrow">Next step · Setup Assistant</span>
+        <h2 id="containerSetupTitle">Finish your container setup</h2>
+        <p>Connect your website, configure tracking, and verify your first events.</p>
+      </div>
+      <button class="button button-primary container-setup-action" type="button" data-view-shortcut="setupAssistant">
+        Continue setup <span aria-hidden="true">→</span>
+      </button>
     </article>
     <article class="panel container-detail-hero">
       <div>

@@ -62,6 +62,36 @@ Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
   cherry-pick 19f2f02, then run gates and reload only the panel service.
 - Event-history contamination remains an investigation, with no fix included.
 
+## 2026-10-08 — Container setup banner design
+
+- Replaced the cramped unstyled setup notice with a dedicated callout using
+  existing Tagioo tokens, clear next-step hierarchy, shorter copy and a compact
+  Continue setup action. Desktop copy/action align horizontally; mobile stacks.
+- App/styles assets bumped to v96/v58. Isolated Chrome preview inspected at
+  1280/390px and overflow checked at 1280/390/320px. Syntax gates, both container
+  creation regressions and whitespace checks pass. Local only; not deployed.
+
+## 2026-10-08 — International homepage positioning
+
+- Reviewed Stape and TAGGRS primary home/pricing pages for positioning. Rewrote
+  homepage copy originally around managed sGTM hosting, first-party data, guided
+  setup and monitoring for ecommerce teams/agencies; international SEO/social
+  metadata replaces Bangladesh-specific messaging.
+- Removed unsupported BDIX/latency/uptime promises, guaranteed blocker bypass,
+  speculative ROI percentages and misleading competitor matrix. Product previews
+  are labeled example data, use USD, and no longer imply actual customer ROAS.
+  Pricing feature lists avoid unimplemented multi-domain/SLA/migration promises.
+- USD Free/$30/$50/$100 monthly prices render by default, including geo failure.
+  BDT geo still restores local prices and multi-cycle choices; Paddle CTAs stay
+  monthly. Copy describes automatic USD subscription renewal and optional local
+  manual payments without changing billing state/configuration.
+- Existing homepage structure/routes retained, with a small scoped CSS contrast
+  correction for the workflow card and landing CSS version v1. Chrome preview
+  verified USD/BDT/geo-failure, quarterly BDT prices, signup links, script errors
+  and 1440/390/320px overflow; desktop/mobile inspected. Syntax/diff gates pass.
+  Local only; not deployed. Other marketing pages and event-history fix remain
+  separate work; Paddle production activation still requires operator setup.
+
 ## Current branch
 `feat/saas-phase1-payments` (main branch is `main`).
 

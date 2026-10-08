@@ -2161,3 +2161,19 @@ thead .col-tagioo { color: var(--accent) !important; }
 .section-dark .outcome-card p { color: var(--text-2); }
 .section-dark .testi-author strong { color: var(--text); }
 .section-dark .testi-author span { color: var(--muted); }
+
+/* Homepage workflow card retains readable ink on its light surface. */
+.section-dark .testi-card h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(24px, 3vw, 36px);
+  line-height: 1.2;
+  letter-spacing: -.035em;
+}
+.section-dark .testi-card > p:not(.eyebrow) {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1.75;
+}
+.section-dark .testi-card .eyebrow { color: var(--accent); }
