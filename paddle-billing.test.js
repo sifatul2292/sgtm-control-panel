@@ -1,3 +1,4 @@
+import { requiresShopifyBilling } from "./shopify-billing.js";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
@@ -73,7 +74,7 @@ test("Paddle activation, replay, renewal, and cancellation preserve tenant state
   const data = { tenants: [{ id: "test", plan: "Free", pendingPlan: "Starter", pendingInvoiceNo: "test-001" }], payments: [] };
   const profile = { monthlyRequestLimit: 500000, containerLimit: 1, domainLimit: 1, memoryMb: 256, cpuLimit: 1 };
   const context = vm.createContext({
-    paddleCheckoutMatchesTenant, paddleRenewalDate, paddleEventIsStale,
+    requiresShopifyBilling, paddleCheckoutMatchesTenant, paddleRenewalDate, paddleEventIsStale,
     planResourceProfiles: { Starter: profile }, resourceProfileForPlan: () => profile,
     paddleUsdMonthly: { Starter: 30 }, FREE_CYCLE_DAYS: 30,
     readDatabase: async () => ({ available: true, data }), writeDatabase: async () => {},
@@ -108,6 +109,7 @@ test("Paddle plan changes use supported proration fields", async () => {
   const start = source.indexOf("async function updatePaddleSubscriptionPlan(");
   let request;
   const context = vm.createContext({
+    requiresShopifyBilling,
     config: { paddlePriceIds: { Starter: "pri_starter", Pro: "pri_pro" } },
     planRankFor: (name) => name === "Pro" ? 2 : 1,
     callPaddleApi: async (_path, _method, body) => { request = body; return { ok: true }; },

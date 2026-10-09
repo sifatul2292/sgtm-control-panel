@@ -5147,6 +5147,7 @@ function renderPlanCards(activePlanName, currency = "BDT", billingProvider = "",
   container.querySelectorAll("[data-shopify-plan-select]").forEach((button) => {
     button.addEventListener("click", () => {
       if (button.dataset.shopifyPlanSelect) window.location.assign(button.dataset.shopifyPlanSelect);
+      else window.alert("Connect your Shopify store in Setup Assistant before choosing a Shopify plan.");
     });
   });
   container.querySelectorAll("[data-cycle]").forEach((button) => {
@@ -5348,6 +5349,13 @@ function openInvoice(payment, billing) {
 function renderPaymentStatusCard(billing) {
   const panel = document.getElementById("paymentPanel");
   if (!panel) return;
+  if (billing.paymentProvider === "shopify") {
+    panel.hidden = false;
+    panel.className = "payment-status-card is-active";
+    panel.innerHTML = '<div class="psc-main"><div class="psc-text"><strong>Billing through Shopify</strong><p>All plans and hosting charges for this workspace use Shopify billing. Choose a plan above for more events or containers. Complete your Shopify connection in Setup Assistant if plan selection is unavailable.</p></div></div>';
+    manageBillingPolling(false, billing.subscriptionStatus, billing.paymentStatus);
+    return;
+  }
   const status = billing.subscriptionStatus;
   const claims = Array.isArray(billing.claims) ? billing.claims : [];
   const openClaim = claims.find((c) => c.status === "pending");
@@ -5553,6 +5561,7 @@ async function submitPaymentClaimForm(event) {
 
 // ── Extra-container add-on modal (recurring ৳1,200/mo) ─────────────────────
 function openExtraContainerModal(billing) {
+  if (billing.paymentProvider === "shopify") return;
   const overlay = document.getElementById("paymentModalOverlay");
   const body = document.getElementById("paymentModalBody");
   if (!overlay || !body) return;

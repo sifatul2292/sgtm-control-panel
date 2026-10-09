@@ -7,7 +7,7 @@ import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeE
 import { deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
 import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
-import { highestActiveShopifyPlan, normalizeShopifyBillingState } from "./shopify-billing.js";
+import { highestActiveShopifyPlan, normalizeShopifyBillingState, requiresShopifyBilling } from "./shopify-billing.js";
 import { removeShopifyOrders, shopifyCustomerOrders } from "./shopify-privacy.js";
 import { parseDataProtectionKey, parseProtectedJson, serializeProtectedJson } from "./data-protection.js";
 import { appendProtectedDataAudit } from "./protected-data-audit.js";
@@ -6671,6 +6671,7 @@ function nextInvoiceNo(data, tenantId) {
 
 // Customer instructions returned to the billing UI for a pending upgrade.
 function paymentInstructionsFor(tenant, data) {
+  if (requiresShopifyBilling(tenant)) return null;
   const settings = paymentSettings(data);
   return {
     invoiceNo: tenant.pendingInvoiceNo || "",
@@ -6713,6 +6714,7 @@ function paddleCatalogReady() {
 // USD card checkout is available in every country. BD tenants can also choose
 // their existing BDT manual invoice; selecting a country never hides Paddle.
 function paddleCheckoutConfigFor(tenant) {
+  if (requiresShopifyBilling(tenant)) return { enabled: false };
   const planName = tenant.pendingPlan || "";
   const priceId = config.paddlePriceIds[planName] || "";
   if (!paddleCatalogReady() || !priceId) return { enabled: false };
@@ -6733,7 +6735,7 @@ function paddleCheckoutConfigFor(tenant) {
 // True while the tenant has a staged pending paid plan and no payment record yet
 // (pending or confirmed). Once they submit a claim, the gate lifts.
 function checkoutRequired(tenant, data) {
-  if (!tenant || !tenant.pendingPlan) return false;
+  if (!tenant || requiresShopifyBilling(tenant) || !tenant.pendingPlan) return false;
   // Only gate tenants whose service is actually blocked on this payment (new
   // paid signups / Free upgrades put into pending_payment by selectCustomerPlan).
   // A tenant with a live plan staging an upgrade keeps subscriptionStatus
@@ -6884,7 +6886,7 @@ async function selectCustomerPlanLocked(input, session, existingDatabase = null)
   if (current.lifetimeAccess) {
     return { ok: false, status: 409, errors: ["This account has owner-managed lifetime access. Contact support to change its plan."] };
   }
-  if (current.paymentProvider === "shopify") {
+  if (requiresShopifyBilling(current)) {
     return { ok: false, status: 409, errors: ["Manage this subscription from the Tagioo app in Shopify Admin."] };
   }
   // A tenant "holds a paid plan" whenever they have paid for a non-Free plan.
@@ -7019,6 +7021,7 @@ async function submitPaymentClaimLocked(input, session) {
   data.payments ||= [];
   const tenant = (data.tenants || []).find((t) => t.id === session.tenantId);
   if (!tenant) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+  if (requiresShopifyBilling(tenant)) return { ok: false, status: 409, errors: ["All Shopify workspace charges must be approved in Shopify Admin. Choose a Shopify plan with the containers you need."] };
   if (!tenant.pendingPlan) return { ok: false, status: 400, errors: ["Choose a plan to upgrade before submitting a payment."] };
 
   // Block duplicate transaction IDs across all payments.
@@ -7076,6 +7079,7 @@ async function submitExtraContainerClaimLocked(input, session) {
   data.payments ||= [];
   const tenant = (data.tenants || []).find((t) => t.id === session.tenantId);
   if (!tenant) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+  if (requiresShopifyBilling(tenant)) return { ok: false, status: 409, errors: ["All Shopify workspace charges must be approved in Shopify Admin. Choose a Shopify plan with the containers you need."] };
   if (!(tenant.lifetimeAccess || (tenant.subscriptionStatus === "active" && tenant.paymentStatus === "paid"))) {
     return { ok: false, status: 400, errors: ["Activate a paid plan before buying extra containers."] };
   }
@@ -7129,6 +7133,7 @@ async function confirmPaymentLocked(paymentId, session) {
 
   const tenantIndex = (data.tenants || []).findIndex((t) => t.id === payment.tenantId);
   if (tenantIndex === -1) return { ok: false, status: 404, errors: ["Customer account was not found."] };
+  if (requiresShopifyBilling(data.tenants[tenantIndex])) return { ok: false, status: 409, errors: ["Shopify workspace payments must use Shopify billing."] };
   if (payment.type !== "addon_container" && data.tenants[tenantIndex].lifetimeAccess) {
     return { ok: false, status: 409, errors: ["Disable lifetime access before confirming a plan payment."] };
   }
@@ -7275,6 +7280,7 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
 
   const now = new Date();
   const tenant = data.tenants[tenantIndex];
+  if (requiresShopifyBilling(tenant)) return { ok: false, status: 409, errors: ["Shopify workspace payments must use Shopify billing."] };
   const checkoutMatch = paddleCheckoutMatchesTenant(tenant, {
     subscriptionId: paddleSubscriptionId,
     invoiceNo: paddleInvoiceNo,
@@ -7467,6 +7473,7 @@ async function callPaddleApi(path, method, body) {
 // tenant's plan/limits in our DB are NOT updated here — the subscription.updated
 // webhook is the source of truth, same pattern as activatePaddleTenant.
 async function updatePaddleSubscriptionPlan(tenant, newPlanName) {
+  if (requiresShopifyBilling(tenant)) return { ok: false, status: 409, errors: ["Manage Shopify workspace charges in Shopify Admin."] };
   const priceId = config.paddlePriceIds[newPlanName];
   if (!priceId) return { ok: false, status: 400, errors: [`No Paddle price configured for "${newPlanName}".`] };
   if (!tenant.paddleSubscriptionId) return { ok: false, status: 400, errors: ["No active Paddle subscription on this account."] };
@@ -7490,6 +7497,7 @@ async function cancelPaddleSubscription(tenant) {
 }
 
 async function createPaddlePortalSession(tenant) {
+  if (requiresShopifyBilling(tenant)) return { ok: false, status: 409, errors: ["Manage Shopify workspace charges in Shopify Admin."] };
   if (!tenant.paddleCustomerId) return { ok: false, status: 400, errors: ["No Paddle customer is linked to this account."] };
   const body = tenant.paddleSubscriptionId ? { subscription_ids: [tenant.paddleSubscriptionId] } : {};
   const result = await callPaddleApi(`/customers/${tenant.paddleCustomerId}/portal-sessions`, "POST", body);
@@ -7634,7 +7642,8 @@ async function getCustomerBilling(session) {
       scheduledPlanCycle: tenant.scheduledPlanCycle || "",
       scheduledEffectiveDate: tenant.scheduledPlan ? (tenant.renewalDate || "") : "",
       payment: tenant.pendingPlan ? paymentInstructionsFor(tenant, data) : null,
-      paymentNumbers: (() => { const s = paymentSettings(data); return { bkashNumber: s.bkashNumber, nagadNumber: s.nagadNumber, ownerWhatsApp: s.ownerWhatsApp, instructions: s.instructions }; })(),
+      paymentProvider: requiresShopifyBilling(tenant) ? "shopify" : (tenant.paymentProvider || ""),
+      paymentNumbers: requiresShopifyBilling(tenant) ? null : (() => { const s = paymentSettings(data); return { bkashNumber: s.bkashNumber, nagadNumber: s.nagadNumber, ownerWhatsApp: s.ownerWhatsApp, instructions: s.instructions }; })(),
       latestPending,
       claims: claims.slice(0, 10)
     }
@@ -7757,6 +7766,9 @@ async function redeemShopifyConnectionCode(input) {
     if (!tenant || !setup.connectCodeExpiresAt || new Date(setup.connectCodeExpiresAt) < new Date()) {
       return { ok: false, status: 401, errors: ["This connection code is invalid or expired. Generate a new code in Tagioo."] };
     }
+    if (tenant.plan !== "Free" && tenant.paymentStatus === "paid" && tenant.paymentProvider !== "shopify" && !tenant.lifetimeAccess) {
+      return { ok: false, status: 409, errors: ["This workspace has an externally billed paid plan. Cancel that subscription and move the workspace to Free before connecting Shopify, or use a separate Free workspace. All Shopify hosting charges must use Shopify billing."] };
+    }
     const integrationToken = randomBytes(32).toString("hex");
     const updatedTracking = {
       ...matchedTracking,
@@ -7770,6 +7782,7 @@ async function redeemShopifyConnectionCode(input) {
     };
     setTrackingForContainer(tenant, data.customerSetupRequests || [], matchedContainerId, updatedTracking);
     if (!matchedContainerId || matchedContainerId === primaryContainerId(tenant, data.customerSetupRequests || [])) tenant.platform = "shopify";
+    tenant.shopifyBillingRequired = true;
     tenant.updatedAt = new Date().toISOString();
     await writeDatabase(data);
     return {
@@ -11773,8 +11786,8 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
     // Drives which currency "My Subscription" displays — a Paddle tenant sees
     // USD pricing, Shopify plans are managed in Shopify Admin, and everyone
     // else sees the BDT bKash/Nagad catalog.
-    paymentProvider: tenant?.paymentProvider || "",
-    billingCurrency: ["paddle", "shopify"].includes(tenant?.paymentProvider)
+    paymentProvider: requiresShopifyBilling(tenant) ? "shopify" : (tenant?.paymentProvider || ""),
+    billingCurrency: requiresShopifyBilling(tenant) || ["paddle", "shopify"].includes(tenant?.paymentProvider)
       || (currencyForCountry(tenant?.country) === "USD" && paddleCatalogReady())
       ? "USD"
       : "BDT",

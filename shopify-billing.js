@@ -37,3 +37,15 @@ export function highestActiveShopifyPlan(billings, rankFor) {
     .filter((billing) => billing?.status === "active" && SHOPIFY_BILLING_PLANS.has(billing.plan))
     .sort((a, b) => rankFor(b.plan) - rankFor(a.plan))[0] || null;
 }
+
+// Reserve Shopify workspaces before the first successful billing sync.
+export function requiresShopifyBilling(tenant) {
+  if (!tenant) return false;
+  if (tenant.paymentProvider === "shopify" || tenant.shopifyBillingRequired
+    || String(tenant.platform || "").toLowerCase() === "shopify") return true;
+  const tracking = tenant.tracking || {};
+  return [tracking, ...Object.values(tracking.containerConfigs || {})].some((entry) =>
+    String(entry?.platform || "").toLowerCase() === "shopify"
+    || Boolean(entry?.shopify?.shop || entry?.shopify?.connectCodeHash)
+  );
+}

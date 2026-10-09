@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { requiresShopifyBilling } from "../shopify-billing.js";
 
 const source = readFileSync(new URL("../server.js", import.meta.url), "utf8");
 function helper(name) {
@@ -10,6 +11,7 @@ function helper(name) {
 }
 function context() {
   const ctx = vm.createContext({
+    requiresShopifyBilling,
     config: { paddleClientToken: "test_token", paddleApiKey: "sandbox_key", paddleWebhookSecret: "secret", paddlePriceIds: { Starter: "pri_starter", Pro: "pri_pro", Enterprise: "pri_enterprise" }, paddleEnv: "sandbox" },
     paddleUsdMonthly: { Starter: 30, Pro: 50, Enterprise: 100 },
     escapeHtml: String, gtmHead: () => "", gtmNoscript: () => "",
