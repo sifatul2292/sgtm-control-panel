@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { parseProtectedJson, serializeProtectedJson } from "./data-protection.js";
 import { unpackEventHistory, archiveEventHistory } from "./history-archive.js";
-import { removeShopifyOrders } from "./shopify-privacy.js";
+import { privacyTokenHash, removeShopifyOrders } from "./shopify-privacy.js";
 
 // Raw event snapshots contain IPs and URLs. Backups retain aggregate billing state
 // but omit Shopify event detail so rotation cannot extend its 30-day lifetime.
@@ -16,6 +16,9 @@ export async function privacySafeBackupData(data) {
   ]);
   if (!tenantIds.size) return data;
   const safe = unpackEventHistory(data);
+  safe.orders = (data.orders || []).filter(order => order.source !== "tagioo-shopify-app"
+    || !(data.shopifyPrivacyRedactions || []).some(route => route.tenantId === order.tenantId
+      && route.shopHash === privacyTokenHash(String(order.raw?.shop_domain || "").toLowerCase())));
   safe.tenantEventHistory = { ...safe.tenantEventHistory };
   for (const id of tenantIds) delete safe.tenantEventHistory[id];
   return archiveEventHistory(safe);
