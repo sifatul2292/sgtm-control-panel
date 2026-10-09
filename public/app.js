@@ -276,7 +276,7 @@ const subscriptionPlans = [
     receivers: 5,
     retention: "15 days log retention",
     popular: true,
-    features: ["Live Chat, Call & Google Meet", "Video & Files Provided", "Consent Mode V2 (GDPR)", "Custom Loader", "Traffic Filtering", "300+ CDN Locations", "Click ID Restorer", "Delay Purchase System", "WordPress Plugin"]
+    features: ["Live Chat, Call & Google Meet", "Video & Files Provided", "Consent Mode V2 (GDPR)", "Custom Loader", "Traffic Filtering", "Click ID Restorer", "Server-side purchase recovery", "WordPress Plugin"]
   },
   {
     name: "Enterprise",
@@ -6964,7 +6964,7 @@ els.workerNodeForm.addEventListener("submit", async (event) => {
 });
 function renderCustomerAccountSettings() {
   if (latestData) renderAccountOverview(latestData, null);
-  fetch("/api/customer/me")
+  fetch(`/api/customer/me${selectedCustomerContainerId ? `?container=${encodeURIComponent(selectedCustomerContainerId)}` : ""}`)
     .then((r) => r.json())
     .then((result) => {
       if (!result.account) return;
@@ -6984,7 +6984,8 @@ function renderAccountOverview(data, account) {
   const name = account?.fullName || tenant.fullName || tenant.name || "Your account";
   const email = account?.email || tenant.email || "—";
   const created = account?.createdAt || tenant.createdAt;
-  const domain = data?.config?.tenantDomain || tenant.trackingDomain || "Not set up yet";
+  const tracking = data?.tracking || tenant.tracking || {};
+  const domain = tracking.domain || data?.activeContainer?.trackingDomain || tenant.trackingDomain || "Not set up yet";
   const plan = usage.plan || tenant.plan || "Starter";
   const subStatus = (usage.subscriptionStatus || tenant.subscriptionStatus || "trial");
   const payStatus = (usage.paymentStatus || tenant.paymentStatus || "");
@@ -6992,7 +6993,8 @@ function renderAccountOverview(data, account) {
   const requestLimit = Number(usage.requestLimit || 0);
   const usagePercent = Number(usage.usagePercent || 0);
   const renewal = usage.lifetimeAccess ? "" : (usage.renewalDate || usage.periodEnd);
-  const webhookConfigured = Boolean(data?.webhookSecret) || Boolean(data?.orders?.configured);
+  const shopifyConnected = Boolean(tracking.shopify?.shop) && tracking.shopify.status === "connected";
+  const webhookConfigured = shopifyConnected || Boolean(data?.orders?.configured);
 
   if (els.accountIdentityName) els.accountIdentityName.textContent = name;
   if (els.accountIdentityEmail) els.accountIdentityEmail.textContent = email;

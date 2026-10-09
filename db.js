@@ -134,6 +134,11 @@ export function openEventStore(dataDir) {
   const tenantSourceCountsForDateStmt = db.prepare(
     "SELECT source, COUNT(*) AS total FROM event_lines WHERE tenant_id = ? AND date_key = ? GROUP BY source"
   );
+  // Dedicated logs already identify their tenant. Do not mix shared-log rows in
+  // before skipping host filtering (combined logs expose the storefront referrer).
+  const dedicatedLinesStmt = db.prepare("SELECT line FROM event_lines WHERE tenant_id = ? AND date_key = ? AND (? = '' OR source = ?) ORDER BY id");
+  const dedicatedCountsStmt = db.prepare("SELECT date_key AS dateKey, COUNT(*) AS total FROM event_lines WHERE tenant_id = ? AND date_key >= ? AND (? = '' OR source = ?) GROUP BY date_key");
+  const dedicatedDatesStmt = db.prepare("SELECT DISTINCT date_key AS dateKey FROM event_lines WHERE tenant_id = ? AND date_key >= ? AND (? = '' OR source = ?) ORDER BY date_key");
 
   const getSummaryStmt = db.prepare("SELECT payload FROM daily_summaries WHERE tenant_id = ? AND date_key = ?");
   const setSummaryStmt = db.prepare(`
@@ -217,24 +222,24 @@ export function openEventStore(dataDir) {
     },
 
     // Tenant's own lines plus shared-log lines (tenant resolved later by host match).
-    linesForTenantDate(tenantId, dateKey, source = "") {
-      const rows = source
+    linesForTenantDate(tenantId, dateKey, source = "", dedicatedOnly = false) {
+      const rows = dedicatedOnly ? dedicatedLinesStmt.all(tenantId, dateKey, source, source) : source
         ? linesForContainerDateStmt.all(dateKey, tenantId || "", source)
         : linesForDateStmt.all(dateKey, tenantId || "");
       return rows.map((row) => row.line);
     },
 
-    dateCountsForTenant(tenantId, fromDateKey, source = "") {
+    dateCountsForTenant(tenantId, fromDateKey, source = "", dedicatedOnly = false) {
       const counts = {};
-      const rows = source
+      const rows = dedicatedOnly ? dedicatedCountsStmt.all(tenantId, fromDateKey, source, source) : source
         ? containerDateCountsStmt.all(tenantId || "", fromDateKey, source)
         : dateCountsStmt.all(tenantId || "", fromDateKey);
       for (const row of rows) counts[row.dateKey] = row.total;
       return counts;
     },
 
-    tenantDates(tenantId, fromDateKey, source = "") {
-      const rows = source
+    tenantDates(tenantId, fromDateKey, source = "", dedicatedOnly = false) {
+      const rows = dedicatedOnly ? dedicatedDatesStmt.all(tenantId, fromDateKey, source, source) : source
         ? containerDatesStmt.all(tenantId || "", fromDateKey, source)
         : tenantDatesStmt.all(tenantId || "", fromDateKey);
       return rows.map((row) => row.dateKey);

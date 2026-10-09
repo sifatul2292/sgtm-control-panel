@@ -11651,7 +11651,7 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
       ? summarizeRequestsForPeriodForPaths(allTenantLogPaths.length ? allTenantLogPaths : fallbackPaths, billingPeriod, customerSummaryOptions)
       : Promise.resolve(emptyPeriodSummary)
   ]);
-  const tenantRequestSummary = filterRequestSummaryForTenant(rawTodaySummary, scopedTenant);
+  const tenantRequestSummary = useDedicatedLogs ? rawTodaySummary : filterRequestSummaryForTenant(rawTodaySummary, scopedTenant);
   const tenantPeriodSummary = rawPeriodSummary;
   const requestLimit = tenant?.requestLimit || data.usage.requestLimit;
   const todayKey = localDateKey();
@@ -11671,15 +11671,15 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
   // log rotation and works across worker VPSes. Per date, keep whichever source saw
   // more events (tail summaries undercount after rotation; SQLite may lag a tick).
   const scopedSource = scopedContainerId ? tenantLogPaths[0] || "" : "";
-  const snapshotCacheKey = scopedContainerId ? `${session.tenantId}:${scopedContainerId}` : session.tenantId;
+  const snapshotCacheKey = `${scopedContainerId ? `${session.tenantId}:${scopedContainerId}` : session.tenantId}${useDedicatedLogs ? ':dedicated-v2' : ''}`;
   const sqliteSnapshotsByDate = hasEventSource
-    ? sqliteSnapshotsForTenant(session.tenantId, scopedTenant, 30, { source: scopedSource, cacheKey: snapshotCacheKey })
+    ? sqliteSnapshotsForTenant(session.tenantId, scopedTenant, 30, { source: scopedSource, cacheKey: snapshotCacheKey, dedicatedOnly: useDedicatedLogs })
     : {};
   const accountTenant = multiContainer
     ? { ...tenant, containerDomains: tenantSetupRequests.map((request) => request.trackingDomain).filter(Boolean) }
     : tenant;
   const accountSqliteSnapshots = multiContainer && hasEventSource
-    ? sqliteSnapshotsForTenant(session.tenantId, accountTenant)
+    ? sqliteSnapshotsForTenant(session.tenantId, accountTenant, 30, { cacheKey: `${session.tenantId}:dedicated-v2`, dedicatedOnly: useDedicatedLogs })
     : sqliteSnapshotsByDate;
   for (const [dateKey, snapshot] of Object.entries(sqliteSnapshotsByDate)) {
     const existing = retainedSnapshotsByDate[dateKey];
@@ -14314,7 +14314,7 @@ async function ingestLocalLogsTick() {
 // seconds, so reuse the result until new lines arrive for that tenant+day.
 const todaySnapshotCache = new Map();
 
-function sqliteSnapshotsForTenant(tenantId, tenant, days = 30, { source = "", cacheKey = tenantId, cachedOnly = false } = {}) {
+function sqliteSnapshotsForTenant(tenantId, tenant, days = 30, { source = "", cacheKey = tenantId, cachedOnly = false, dedicatedOnly = false } = {}) {
   if (!eventStore) return {};
   const fromKey = localDateKey(addDays(new Date(), -(days - 1)));
   const todayKey = localDateKey();
@@ -14333,8 +14333,8 @@ function sqliteSnapshotsForTenant(tenantId, tenant, days = 30, { source = "", ca
       }
       return snapshots;
     }
-    const lineCounts = eventStore.dateCountsForTenant(tenantId, fromKey, source);
-    for (const dateKey of eventStore.tenantDates(tenantId, fromKey, source)) {
+    const lineCounts = eventStore.dateCountsForTenant(tenantId, fromKey, source, dedicatedOnly);
+    for (const dateKey of eventStore.tenantDates(tenantId, fromKey, source, dedicatedOnly)) {
       if (dateKey !== todayKey) {
         const cached = eventStore.getDailySummary(cacheKey, dateKey);
         if (cached) {
@@ -14348,12 +14348,10 @@ function sqliteSnapshotsForTenant(tenantId, tenant, days = 30, { source = "", ca
           continue;
         }
       }
-      const lines = eventStore.linesForTenantDate(tenantId, dateKey, source);
+      const lines = eventStore.linesForTenantDate(tenantId, dateKey, source, dedicatedOnly);
       if (!lines.length) continue;
-      const summary = filterRequestSummaryForTenant(
-        aggregateTrackingLines(lines, { path: "sqlite:events.db" }),
-        tenant
-      );
+      const rawSummary = aggregateTrackingLines(lines, { path: "sqlite:events.db" });
+      const summary = dedicatedOnly ? rawSummary : filterRequestSummaryForTenant(rawSummary, tenant);
       if (!summary?.available) continue;
       const snapshot = historySnapshotFromSummary(summary, dateKey);
       snapshots[dateKey] = snapshot;
