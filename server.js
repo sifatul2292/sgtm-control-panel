@@ -8,7 +8,7 @@ import { deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
 import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
 import { highestActiveShopifyPlan, normalizeShopifyBillingState, requiresShopifyBilling } from "./shopify-billing.js";
-import { removeShopifyOrders, shopifyCustomerOrders } from "./shopify-privacy.js";
+import { privacyTokenHash, retainShopifyPrivacyRoute, removeShopifyOrders, shopifyCustomerOrders } from "./shopify-privacy.js";
 import { parseDataProtectionKey, parseProtectedJson, serializeProtectedJson } from "./data-protection.js";
 import { appendProtectedDataAudit } from "./protected-data-audit.js";
 import { staffPasswordPolicyErrors } from "./staff-password-policy.js";
@@ -7769,6 +7769,8 @@ async function redeemShopifyConnectionCode(input) {
     if (tenant.plan !== "Free" && tenant.paymentStatus === "paid" && tenant.paymentProvider !== "shopify" && !tenant.lifetimeAccess) {
       return { ok: false, status: 409, errors: ["This workspace has an externally billed paid plan. Cancel that subscription and move the workspace to Free before connecting Shopify, or use a separate Free workspace. All Shopify hosting charges must use Shopify billing."] };
     }
+    retainShopifyPrivacyRoute(data, tenant, matchedContainerId, matchedTracking,
+      matchedContainerId === primaryContainerId(tenant, data.customerSetupRequests || []) ? "" : matchedContainerId);
     const integrationToken = randomBytes(32).toString("hex");
     const updatedTracking = {
       ...matchedTracking,
@@ -7819,6 +7821,8 @@ async function syncShopifySubscription(tenantId, containerId, billingState) {
     const now = new Date();
     const nextTracking = { ...currentTracking };
     if (billingState.status === "disconnected") {
+      retainShopifyPrivacyRoute(data, tenant, containerId, currentTracking,
+        containerId === primaryContainerId(tenant, data.customerSetupRequests || []) ? "" : containerId);
       delete nextTracking.shopify;
     } else {
       nextTracking.shopify = {
@@ -12821,7 +12825,7 @@ const server = createServer(async (req, res) => {
       }
       const primaryId = primaryContainerId(tenant, loadedForSecret.data.customerSetupRequests || []);
       const containerId = matchedIntegration.containerId === primaryId ? "" : matchedIntegration.containerId;
-      const result = await addOrderWebhook({ ...payload, tenant_id: tenantId, container_id: containerId, source: "tagioo-shopify-app" });
+      const result = await addOrderWebhook({ ...payload, shop_domain: matchedIntegration.tracking.shopify.shop, tenant_id: tenantId, container_id: containerId, source: "tagioo-shopify-app" });
       jsonResponse(res, result.ok ? (result.created ? 202 : 200) : 400, result.ok
         ? { accepted: true, created: result.created, order_id: result.order.id }
         : { errors: result.errors });
@@ -12887,13 +12891,22 @@ const server = createServer(async (req, res) => {
       }
       const loadedForSecret = await readDatabaseCached();
       const tenant = loadedForSecret.available ? (loadedForSecret.data.tenants || []).find((item) => item.id === tenantId) : null;
+      const privacyEntries = tenant ? [
+        ...scopedTrackingEntries(tenant, loadedForSecret.data.customerSetupRequests || []),
+        ...(loadedForSecret.data.shopifyPrivacyRoutes || []).filter((route) => route.tenantId === tenantId)
+          .map((route) => ({ containerId: route.containerId, tracking: { shopify: route }, archived: true }))
+      ] : [];
       const matchedIntegration = tenant
-        ? scopedTrackingEntries(tenant, loadedForSecret.data.customerSetupRequests || []).find((entry) =>
+        ? privacyEntries.find((entry) =>
           entry.tracking?.shopify?.integrationToken
           && isShopifyIntegrationAuthorized(req, rawBody, entry.tracking.shopify.integrationToken)
         )
         : null;
-      if (!tenantId || !matchedIntegration) {
+      const privacyToken = String(req.headers["x-tagioo-privacy-token"] || "");
+      const redacted = (loadedForSecret.data?.shopifyPrivacyRedactions || []).find((entry) =>
+        entry.tenantId === tenantId && privacyToken && entry.tokenHash === privacyTokenHash(privacyToken)
+        && isShopifyIntegrationAuthorized(req, rawBody, privacyToken));
+      if (!tenantId || (!matchedIntegration && !redacted)) {
         jsonResponse(res, 401, { error: "Invalid Shopify integration signature." });
         return;
       }
@@ -12906,6 +12919,13 @@ const server = createServer(async (req, res) => {
       }
       const topic = String(requestPayload.topic || "").toUpperCase();
       const payload = requestPayload.payload || {};
+      const requestedShop = String(requestPayload.shop || payload.shop_domain || "").toLowerCase();
+      if (!matchedIntegration && redacted) {
+        if (topic === "SHOP_REDACT" && privacyTokenHash(requestedShop) === redacted.shopHash) {
+          jsonResponse(res, 200, { accepted: true, removed: 0 });
+        } else jsonResponse(res, 400, { error: "Invalid Shopify privacy request." });
+        return;
+      }
       const configuredShop = String(matchedIntegration.tracking.shopify.shop || "").toLowerCase();
       if (!["CUSTOMERS_DATA_REQUEST", "CUSTOMERS_REDACT", "SHOP_REDACT"].includes(topic)
         || String(requestPayload.shop || payload.shop_domain || "").toLowerCase() !== configuredShop) {
@@ -12916,6 +12936,7 @@ const server = createServer(async (req, res) => {
       const containerId = matchedIntegration.containerId === primaryId ? "" : matchedIntegration.containerId;
       const options = {
         tenantId,
+        shop: configuredShop,
         containerId,
         customer: payload.customer || {},
         orderIds: payload.orders_requested || payload.orders_to_redact || []
@@ -12949,6 +12970,9 @@ const server = createServer(async (req, res) => {
         const loaded = await readDatabase();
         if (!loaded.available) return { ok: false };
         const data = loaded.data;
+        const freshTenant = (data.tenants || []).find((item) => item.id === tenantId);
+        retainShopifyPrivacyRoute(data, freshTenant, matchedIntegration.containerId,
+          matchedIntegration.tracking, containerId);
         const before = (data.orders || []).length;
         data.orders = removeShopifyOrders(data.orders || [], { ...options, allForShop: topic === "SHOP_REDACT" });
         await writeDatabase(data);
@@ -12958,7 +12982,7 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 503, { error: "Tagioo data store is unavailable." });
         return;
       }
-      if (topic === "SHOP_REDACT") {
+      if (topic === "SHOP_REDACT" && !matchedIntegration.archived) {
         const disconnected = await syncShopifySubscription(tenantId, matchedIntegration.containerId, {
           shop: configuredShop,
           plan: "Free",
@@ -12974,6 +12998,21 @@ const server = createServer(async (req, res) => {
           jsonResponse(res, disconnected.status || 503, { errors: disconnected.errors });
           return;
         }
+      }
+      if (topic === "SHOP_REDACT") {
+        await withDbLock(async () => {
+          const loaded = await readDatabase();
+          if (!loaded.available) throw new Error("Tagioo data store is unavailable.");
+          const data = loaded.data;
+          const tokenHash = privacyTokenHash(matchedIntegration.tracking.shopify.integrationToken);
+          const redactions = data.shopifyPrivacyRedactions ||= [];
+          if (!redactions.some((entry) => entry.tokenHash === tokenHash)) {
+            redactions.push({ tenantId, tokenHash, shopHash: privacyTokenHash(configuredShop) });
+          }
+          data.shopifyPrivacyRoutes = (data.shopifyPrivacyRoutes || []).filter((route) =>
+            route.integrationToken !== matchedIntegration.tracking.shopify.integrationToken);
+          await writeDatabase(data);
+        });
       }
       await recordProtectedDataAccess({
         actor: "shopify-app",
