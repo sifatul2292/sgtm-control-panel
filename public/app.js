@@ -253,7 +253,7 @@ const subscriptionPlans = [
     domains: 1,
     receivers: 5,
     retention: "3 days log retention",
-    features: ["Email Support", "Consent Mode V2 (GDPR)", "Bot Detection & Filtering", "Custom Loader", "Custom Domain", "First-Party Domain", "Event Logs"]
+    features: ["Email Support", "Consent Mode V2 (GDPR)", "Custom Loader", "Custom Domain", "First-Party Domain", "Event Logs"]
   },
   {
     name: "Starter",
@@ -309,17 +309,17 @@ const powerUps = [
     icon: "●",
     minimumPlan: "Starter",
     defaultState: "enabled",
-    description: "Safari and iOS cut analytics cookies to 7 days. Cookie Keeper renews them to 400 days via first-party HTTP headers — so ad platforms see your full conversion window and bid accurately."
+    description: "Renews existing analytics cookies with a configured lifetime through first-party HTTP headers. Actual cookie lifetime depends on browser policies and consent."
   },
   {
     id: "custom-loader",
     name: "Custom Loader",
     category: "Web GTM load",
     icon: "</>",
-    minimumPlan: "Starter",
+    minimumPlan: "Free",
     defaultState: "configure",
     recommended: true,
-    description: "Loads GTM and GA scripts from your own tracking subdomain. Bypasses ad blockers and Safari restrictions that kill 15–25% of tracking — recovering lost conversion signals for Google and Meta."
+    description: "Loads GTM and GA scripts from your own tracking subdomain after setup. Browser privacy settings and ad blockers can still affect delivery."
   },
   {
     id: "click-id-restorer",
@@ -2853,7 +2853,7 @@ function showCookieKeeperInfoModal() {
         <h3>Cookie Keeper — How It Works</h3>
         <button class="powerup-modal-close" type="button" aria-label="Close">✕</button>
       </div>
-      <p class="powerup-modal-desc">Safari and iOS browsers limit JavaScript-set cookies to <strong>7 days</strong>. Cookie Keeper renews analytics cookies via <strong>HTTP Set-Cookie headers</strong> on every tracking response — extending them to <strong>400 days</strong>.</p>
+      <p class="powerup-modal-desc">Cookie Keeper renews existing analytics cookies through <strong>HTTP Set-Cookie headers</strong> with a configured maximum age of <strong>400 days</strong>. Browser policies and consent can shorten the actual lifetime.</p>
       <ul class="powerup-modal-list">
         <li>✓ <code>_ga</code> → renewed (400 days, SameSite=Lax)</li>
         <li>✓ <code>_fbp</code> → renewed (400 days, SameSite=None)</li>
@@ -6286,7 +6286,7 @@ function paintOfflineConversions() {
     </section>
     <section class="panel">
       <div class="panel-header">
-        <div><h2>Cookie life extension</h2><p class="panel-sub">Resist Safari ITP's 7-day cap by writing the first-party FPID cookie server-side with a long lifetime.</p></div>
+        <div><h2>Cookie life extension</h2><p class="panel-sub">Configure the server-side FPID cookie lifetime. Browser policies and consent still apply.</p></div>
       </div>
       <div class="cookie-ext">
         <label class="toggle-row"><input type="checkbox" id="cookieExtEnabled" ${cookie.enabled ? "checked" : ""}/> <span>Enable extended cookie lifetime</span></label>
