@@ -337,6 +337,20 @@ export function openEventStore(dataDir) {
       return deleteErrorLogsStmt.run().changes;
     },
 
+    pruneShopifyTenant(tenantId, hosts = []) {
+      const cutoff = new Date(Date.now() + 6 * 3600000 - 29 * 86400000).toISOString().slice(0, 10);
+      const lines = db.prepare("DELETE FROM event_lines WHERE tenant_id = ? AND date_key < ?").run(tenantId, cutoff).changes;
+      // Shared rows have no tenant id: match the exact host marker, never a loose
+      // substring that could delete another tenant with a similar domain.
+      let shared = 0;
+      for (const host of hosts) {
+        if (!/^[a-z0-9.-]+$/.test(host)) continue;
+        shared += db.prepare("DELETE FROM event_lines WHERE tenant_id = '' AND date_key < ? AND instr(line, ?) > 0").run(cutoff, `host="${host}"`).changes;
+      }
+      const summaries = db.prepare("DELETE FROM daily_summaries WHERE tenant_id = ? AND date_key < ?").run(tenantId, cutoff).changes;
+      return { lines: lines + shared, summaries, cutoff };
+    },
+
     prune(retentionDays, batchRetentionDays = 7) {
       const cutoff = isoDateKeyDaysAgo(retentionDays);
       const lines = db.prepare("DELETE FROM event_lines WHERE date_key < ?").run(cutoff).changes;

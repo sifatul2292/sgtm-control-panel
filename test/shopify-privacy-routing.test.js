@@ -37,6 +37,7 @@ test('delayed redaction after uninstall deletes only old shop and survives retry
       jsonResponse: (_r, status, result) => { response = { status, result }; },
       syncShopifySubscription: async () => { syncCalls++; return { ok: true }; },
       recordProtectedDataAccess: async () => {},
+      redactShopifyBackups: async () => {}, backupsDir: "", config: { dataEncryptionKey: "" },
     };
     await vm.runInNewContext(`(async()=>{${route}})()`, context);
     return response;

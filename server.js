@@ -8,6 +8,7 @@ import { deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
 import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
 import { highestActiveShopifyPlan, normalizeShopifyBillingState, requiresShopifyBilling } from "./shopify-billing.js";
+import { redactShopifyBackups, privacySafeBackupData } from "./shopify-privacy-backups.js";
 import { privacyTokenHash, retainShopifyPrivacyRoute, removeShopifyOrders, shopifyCustomerOrders } from "./shopify-privacy.js";
 import { parseDataProtectionKey, parseProtectedJson, serializeProtectedJson } from "./data-protection.js";
 import { appendProtectedDataAudit } from "./protected-data-audit.js";
@@ -4734,7 +4735,7 @@ async function createBackup(source = "manual") {
   await mkdir(backupsDir, { recursive: true });
   const now = new Date();
   const id = backupIdFor(now, randomBytes(3).toString("hex"));
-  const payload = { id, createdAt: now.toISOString(), source, data: loaded.data };
+  const payload = { id, createdAt: now.toISOString(), source, data: await privacySafeBackupData(loaded.data) };
   await writeFile(join(backupsDir, id), serializeProtectedJson(payload, config.dataEncryptionKey), { encoding: "utf8", mode: 0o600 });
   await pruneBackups();
   return id;
@@ -4789,7 +4790,7 @@ async function importBackupLocked(rawData) {
   await mkdir(backupsDir, { recursive: true });
   const now = new Date();
   const id = backupIdFor(now, randomBytes(3).toString("hex"));
-  const payload = { id, createdAt: now.toISOString(), source: "import", data: rawData };
+  const payload = { id, createdAt: now.toISOString(), source: "import", data: await privacySafeBackupData(rawData) };
   await writeFile(join(backupsDir, id), serializeProtectedJson(payload, config.dataEncryptionKey), { encoding: "utf8", mode: 0o600 });
   await pruneBackups();
   return { ok: true, id };
@@ -12974,7 +12975,9 @@ const server = createServer(async (req, res) => {
         retainShopifyPrivacyRoute(data, freshTenant, matchedIntegration.containerId,
           matchedIntegration.tracking, containerId);
         const before = (data.orders || []).length;
-        data.orders = removeShopifyOrders(data.orders || [], { ...options, allForShop: topic === "SHOP_REDACT" });
+        const deletionOptions = { ...options, allForShop: topic === "SHOP_REDACT" };
+        await redactShopifyBackups(backupsDir, config.dataEncryptionKey, deletionOptions);
+        data.orders = removeShopifyOrders(data.orders || [], deletionOptions);
         await writeDatabase(data);
         return { ok: true, removed: before - data.orders.length };
       });
@@ -14293,8 +14296,24 @@ async function ingestLocalLogsTick() {
     // Retention: prune once per day.
     const today = localDateKey();
     if (lastEventPruneDate !== today) {
-      lastEventPruneDate = today;
       const pruned = eventStore.prune(config.eventRetentionDays);
+      if (loaded.available) {
+        const privacyTenantIds = new Set([
+          ...(loaded.data.shopifyPrivacyRoutes || []).map(route => route.tenantId),
+          ...(loaded.data.shopifyPrivacyRedactions || []).map(route => route.tenantId)
+        ]);
+        for (const tenant of loaded.data.tenants || []) {
+          // Only confirmed Shopify connections or archived privacy routes qualify;
+          // generic workspace platform flags are not proof of a Shopify customer.
+          const entries = scopedTrackingEntries(tenant, loaded.data.customerSetupRequests || []);
+          if (!privacyTenantIds.has(tenant.id) && !entries.some(entry => entry.tracking?.shopify?.shop)) continue;
+          const hosts = entries.map(entry => {
+            try { return new URL(entry.tracking?.domain || "").hostname.toLowerCase(); } catch { return ""; }
+          }).filter(Boolean);
+          eventStore.pruneShopifyTenant(tenant.id, hosts);
+        }
+        lastEventPruneDate = today;
+      }
       if (pruned.lines || pruned.summaries) {
         console.log(`[events] pruned ${pruned.lines} lines, ${pruned.summaries} summaries older than ${pruned.cutoff}`);
       }
