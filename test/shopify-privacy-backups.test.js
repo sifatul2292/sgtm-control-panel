@@ -40,11 +40,13 @@ test("new backups omit Shopify raw history without changing the active data or o
 
 test("hashed shop deletion ledger prevents erased orders returning through old snapshots", async () => {
   const { privacyTokenHash } = await import("../shopify-privacy.js");
-  const data = { shopifyPrivacyRedactions: [{ tenantId: "review", shopHash: privacyTokenHash("old.myshopify.com") }], orders: [
+  const data = { tenants: [{ id: "review", tracking: { shopify: { shop: "old.myshopify.com", integrationToken: "synthetic" } } }], shopifyPrivacyRedactions: [{ tenantId: "review", shopHash: privacyTokenHash("old.myshopify.com") }], orders: [
     { id: "1", tenantId: "review", source: "tagioo-shopify-app", raw: { shop_domain: "old.myshopify.com" } },
     { id: "2", tenantId: "other", source: "tagioo-shopify-app", raw: { shop_domain: "old.myshopify.com" } }
   ] };
   const safe = await privacySafeBackupData(data);
   assert.deepEqual(safe.orders.map(order => order.id), ["2"]);
   assert.equal(data.orders.length, 2);
+  assert.equal(safe.tenants[0].tracking.shopify, undefined);
+  assert.equal(data.tenants[0].tracking.shopify.integrationToken, "synthetic");
 });
