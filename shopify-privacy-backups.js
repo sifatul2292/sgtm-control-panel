@@ -34,9 +34,9 @@ export async function redactShopifyBackups(directory, key, options) {
     if (!snapshot.data) throw new Error("Invalid privacy backup snapshot.");
     const orders = snapshot.data.orders || [];
     snapshot.data.orders = removeShopifyOrders(orders, options);
-    const hadHistory = Boolean(unpackEventHistory(snapshot.data).tenantEventHistory?.[options.tenantId]);
+    const safe = unpackEventHistory(snapshot.data);
+    const hadHistory = Boolean(safe.tenantEventHistory?.[options.tenantId]);
     if (hadHistory) {
-      const safe = unpackEventHistory(snapshot.data);
       delete safe.tenantEventHistory[options.tenantId];
       snapshot.data = await archiveEventHistory(safe);
     }

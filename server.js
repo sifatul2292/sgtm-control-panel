@@ -4729,7 +4729,11 @@ async function pruneBackups() {
   }
 }
 
-async function createBackup(source = "manual") {
+function createBackup(source = "manual") {
+  return withDbLock(() => createBackupLocked(source));
+}
+
+async function createBackupLocked(source) {
   const loaded = await readDatabase();
   if (!loaded.available) throw new Error(loaded.detail || loaded.message || "Database unavailable.");
   await mkdir(backupsDir, { recursive: true });
