@@ -6504,25 +6504,36 @@ function renderAll(data) {
   renderCurrentView(data);
 }
 
-async function loadDashboard() {
+let dashboardRefreshTimer;
+async function loadDashboard(staleRetry = 0) {
+  clearTimeout(dashboardRefreshTimer);
   els.refreshButton.disabled = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000);
+  els.generatedAt.textContent = latestData ? "Updating…" : "Loading dashboard…";
   try {
     const query = currentSession.role === "customer" && selectedCustomerContainerId
       ? `?container=${encodeURIComponent(selectedCustomerContainerId)}`
       : "";
-    const response = await fetch(`/api/dashboard${query}`, { cache: "no-store" });
+    const response = await fetch(`/api/dashboard${query}`, { cache: "no-store", signal: controller.signal });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || data.error || "Request failed");
     latestData = data;
     renderAll(data);
+    if (currentSession.role === "customer" && data.timing?.cache === "stale" && staleRetry < 3) {
+      dashboardRefreshTimer = setTimeout(() => loadDashboard(staleRetry + 1), 10000);
+    }
     document.body.classList.remove("app-loading");
     return true;
   } catch (error) {
-    els.generatedAt.textContent = "Update failed";
+    els.generatedAt.textContent = error.name === "AbortError"
+      ? "Dashboard took too long. Click Refresh to retry."
+      : "Dashboard could not load. Click Refresh to retry.";
     els.containerCards.innerHTML = `<div class="empty-log">${escapeHtml(error.message)}</div>`;
     document.body.classList.remove("app-loading");
     return false;
   } finally {
+    clearTimeout(timeout);
     els.refreshButton.disabled = false;
   }
 }
@@ -6635,7 +6646,7 @@ document.addEventListener("click", (e) => {
   if (latestData) renderPurchaseInspector(latestData);
 });
 
-els.refreshButton.addEventListener("click", loadDashboard);
+els.refreshButton.addEventListener("click", () => loadDashboard());
 
 // Payment modal: close on backdrop click, ✕, or "Done"; Esc key closes too.
 document.addEventListener("click", (event) => {

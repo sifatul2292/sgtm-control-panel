@@ -11320,7 +11320,7 @@ function emptyCustomerRequestSummary() {
 }
 
 async function getCustomerDashboardData(session, requestedContainerId = "") {
-  const loaded = await readDatabase();
+  const loaded = await readDatabaseCached();
   const raw = loaded.data;
   const docker = customerDockerPlaceholder();
   // Reuse already-loaded DB data instead of calling readDatabase() again inside getOrderSummary
@@ -11391,13 +11391,35 @@ async function getCustomerDashboardData(session, requestedContainerId = "") {
 // last payload immediately and refreshes in the background, so a hard refresh or a
 // logout→login round-trip paints real numbers right away instead of waiting on log parsing.
 const CUSTOMER_DASHBOARD_FRESH_MS = Number(process.env.CUSTOMER_DASHBOARD_FRESH_MS || 8000);
-const CUSTOMER_DASHBOARD_STALE_MS = Number(process.env.CUSTOMER_DASHBOARD_STALE_MS || 120000);
+const CUSTOMER_DASHBOARD_STALE_MS = Number(process.env.CUSTOMER_DASHBOARD_STALE_MS || 3600000);
 const customerDashboardCache = new Map();
+const customerDashboardBuilds = new Map();
+
+function refreshCustomerDashboardCache(session, containerId, key) {
+  if (customerDashboardBuilds.has(key)) return customerDashboardBuilds.get(key);
+  const startedAt = Date.now();
+  const build = getCustomerDashboardData(session, containerId)
+    .then((payload) => {
+      payload.timing = { dashboardMs: Date.now() - startedAt, role: "customer", cache: "miss" };
+      if (customerDashboardBuilds.get(key) === build) {
+        customerDashboardCache.set(key, { payload, at: Date.now(), refreshing: false });
+      }
+      return payload;
+    })
+    .finally(() => {
+      if (customerDashboardBuilds.get(key) === build) customerDashboardBuilds.delete(key);
+    });
+  customerDashboardBuilds.set(key, build);
+  return build;
+}
 
 function invalidateCustomerDashboardCache(tenantId = "") {
   const prefix = tenantId ? `${tenantId}:` : "";
   for (const key of customerDashboardCache.keys()) {
     if (!prefix || key.startsWith(prefix)) customerDashboardCache.delete(key);
+  }
+  for (const key of customerDashboardBuilds.keys()) {
+    if (!prefix || key.startsWith(prefix)) customerDashboardBuilds.delete(key);
   }
 }
 
@@ -11413,18 +11435,13 @@ async function getCustomerDashboardDataCached(session, containerId = "") {
   if (entry && now - entry.at < CUSTOMER_DASHBOARD_STALE_MS) {
     if (!entry.refreshing) {
       entry.refreshing = true;
-      getCustomerDashboardData(session, containerId)
-        .then((payload) => { customerDashboardCache.set(key, { payload, at: Date.now(), refreshing: false }); })
+      refreshCustomerDashboardCache(session, containerId, key)
         .catch(() => { entry.refreshing = false; });
     }
     return { ...entry.payload, timing: { ...entry.payload.timing, cache: "stale" } };
   }
 
-  const startedAt = Date.now();
-  const payload = await getCustomerDashboardData(session, containerId);
-  payload.timing = { dashboardMs: Date.now() - startedAt, role: "customer", cache: "miss" };
-  customerDashboardCache.set(key, { payload, at: Date.now(), refreshing: false });
-  return payload;
+  return refreshCustomerDashboardCache(session, containerId, key);
 }
 
 // ── Owner dashboard cache (stale-while-revalidate) ──────────────────────────

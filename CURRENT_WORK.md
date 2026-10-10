@@ -3,6 +3,20 @@
 Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 
 
+## 2026-10-10 — Customer dashboard loading recovery
+
+- Customer reports 10–30 seconds on Home. Avoid duplicate tenant/container builds
+  on concurrent cold requests; customer read-only builds share the existing DB
+  read cache instead of reparsing history.json for each request.
+- Extend customer stale-while-revalidate window from two minutes to one hour.
+  Returning customers see timestamped cached data while rebuilding; app v102
+  checks again after ten seconds (up to three times) to paint fresh results.
+- Bound requests to 45 seconds; timeout/error restores Refresh and shows a retry
+  message. Mutation invalidation prevents obsolete builds repopulating the cache.
+- Focused cache/isolation/invalidation/retry tests, owner usage cache test and
+  syntax checks pass. Production cold-load timing still requires verification
+  after deployment; a first uncached build can still take longer than cache hits.
+
 ## 2026-10-10 — Customer dashboard Shopify-style experience
 
 - Owner requested full customer experience: navigation, overview, tables and
