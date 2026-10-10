@@ -2534,7 +2534,7 @@ function customerContainersList(requests, totalCount, data) {
           <th>Domain</th>
           <th>Status</th>
           <th>Requests</th>
-          <th>Last Sync</th>
+          <th>Updated</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -2544,7 +2544,7 @@ function customerContainersList(requests, totalCount, data) {
     </table>
     <div class="container-list-footer">
       <span>Showing ${requests.length.toLocaleString()} of ${totalCount.toLocaleString()} container${totalCount === 1 ? "" : "s"}</span>
-      <span>Per page 10</span>
+      <span>Account workspaces</span>
     </div>
   </div>`;
 }
@@ -2553,7 +2553,6 @@ function customerContainerRow(request, data) {
   const meta = customerStatusMeta(request.status);
   const isSelected = request.id === selectedCustomerContainerId;
   const requestCount = customerContainerRequestCount(request, data);
-  const canDelete = !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase());
   return `<tr class="${isSelected ? "is-selected" : ""}">
     <td>
       <button class="container-name-button" type="button" data-container-select="${escapeHtml(request.id)}">
@@ -2570,8 +2569,7 @@ function customerContainerRow(request, data) {
       <div class="container-row-actions">
         <button type="button" data-container-select="${escapeHtml(request.id)}">View</button>
         <button type="button" data-container-logs="${escapeHtml(request.id)}">Logs</button>
-        <button type="button" data-container-powerups="${escapeHtml(request.id)}">Power-Ups</button>
-        ${canDelete ? `<button class="danger-link" type="button" data-container-delete="${escapeHtml(request.id)}">Delete</button>` : ""}
+        <button type="button" data-container-powerups="${escapeHtml(request.id)}">Tools</button>
       </div>
     </td>
   </tr>`;
@@ -2582,7 +2580,7 @@ function customerContainerDetail(request, data, dnsTarget) {
   const usage = data.usage || {};
   const planName = usage.plan || "Starter";
   const requestLimit = Number(usage.requestLimit || 100000);
-  const monthRequests = Number(data.containerUsage?.requestsMonth ?? usage.requestsMonth ?? 0);
+  const monthRequests = Number(usage.requestsMonth ?? 0);
   const requestCount = customerContainerRequestCount(request, data);
   const usagePercent = requestLimit ? Math.min(100, Math.round((monthRequests / requestLimit) * 1000) / 10) : 0;
   const serverUrl = request.trackingDomain ? `https://${request.trackingDomain}` : null;
@@ -2592,9 +2590,9 @@ function customerContainerDetail(request, data, dnsTarget) {
   return `<section class="container-detail-view">
     <article class="panel container-setup-callout" aria-labelledby="containerSetupTitle">
       <div class="container-setup-copy">
-        <span class="container-setup-eyebrow">Next step · Setup Assistant</span>
-        <h2 id="containerSetupTitle">Finish your container setup</h2>
-        <p>Connect your website, configure tracking, and verify your first events.</p>
+        <span class="container-setup-eyebrow">Setup guide</span>
+        <h2 id="containerSetupTitle">Connect your website</h2>
+        <p>Generate GTM templates and test your tracking.</p>
       </div>
       <button class="button button-primary container-setup-action" type="button" data-view-shortcut="setupAssistant">
         Continue setup <span aria-hidden="true">→</span>
@@ -2625,8 +2623,8 @@ function customerContainerDetail(request, data, dnsTarget) {
     </article>
 
     <nav class="container-detail-tabs" aria-label="Container shortcuts">
-      <button class="is-active" type="button">Settings</button>
-      <button type="button" data-view-shortcut="powerUps">Power-Ups</button>
+      <span class="container-detail-label">Configuration</span>
+      <button type="button" data-view-shortcut="powerUps">Tracking tools</button>
       <button type="button" data-view-shortcut="logs">Logs</button>
     </nav>
 
@@ -2640,8 +2638,6 @@ function customerContainerDetail(request, data, dnsTarget) {
           <span class="badge ${isLive ? "ok" : "warn"}">${escapeHtml(meta.badge)}</span>
         </div>
         <div class="detail-setting-list">
-          ${detailSetting("Name", containerDisplayName(request))}
-          ${detailSetting("Type", request.containerType || "sGTM")}
           ${detailSetting("sGTM Container ID", request.sgtmContainerId || "Unavailable")}
           ${detailSetting("Container Config", request.containerConfig ? "Configured" : "Missing")}
           ${detailSetting("Recent Requests", Number(requestCount || 0).toLocaleString())}
@@ -2671,7 +2667,7 @@ function customerContainerDetail(request, data, dnsTarget) {
           </div>
           <span class="badge ${isLive ? "ok" : "warn"}">${isLive ? "Active" : "Waiting"}</span>
         </div>
-        ${serverUrl ? `<div class="domain-live-card">
+        ${serverUrl ? `<div class="domain-live-card${isLive ? "" : " is-pending"}">
           <strong>${escapeHtml(serverUrl)}</strong>
           <span>Domain: ${isLive ? "Active" : "Waiting"} · SSL: ${isLive ? "Active" : "Provisioning"}</span>
         </div>` : ""}
@@ -2689,11 +2685,12 @@ function customerContainerDetail(request, data, dnsTarget) {
             <strong>${escapeHtml(dnsTarget)}</strong>
           </div>
         </div>
-        ${canDelete ? `<div class="domain-panel-footer">
-          <button class="danger-link" type="button" data-container-delete="${escapeHtml(request.id)}">Delete Container</button>
-        </div>` : ""}
       </article>
     </div>
+    ${canDelete ? `<div class="container-danger-zone">
+      <div><strong>Delete container</strong><p>Remove this tracking workspace from your account.</p></div>
+      <button class="button button-danger" type="button" data-container-delete="${escapeHtml(request.id)}">Delete container</button>
+    </div>` : ""}
   </section>`;
 }
 
@@ -7072,7 +7069,7 @@ function renderAccountOverview(data, account) {
     { label: "Usage this period", value: requestLimit ? `${usagePercent}%` : requestsMonth.toLocaleString(), detail: requestLimit ? `${requestsMonth.toLocaleString()} / ${requestLimit.toLocaleString()} requests` : "Requests this period", tone: usagePercent >= 90 ? "bad" : usagePercent >= 75 ? "warn" : "healthy" },
     { label: "Tracking domain", value: domain, detail: "Your first-party endpoint", tone: domain.includes(".") ? "healthy" : "warn", mono: true },
     { label: "Order webhook", value: webhookConfigured ? "Connected" : "Not connected", detail: webhookConfigured ? "Server-side purchase recovery active" : "Set up in Setup Assistant", tone: webhookConfigured ? "healthy" : "warn" },
-    { label: "Support", value: "tagioo.com", detail: "We reply within a few hours", tone: "accent" }
+    { label: "Support", value: "tagioo.com", detail: "Billing and tracking help", tone: "accent" }
   ];
 
   els.accountOverviewGrid.innerHTML = cards.map((c) => `
@@ -7097,6 +7094,7 @@ els.accountSettingsTabs.addEventListener("click", (event) => {
 els.customerProfileForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   els.customerProfileFormMessage.textContent = "Saving...";
+  els.customerProfileFormMessage.dataset.state = "loading";
   const payload = Object.fromEntries(new FormData(els.customerProfileForm).entries());
   const saveButton = els.customerProfileForm.querySelector('[type="submit"]');
   if (saveButton.disabled) return;
@@ -7111,8 +7109,10 @@ els.customerProfileForm.addEventListener("submit", async (event) => {
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Save failed"]).join(" "));
     els.customerProfileFormMessage.textContent = "Profile updated.";
+    els.customerProfileFormMessage.dataset.state = "success";
   } catch (error) {
     els.customerProfileFormMessage.textContent = error.message;
+    els.customerProfileFormMessage.dataset.state = "error";
   } finally {
     saveButton.disabled = false;
     els.customerProfileForm.removeAttribute("aria-busy");
@@ -7124,9 +7124,11 @@ els.customerPasswordForm.addEventListener("submit", async (event) => {
   const data = Object.fromEntries(new FormData(els.customerPasswordForm).entries());
   if (data.newPassword !== data.confirmPassword) {
     els.customerPasswordFormMessage.textContent = "New passwords do not match.";
+    els.customerPasswordFormMessage.dataset.state = "error";
     return;
   }
   els.customerPasswordFormMessage.textContent = "Changing password...";
+  els.customerPasswordFormMessage.dataset.state = "loading";
   const saveButton = els.customerPasswordForm.querySelector('[type="submit"]');
   if (saveButton.disabled) return;
   saveButton.disabled = true;
@@ -7141,8 +7143,10 @@ els.customerPasswordForm.addEventListener("submit", async (event) => {
     if (!response.ok) throw new Error((result.errors || [result.error || "Password change failed"]).join(" "));
     els.customerPasswordForm.reset();
     els.customerPasswordFormMessage.textContent = "Password changed successfully.";
+    els.customerPasswordFormMessage.dataset.state = "success";
   } catch (error) {
     els.customerPasswordFormMessage.textContent = error.message;
+    els.customerPasswordFormMessage.dataset.state = "error";
   } finally {
     saveButton.disabled = false;
     els.customerPasswordForm.removeAttribute("aria-busy");

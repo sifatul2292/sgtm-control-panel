@@ -3,6 +3,25 @@
 Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 
 
+## 2026-10-10 — Customer tab content refinement
+
+- Refined Home, event logs, containers, tracking tools, setup, settings and billing
+  inside the existing customer workspace. Shared compact cards, centered content,
+  readable typography, concise introductions and purposeful semantic colors.
+- Containers use paired configuration/DNS cards, a smaller setup prompt and a
+  separate destructive action. Removed repeated name/type rows, inert Settings
+  shortcut and misleading pagination/Last Sync copy. Usage now consistently shows
+  account-wide billing totals, covered by a native regression test.
+- Home/log metrics use distinct cards; filters, tool categories, setup step numbers,
+  current-plan comparisons and account overview are easier to scan. Profile/password
+  feedback exposes success/error states with semantic color. Assets: styles v61,
+  app v103. Backend and loading recovery preserved.
+- Syntax checks, 18 focused native tests and mocked browser checks passed. All seven
+  customer tabs checked for overflow at 320/375/414/768px plus desktop, with navigation,
+  search, profile-save recovery, reduced motion and owner isolation verified.
+- Synthetic screenshots: artifacts/customer-content/. Production visual verification
+  remains after applying this UI-only commit; no PM2 reload needed.
+
 ## 2026-10-10 — Customer dashboard loading recovery
 
 - Customer reports 10–30 seconds on Home. Avoid duplicate tenant/container builds
