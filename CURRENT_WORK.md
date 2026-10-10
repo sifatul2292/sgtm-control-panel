@@ -3,6 +3,19 @@
 Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 
 
+## 2026-10-10 — Stronger customer dashboard color
+
+- Owner requested more visual emphasis. Added distinct tinted metric cards,
+  accent borders, category-colored tool icons/headings, event-colored distribution
+  bars and totals, stronger navigation selection and indigo primary actions.
+- Containers/DNS, setup, billing and account cards now use the same purposeful
+  indigo/blue/green/amber/violet palette. Status labels remain explicit, and
+  unavailable tools retain muted styling. Customer-only CSS preserves owner UI.
+- Styles v62 / app v104. No backend changes. Eighteen focused tests and syntax
+  checks pass; mocked all-tab browser checks pass at 320/375/414/768 and desktop,
+  including reduced motion, save errors, search and owner isolation.
+- Synthetic previews: artifacts/customer-emphasis/. Live appearance awaits rollout.
+
 ## 2026-10-10 — Customer tab content refinement
 
 - Refined Home, event logs, containers, tracking tools, setup, settings and billing

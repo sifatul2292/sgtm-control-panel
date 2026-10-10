@@ -2436,7 +2436,7 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
     }
     els.customerTopEvents.innerHTML = events.length
       ? topEvents.map((event) => `
-          <div class="top-event-row">
+          <div class="top-event-row" data-event-name="${escapeHtml(event.name || "Other")}">
             <span>${escapeHtml(event.name || "Other")}</span>
             <strong>${Number(event.count || 0).toLocaleString()}</strong>
           </div>
@@ -2449,7 +2449,7 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
     els.customerEventDistribution.innerHTML = events.length
       ? events.slice(0, 5).map((event) => {
         const percent = total ? Math.round((Number(event.count || 0) / total) * 100) : 0;
-        return `<div class="distribution-row">
+        return `<div class="distribution-row" data-event-name="${escapeHtml(event.name || "Other")}">
           <div><span>${escapeHtml(event.name || "Other")}</span><strong>${percent}%</strong></div>
           <div class="usage-progress"><span style="width:${percent}%"></span></div>
         </div>`;
@@ -3041,7 +3041,7 @@ async function renderPowerUps(data) {
       : state === "needs-init" ? "button-warn"
       : state === "active" ? "button-active"
       : "";
-    return `<article class="powerup-card ${state}">
+    return `<article class="powerup-card ${state}" data-tool-category="${escapeHtml(item.category)}">
       <div class="powerup-icon" aria-hidden="true">${escapeHtml(item.icon)}</div>
       <div class="powerup-copy">
         <div class="powerup-title-row">
