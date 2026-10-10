@@ -2,6 +2,31 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
 
+
+## 2026-10-10 — Customer dashboard Shopify-style experience
+
+- Owner requested full customer experience: navigation, overview, tables and
+  settings. Added customer-only dark sidebar, persistent container picker,
+  Home/Tracking tools/Setup guide/Settings/Billing labels and Cmd/Ctrl+K page
+  search. Search uses visible permitted navigation, with arrow/Enter/Escape
+  handling, empty results and native dialog focus management.
+- Added compact neutral cards, metric strip, calmer table selection, mobile
+  navigation and two-column phone metrics. Owner frame and backend stay intact.
+- Profile/password submissions disable while saving and recover on failure;
+  live status messages and active-page aria-current improve accessible feedback.
+- Follow-up polish: Inter UI typography with tabular metrics, consistent SVG line
+  icons, short page/search/mobile-menu transitions, hover/press feedback and
+  in-flight refresh motion. Reduced-motion browser assertions pass.
+- Assets bumped to styles v60 and app v101. Existing marketing work preserved.
+- npm run check, app syntax, diff check and 11 focused native tests passed.
+  Mocked customer browser checks passed across Home, logs, containers, tools,
+  setup, settings and billing; no overflow at tested phone/tablet/desktop widths.
+  Search keyboard/empty results, mobile menu, container picker, profile save/error
+  recovery and owner-session isolation passed without browser exceptions.
+- Customer UI prepared for Git push on feat/saas-phase1-payments. Browser checks
+  use synthetic accounts/API responses; live customer verification and deployment
+  remain next. Previews: artifacts/customer-workspace/.
+
 ## 2026-10-07 — Honest Power-Up availability labels
 
 - Marked Multi-Domains, IP blocking, Dedicated IP, BigQuery Export and Tagioo

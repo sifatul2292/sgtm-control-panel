@@ -212,6 +212,47 @@ const viewTitles = {
   docs: ["Public / Docs", "Landing & Docs"]
 };
 
+const customerPageLabels = {
+  dashboard: "Home", logs: "Event logs", customerContainers: "Containers",
+  powerUps: "Tracking tools", offlineConversions: "Offline conversions",
+  setupAssistant: "Setup guide", customerAccountSettings: "Settings", billing: "Billing"
+};
+const customerNavIcons = {
+  dashboard: '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
+  logs: '<path d="M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01"/>',
+  customerContainers: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+  powerUps: '<path d="m13 2-9 12h7l-1 8 10-12h-7z"/>',
+  offlineConversions: '<path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5"/>',
+  setupAssistant: '<path d="M4 4h6a3 3 0 0 1 3 3v14a4 4 0 0 0-4-3H4zm16 0h-4a3 3 0 0 0-3 3v14a4 4 0 0 1 4-3h3z"/>',
+  customerAccountSettings: '<path d="m9 3-1 3-3 1-2 3 2 2v3l3 2 1 4h6l1-4 3-2v-3l2-2-2-3-3-1-1-3z"/><circle cx="12" cy="12" r="3"/>',
+  billing: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/>'
+};
+function configureCustomerWorkspace(customerMode) {
+  const switcher = document.getElementById("customerContainerSwitcher");
+  const sidebar = document.querySelector(".sidebar");
+  const actions = document.querySelector(".topbar-actions");
+  if (switcher) {
+    if (customerMode) sidebar.insertBefore(switcher, document.getElementById("customerSearchButton"));
+    else actions.prepend(switcher);
+  }
+  els.navItems.forEach((item) => {
+    const icon = item.querySelector(".nav-icon");
+    if (icon) {
+      icon.dataset.originalIcon ||= icon.textContent;
+      const path = customerNavIcons[item.dataset.viewTarget];
+      if (customerMode && path) icon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+      else icon.textContent = icon.dataset.originalIcon;
+    }
+    const label = item.querySelector(".nav-icon + span");
+    if (!label) return;
+    item.dataset.originalLabel ||= label.textContent;
+    const text = customerMode ? (customerPageLabels[item.dataset.viewTarget] || item.dataset.originalLabel) : item.dataset.originalLabel;
+    label.textContent = text;
+    item.setAttribute("aria-label", text);
+    item.title = text;
+  });
+}
+
 let latestData = null;
 let customerChartRange = "24h";
 let customerKpiRange = "24h";
@@ -489,9 +530,14 @@ function setView(name, options = {}) {
       : requested;
   currentViewName = next;
   els.views.forEach((view) => view.classList.toggle("is-active", view.dataset.view === next));
-  els.navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.viewTarget === next));
+  els.navItems.forEach((item) => {
+    const active = item.dataset.viewTarget === next;
+    item.classList.toggle("is-active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  });
   els.breadcrumb.textContent = currentSession.role === "customer" && next === "dashboard" ? "Dashboard" : viewTitles[next][0];
-  els.pageTitle.textContent = currentSession.role === "customer" && next === "dashboard" ? "Tracking Overview" : viewTitles[next][1];
+  els.pageTitle.textContent = currentSession.role === "customer" ? (customerPageLabels[next] || viewTitles[next][1]) : viewTitles[next][1];
   window.location.hash = next;
   if (!options.skipRender && latestData) renderCurrentView(latestData);
   // Payment panels load independently of the (sometimes-failing) dashboard fetch.
@@ -562,6 +608,7 @@ function applySession(session) {
     // Ignore local storage failures; this only improves the next page refresh.
   }
   document.body.classList.toggle("customer-session", customerMode);
+  configureCustomerWorkspace(customerMode);
   document.querySelectorAll("[data-owner-only]").forEach((element) => {
     element.hidden = customerMode;
   });
@@ -2042,7 +2089,7 @@ function renderCustomerSetup(data) {
   if (els.customerHeroDomain) {
     els.customerHeroDomain.textContent = latest
       ? `${latest.websiteUrl || "Website"} · ${latest.trackingDomain || "tracking domain"} · ${latestStatus || "requested"}`
-      : `Create a container, then point CNAME to ${dnsTarget}. Tagioo handles Docker, Nginx, SSL, and launch status automatically.`;
+      : `Connect your website and tracking domain. We host your server and manage SSL. Start with Create Container below.`;
   }
   if (els.customerUsagePercent) els.customerUsagePercent.textContent = `${usagePercent}%`;
   if (els.customerUsageRing) els.customerUsageRing.style.setProperty("--usage-percent", usagePercent);
@@ -6485,7 +6532,7 @@ function renderContainerSwitcher(data) {
   const requests = (data.customerSetup?.requests || []).filter((request) =>
     !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase())
   );
-  const show = currentSession.role === "customer" && requests.length > 1;
+  const show = currentSession.role === "customer" && requests.length > 0;
   els.customerContainerSwitcher.hidden = !show;
   if (data.activeContainer?.id) selectedCustomerContainerId = data.activeContainer.id;
   els.customerActiveContainer.innerHTML = requests.map((request) =>
@@ -7040,6 +7087,10 @@ els.customerProfileForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   els.customerProfileFormMessage.textContent = "Saving...";
   const payload = Object.fromEntries(new FormData(els.customerProfileForm).entries());
+  const saveButton = els.customerProfileForm.querySelector('[type="submit"]');
+  if (saveButton.disabled) return;
+  saveButton.disabled = true;
+  els.customerProfileForm.setAttribute("aria-busy", "true");
   try {
     const response = await fetch("/api/customer/me", {
       method: "PATCH",
@@ -7051,6 +7102,9 @@ els.customerProfileForm.addEventListener("submit", async (event) => {
     els.customerProfileFormMessage.textContent = "Profile updated.";
   } catch (error) {
     els.customerProfileFormMessage.textContent = error.message;
+  } finally {
+    saveButton.disabled = false;
+    els.customerProfileForm.removeAttribute("aria-busy");
   }
 });
 
@@ -7062,6 +7116,10 @@ els.customerPasswordForm.addEventListener("submit", async (event) => {
     return;
   }
   els.customerPasswordFormMessage.textContent = "Changing password...";
+  const saveButton = els.customerPasswordForm.querySelector('[type="submit"]');
+  if (saveButton.disabled) return;
+  saveButton.disabled = true;
+  els.customerPasswordForm.setAttribute("aria-busy", "true");
   try {
     const response = await fetch("/api/customer/me/password", {
       method: "POST",
@@ -7074,6 +7132,9 @@ els.customerPasswordForm.addEventListener("submit", async (event) => {
     els.customerPasswordFormMessage.textContent = "Password changed successfully.";
   } catch (error) {
     els.customerPasswordFormMessage.textContent = error.message;
+  } finally {
+    saveButton.disabled = false;
+    els.customerPasswordForm.removeAttribute("aria-busy");
   }
 });
 
@@ -7125,6 +7186,60 @@ els.customerSetupForm.addEventListener("submit", async (event) => {
   }
 });
 window.addEventListener("hashchange", () => setView(window.location.hash.replace("#", "") || "dashboard"));
+
+// Page search uses the same visible navigation and access rules as the sidebar.
+const customerSearchDialog = document.getElementById("customerSearchDialog");
+const customerPageSearch = document.getElementById("customerPageSearch");
+const customerSearchResults = document.getElementById("customerSearchResults");
+function renderCustomerPageSearch() {
+  const query = customerPageSearch.value.trim().toLowerCase();
+  const pages = [...els.navItems].filter((item) => !item.hidden && `${customerPageLabels[item.dataset.viewTarget] || ""} ${item.dataset.originalLabel || ""}`.toLowerCase().includes(query));
+  customerSearchResults.innerHTML = pages.length ? pages.map((item) =>
+    `<button class="customer-search-result" type="button" data-search-view="${escapeHtml(item.dataset.viewTarget)}"><span>${escapeHtml(customerPageLabels[item.dataset.viewTarget] || item.textContent.trim())}</span><span aria-hidden="true">↵</span></button>`
+  ).join("") : '<p class="empty-log">No matching pages. Try “billing” or “events”.</p>';
+}
+function openCustomerPageSearch() {
+  if (currentSession.role !== "customer" || customerSearchDialog.open) return;
+  customerPageSearch.value = "";
+  renderCustomerPageSearch();
+  customerSearchDialog.showModal();
+  customerPageSearch.focus();
+}
+document.getElementById("customerSearchButton").addEventListener("click", openCustomerPageSearch);
+document.getElementById("customerSearchClose").addEventListener("click", () => customerSearchDialog.close());
+customerPageSearch.addEventListener("input", renderCustomerPageSearch);
+customerSearchResults.addEventListener("click", (event) => {
+  const result = event.target.closest("[data-search-view]");
+  if (!result) return;
+  customerSearchDialog.close();
+  setView(result.dataset.searchView);
+  els.pageTitle.setAttribute("tabindex", "-1");
+  els.pageTitle.focus({ preventScroll: true });
+});
+customerSearchDialog.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    customerSearchDialog.close();
+    return;
+  }
+  const results = [...customerSearchResults.querySelectorAll("button")];
+  const index = results.indexOf(document.activeElement);
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const next = event.key === "ArrowDown" ? index + 1 : (index < 0 ? results.length - 1 : index - 1);
+    results[(next + results.length) % results.length]?.focus();
+  }
+  if (event.key === "Enter" && document.activeElement === customerPageSearch) {
+    event.preventDefault();
+    results[0]?.click();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (currentSession.role === "customer" && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    openCustomerPageSearch();
+  }
+});
 
 (async () => {
   const sessionReady = await initSession();              // resolve role first (cheap)
