@@ -1148,6 +1148,19 @@ function renderEventTable(data) {
   renderEventRows(visibleItems, "No SGTM event collection requests found in the recent sample. The full-day summary may still have older events.");
 }
 
+function requestDateLabel(item) {
+  const date = item.date instanceof Date ? item.date : new Date(item.date);
+  if (!item.date || !Number.isFinite(date.getTime())) return item.displayDate || "—";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Dhaka", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit"
+  }).format(date);
+}
+
+function requestStatusClass(status) {
+  const code = Number(status);
+  return code >= 400 ? "bad" : code >= 300 ? "redirect" : code >= 200 ? "good" : "unknown";
+}
+
 function renderEventRows(visibleItems, emptyMessage) {
   if (!visibleItems.length) {
     els.accessLog.innerHTML = `<tr><td colspan="6">${escapeHtml(emptyMessage)}</td></tr>`;
@@ -1162,18 +1175,18 @@ function renderEventRows(visibleItems, emptyMessage) {
     const eventRow = document.createElement("tr");
     eventRow.className = "event-main-row";
     eventRow.innerHTML = `
-      <td>${escapeHtml(item.displayDate)}</td>
-      <td><span class="status-code ${Number(item.status) >= 400 ? "bad" : "good"}">${escapeHtml(item.status)}</span></td>
+      <td class="request-date-cell">${escapeHtml(requestDateLabel(item))}</td>
+      <td><span class="status-code ${requestStatusClass(item.status)}"><span class="request-status-dot" aria-hidden="true"></span>${escapeHtml(item.status || "Unknown")}</span></td>
       <td><div class="event-type-cell"><strong>${escapeHtml(item.eventName || "Other")}</strong>${item.value ? `<small>${escapeHtml(formatMoney(item.value, item.currency))}</small>` : ""}</div></td>
       <td>${escapeHtml(item.client || "Other")}</td>
-      <td><span class="request-url">${escapeHtml(item.requestUrl)}</span></td>
-      <td><button class="more-button" type="button" aria-expanded="false" aria-controls="${detailId}" aria-label="Toggle request details">Details</button></td>
+      <td class="request-url-cell"><span class="request-url" title="${escapeHtml(item.requestUrl)}">${escapeHtml(item.requestUrl)}</span></td>
+      <td><button class="more-button" type="button" aria-expanded="false" aria-controls="${detailId}" aria-label="Toggle request details ${index + 1}">Details</button></td>
     `;
     const detailRow = document.createElement("tr");
     detailRow.id = detailId;
     detailRow.className = "event-detail-row";
     detailRow.hidden = true;
-    detailRow.innerHTML = `<td colspan="6"><div class="event-detail-box">${escapeHtml(item.detail || item.requestUrl || "No details available.")}</div></td>`;
+    detailRow.innerHTML = `<td colspan="6"><div class="event-detail-box"><strong>Full request URL</strong><code class="request-full-url">${escapeHtml(item.requestUrl || "Unavailable")}</code><p>${escapeHtml(item.detail || "No additional details available.")}</p></div></td>`;
     eventRow.querySelector(".more-button").addEventListener("click", (event) => {
       const expanded = event.currentTarget.getAttribute("aria-expanded") === "true";
       event.currentTarget.setAttribute("aria-expanded", String(!expanded));
@@ -1222,16 +1235,14 @@ function cleanPurchaseRows(data) {
     });
 
   const grouped = new Map();
-  for (const item of rows) {
+  for (const [index, item] of rows.entries()) {
     // Group by transaction first so the same order sent to sGTM on multiple days
     // collapses into one card instead of inflating the count.
     const key = item.transactionId
       ? `tx:${item.transactionId}`
       : item.eventId
         ? `event:${item.eventId}`
-        : item.value && item.currency && item.date
-          ? `value:${item.value}:${item.currency}:${Math.floor(item.date.getTime() / 60000)}`
-          : `raw:${item.path}:${item.date?.getTime() || ""}`;
+        : `raw:${index}`;
     const current = grouped.get(key);
     const ts = item.date instanceof Date ? item.date.getTime() : 0;
     if (!current) {
@@ -1250,10 +1261,8 @@ function cleanPurchaseRows(data) {
   }
 
   const deduped = [...grouped.values()];
-  const hasUsefulPurchase = deduped.some((item) => item.value || item.eventId || item.transactionId);
-  return hasUsefulPurchase
-    ? deduped.filter((item) => item.value || item.eventId || item.transactionId)
-    : deduped;
+  // Missing metadata must not hide a tracked purchase or merge equal-value orders.
+  return deduped;
 }
 
 // Day boundaries pinned to Asia/Dhaka (UTC+6, no DST) so "today" starts at
@@ -1322,42 +1331,35 @@ function renderPurchaseInspector(data) {
     return;
   }
 
-  els.purchaseInspector.replaceChildren(
-    ...rows.slice(0, 12).map((item) => {
-      const card = document.createElement("article");
-      card.className = "inspector-card";
-      const hasValue = item.value && item.currency;
-      // Show the order's first-seen time as the purchase time. If it hit sGTM more
-      // than once, flag it so duplicate/re-sent transactions are obvious.
-      const firstSeen = item.firstDate instanceof Date ? formatDate(item.firstDate) : item.displayDate;
-      const sentCount = Number(item.sentCount || 1);
-      const resentBadge = sentCount > 1
-        ? `<span class="badge warn" title="This transaction reached sGTM ${sentCount} times — likely a re-send or duplicate fire.">re-sent ×${sentCount}</span>`
-        : "";
-      card.innerHTML = `
-        <div class="inspector-card-top">
-          <div>
-            <strong>${escapeHtml(hasValue ? formatMoney(item.value, item.currency) : "Purchase")}</strong>
-            <small>${escapeHtml(firstSeen)}</small>
-          </div>
-          <div class="inspector-card-flags">${resentBadge}
-            <span class="status-code ${Number(item.status) >= 400 ? "bad" : "good"}">${escapeHtml(item.status)}</span>
-          </div>
-        </div>
-        <div class="inspector-grid">
-          <span>Client</span><strong>${escapeHtml(item.client || "Other")}</strong>
-          <span>Domain</span><strong>${escapeHtml(item.displayHost)}</strong>
-          <span>Transaction ID</span><strong>${escapeHtml(item.transactionId || "Not provided")}</strong>
-          <span>Event ID</span><strong>${item.eventId ? escapeHtml(item.eventId) : item.transactionId ? `<span style="color:var(--color-muted)">${escapeHtml(item.transactionId)} <small>(via transaction ID)</small></span>` : "Not provided"}</strong>
-        </div>
-        <details class="inspector-details">
-          <summary>Request details</summary>
-          <code>${escapeHtml(item.path || "No request URL available.")}</code>
-        </details>
-      `;
-      return card;
-    })
-  );
+  els.purchaseInspector.innerHTML = `
+    <div class="purchase-table-wrap"><table class="purchase-table">
+      <thead><tr><th>Date</th><th>Purchase</th><th>Transaction ID</th><th>Client</th><th>Domain</th><th>Status</th><th>Requests</th><th>More</th></tr></thead>
+      <tbody>${rows.map((item, index) => {
+        const sentCount = Number(item.sentCount || 1);
+        const firstDate = item.firstDate instanceof Date ? item.firstDate : item.date;
+        return `<tr>
+          <td class="purchase-date">${escapeHtml(requestDateLabel({ ...item, date: firstDate }))}</td>
+          <td><strong>${escapeHtml(item.value && item.currency ? formatMoney(item.value, item.currency) : "Purchase")}</strong></td>
+          <td>${escapeHtml(item.transactionId || "—")}</td>
+          <td>${escapeHtml(item.client || "Other")}</td>
+          <td><span class="purchase-domain" title="${escapeHtml(item.displayHost)}">${escapeHtml(item.displayHost)}</span></td>
+          <td><span class="status-code ${requestStatusClass(item.status)}">${escapeHtml(item.status || "Unknown")}</span></td>
+          <td>${sentCount > 1 ? `<span class="badge warn" title="This purchase reached sGTM ${sentCount} times.">re-sent ×${sentCount}</span>` : "1"}</td>
+          <td><button type="button" class="more-button" aria-expanded="false" aria-controls="purchase-detail-${index}" aria-label="Toggle purchase details ${index + 1}">Details</button></td>
+        </tr><tr id="purchase-detail-${index}" class="purchase-detail-row" hidden><td colspan="8">
+          <div class="event-detail-box"><strong>Event ID:</strong> ${escapeHtml(item.eventId || "Not provided")}<br>
+          <strong>Full request URL</strong><code class="purchase-full-url">${escapeHtml(item.requestUrl || item.path || "Unavailable")}</code>
+          <p>${escapeHtml(item.detail || "No additional details available.")}</p></div>
+        </td></tr>`;
+      }).join("")}</tbody>
+    </table></div>`;
+  els.purchaseInspector.querySelectorAll(".more-button").forEach(button => {
+    button.addEventListener("click", () => {
+      const expanded = button.getAttribute("aria-expanded") === "true";
+      button.setAttribute("aria-expanded", String(!expanded));
+      document.getElementById(button.getAttribute("aria-controls")).hidden = expanded;
+    });
+  });
 }
 
 function setLog(el, log, kind) {

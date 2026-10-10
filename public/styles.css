@@ -6038,7 +6038,9 @@ body.modal-open { overflow: hidden; }
 .customer-session .customer-hero-card { min-height: 150px; grid-template-columns: minmax(0,1fr) 84px 220px; }
 .customer-session .usage-ring { animation: none; color: var(--color-text); }
 .customer-session .usage-ring strong,.customer-session .usage-ring span { z-index: 1; color: var(--color-text); }
-.customer-session .customer-analytics-svg { max-height: 280px; }
+/* Let the SVG aspect ratio follow panel width instead of letterboxing at 280px. */
+.customer-session :is(#customerEventChart,#customerEventLogChart) { min-height: 0; }
+.customer-session :is(#customerEventChart,#customerEventLogChart) .customer-analytics-svg { width: 100%; height: auto; min-height: 0; max-height: none; }
 .customer-session .business-grid>.business-item { border-left: 0; }
 .customer-search-button:focus-visible,.customer-help-link:focus-visible { outline: 2px solid var(--color-accent-bright); outline-offset: 3px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -6357,6 +6359,14 @@ body.modal-open { overflow: hidden; }
 
 /* Neutral customer surfaces; semantic status colors remain explicit. */
 .customer-session {
+  --color-page: #f1f1f1;
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f7f7;
+  --color-surface-3: #eeeeee;
+  --color-text: #303030;
+  --color-muted: #616161;
+  --color-line: #e3e3e3;
+  --color-line-strong: #cccccc;
   --color-accent: #454545;
   --color-accent-deep: #303030;
   --color-accent-ink: #303030;
@@ -6386,3 +6396,76 @@ body.modal-open { overflow: hidden; }
 .communication-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .communication-reply { margin-block: 16px; padding: 14px; border-left: 2px solid #6366f1; background: rgba(99,102,241,.05); }
 @media (max-width: 600px) { .communication-panel { padding: 16px; } }
+
+/* Hallmark · component: incoming request table · theme: neutral commerce admin
+ * Screenshot reference: compact rows, gray success pills, yellow attention states.
+ * Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V4 */
+#nginx {
+  --request-paper: #ffffff;
+  --request-header: #f7f7f7;
+  --request-hover: #f8f8f8;
+  --request-ink: #303030;
+  --request-muted: #616161;
+  --request-line: #ebebeb;
+  --request-pill: #f1f1f1;
+  --request-warning: #ffeb78;
+  --request-warning-ink: #5e4200;
+  --request-error: #fee9e8;
+  --request-error-ink: #b42318;
+  background: var(--request-paper);
+  color: var(--request-ink);
+}
+#nginx .panel-header { padding: 16px 20px; background: var(--request-paper); gap: 12px; }
+#nginx .panel-header h2 { color: var(--request-ink); font-size: 15px; font-weight: 600; }
+#nginx .panel-header p { color: var(--request-muted); font-size: 12px; line-height: 1.5; }
+#nginx .event-table { table-layout: fixed; width: 100%; min-width: 720px; font-size: 13px; }
+#nginx .event-table th { background: var(--request-header); color: var(--request-muted); text-transform: none; letter-spacing: 0; font-weight: 500; }
+#nginx .event-table :is(th,td) { height: auto; padding: 10px 12px; border-bottom: 1px solid var(--request-line); }
+#nginx .event-table th:nth-child(1) { width: 185px; }
+#nginx .event-table th:nth-child(2) { width: 85px; }
+#nginx .event-table th:nth-child(3) { width: 145px; }
+#nginx .event-table th:nth-child(4) { width: 100px; }
+#nginx .event-table th:nth-child(6) { width: 85px; }
+#nginx .event-main-row:hover { background: var(--request-hover); }
+#nginx .request-date-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+#nginx .event-type-cell strong { font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
+#nginx .event-type-cell small { font-size: 11px; font-weight: 400; }
+#nginx .request-url { display: block; width: 100%; max-width: none; font-size: 12px; }
+#nginx .status-code { min-width: 0; min-height: 22px; padding: 2px 8px; gap: 6px; border-radius: 7px; font-size: 12px; font-weight: 500; white-space: nowrap; background: var(--request-pill); color: var(--request-muted); }
+#nginx .status-code.redirect { background: var(--request-warning); color: var(--request-warning-ink); }
+#nginx .status-code.bad { background: var(--request-error); color: var(--request-error-ink); }
+#nginx .request-status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+#nginx .more-button { min-width: 0; min-height: 28px; padding: 4px 9px; border-radius: 7px; font-weight: 500; white-space: nowrap; }
+#nginx .more-button:hover,#nginx .more-button[aria-expanded="true"] { background: var(--request-pill); color: var(--request-ink); }
+#nginx .more-button:focus-visible { outline: 2px solid var(--request-ink); outline-offset: 2px; }
+#nginx .event-detail-row td { background: var(--request-header); padding: 12px; }
+#nginx .event-detail-box { font-size: 12px; color: var(--request-muted); }
+#nginx .event-detail-box strong { color: var(--request-ink); font-weight: 600; }
+#nginx .request-full-url { display: block; white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 8px; font-family: var(--font-mono); }
+#nginx .event-detail-box p { margin-top: 12px; }
+@media (max-width: 600px) { #nginx .panel-header { flex-direction: column; align-items: flex-start; padding: 14px 16px; } }
+
+/* Compact purchase rows retain every match; only request details are collapsed. */
+#purchaseInspector { display: block; padding: 0; }
+.purchase-table-wrap { width: 100%; max-height: 640px; overflow: auto; }
+.purchase-table { width: 100%; min-width: 960px; table-layout: fixed; border-collapse: collapse; font-size: 13px; }
+.purchase-table :is(th,td) { height: auto; padding: 10px 12px; border-bottom: 1px solid var(--color-line); text-align: left; vertical-align: middle; }
+.purchase-table th { position: sticky; top: 0; z-index: 1; background: var(--color-surface-2); color: var(--color-muted); font-size: 12px; font-weight: 500; text-transform: none; }
+.purchase-table th:nth-child(1) { width: 180px; }
+.purchase-table th:nth-child(2) { width: 115px; }
+.purchase-table th:nth-child(3) { width: 120px; }
+.purchase-table th:nth-child(4) { width: 110px; }
+.purchase-table th:nth-child(6) { width: 75px; }
+.purchase-table th:nth-child(7) { width: 120px; }
+.purchase-table th:nth-child(8) { width: 85px; }
+.purchase-table td { overflow-wrap: anywhere; }
+.purchase-table strong { font-weight: 550; }
+.purchase-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.purchase-domain { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.purchase-table tbody>tr:hover { background: var(--color-surface-2); }
+.purchase-table .status-code { min-height: 22px; min-width: 0; padding: 2px 8px; border-radius: 7px; font-size: 12px; font-weight: 500; }
+.purchase-table .status-code.good,.purchase-table .status-code.unknown { background: var(--color-surface-3); color: var(--color-muted); }
+.purchase-table .status-code.redirect { background: var(--workspace-warning-wash,var(--color-surface-3)); color: var(--color-warn); }
+.purchase-table .more-button { min-width: 0; min-height: 28px; padding: 4px 9px; border-radius: 7px; font-weight: 500; }
+.purchase-detail-row td { padding: 12px; background: var(--color-surface-2); }
+.purchase-full-url { display: block; margin-top: 8px; overflow-wrap: anywhere; white-space: pre-wrap; font-family: var(--font-mono); }

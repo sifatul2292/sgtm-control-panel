@@ -1306,3 +1306,45 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Keep `history.json` writes atomic (temp + `rename`). Don't hand-edit `data/*.db` or `data/history.json` while server runs.
 - Keep Asia/Dhaka offset-based date math.
 - `.env` / secrets never committed.
+
+## 2026-10-11 — Compact, complete Purchase Inspector
+
+- Replaced tall purchase cards with compact rows: date, value, transaction ID,
+  client, domain, HTTP status, send count and expandable full request metadata.
+  Removed the frontend's 12-purchase cap; every matching loaded purchase renders.
+- Removed amount/minute-based grouping and metadata-based suppression, which could
+  hide separate same-value orders or purchases without IDs. Identified duplicate
+  transactions still collapse with re-send counts; search and Dhaka ranges remain.
+- App v107 / styles v67. Eleven focused tests and both syntax checks pass, including
+  100 identified purchases, 100 same-value unidentified purchases, a metadata-less
+  purchase, duplicate sends, date ranges and search. No tracking/backend changes.
+- Feed retains its existing 2,000 purchase-request ceiling; 100 tracked purchases
+  render in full when present in that feed. Larger feeds need backend pagination.
+  Prepared for Git delivery; production verification remains. Live visual verification remains.
+
+## 2026-10-11 — Full-width customer graphs
+
+- Removed the customer SVG height cap that letterboxed Event activity and Events
+  per Day inside wide panels. Both now scale proportionally to available panel
+  width; min-height no longer forces centered whitespace on phones. Styles v66.
+- CSS-only change preserves graph data, labels, ranges, hover targets and aspect
+  ratio. Backend syntax and diff checks pass. Synthetic browser measurements at
+  320/375/414/768/1600px confirm full chart width and preserved proportions without
+  page overflow. Prepared for Git delivery; production verification remains. Preview: artifacts/chart-width/.
+
+## 2026-10-10 — Shopify-style incoming requests
+
+- Restyled Incoming Requests using the supplied Shopify Orders reference: compact
+  rows, single-line Dhaka dates including seconds, fixed column widths, truncated
+  URLs, gray success/unknown pills, yellow redirects and restrained red errors.
+- Details retains metadata and now explicitly shows the full escaped request URL.
+  Customer background/surface/line/text tokens match the reference's neutral grays.
+  Existing filtering, row limits, data feeds and tracking backend preserved.
+- App v106 / styles v65. Backend/frontend syntax and diff checks pass; 11 focused
+  tests pass (date/status/escaping/details plus support/customer regressions).
+  Synthetic browser preview verified at 320/375/414/768px with no page overflow;
+  table scroll stays local, Details expands correctly. Screenshot and standalone
+  preview: artifacts/request-table/. Prepared for Git delivery; production verification remains.
+- Remote fetched before editing; VPS merge 31df344 is not yet on the shared branch.
+  Synchronize production history before pushing this follow-up.
+
