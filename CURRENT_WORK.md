@@ -1347,4 +1347,3 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   preview: artifacts/request-table/. Prepared for Git delivery; production verification remains.
 - Remote fetched before editing; VPS merge 31df344 is not yet on the shared branch.
   Synchronize production history before pushing this follow-up.
-
