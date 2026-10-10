@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=62" />
+    <link rel="stylesheet" href="/styles.css?v=64" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -108,6 +108,8 @@
             <span class="nav-icon" aria-hidden="true">⚙</span>
             <span>Account</span>
           </button>
+          <button class="nav-item" type="button" data-view-target="support" aria-label="Support tickets" title="Support tickets"><span class="nav-icon" aria-hidden="true">✉</span><span>Support tickets</span><span id="supportNavBadge" class="nav-badge" hidden>0</span></button>
+          <button class="nav-item" type="button" data-view-target="notifications" aria-label="Notifications" title="Notifications"><span class="nav-icon" aria-hidden="true">♧</span><span>Notifications</span><span id="notificationsNavBadge" class="nav-badge" hidden>0</span></button>
           <button class="nav-item" type="button" data-view-target="billing" aria-label="My Subscription" title="My Subscription">
             <span class="nav-icon" aria-hidden="true">৳</span>
             <span>My Subscription</span>
@@ -2509,6 +2511,29 @@ window.dataLayer.push({
           </div>
         </section>
 
+        <section class="view" data-view="support">
+          <div class="panel communication-panel">
+            <h2>Support tickets</h2><p>Start a conversation with our team or follow up on an existing ticket.</p>
+            <form id="ticketCreateForm" data-customer-only hidden class="communication-form">
+              <label>Subject<input name="subject" required maxlength="160" placeholder="What do you need help with?"></label>
+              <label>Message<textarea name="text" required maxlength="5000" rows="4"></textarea></label>
+              <button class="button button-primary" type="submit">Create ticket</button>
+            </form>
+            <p id="supportMessage" role="status"></p><div id="supportTicketList"></div>
+          </div>
+        </section>
+        <section class="view" data-view="notifications">
+          <div class="panel communication-panel">
+            <h2 id="notificationsHeading">Notifications</h2>
+            <form id="announcementForm" data-owner-only class="communication-form">
+              <label>Title<input name="title" required maxlength="160" placeholder="New feature announcement"></label>
+              <label>Announcement<textarea name="text" required maxlength="5000" rows="4"></textarea></label>
+              <button class="button button-primary" type="submit">Publish to all customers</button>
+            </form>
+            <button id="notificationsReadButton" class="button" type="button" data-customer-only hidden>Mark all as read</button>
+            <p id="notificationsMessage" role="status"></p><div id="notificationList"></div>
+          </div>
+        </section>
         <section id="billingView" class="view" data-view="billing">
           <section id="billingHeroCard" class="billing-hero-card"></section>
           <section id="paymentPanel" class="payment-status-card" hidden></section>
@@ -2597,6 +2622,6 @@ window.dataLayer.push({
       <div id="customerSearchResults" class="customer-search-results"></div>
       <p class="customer-search-hint">↑ ↓ to choose · Enter to open · Esc to close</p>
     </dialog>
-    <script src="/app.js?v=104" type="module"></script>
+    <script src="/app.js?v=105" type="module"></script>
   </body>
 </html>

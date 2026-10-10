@@ -6355,103 +6355,34 @@ body.modal-open { overflow: hidden; }
  .customer-session .customer-container-card.compact .customer-container-meta { grid-template-columns: minmax(0,1fr); gap: 8px; }
 }
 
-/* Customer emphasis · brand-led actions and distinct information accents.
- * Hallmark · pre-emit critique: P4 H5 E4 S5 R4 V4 */
+/* Neutral customer surfaces; semantic status colors remain explicit. */
 .customer-session {
-  --workspace-violet: #6d28d9;
-  --workspace-violet-wash: #f3edff;
-  --workspace-blue: #0369a1;
-  --workspace-blue-wash: #e8f4ff;
-  --workspace-green: #087f5b;
-  --workspace-green-wash: #e6f7ef;
-  --workspace-amber: #a45c00;
-  --workspace-amber-wash: #fff3dc;
-  --workspace-highlight-shadow: 0 4px 18px color-mix(in srgb,var(--color-accent),transparent 90%);
+  --color-accent: #454545;
+  --color-accent-deep: #303030;
+  --color-accent-ink: #303030;
+  --color-accent-bright: #616161;
+  --color-accent-wash: #f4f4f4;
+  --color-accent-line: #dedede;
+  --workspace-info: #616161;
+  --workspace-info-wash: #f4f4f4;
 }
-.customer-session .button-primary { background: var(--color-accent); border-color: var(--color-accent-deep); color: var(--color-surface); }
-.customer-session .button-primary:hover { background: var(--color-accent-deep); border-color: var(--color-accent-deep); box-shadow: var(--workspace-highlight-shadow); }
-.customer-session .sidebar .nav-item.is-active { background: color-mix(in srgb,var(--color-accent),var(--workspace-dark) 58%); box-shadow: inset 3px 0 var(--color-accent-bright); }
-.customer-session .nav-item.is-active .nav-icon { color: var(--workspace-text); }
-.customer-session .customer-page-head p { color: var(--color-muted); }
-.customer-session .panel-header h2 { font-weight: 650; }
-.customer-session .panel-header { background: color-mix(in srgb,var(--color-accent-wash),var(--color-surface) 65%); }
-.customer-session .panel-header:first-child { border-radius: 13px 13px 0 0; }
-.customer-session .customer-hero-card { border-top: 3px solid var(--color-accent); }
-.customer-session .customer-hero-main h2 { color: var(--color-accent-ink); }
-.customer-session .customer-plan-box { background: var(--workspace-green-wash); border: 1px solid color-mix(in srgb,var(--workspace-green),transparent 78%); }
-.customer-session .customer-plan-box strong { color: var(--workspace-green); }
-.customer-session .customer-performance-grid>.business-item { --metric-accent: var(--color-accent); --metric-wash: var(--color-accent-wash); border-top: 3px solid var(--metric-accent); background: var(--metric-wash); }
-.customer-session .customer-performance-grid>.business-item:nth-child(2) { --metric-accent: var(--workspace-blue); --metric-wash: var(--workspace-blue-wash); }
-.customer-session .customer-performance-grid>.business-item:nth-child(3) { --metric-accent: var(--workspace-green); --metric-wash: var(--workspace-green-wash); }
-.customer-session .customer-performance-grid>.business-item:nth-child(4) { --metric-accent: var(--workspace-amber); --metric-wash: var(--workspace-amber-wash); }
-.customer-session .customer-performance-grid>.business-item:nth-child(5) { --metric-accent: var(--workspace-violet); --metric-wash: var(--workspace-violet-wash); }
-.customer-session .customer-performance-grid>.business-item strong { color: var(--metric-accent); font-weight: 650; }
-.customer-session .customer-performance-grid>.business-item>span { color: var(--color-text); font-weight: 600; }
-.customer-session .log-stats-grid>.business-item:nth-child(1) { background: var(--workspace-blue-wash); border-top: 3px solid var(--workspace-blue); }
-.customer-session .log-stats-grid>.business-item:nth-child(2) { background: var(--workspace-green-wash); border-top: 3px solid var(--workspace-green); }
-.customer-session .log-stats-grid>.business-item:nth-child(3) { background: var(--workspace-danger-wash); border-top: 3px solid var(--color-danger); }
-.customer-session .log-stats-grid>.business-item:nth-child(4) { background: var(--workspace-violet-wash); border-top: 3px solid var(--workspace-violet); }
-.customer-session .log-stats-grid>.business-item:nth-child(1) strong { color: var(--workspace-blue); }
-.customer-session .log-stats-grid>.business-item:nth-child(4) strong { color: var(--workspace-violet); }
-.customer-session .badge.ok,.customer-session .state.healthy { background: var(--workspace-green-wash); border: 1px solid color-mix(in srgb,var(--workspace-green),transparent 78%); color: var(--workspace-green); }
-.customer-session .badge.warn,.customer-session .state.warning { background: var(--workspace-amber-wash); border: 1px solid color-mix(in srgb,var(--workspace-amber),transparent 78%); color: var(--workspace-amber); }
-.customer-session .container-type-pill { background: var(--workspace-blue-wash); color: var(--workspace-blue); }
-.customer-session .container-setup-callout { background: var(--workspace-blue-wash); border-left: 4px solid var(--workspace-blue); }
-.customer-session .container-setup-copy h2 { color: var(--workspace-blue); }
-.customer-session .container-detail-hero { border-top: 3px solid var(--color-accent); }
-.customer-session .container-detail-hero h2 { color: var(--color-accent-ink); }
-.customer-session .container-plan-chip { background: var(--color-accent-wash); border: 1px solid var(--color-accent-line); }
-.customer-session .container-detail-grid>.panel:first-child { border-top: 3px solid var(--color-accent); }
-.customer-session .container-detail-grid>.panel:first-child .panel-header h2 { color: var(--color-accent-deep); }
-.customer-session .domain-detail-panel { border-top: 3px solid var(--workspace-blue); }
-.customer-session .domain-detail-panel .panel-header { background: var(--workspace-blue-wash); }
-.customer-session .domain-detail-panel .panel-header h2 { color: var(--workspace-blue); }
-.customer-session .domain-live-card { background: var(--workspace-green-wash); }
-.customer-session .domain-live-card.is-pending { background: var(--workspace-amber-wash); }
-.customer-session .dns-instruction-card strong { color: var(--workspace-blue); font-weight: 500; }
-.customer-session .customer-container-card.compact { border-left: 3px solid var(--color-accent); }
-.customer-session .customer-container-card.compact h3 { color: var(--color-accent-deep); }
-.customer-session .customer-container-card.compact .customer-container-meta>div:first-child strong { color: var(--workspace-blue); }
-.customer-session .powerup-card { --tool-accent: var(--workspace-blue); --tool-wash: var(--workspace-blue-wash); border-top: 3px solid var(--tool-accent); }
-.customer-session .powerup-card[data-tool-category="Popular"] { --tool-accent: var(--workspace-violet); --tool-wash: var(--workspace-violet-wash); }
-.customer-session .powerup-card[data-tool-category="Web GTM load"] { --tool-accent: var(--color-accent); --tool-wash: var(--color-accent-wash); }
-.customer-session .powerup-card[data-tool-category="Data enrich"] { --tool-accent: var(--workspace-green); --tool-wash: var(--workspace-green-wash); }
-.customer-session .powerup-card[data-tool-category="Utilities"] { --tool-accent: var(--workspace-amber); --tool-wash: var(--workspace-amber-wash); }
-.customer-session .powerup-card .powerup-icon { width: 40px; height: 40px; background: var(--tool-wash); color: var(--tool-accent); border: 1px solid color-mix(in srgb,var(--tool-accent),transparent 82%); }
-.customer-session .powerup-card .powerup-title-row h3 { color: var(--tool-accent); }
-.customer-session .powerup-card.coming { --tool-accent: var(--color-dim); --tool-wash: var(--color-surface-2); }
-.customer-session .powerup-card:hover { border-color: color-mix(in srgb,var(--tool-accent),transparent 55%); box-shadow: var(--workspace-card-shadow); }
-.customer-session .powerups-filter.is-active { border-color: var(--color-accent); color: var(--color-accent-deep); }
-.customer-session .assistant-hero { background: var(--workspace-violet-wash); border-left: 4px solid var(--workspace-violet); }
-.customer-session .assistant-hero h2 { color: var(--workspace-violet); }
-.customer-session .assistant-hero-step-num { background: var(--workspace-violet); color: var(--color-surface); }
-.customer-session .assistant-step.is-active { background: var(--color-accent-wash); border-radius: 8px; padding-block: 6px; }
-.customer-session .setup-video-copy h2 { color: var(--color-accent-deep); }
-.customer-session .billing-hero-card { background: var(--color-accent); color: var(--color-surface); border-color: var(--color-accent-deep); box-shadow: var(--workspace-highlight-shadow); }
-.customer-session .bhc-badge,.customer-session .bhc-status,.customer-session .bhc-renewal { color: var(--color-surface); }
-.customer-session .bhc-metric { background: color-mix(in srgb,var(--color-surface),transparent 85%); color: var(--color-surface); }
-.customer-session .subscription-plan-card.is-active-plan { box-shadow: var(--workspace-highlight-shadow); }
-.customer-session .subscription-plan-card.is-active-plan .spc-header { background: var(--color-accent-wash); border-top: 3px solid var(--color-accent); }
-.customer-session .card-starter .spc-name { color: var(--workspace-blue); }
-.customer-session .card-pro .spc-name { color: var(--color-accent-deep); }
-.customer-session .card-enterprise .spc-name { color: var(--workspace-violet); }
-.customer-session .spc-btn:not(.spc-btn-current) { background: var(--color-accent); border-color: var(--color-accent-deep); color: var(--color-surface); }
-.customer-session .spc-btn:hover:not(:disabled) { background: var(--color-accent-deep); }
-.customer-session .account-identity { background: var(--workspace-violet-wash); border-color: var(--color-accent-line); }
-.customer-session .account-avatar { background: var(--color-accent); color: var(--color-surface); }
-.customer-session .account-card-accent { background: var(--color-accent-wash); border-top: 3px solid var(--color-accent); }
-.customer-session .account-card-healthy { background: var(--workspace-green-wash); border-top: 3px solid var(--workspace-green); }
-.customer-session .account-card-warn { background: var(--workspace-amber-wash); border-top: 3px solid var(--workspace-amber); }
-.customer-session .account-card-bad { background: var(--workspace-danger-wash); border-top: 3px solid var(--color-danger); }
-.customer-session .account-settings-panel { border-top: 3px solid var(--color-accent); }
-.customer-session .account-settings-panel .panel-header h2 { color: var(--color-accent-deep); }
-.customer-session :is(.top-event-row,.distribution-row) { --event-accent: var(--color-accent); }
-.customer-session [data-event-name="PageView"] { --event-accent: var(--workspace-blue); }
-.customer-session [data-event-name="ViewContent"] { --event-accent: var(--workspace-violet); }
-.customer-session [data-event-name="AddToCart"] { --event-accent: var(--workspace-green); }
-.customer-session [data-event-name="InitiateCheckout"] { --event-accent: var(--workspace-amber); }
-.customer-session [data-event-name="Purchase"] { --event-accent: var(--workspace-green); }
-.customer-session .distribution-row .usage-progress span { background: var(--event-accent); }
-.customer-session .top-event-row>span { display: inline-flex; align-items: center; gap: 9px; color: var(--color-text); }
-.customer-session .top-event-row>span::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--event-accent); flex: none; }
-.customer-session .top-event-row>strong { color: var(--event-accent); font-weight: 650; }
+.customer-session .account-identity { background: var(--color-surface); border-color: var(--color-line); }
+.customer-session .account-avatar { background: var(--color-surface-3); color: var(--color-text); }
+.customer-session .powerup-icon,.customer-session .powerup-card.active .powerup-icon { background: var(--color-surface-3); color: var(--color-muted); }
+.customer-session .communication-card.is-unread { border-left-color: var(--color-text); }
+.customer-session .communication-reply { border-left-color: var(--color-line-strong); background: var(--color-surface-2); }
+
+/* Support conversations and announcements share the existing panel palette. */
+.communication-panel { max-width: 1000px; margin-inline: auto; padding: 24px; }
+.communication-form { display: grid; gap: 14px; margin-block: 20px; }
+.communication-form label { display: grid; gap: 8px; }
+.communication-form input, .communication-form textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface); color: inherit; font: inherit; }
+.communication-form textarea { resize: vertical; }
+.communication-form button { justify-self: start; }
+.communication-card { border: 1px solid var(--color-line); border-radius: 12px; padding: 18px; margin-block: 14px; overflow-wrap: anywhere; }
+.communication-card.is-unread { border-left: 4px solid #6366f1; }
+.communication-card summary { cursor: pointer; }
+.communication-card summary small { display: block; margin-top: 8px; }
+.communication-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.communication-reply { margin-block: 16px; padding: 14px; border-left: 2px solid #6366f1; background: rgba(99,102,241,.05); }
+@media (max-width: 600px) { .communication-panel { padding: 16px; } }

@@ -193,6 +193,8 @@ const els = {
 setTimeout(() => document.body.classList.remove("app-loading"), 8000);
 
 const viewTitles = {
+  support: ["Service / Support", "Support tickets"],
+  notifications: ["Service / Notifications", "Notifications"],
   dashboard: ["Dashboard", "Server Overview"],
   logs: ["Containers / Event Logs", "Event Logs"],
   analytics: ["Tracking / Analytics", "Analytics"],
@@ -268,8 +270,8 @@ let currentSession = { role: "pending" };
 let currentViewName = "dashboard";
 const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "customers", "errorLogs", "integrations", "docs"]);
 const customerOnlyViews = new Set(["customerContainers", "setupAssistant", "customerAccountSettings", "offlineConversions"]);
-const customerNavViews = new Set(["dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "customerAccountSettings", "billing"]);
-const ownerNavViews = new Set(["dashboard", "admin", "customers", "errorLogs", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs", "powerUps"]);
+const customerNavViews = new Set(["support", "notifications", "dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "customerAccountSettings", "billing"]);
+const ownerNavViews = new Set(["support", "notifications", "dashboard", "admin", "customers", "errorLogs", "provisioning", "logs", "billing", "settings", "deployment", "analytics", "integrations", "docs", "powerUps"]);
 try {
   const cachedRole = window.localStorage.getItem("tagioo_session_role");
   if (cachedRole === "customer" || cachedRole === "owner") {
@@ -544,6 +546,7 @@ function setView(name, options = {}) {
   if (next === "admin") { loadOwnerPayments(); loadPaymentSettings(); loadBackups(); }
   if (next === "errorLogs") loadErrorLogs();
   if (next === "billing") loadBillingPayment();
+  if (next === "support" || next === "notifications") loadCommunication();
   // Hash routing is invisible to PostHog's pageview autodetection — record view
   // changes as explicit events so funnels/paths work per panel section.
   try { window.posthog?.capture?.("panel_view_opened", { view: next, role: currentSession.role }); } catch { /* noop */ }
@@ -7256,6 +7259,101 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+let communicationData = null;
+let communicationLoading = false;
+let communicationRevision = 0;
+function communicationDate(value) {
+  return new Date(value).toLocaleString("en-GB", { timeZone: "Asia/Dhaka", dateStyle: "medium", timeStyle: "short" });
+}
+function renderCommunication() {
+  if (!communicationData) return;
+  const owner = currentSession.role === "owner";
+  const { tickets, notifications, announcements, unread, seenAt } = communicationData;
+  for (const [id, count] of [["supportNavBadge", owner ? tickets.filter(ticket => ticket.status === "open").length : 0], ["notificationsNavBadge", unread]]) {
+    const badge = document.getElementById(id);
+    badge.textContent = count;
+    badge.hidden = !count;
+  }
+  document.getElementById("notificationsHeading").textContent = owner ? "Announcements" : "Notifications";
+  document.getElementById("notificationsReadButton").disabled = !unread;
+  document.getElementById("notificationList").innerHTML = (owner ? announcements : notifications).map(item => `
+    <article class="communication-card ${!owner && item.createdAt > seenAt ? "is-unread" : ""}">
+      <h3>${escapeHtml(item.title)}</h3><small>${escapeHtml(communicationDate(item.createdAt))}${!owner && item.createdAt > seenAt ? " · Unread" : ""}</small>
+      <p class="communication-text">${escapeHtml(item.text)}</p>
+      ${item.ticketId ? '<button type="button" class="button" data-open-support>View support tickets</button>' : ""}
+    </article>`).join("") || '<p class="empty-log">No announcements or replies yet.</p>';
+  // Preserve unsent replies during background badge refreshes.
+  if (currentViewName !== "support") return;
+  const list = document.getElementById("supportTicketList");
+  const drafts = new Map([...list.querySelectorAll("form[data-ticket-id]")].map(form => [form.dataset.ticketId, { text: form.elements.text.value, open: form.closest("details").open }]));
+  list.innerHTML = tickets.map(ticket => `
+    <details class="communication-card" data-ticket="${escapeHtml(ticket.id)}" ${drafts.get(ticket.id)?.open ? "open" : ""}>
+      <summary><strong>${escapeHtml(ticket.subject)}</strong> <span class="badge">${escapeHtml(ticket.status)}</span><small>${escapeHtml(communicationDate(ticket.updatedAt))}${owner ? ` · ${escapeHtml(ticket.customer)}` : ""}</small></summary>
+      ${ticket.messages.map(message => `<div class="communication-reply"><strong>${message.role === "owner" ? "Support team" : "Customer"}</strong> <small>${escapeHtml(communicationDate(message.createdAt))}</small><p class="communication-text">${escapeHtml(message.text)}</p></div>`).join("")}
+      <form data-ticket-id="${escapeHtml(ticket.id)}" class="communication-form"><label>Reply<textarea name="text" required maxlength="5000" rows="3">${escapeHtml(drafts.get(ticket.id)?.text || "")}</textarea></label><button type="submit" class="button button-primary">Send reply</button></form>
+      ${owner ? `<button type="button" class="button" data-ticket-status="${ticket.status === "open" ? "closed" : "open"}" data-ticket-id="${escapeHtml(ticket.id)}">${ticket.status === "open" ? "Close ticket" : "Reopen ticket"}</button>` : ""}
+    </details>`).join("") || '<p class="empty-log">No support tickets yet.</p>';
+}
+async function loadCommunication() {
+  if (communicationLoading || !["owner", "customer"].includes(currentSession.role)) return;
+  communicationLoading = true;
+  const revision = communicationRevision;
+  try {
+    const response = await fetch("/api/communication", { cache: "no-store", signal: AbortSignal.timeout(15000) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not load messages.");
+    if (revision !== communicationRevision) return;
+    communicationData = data;
+    // Poll updates badges without replacing a conversation someone is typing in.
+    if (!document.getElementById("supportTicketList").contains(document.activeElement)) renderCommunication();
+  } catch (error) {
+    if (["support", "notifications"].includes(currentViewName)) document.getElementById(currentViewName === "support" ? "supportMessage" : "notificationsMessage").textContent = error.message;
+  } finally { communicationLoading = false; }
+}
+async function saveCommunication(payload, form, messageId) {
+  const feedback = document.getElementById(messageId);
+  const buttons = form ? [...form.querySelectorAll("button")] : [];
+  buttons.forEach(button => { button.disabled = true; });
+  feedback.textContent = "Saving…";
+  try {
+    const response = await fetch("/api/communication", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15000) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not save. Please try again.");
+    if (form?.tagName === "FORM") form.reset();
+    communicationRevision += 1;
+    communicationData = data;
+    renderCommunication();
+    feedback.textContent = payload.action === "announcement" ? "Announcement published to all customers." : "Saved.";
+  } catch (error) { feedback.textContent = error.message; }
+  finally { buttons.forEach(button => { button.disabled = false; }); }
+}
+document.getElementById("ticketCreateForm").addEventListener("submit", event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  saveCommunication({ action: "ticket", ...Object.fromEntries(new FormData(form)) }, form, "supportMessage");
+});
+document.getElementById("announcementForm").addEventListener("submit", event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  saveCommunication({ action: "announcement", ...Object.fromEntries(new FormData(form)) }, form, "notificationsMessage");
+});
+document.getElementById("supportTicketList").addEventListener("submit", event => {
+  const form = event.target.closest("form[data-ticket-id]");
+  if (!form) return;
+  event.preventDefault();
+  saveCommunication({ action: "reply", ticketId: form.dataset.ticketId, text: form.elements.text.value }, form, "supportMessage");
+});
+document.getElementById("supportTicketList").addEventListener("click", event => {
+  const button = event.target.closest("[data-ticket-status]");
+  if (button) saveCommunication({ action: "status", ticketId: button.dataset.ticketId, status: button.dataset.ticketStatus }, button.parentElement, "supportMessage");
+});
+document.getElementById("notificationList").addEventListener("click", event => {
+  if (event.target.closest("[data-open-support]")) setView("support");
+});
+document.getElementById("notificationsReadButton").addEventListener("click", event => {
+  saveCommunication({ action: "read", notificationId: communicationData?.notifications[0]?.id }, event.currentTarget.parentElement, "notificationsMessage");
+});
+
 (async () => {
   const sessionReady = await initSession();              // resolve role first (cheap)
   setView(window.location.hash.replace("#", "") || "dashboard");
@@ -7264,6 +7362,8 @@ document.addEventListener("keydown", (event) => {
   // full-screen splash during a cold server/cache build.
   if (sessionReady) document.body.classList.remove("app-loading");
   loadDashboard();                                       // heavy data; may fail without breaking access
+  loadCommunication();
+  setInterval(() => { if (!document.hidden) loadCommunication(); }, 30000);
   // Owner: keep the pending-payments nav badge fresh so new claims surface fast
   // from any view (the activation bottleneck is owner awareness, not clicks).
   if (currentSession.role === "owner") {

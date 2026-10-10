@@ -1,7 +1,30 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-09-29.
+Living status doc. Update after meaningful progress. Last updated: 2026-10-10.
 
+
+## 2026-10-10 — Neutral customer dashboard
+
+- Removed the colorful emphasis layer at the owner's request: tinted metric cards,
+  category colors, decorative borders, purple account header and bright billing hero.
+  Customer actions, selection accents and informational surfaces now use gray;
+  status/error feedback keeps its semantic colors. Support features preserved.
+- Styles v64. Syntax and diff checks passed; refreshed the local customer preview.
+
+## 2026-10-10 — Support tickets and customer notifications
+
+- Added Support tickets to both dashboards: customers create tickets and continue
+  conversations; owners see every ticket, reply, and close/reopen tickets. Tenant
+  filtering and owner-only actions are enforced by the API, not just the UI.
+- Added Notifications: owners publish announcements to all customers; customer
+  feeds include announcements and owner replies with persistent account read state.
+  Navigation badges poll every 30 seconds independently of tracking dashboard loads.
+  Reply drafts survive refreshes; all submitted content is rendered as escaped text.
+- Reuses history.json with locked, atomic writes and cached reads. No tracking,
+  billing, infrastructure or dependency changes. Assets: app v105 / styles v63.
+- npm run check, frontend syntax, diff check and 12 focused native tests passed,
+  including real-route authentication/isolation/locked-write checks and notification
+  concurrency/read-state cases. Local customer dashboard browser preview verified; not deployed.
 
 ## 2026-10-10 — Stronger customer dashboard color
 

@@ -1,3 +1,4 @@
+import { communicationFeed, updateCommunication } from "./communication.js";
 import { createServer } from "node:http";
 import { mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
@@ -13792,6 +13793,35 @@ const server = createServer(async (req, res) => {
       const result = await submitExtraContainerClaim(body, session);
       if (result.ok) invalidateOwnerDashboardCache();
       jsonResponse(res, result.ok ? 201 : result.status || 400, result.ok ? { payment: result.payment } : { errors: result.errors });
+      return;
+    }
+
+    if (pathname === "/api/communication" && ["GET", "POST"].includes(req.method)) {
+      const session = getSession(req);
+      if (!session || !["owner", "customer"].includes(session.role) || (session.role === "customer" && !session.tenantId)) {
+        jsonResponse(res, 401, { error: "Account session required." });
+        return;
+      }
+      if (req.method === "GET") {
+        const loaded = await readDatabaseCached();
+        jsonResponse(res, loaded.available ? 200 : 503, loaded.available ? communicationFeed(loaded.data, session) : { error: "Database unavailable." });
+        return;
+      }
+      if (!checkRateLimit(req, "communication", 60, 60 * 60 * 1000)) { tooManyRequests(res); return; }
+      const body = await readJson(req);
+      try {
+        const result = await withDbLock(async () => {
+          const loaded = await readDatabase();
+          if (!loaded.available) throw Object.assign(new Error("Database unavailable."), { status: 503 });
+          const result = updateCommunication(loaded.data, session, body?.action, body);
+          await writeDatabase(loaded.data);
+          return result;
+        });
+        jsonResponse(res, 200, result);
+      } catch (error) {
+        if (!error.status) throw error;
+        jsonResponse(res, error.status, { error: error.message });
+      }
       return;
     }
 
