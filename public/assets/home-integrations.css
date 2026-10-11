@@ -1,0 +1,7 @@
+#integrations .int-inner { display:flex; flex-direction:column; align-items:center; gap:20px; text-align:center; }
+#integrations .int-badges { justify-content:center; width:100%; }
+#integrations .int-badge { animation:platformFloat 5s ease-in-out infinite; }
+#integrations .int-badge:nth-child(3n+2) { animation-delay:-1.7s; }
+#integrations .int-badge:nth-child(3n) { animation-delay:-3.3s; }
+@keyframes platformFloat { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
+@media(prefers-reduced-motion:reduce) { #integrations .int-badge { animation:none; } }

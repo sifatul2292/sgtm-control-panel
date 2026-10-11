@@ -1,7 +1,7 @@
 # Shopify review 135263 — billing and test access
 
-Prepared 2026-10-09 for Tagioo Server-Side Tracking. Local changes require
-production deployment and live verification before resubmission.
+Updated 2026-10-09 for Tagioo Server-Side Tracking. Billing prevention is deployed;
+review submitted at owner request; delayed privacy-routing fix deployed. Broader checks remain open.
 
 ## Billing correction
 
@@ -67,6 +67,34 @@ that the login or production release is working.
 - Review the screening screencast and live listing against the deployed behavior,
   then submit fixes through Partner Dashboard. Do not reply to the email.
 
-Production access on 2026-10-09: SSH as root to the documented VPS was rejected
-with Permission denied (publickey,password). Deployment and account verification
-remain blocked on working access.
+## Deployment and remaining blockers
+
+- Local commit `351ea08`, production cherry-pick `37520e6`. Deployed through the
+  owner's authenticated Hostinger Chrome terminal; panel reloaded successfully.
+- Backup: `/var/backups/tagioo-review-135263/code-before-351ea08.tar.gz` on the VPS.
+- All 64 local tests and 22 focused production tests passed, plus syntax gates.
+  Tagioo login and Shopify app returned HTTP 200 after restart.
+- Live reviewer billing returns Shopify with no manual payment instructions;
+  checkout redirects to the dashboard. Manual payment/add-on POSTs return 409.
+- Reviewer login verified by owner sign-out/sign-in and account identity check.
+  Workspace shopify-review-workspace is now Pro / active / Shopify with no pending
+  upgrade; old manual claim rejected. Starter → Pro synchronization is confirmed.
+- Owner confirmed saved private Test account password matches the verified login.
+  Existing credentials retained; corrected account description and testing
+  instructions saved in Shopify. Password never copied to repository or chat.
+- Owner clarifies there are no Shopify clients currently. Earlier workspace flags
+  did not establish Shopify use by the two real customers. Their subscriptions
+  remain unchanged; no migration or cancellation is authorized.
+- Owner authorized withdrawal of accidental submission; live status now Draft.
+  Automated Shopify configuration and protected-data checks pass. Do not resubmit
+  until the remaining gates in shopify-review-audit-2026-10-09.md are resolved.
+- Fresh product/cart/checkout events reach the panel, but app pixel and existing
+  Stape/GTM tracking duplicate events on the test store. Paid backend order,
+  downgrade/decline/reinstall, and privacy lifecycle checks remain open.
+
+## Final submission — 2026-10-09
+
+Owner requested submission after disconnecting the custom pixel. Fresh app-only
+product/cart requests returned HTTP 200. Clicked Submit for review and verified
+Shopify receipt success / assigning reviewer. Verified private credentials and
+instructions are saved. Remaining audit gaps are not fixed by submission.

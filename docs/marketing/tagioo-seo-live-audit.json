@@ -1,0 +1,34 @@
+[
+  {
+    "path": "/",
+    "status": 403
+  },
+  {
+    "path": "/features",
+    "status": 403
+  },
+  {
+    "path": "/pricing",
+    "status": 403
+  },
+  {
+    "path": "/how-it-works",
+    "status": 403
+  },
+  {
+    "path": "/compare",
+    "status": 403
+  },
+  {
+    "path": "/docs",
+    "status": 403
+  },
+  {
+    "path": "/robots.txt",
+    "status": 403
+  },
+  {
+    "path": "/sitemap.xml",
+    "status": 403
+  }
+]

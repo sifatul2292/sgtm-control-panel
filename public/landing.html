@@ -4,27 +4,35 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="description" content="Managed server-side Google Tag Manager hosting for ecommerce teams and agencies. Connect GA4, Meta, Google Ads and TikTok with guided setup and event monitoring. Start free." />
-    <meta property="og:title" content="Tagioo — Server-side tracking, from setup to insight" />
-    <meta property="og:description" content="Managed sGTM hosting, first-party domains and a guided setup assistant. Build your tracking setup and inspect your events in one workspace." />
-    <title>Tagioo — Managed server-side GTM hosting</title>
+    <meta name="description" content="Connect browser and backend signals with managed server-side GTM hosting. First-party domains, guided setup and event inspection. Start Tagioo free." />
+    <meta property="og:title" content="Server-Side GTM Hosting &amp; Conversion Tracking | Tagioo" />
+    <meta property="og:description" content="Connect browser and backend signals with managed server-side GTM hosting. First-party domains, guided setup and event inspection. Start Tagioo free." />
+    <title>Server-Side GTM Hosting &amp; Conversion Tracking | Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/landing.css?v=1" />
-      <!-- Google Tag Manager -->
+    <link rel="stylesheet" href="/assets/home-production-style.css?v=mobile-menu-2"><link rel="stylesheet" href="/assets/home-hero-only.css?v=top-3"><link rel="stylesheet" href="/assets/home-flow.css?v=top-3"><link rel="stylesheet" href="/assets/home-integrations.css?v=1">
+
+  <link rel="stylesheet" href="/assets/home-homepage-guides.css?v=2">
+<link rel="canonical" href="https://tagioo.com/" />
+<meta property="og:url" content="https://tagioo.com/" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://tagioo.com/#organization", "name": "Tagioo", "url": "https://tagioo.com/"}, {"@type": "WebSite", "@id": "https://tagioo.com/#website", "name": "Tagioo", "url": "https://tagioo.com/", "publisher": {"@id": "https://tagioo.com/#organization"}}]}</script>
+<!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
     j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
     })(window,document,'script','dataLayer','GTM-MCR3FD4W');</script>
     <!-- End Google Tag Manager -->
-  </head>
+</head>
   <body>
-    <!-- Google Tag Manager (noscript) -->
+<!-- Google Tag Manager (noscript) -->
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MCR3FD4W"
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
+
 
     <!-- ── HEADER ─────────────────────────────────────────────── -->
     <header class="site-header" id="siteHeader">
@@ -43,70 +51,90 @@
         <a href="/pricing">Pricing</a>
         <a href="/compare">Compare</a>
         <a href="/docs">Docs</a>
+        <a href="/blog">Blog</a>
         <a href="/login" class="nav-login">Sign in</a>
         <a class="nav-cta" href="/signup">Get started free</a>
       </nav>
-      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false">
+      <button class="menu-btn" id="menuBtn" aria-controls="mobileNav" aria-label="Open menu" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
     </header>
 
     <!-- ── MOBILE NAV ─────────────────────────────────────────── -->
-    <div class="mobile-nav" id="mobileNav" aria-hidden="true">
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true" inert>
       <nav>
         <a href="/features" onclick="closeMobileNav()">Platform</a>
         <a href="/how-it-works" onclick="closeMobileNav()">How it works</a>
         <a href="/pricing" onclick="closeMobileNav()">Pricing</a>
         <a href="/compare" onclick="closeMobileNav()">Compare</a>
         <a href="/docs" onclick="closeMobileNav()">Docs</a>
+        <a href="/blog" onclick="closeMobileNav()">Blog</a>
         <a href="/login">Sign in</a>
         <a class="mobile-cta" href="/signup">Get started free →</a>
       </nav>
     </div>
 
-    <main>
+    <main id="main-content">
 
       <!-- ── HERO ───────────────────────────────────────────────── -->
       <section class="hero">
-        <div class="hero-bg">
-          <div class="hero-orb hero-orb-1"></div>
-          <div class="hero-orb hero-orb-2"></div>
-        </div>
-        <div class="hero-inner hero-centered">
-          <div class="hero-content">
-            <div class="hero-tags">
-              <div class="hero-badge">
-                <span class="badge-dot"></span>
-                Managed sGTM hosting &nbsp;·&nbsp; First-party tracking
-              </div>
-              <div class="hero-owner-tag">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9ZM4 20a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                For ecommerce teams &amp; agencies
-              </div>
-            </div>
-            <h1>Better tracking starts with <span class="hero-accent">data you can see.<svg class="hero-accent-underline" viewBox="0 0 300 12" fill="none" preserveAspectRatio="none" aria-hidden="true"><path d="M2 8.5C52 4 150 2.5 298 6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span></h1>
-            <p class="hero-copy">Connect your website to GA4, Meta, Google Ads and TikTok through your own tracking domain. Tagioo brings managed hosting, guided GTM setup and event monitoring into one workspace.</p>
-
-            <form class="hero-signup" action="/signup" method="get">
+    <div class="hero-bg" aria-hidden="true"><div class="hero-orb hero-orb-1"></div><div class="hero-orb hero-orb-2"></div></div>
+    <div class="hero-inner hero-centered copy-hero">
+      <div class="hero-content">
+        <div class="hero-badge"><span class="badge-dot"></span> Server-side tracking for stores, lead generation &amp; agencies</div>
+        <h1>Your store records the sale.<br><span class="hero-accent">Does your tracking?</span></h1>
+        <p class="hero-copy">Browser pixels can miss purchase events. Tagioo helps you connect browser and backend signals to your ad platforms through your own tracking domain.</p>
+      </div>
+      <div class="hero-top-signup"><form class="hero-signup" action="/signup" method="get">
               <input class="hero-signup-input" type="email" name="email" placeholder="Enter your email" autocomplete="email" required aria-label="Email address" />
               <button class="button button-primary" type="submit">
                 <span>Start for free</span>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7H12M8 3L12 7L8 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
-            </form>
-            <p class="hero-social-proof">
-              <strong>Start with 15,000 events per 30-day cycle.</strong>
-              No card required for Free — or <a href="#pricing">see pricing</a>.
-            </p>
-          </div>
-        </div>
-      </section>
+            </form></div>
+      <div class="copy-hero-body">
+<figure id="tracking-flow" class="event-flow signal-diagram" aria-labelledby="flow-title flow-caption">
+  <div class="signal-controls"><span id="flow-title">A first-party path for your events</span><button type="button" id="motionToggle" aria-pressed="false">Pause animation</button></div>
+  <div class="signal-banner"><span class="signal-banner-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Z"/><path d="m8 12 3 3 5-6"/></svg></span><div><span>MANAGED SGTM</span><strong>Your tracking. Connected.</strong></div></div>
+  <div class="signal-scene">
+    <span class="signal-label signal-store-label">YOUR STORE</span><span class="signal-label signal-dest-label">DESTINATIONS</span>
+    <svg class="signal-lines" viewBox="0 0 680 520" aria-hidden="true">
+      <g class="signal-line-base"><path d="M171 275 C192 275 192 248 210 248"/><path d="M459 185 C494 185 474 128 520 128"/><path d="M459 211 C494 211 485 208 520 208"/><path d="M459 237 C494 237 485 288 520 288"/><path d="M459 263 C494 263 480 368 520 368"/></g>
+      <g class="signal-line-packets"><path class="packet" pathLength="100" d="M171 275 C192 275 192 248 210 248"/><path class="packet" pathLength="100" d="M459 185 C494 185 474 128 520 128"/><path class="packet" pathLength="100" d="M459 211 C494 211 485 208 520 208"/><path class="packet" pathLength="100" d="M459 237 C494 237 485 288 520 288"/><path class="packet" pathLength="100" d="M459 263 C494 263 480 368 520 368"/></g>
+    </svg>
+    <div class="signal-store">
+      <div class="signal-store-head"><span>Store events</span><span class="signal-sample-label">DEMO</span></div>
+      <div class="signal-store-states" aria-label="Illustrative browser product view and backend purchase events">
+        <div class="signal-store-state signal-view"><div class="signal-product-art" aria-hidden="true"><svg viewBox="0 0 100 85"><path d="M29 23h42l6 51H23l6-51Z"/><path d="M38 26V16a12 12 0 0 1 24 0v10"/><path d="m39 49 8 8 16-18"/></svg></div><span class="signal-event-type">BROWSER EVENT</span><strong>Product viewed</strong><span class="signal-store-description">A visitor explores your store</span><code>view_item</code></div>
+        <div class="signal-store-state signal-purchase"><div class="signal-order-art" aria-hidden="true"><svg viewBox="0 0 100 85"><rect x="25" y="8" width="50" height="68" rx="8"/><path d="M37 22h26M37 31h16"/><circle cx="50" cy="55" r="13"/><path d="m43 55 5 5 10-11"/></svg></div><span class="signal-event-type">BACKEND EVENT</span><strong>Order completed</strong><span class="signal-store-description">The purchase reaches your backend</span><code>purchase</code></div>
+      </div>
+      <span class="signal-store-pill"><span aria-hidden="true">✓</span> Browser + backend</span>
+    </div>
+    <svg class="signal-mobile-lines" viewBox="0 0 300 40" aria-hidden="true"><g class="signal-line-base"><path d="M150 0V40"/></g><g class="signal-line-packets"><path class="packet" pathLength="100" d="M150 0V40"/></g></svg><div class="signal-server">
+      <div class="signal-server-head"><span class="signal-brand-mark" aria-hidden="true">T</span><div><strong>Tagioo</strong><span>FIRST-PARTY SERVER</span></div><span class="signal-sgtm">sGTM</span></div>
+      <div class="signal-domain"><span class="signal-dot" aria-hidden="true"></span><code>track.yourstore.com</code></div>
+      <div class="signal-server-body"><span class="signal-label">YOUR TRACKING WORKSPACE</span><ul><li><span aria-hidden="true">✓</span> Your own tracking domain</li><li><span aria-hidden="true">✓</span> Managed container hosting</li><li><span aria-hidden="true">✓</span> Web + Server GTM templates</li><li><span aria-hidden="true">✓</span> Incoming event logs</li><li><span aria-hidden="true">✓</span> Purchase inspection</li></ul></div>
+      <div class="signal-pipeline"><span>Collect</span><b aria-hidden="true">→</b><span>Inspect</span><b aria-hidden="true">→</b><span>Route</span></div>
+    </div>
+    <svg class="signal-mobile-lines" viewBox="0 0 300 40" aria-hidden="true"><g class="signal-line-base"><path d="M150 0V12Q150 20 140 20H85Q75 20 75 30V40"/><path d="M150 0V12Q150 20 160 20H215Q225 20 225 30V40"/></g><g class="signal-line-packets"><path class="packet" pathLength="100" d="M150 0V12Q150 20 140 20H85Q75 20 75 30V40"/><path class="packet" pathLength="100" d="M150 0V12Q150 20 160 20H215Q225 20 225 30V40"/></g></svg><div class="signal-destinations">
+      <div class="signal-destination signal-meta"><span class="signal-destination-icon" aria-hidden="true"><img src="/assets/home-meta.svg" alt="" width="24" height="24"></span><div><strong>Meta CAPI</strong><span>Conversions API</span></div></div>
+      <div class="signal-destination signal-ads"><span class="signal-destination-icon" aria-hidden="true"><img src="/assets/home-google-ads.svg" alt="" width="24" height="24"></span><div><strong>Google Ads</strong><span>Conversion tags</span></div></div>
+      <div class="signal-destination signal-tiktok"><span class="signal-destination-icon" aria-hidden="true"><img src="/assets/home-tiktok.svg" alt="" width="24" height="24"></span><div><strong>TikTok</strong><span>Events API</span></div></div>
+      <div class="signal-destination signal-ga4"><span class="signal-destination-icon" aria-hidden="true"><svg viewBox="0 0 28 28"><rect x="3" y="17" width="5" height="8" rx="2"/><rect x="11" y="10" width="5" height="15" rx="2"/><rect x="19" y="2" width="5" height="23" rx="2"/></svg></span><div><strong>GA4</strong><span>Analytics</span></div></div>
+    </div>
+  </div>
+  <div class="signal-summary"><div><span class="signal-label">INPUT</span><strong>Browser + backend</strong></div><span class="signal-summary-arrow" aria-hidden="true">→</span><div><span class="signal-label">OUTPUT</span><strong>Your chosen destinations</strong></div></div>
+  <figcaption id="flow-caption">Illustrative flow. Configure your tags and verify event acceptance in each destination.</figcaption>
+</figure>
+      </div>
+    </div>
+  </section>
 
       <!-- ── DASHBOARD SHOWCASE ─────────────────────────────────── -->
       <section class="section dash-showcase">
         <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Live dashboard</p>
-          <h2>Your tracking activity.<br>One place to inspect it.</h2>
+          <h2>You are losing sales.<br>If you are not tracking Events correctly.</h2>
           <p class="section-sub">Review incoming requests, purchase events and daily trends. Then verify delivery in your analytics and advertising platforms.</p>
         </div>
         <div class="dash-showcase-visual">
@@ -240,11 +268,11 @@
       </section>
 
       <!-- ── STATUS QUO ────────────────────────────────────────── -->
-      <section class="section status-quo-section">
+      <section class="section status-quo-section" id="why">
         <div class="section-heading centered" data-reveal>
           <p class="eyebrow">The problem</p>
           <h2>Better decisions need<br>better conversion signals.</h2>
-          <p class="section-sub">Browser restrictions, incomplete integrations and broken tags can leave gaps in your reports. Server-side tagging gives you another way to collect, inspect and send the signals your campaigns rely on.</p>
+          <p class="section-sub">Missing sales and leads can leave your ad platforms working with incomplete data. Better tracking helps them learn what converts, so you can improve ROAS, generate more sales and grow profit—not just spend more on ads.</p>
         </div>
         <div class="sq-grid">
           <article class="sq-card" data-reveal>
@@ -291,9 +319,9 @@
       <section id="platform" class="section platform-section section-dark">
         <span id="features" class="anchor-offset" aria-hidden="true"></span>
         <div class="section-heading centered" data-reveal>
-          <p class="eyebrow">Full platform</p>
-          <h2>From your first container<br>to your daily tracking checks.</h2>
-          <p class="section-sub">Tagioo isn't just a container host. It's a complete tracking operations platform — from launch to daily analytics to offline conversion recovery.</p>
+          <p class="eyebrow">Your tracking toolkit</p>
+          <h2>Set up. Track. Stay in control.</h2>
+          <p class="section-sub">Connect your tracking, see incoming events and spot problems in one place.</p>
         </div>
         <div class="platform-grid">
           <article class="platform-module" data-reveal>
@@ -301,8 +329,8 @@
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 7H14M6 10H11M6 13H9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
             <div>
-              <strong>Dedicated sGTM Container</strong>
-              <p>An isolated sGTM container with resource limits and server preview support. Tagioo manages the hosting infrastructure.</p>
+              <strong>Managed hosting</strong>
+              <p>We run your tracking server for you.</p>
             </div>
           </article>
           <article class="platform-module" data-reveal>
@@ -310,8 +338,8 @@
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14L7 9L10 11L13 7L17 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14H17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
             <div>
-              <strong>Real-time Event Analytics</strong>
-              <p>Inspect incoming PageView, AddToCart and Purchase requests, with daily trends and purchase values.</p>
+              <strong>Live event view</strong>
+              <p>See page views, leads and purchases as they arrive.</p>
             </div>
           </article>
           <article class="platform-module" data-reveal>
@@ -319,8 +347,8 @@
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 8H16M4 12H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
             </div>
             <div>
-              <strong>Revenue &amp; Conv. Rate Tracking</strong>
-              <p>Daily breakdown table with revenue, purchases, conversion rate — 30 days of history that survives restarts.</p>
+              <strong>Sales reports</strong>
+              <p>Review sales, revenue and conversion rates over 30 days.</p>
             </div>
           </article>
           <article class="platform-module" data-reveal>
@@ -328,8 +356,8 @@
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2V6M10 14V18M2 10H6M14 10H18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/></svg>
             </div>
             <div>
-              <strong>GTM Setup Assistant</strong>
-              <p>4-step wizard generates Web + Server GTM import files for GA4, Meta CAPI, Google Ads, and TikTok — ready in minutes.</p>
+              <strong>Guided setup</strong>
+              <p>Prepare tracking for Meta, Google, TikTok and GA4.</p>
             </div>
           </article>
           <article class="platform-module" data-reveal>
@@ -337,8 +365,8 @@
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 12H8L10 5L12 15L14 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
             <div>
-              <strong>Offline Conversions to Meta</strong>
-              <p>Upload eligible offline orders to Meta CAPI so phone and in-person purchases can join your measurement workflow.</p>
+              <strong>Offline sales</strong>
+              <p>Send eligible phone and in-person orders to Meta.</p>
             </div>
           </article>
           <article class="platform-module" data-reveal>
@@ -346,8 +374,8 @@
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 3C10 3 13 7 13 10C13 13 10 17 10 17" stroke="currentColor" stroke-width="1.5"/><path d="M10 3C10 3 7 7 7 10C7 13 10 17 10 17" stroke="currentColor" stroke-width="1.5"/><path d="M3 10H17" stroke="currentColor" stroke-width="1.5"/></svg>
             </div>
             <div>
-              <strong>First-party Domain + Auto SSL</strong>
-              <p>Use your own subdomain (e.g. <code>server.mystore.com</code>) with automatic SSL via Let's Encrypt — renewed silently.</p>
+              <strong>Your own tracking domain</strong>
+              <p>Connect your domain. We handle SSL.</p>
             </div>
           </article>
           <article class="platform-module" data-reveal>
@@ -355,8 +383,8 @@
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 4V16M3 8H8M3 12H8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             </div>
             <div>
-              <strong>WooCommerce Integration</strong>
-              <p>Install the Tagioo WordPress plugin — pushes the full ecommerce dataLayer (view_item, add_to_cart, purchase, user_data) automatically. No GTM4WP needed.</p>
+              <strong>WooCommerce plugin</strong>
+              <p>Add ecommerce tracking with the Tagioo plugin.</p>
             </div>
           </article>
           <article class="platform-module" data-reveal>
@@ -364,8 +392,8 @@
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L11.8 7.2L16.5 7.6L13.1 10.6L14.2 15.2L10 12.7L5.8 15.2L6.9 10.6L3.5 7.6L8.2 7.2L10 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
             </div>
             <div>
-              <strong>Smart Purchase Gap Alert</strong>
-              <p>Automatic alert when today's purchases drop &gt;50% below your 7-day average. Catch tracking breaks the same day.</p>
+              <strong>Purchase alerts</strong>
+              <p>Get a warning when tracked purchases drop.</p>
             </div>
           </article>
           <article class="platform-module" data-reveal>
@@ -373,8 +401,8 @@
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10C4 10 7 6 10 6C13 6 16 10 16 10C16 10 13 14 10 14C7 14 4 10 4 10Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2" fill="currentColor"/></svg>
             </div>
             <div>
-              <strong>First-party Tracking Tools</strong>
-              <p>Serve Google scripts through your tracking domain and pass bot, device and click-ID headers to sGTM. Configure your tags to use these signals.</p>
+              <strong>First-party tracking</strong>
+              <p>Load tracking scripts through your own domain.</p>
             </div>
           </article>
         </div>
@@ -485,8 +513,8 @@
       <section id="how" class="section how-section">
         <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Simple launch flow</p>
-          <h2>A clear path from signup to setup.</h2>
-          <p class="section-sub">Create your account, connect a tracking domain, and follow Setup Assistant through GTM import and verification.</p>
+          <h2>Simple setup. No coding.</h2>
+          <p class="section-sub">Setup yourself in 10 minutes, It's just like creating an Instagram account</p>
         </div>
         <div class="step-timeline step-timeline-teaser">
           <article class="step-card step-reveal">
@@ -535,7 +563,7 @@
       </section>
 
       <!-- ── INTEGRATIONS ──────────────────────────────────────── -->
-      <section class="integrations-section">
+      <section class="integrations-section" id="integrations">
         <div class="int-inner">
           <span class="int-label">Sends data to</span>
           <div class="int-badges">
@@ -563,6 +591,12 @@
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#96BF48" stroke-width="1.2"/><path d="M5 8L7.5 10.5L11 6" stroke="#96BF48" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Shopify
             </span>
+<span class="int-badge">LinkedIn</span>
+<span class="int-badge">Snapchat</span>
+<span class="int-badge">Pinterest</span>
+<span class="int-badge">Klaviyo</span>
+<span class="int-badge">Bing Ads</span>
+<span class="int-badge">ActiveCampaign</span>
           </div>
         </div>
       </section>
@@ -590,34 +624,9 @@
       </section>
 
       <!-- ── OUTCOME PROOF ──────────────────────────────────────── -->
-      <section class="section outcome-section section-dark">
-        <div class="section-heading centered" data-reveal>
-          <p class="eyebrow">Built for your workflow</p>
-          <h2>A clearer view of what<br>happens after the click.</h2>
-          <p class="section-sub">Use your tracking workspace to connect signals, inspect purchases and keep your implementation organized.</p>
-        </div>
-        <div class="outcome-grid">
-          <article class="outcome-card" data-reveal><div class="outcome-num" style="--oc:var(--orange)">Stores</div><h3>Connect your ecommerce funnel</h3><p>Prepare tracking for product views, cart actions, checkout and purchases across your selected destinations.</p></article>
-          <article class="outcome-card" data-reveal><div class="outcome-num" style="--oc:var(--accent)">Agencies</div><h3>Give each setup its own workspace</h3><p>Switch between containers, configure their tracking separately, and inspect the activity for the selected container.</p></article>
-          <article class="outcome-card" data-reveal><div class="outcome-num" style="--oc:var(--green)">Orders</div><h3>Bring backend purchases into view</h3><p>Use supported store integrations and purchase recovery to complement browser events with order data.</p></article>
-          <article class="outcome-card" data-reveal><div class="outcome-num" style="--oc:var(--accent)">Signals</div><h3>Configure the data you send</h3><p>Choose destinations in Setup Assistant, then preview and publish your GTM containers to validate the implementation.</p></article>
-        </div>
-      </section>
 
-      <section class="section testimonial-section section-dark">
-        <div class="testimonial-inner">
-          <div class="testi-card">
-            <p class="eyebrow">A workspace for tracking operations</p>
-            <h2>Hosting is the start.<br>Knowing what happens next matters.</h2>
-            <p>Tagioo connects container creation, GTM setup and event inspection in one workflow. Generate the templates you need, install them on your site, and use the dashboard to check incoming activity.</p>
-          </div>
-          <div class="testi-aside">
-            <div class="testi-stat-card"><span class="tsa-num">Guided</span><span>A four-step assistant for Web and Server GTM</span></div>
-            <div class="testi-stat-card"><span class="tsa-num">Free</span><span>15,000 events per 30-day cycle to get started</span></div>
-            <div class="testi-stat-card"><span class="tsa-num">Visible</span><span>Event logs, purchase inspection and container status</span></div>
-          </div>
-        </div>
-      </section>
+
+
 
       <!-- ── PRICING ────────────────────────────────────────────── -->
       <section id="pricing" class="section pricing-section">
@@ -720,6 +729,8 @@
           <p><a href="/pricing">Full plan details &amp; billing FAQ →</a> &nbsp;·&nbsp; Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
         </div>
       </section>
+
+<section id="guides" class="section homepage-guides"><div class="section-heading centered"><div class="eyebrow">THE TAGIOO JOURNAL</div><h2>Make sense of your tracking.</h2><p class="section-sub">Practical guides for missing purchases, duplicate events and your first setup.</p></div><div class="guide-toolbar"><span>Six practical guides. Pick your next step.</span><div class="guide-controls"><button type="button" class="guide-prev" aria-label="Previous guides" aria-controls="guide-track">←</button><button type="button" class="guide-next" aria-label="Next guides" aria-controls="guide-track">→</button></div></div><div class="home-guide-grid" id="guide-track" tabindex="0" aria-label="Tracking guides slider"><article class="home-guide"><div class="guide-art guide-art-0" aria-hidden="true"><span class="art-label">SIGNAL PATH</span><div class="art-flow"><span>Website</span><i>↓</i><strong>Tagioo</strong><i>↓</i><span>Ad platforms</span></div><span class="art-index">01</span></div><div class="guide-copy"><span class="home-guide-topic">Getting started</span><h3><a href="/blog/server-side-tracking-explained">What is server-side tracking? Follow one sale from checkout to your ads</a></h3><p>What changes when you send events through your own server? Follow one purchase and find out.</p><a class="home-guide-link" href="/blog/server-side-tracking-explained">Read guide →</a></div></article><article class="home-guide"><div class="guide-art guide-art-1" aria-hidden="true"><span class="art-label">ORDER CHECK</span><div class="art-flow"><span>Order #1042</span><i>↓</i><strong>Purchase received</strong><i>↓</i><span>Matched</span></div><span class="art-index">02</span></div><div class="guide-copy"><span class="home-guide-topic">Ecommerce</span><h3><a href="/blog/woocommerce-purchase-tracking-checklist">WooCommerce orders missing from your ads? Start with this checklist</a></h3><p>Check one real order, find the missing step and avoid counting retries as new sales.</p><a class="home-guide-link" href="/blog/woocommerce-purchase-tracking-checklist">Read guide →</a></div></article><article class="home-guide"><div class="guide-art guide-art-2" aria-hidden="true"><span class="art-label">META CAPI</span><div class="art-flow"><span>Browser event</span><i>↓</i><strong>Same event ID</strong><i>↓</i><span>Server event</span></div><span class="art-index">03</span></div><div class="guide-copy"><span class="home-guide-topic">Meta</span><h3><a href="/blog/meta-capi-deduplication-checklist">Meta Pixel + CAPI: how to check for duplicate purchases</a></h3><p>Check event IDs, retries and old integrations before trusting your purchase count.</p><a class="home-guide-link" href="/blog/meta-capi-deduplication-checklist">Read guide →</a></div></article><article class="home-guide"><div class="guide-art guide-art-3" aria-hidden="true"><span class="art-label">REPORT CHECK</span><div class="art-flow"><span>Store orders</span><i>↓</i><strong>Compare signals</strong><i>↓</i><span>Ad reports</span></div><span class="art-index">04</span></div><div class="guide-copy"><span class="home-guide-topic">Troubleshooting</span><h3><a href="/blog/conversion-tracking-discrepancies">Why your store, GA4 and ad reports show different sales numbers</a></h3><p>Not every reporting gap is a broken tag. Here’s how to tell the difference.</p><a class="home-guide-link" href="/blog/conversion-tracking-discrepancies">Read guide →</a></div></article><article class="home-guide"><div class="guide-art guide-art-4" aria-hidden="true"><span class="art-label">LEAD TRACKING</span><div class="art-flow"><span>Form submitted</span><i>↓</i><strong>Lead received</strong><i>↓</i><span>CRM connected</span></div><span class="art-index">05</span></div><div class="guide-copy"><span class="home-guide-topic">Lead generation</span><h3><a href="/blog/server-side-tracking-lead-generation">Track form submissions that actually become leads</a></h3><p>Stop treating button clicks as enquiries. Measure the submissions your team receives.</p><a class="home-guide-link" href="/blog/server-side-tracking-lead-generation">Read guide →</a></div></article><article class="home-guide"><div class="guide-art guide-art-5" aria-hidden="true"><span class="art-label">SETUP GUIDE</span><div class="art-flow"><span>Connect domain</span><i>↓</i><strong>Import tags</strong><i>↓</i><span>Test event</span></div><span class="art-index">06</span></div><div class="guide-copy"><span class="home-guide-topic">Getting started</span><h3><a href="/blog/tagioo-server-side-tracking-setup">Set up server-side tracking with Tagioo, step by step</a></h3><p>Connect your domain, import the templates and check your first event.</p><a class="home-guide-link" href="/blog/tagioo-server-side-tracking-setup">Read guide →</a></div></article></div><div class="home-guide-all"><a href="/blog">View all guides →</a></div></section>
 
       <!-- ── FAQ ────────────────────────────────────────────────── -->
       <section id="faq" class="section faq-section section-dark">
@@ -824,8 +835,9 @@
           <div class="footer-col">
             <strong>Support</strong>
             <a href="/docs">Docs</a>
+        <a href="/blog">Blog</a>
             <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
-            <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
+            <a href="/cdn-cgi/l/email-protection#7e161b1212113e0a1f19171111501d1113"><span class="__cf_email__" data-cfemail="147c7178787b546075737d7b7b3a777b79">[email&#160;protected]</span></a>
             <a href="#faq">FAQ</a>
           </div>
           <div class="footer-col">
@@ -845,27 +857,35 @@
     </footer>
 
     <!-- ── WHATSAPP FLOAT ──────────────────────────────────────── -->
-    <a class="whatsapp-float" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-      </svg>
-    </a>
 
-    <script>
+
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
       const menuBtn = document.getElementById("menuBtn");
       const mobileNav = document.getElementById("mobileNav");
 
       menuBtn.addEventListener("click", () => {
         const open = mobileNav.classList.toggle("open");
+        mobileNav.inert = !open;
+        menuBtn.setAttribute("aria-label", open ? "Close menu" : "Open menu");
         menuBtn.setAttribute("aria-expanded", String(open));
         mobileNav.setAttribute("aria-hidden", String(!open));
       });
 
       function closeMobileNav() {
         mobileNav.classList.remove("open");
+        mobileNav.inert = true;
+        menuBtn.setAttribute("aria-label", "Open menu");
         menuBtn.setAttribute("aria-expanded", "false");
         mobileNav.setAttribute("aria-hidden", "true");
       }
+
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && menuBtn.getAttribute("aria-expanded") === "true") {
+          closeMobileNav();
+          menuBtn.focus();
+        }
+      });
+      mobileNav.querySelectorAll("a").forEach(link => link.addEventListener("click", closeMobileNav));
 
       const header = document.getElementById("siteHeader");
       window.addEventListener("scroll", () => {
@@ -966,7 +986,7 @@
       fetch("/api/geo").then(r => r.json()).then(({ currency }) => {
         if (currency !== "BDT") return;
         const switchEl = document.getElementById("pricingCurrencySwitch");
-        if (switchEl) switchEl.innerHTML = 'Prefer card checkout? <a href="/global?next=/#pricing">See USD monthly pricing →</a>';
+        if (switchEl) switchEl.innerHTML = 'Prefer card checkout? <a href="/global?next=/pricing">See USD monthly pricing →</a>';
         const toggle = document.getElementById("billingToggle");
         if (toggle) toggle.style.display = "";
         const cycleNote = document.getElementById("pricingCycleNote");
@@ -981,5 +1001,6 @@
         if (freePrice) freePrice.textContent = bt(0);
       }).catch(() => {});
     </script>
-  </body>
+  <script src="/assets/home-hero-motion.js"></script><script src="/assets/home-homepage-guides.js?v=1" defer></script>
+</body>
 </html>

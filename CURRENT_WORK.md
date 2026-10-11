@@ -2,6 +2,87 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-10.
 
+## 2026-10-11 — Production-style homepage copy review
+
+- Reviewed live tagioo.com (different from the local redesign) and the owner's
+  8.2-second animation reference. Added complete section audit/copy in
+  `docs/marketing/tagioo-homepage-copy-review.md` and an isolated preview in
+  `artifacts/homepage-copy-review/`. No public homepage files or deployment changed.
+- Retains production typography/colors/components; reduces 14 section elements
+  (including two strips) to eight. Leads with missing purchase signals, explains
+  browser/backend paths, and consolidates core benefits, proof, setup and FAQs.
+- Added original Tagioo event-flow animation with pause/play, reduced-motion,
+  offscreen/tab visibility handling and a readable static phone layout. No copied
+  reference artwork, accuracy guarantees or fabricated performance counters.
+- 320/375/414/768px browser checks show no horizontal overflow or broken image;
+  menu/Escape, FAQ and pause/resume checked. Script smoke checks and npm run check
+  pass. Screenshots and README included. Next: owner reviews copy/preview; apply
+  selected changes against the production baseline with geo/billing behavior intact.
+
+## 2026-10-11 — International brand and launch plan
+
+- Added `docs/marketing/tagioo-brand-and-launch-plan.md`: international-first
+  positioning, WooCommerce/agency customer profiles, messaging, launch offer,
+  outreach scripts, 90-day funnel, $1,000–$3,000 budgets and retention scorecard.
+- Models 110 gross acquisitions for 100 active paying accounts; rates, revenue
+  mix and costs are explicit assumptions. Current code pricing supersedes older
+  conflicting USD-tier/container notes. Paddle production verification and Shopify
+  approval remain launch dependencies; no live approval assumed.
+- Next: verify international checkout and a supported test-store implementation,
+  prepare demo/checklist, and validate demand with the first five paid customers.
+  Planning only: no product changes, deployment, spending or outreach performed.
+
+## 2026-10-11 — Compact, complete Purchase Inspector
+
+- Replaced tall purchase cards with compact rows: date, value, transaction ID,
+  client, domain, HTTP status, send count and expandable full request metadata.
+  Removed the frontend's 12-purchase cap; every matching loaded purchase renders.
+- Removed amount/minute-based grouping and metadata-based suppression, which could
+  hide separate same-value orders or purchases without IDs. Identified duplicate
+  transactions still collapse with re-send counts; search and Dhaka ranges remain.
+- App v107 / styles v67. Eleven focused tests and both syntax checks pass, including
+  100 identified purchases, 100 same-value unidentified purchases, a metadata-less
+  purchase, duplicate sends, date ranges and search. No tracking/backend changes.
+- Feed retains its existing 2,000 purchase-request ceiling; 100 tracked purchases
+  render in full when present in that feed. Larger feeds need backend pagination.
+  Local only; not pushed/deployed. Live visual verification remains.
+
+## 2026-10-11 — Full-width customer graphs
+
+- Removed the customer SVG height cap that letterboxed Event activity and Events
+  per Day inside wide panels. Both now scale proportionally to available panel
+  width; min-height no longer forces centered whitespace on phones. Styles v66.
+- CSS-only change preserves graph data, labels, ranges, hover targets and aspect
+  ratio. Backend syntax and diff checks pass. Synthetic browser measurements at
+  320/375/414/768/1600px confirm full chart width and preserved proportions without
+  page overflow. Not pushed or deployed. Preview: artifacts/chart-width/.
+
+## 2026-10-10 — Shopify-style incoming requests
+
+- Restyled Incoming Requests using the supplied Shopify Orders reference: compact
+  rows, single-line Dhaka dates including seconds, fixed column widths, truncated
+  URLs, gray success/unknown pills, yellow redirects and restrained red errors.
+- Details retains metadata and now explicitly shows the full escaped request URL.
+  Customer background/surface/line/text tokens match the reference's neutral grays.
+  Existing filtering, row limits, data feeds and tracking backend preserved.
+- App v106 / styles v65. Backend/frontend syntax and diff checks pass; 11 focused
+  tests pass (date/status/escaping/details plus support/customer regressions).
+  Synthetic browser preview verified at 320/375/414/768px with no page overflow;
+  table scroll stays local, Details expands correctly. Screenshot and standalone
+  preview: artifacts/request-table/. Changes local, not pushed or deployed.
+- Remote fetched before editing; VPS merge 31df344 is not yet on the shared branch.
+  Synchronize production history before pushing this follow-up.
+
+## Deployment workflow — VPS has separate commits
+
+- /var/www/tagioo has production commits that diverge from the local branch.
+  Plain git pull fails; a blanket merge can conflict and can silently duplicate
+  declarations in app.js. Inspect both histories and staged/working diffs first.
+- Resolve individual conflict hunks, preserving production fixes. Run backend AND
+  frontend syntax checks plus focused tests before restart. Chain rollout gates
+  with &&. Never stage .env files or .env backups (including .env.before-password-reset).
+- After reviewing a completed VPS merge, synchronize its merge commit to the shared
+  branch and fetch locally before the next delivery; otherwise divergence recurs.
 
 ## 2026-10-10 — Neutral customer dashboard
 
@@ -24,7 +105,7 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-10.
   billing, infrastructure or dependency changes. Assets: app v105 / styles v63.
 - npm run check, frontend syntax, diff check and 12 focused native tests passed,
   including real-route authentication/isolation/locked-write checks and notification
-  concurrency/read-state cases. Local customer dashboard browser preview verified; not deployed.
+  concurrency/read-state cases. Not deployed; live browser verification remains.
 
 ## 2026-10-10 — Stronger customer dashboard color
 
@@ -95,6 +176,166 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-10.
 - Customer UI prepared for Git push on feat/saas-phase1-payments. Browser checks
   use synthetic accounts/API responses; live customer verification and deployment
   remain next. Previews: artifacts/customer-workspace/.
+
+## 2026-10-10 — Homepage redesign canceled
+
+- Owner chose the existing homepage. Restored the exact pre-redesign homepage
+  snapshot and removed only the homepage CSS/JS added in this chat. Earlier
+  marketing edits and other in-progress work are preserved. No deployment made.
+
+## 2026-10-10 — Remaining Shopify tasks
+
+- Owner authorized free Pro after reinstall; approved and verified Shopify pricing
+  now marks Pro Current, with no subscription-expiry warning. Embedded app connected
+  correctly in Incognito with blocked third-party cookies.
+- Backup privacy fix local baa8fb6/896c4d6/d9ec2e7 deployed as
+  75cb34c/c29aa42/d3310eb. Matching Shopify orders are scrubbed from encrypted
+  panel snapshots before redaction is acknowledged; failures cause webhook retry.
+  New/imported backups omit raw Shopify event history. Backup creation is serialized
+  with redaction to prevent a concurrent snapshot resurrecting deleted orders.
+- Confirmed Shopify connections/archive routes/redaction records get 29-day date
+  cutoff in the raw event store (Dhaka offset), preserving unrelated tenants and
+  exact shared host matches. Existing Nginx logrotate is daily, 14 archives.
+  Production focused tests and PM2 reload passed. Local actual two-service HTTP
+  privacy verifier passed again. Existing snapshot scrub completed.
+- Pricing wording edits still locked while Submitted. Asked owner whether to
+  withdraw, replace Brave bypass/SLA promises, and resubmit, or preserve queue.
+  Existing four snapshot scrub applied (zero erased-shop orders found). Daily
+  rollout copy expiry older than 14 days installed and run-parts discovery checked.
+  Local 76b7c43 deployed as 69c2ff9 erases deleted-shop backup connection/routing
+  secrets. Three production backup tests passed; PM2 reload and final four-snapshot
+  scrub succeeded. Both public endpoints returned HTTP 200. Owner chose Keep
+  current review queue: pricing wording changes explicitly deferred.
+
+## 2026-10-10 — Shopify review follow-up verification
+
+- Deployed dedicated Event Logs isolation/filter fix and selected-container Account
+  summary (local 38bcec5, production e35ed7a, asset v98). Live reviewer UI now
+  shows previously hidden Shopify PageView/ViewItem/AddToCart/Purchase requests;
+  Account correctly shows review-track.tagioo.com instead of global config domain.
+  Four focused production tests and syntax checks pass; owner cache path preserved.
+- Removed unsupported panel “300+ CDN Locations” claim; renamed Delay Purchase
+  System to implemented server-side purchase recovery. Managed Pricing support/SLA
+  and Brave claims still need review/edit; user marketing edits were preserved.
+- Live cancel kept Pro; authorized Starter downgrade synced to embedded app and
+  Shopify pricing. Authorized free Pro restoration confirmed in Incognito.
+- Found real Shopify automated-review victim-shop cleanup deliveries HTTP 500.
+  Victim sessions have expired access tokens and refresh tokens; Shopify library
+  tries to refresh these before cleanup and throws 500 after revocation. Cleanup
+  routes now verify raw-body HMAC without loading/refreshing sessions. Invalid HMAC
+  401 and malformed topic/domain 400; normal admin authentication remains unchanged.
+- App local 8523b43/a8ba517, production 0e4725a/b485735, image
+  tagioo-shopify-app:cleanup-a8ba517 started with unchanged env/mounts/port.
+  Previous stopped container and SQLite backup retained. Local 10 tests, lint,
+  typecheck and build pass. Production checks passed.
+- Approval return initially rendered the previous plan until reload. Local
+  39314c0 / production 2bd935e awaits billing synchronization only on plan_handle
+  returns. Image tagioo-shopify-app:review-39314c0 deployed; 11 production tests
+  passed and public app HTTP 200. Previous stopped image retained for rollback.
+- Panel feature wording/access local 9d815f0 / production 5a202c4, asset v99:
+  Custom Loader available on Free; removed browser-bypass/cookie guarantees.
+- New disposable two-service signed HTTP verifier covers expired/revoked session,
+  uninstall, encrypted retained route, post-uninstall customer/shop deletion,
+  tenant isolation and repeated delivery. Passed against actual compiled routes
+  and panel HTTP. Script: scripts/verify-shopify-privacy-e2e.mjs. This is a signed
+  replay, not proof of Shopify’s actual delayed 48-hour delivery.
+- Incognito with blocked third-party cookies passed initial app loading and fresh
+  install/reconnection. Owner-authorized test-store uninstall returned HTTP 200
+  in 28 ms; fresh app asks for a new connection code and successfully installs
+  pixel/order webhook. Pro reapproval after reinstall is awaiting owner Terms
+  confirmation. Shopify pricing confirms expiry November 8, 2026.
+- Real Shopify shop/redact retry now passed: webhook
+  36c5c39c-a801-5b52-912a-0bfc24119f67, delivery attempt 9,
+  2026-10-09T19:14:58Z (Oct 10 01:14 Dhaka), HTTP 200 confirmed in
+  Shopify Dev Dashboard and production logs. Read-only Prisma counts: victim
+  connections/sessions/order deliveries all zero; reviewer connections one.
+  Broader log/event-store/backup PII erasure is still unverified.
+  Submitted listing editor is locked; Brave bypass/SLA pricing claims remain.
+  Existing submission
+  and real customer subscriptions are preserved; do not claim approval guaranteed.
+
+## 2026-10-09 — Amolbooks traffic concern
+
+- Owner reported no amolbooks.com traffic after privacy deployment. Read-only
+  checks: public website and first-party GTM loader HTTP 200. Refreshed GA4
+  Amolbooks V2 Realtime increased from 34 to 38 active users / 30 minutes,
+  1 to 4 users / 5 minutes and 47 to 49 page_view events. Tracking is receiving
+  fresh traffic; no complete outage established. No tracking changes made.
+- Server log/status command attempted in Chrome, but user switched windows;
+  execution/output not verified. Do not claim a full server or Meta audit.
+
+## 2026-10-09 — Shopify review billing and privacy remediation
+
+- App submitted at owner's request; receipt success and Submitted / assigning
+  reviewer verified. Reviewer login and private Partner credentials/instructions
+  verified. Custom pixel disconnected; fresh app product/cart requests HTTP 200.
+- Owner clarifies there are no Shopify clients currently. Earlier workspace flags
+  were insufficient evidence that two real customers use Shopify. Leave all their
+  billing records/subscriptions unchanged; migration is not an established blocker.
+- External billing prevention remains deployed (local 351ea08 / production 37520e6).
+- Fixed delayed privacy routing after uninstall/disconnect/reconnect: encrypted
+  minimal routes in Shopify app, privacy-only archived panel authentication,
+  store-scoped order deletion and safe repeated shop/redact handling. Active
+  tracking/billing cannot authenticate using an archived route. Other shops intact.
+- Panel fix afbfeda deployed as ce8f8c1; five focused production tests passed and
+  PM2 reload succeeded. Shopify fix ec7787f deployed as 36b1bc9, image
+  tagioo-shopify-app:privacy-ec7787f running; eight production app tests passed; panel public login HTTP 200. Private runtime/SQLite
+  backups and previous stopped container retained for rollback.
+- Local checks: 42 panel tests, six Shopify app test files, syntax, lint, typecheck
+  and build pass. Existing marketing changes and local pixel edit preserved.
+- Still unverified: real delayed Shopify uninstall webhook end-to-end, broader
+  event/log/backups privacy retention, downstream conversion deduplication,
+  stale Event Logs, inconsistent Account Settings summary, decline/downgrade/
+  reinstall, blocked-cookie behavior and full feature claims. Submission is not
+  approval; do not withdraw or resubmit automatically.
+
+## 2026-10-09 — Screenshot-guided marketing revision
+
+- Owner rejected the first warm-white/purple editorial direction. Reworked from
+  the supplied full-page TrackingConsulting screenshot: centered bold/italic
+  hero, compact split copy/technical diagram, green/lime actions, narrower
+  1000px content, pale blue-gray sections and navy panels.
+- Added original Tagioo architecture illustration, tracking review checklist,
+  compact setup cards, hosting/configuration/inspection cards and factual Free
+  capacity. Kept existing plan IDs, geo/cycle pricing behavior and corrected
+  product claims. No reference photos, testimonials or guarantees copied.
+- Shared font changed to Plus Jakarta Sans + Instrument Serif; marketing CSS
+  references bumped to v3 across eight public pages. design.md updated.
+- Local revision only; not deployed. Current screenshots supersede the first
+  marketing proposal.
+- Validation: server/shared script syntax, four public pricing regression tests
+  and diff checks pass. All eight pages checked at five widths (320–1440px)
+  without horizontal overflow; mobile menu/Escape verified. Product image loads
+  at its native 1600px width. Revision screenshots saved in
+  `artifacts/marketing-redesign/revision-*.jpg`.
+
+## 2026-10-09 — Public marketing redesign
+
+- Reworked the homepage around an original split hero, first-party event-flow
+  diagram, actual Event Logs capture (request URLs already concealed), setup
+  journey, audience fit, plans and FAQs. No third-party assets, testimonials or
+  outcome guarantees copied from the TrackingConsulting reference.
+- Added a scoped warm-white/ink/purple system with DM Sans and Instrument Serif
+  in `public/assets/marketing.css`; `design.md` records the system. Features,
+  pricing, comparison and setup pages share it; docs/legal inherit the typography
+  and navigation treatment. Public assets stay under the existing unauthenticated
+  `/assets/` route. Shared landing CSS references bumped to v4.
+- Unified homepage/pricing plan cards and capacities (1/1/3/5 containers), made
+  pricing default to monthly USD with BDT cycles enabled by geo response, and
+  removed misleading multi-domain/SLA availability and competitor claims.
+  Comparison now explains managed versus self-managed responsibilities.
+- Added skip links, closed-menu inert handling and Escape support. Updated the
+  setup guide to use the supplied DNS target, supported platform instructions
+  and end-to-end verification instead of timing guarantees.
+- Validation: all 50 native tests pass, including four new public pricing tests
+  for USD/geo-failure fallback and BDT discounts/plan links. Server and public
+  script syntax and diff checks pass. Eight pages checked at 320/375/414/768/
+  1440px without page overflow; menus, FAQ and currency switches exercised.
+  Isolated real Node staging returned HTTP 200 for all public routes/assets
+  without login. Preview screenshots: `artifacts/marketing-redesign/`.
+- Local only, not deployed. Next: owner reviews preview, then deploy only these
+  marketing files on the preserved production branch. Paddle live activation,
+  event-history investigation and Shopify approval remain separate launch work.
 
 ## 2026-10-07 — Honest Power-Up availability labels
 
@@ -1307,43 +1548,88 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Keep Asia/Dhaka offset-based date math.
 - `.env` / secrets never committed.
 
-## 2026-10-11 — Compact, complete Purchase Inspector
+## 2026-10-11 — Screenshot-inspired homepage illustration preview
 
-- Replaced tall purchase cards with compact rows: date, value, transaction ID,
-  client, domain, HTTP status, send count and expandable full request metadata.
-  Removed the frontend's 12-purchase cap; every matching loaded purchase renders.
-- Removed amount/minute-based grouping and metadata-based suppression, which could
-  hide separate same-value orders or purchases without IDs. Identified duplicate
-  transactions still collapse with re-send counts; search and Dhaka ranges remain.
-- App v107 / styles v67. Eleven focused tests and both syntax checks pass, including
-  100 identified purchases, 100 same-value unidentified purchases, a metadata-less
-  purchase, duplicate sends, date ranges and search. No tracking/backend changes.
-- Feed retains its existing 2,000 purchase-request ceiling; 100 tracked purchases
-  render in full when present in that feed. Larger feeds need backend pagination.
-  Prepared for Git delivery; production verification remains. Live visual verification remains.
+- Updated only `artifacts/homepage-copy-review/`: original light dotted canvas, lime banner, dark Tagioo server card, animated connections and alternating store/order states, based on the supplied screenshots. Retained the surrounding production-style homepage and professional copy.
+- Kept destination labels to Meta, Google Ads, TikTok and GA4; omitted unverified accuracy guarantees, recovery counters and integrations.
+- Responsive vertical flow on phones with two-column destinations; pause/play, reduced-motion and offscreen/hidden-tab handling retained. Browser checks at 320/375/414/520/540/768/1024/1280px found no horizontal overflow, clipped labels or cards outside the illustration.
+- Validation: preview interaction smoke harness, JavaScript syntax and `npm run check` passed. Production files and deployment remain unchanged. Next: review the preview before applying approved copy/illustration to the production landing page.
 
-## 2026-10-11 — Full-width customer graphs
+## 2026-10-11 — Destination brand logos
 
-- Removed the customer SVG height cap that letterboxed Event activity and Events
-  per Day inside wide panels. Both now scale proportionally to available panel
-  width; min-height no longer forces centered whitespace on phones. Styles v66.
-- CSS-only change preserves graph data, labels, ranges, hover targets and aspect
-  ratio. Backend syntax and diff checks pass. Synthetic browser measurements at
-  320/375/414/768/1600px confirm full chart width and preserved proportions without
-  page overflow. Prepared for Git delivery; production verification remains. Preview: artifacts/chart-width/.
+- Replaced Meta, Google Ads and TikTok placeholder icons in the isolated homepage preview with locally stored SVG brand marks sourced from their official sites. Preserved proportions and responsive sizing. No production changes.
+- Validation: browser rendering on desktop/mobile, preview smoke checks and npm syntax gate.
 
-## 2026-10-10 — Shopify-style incoming requests
+## 2026-10-11 — Restore original homepage below updated hero
 
-- Restyled Incoming Requests using the supplied Shopify Orders reference: compact
-  rows, single-line Dhaka dates including seconds, fixed column widths, truncated
-  URLs, gray success/unknown pills, yellow redirects and restrained red errors.
-- Details retains metadata and now explicitly shows the full escaped request URL.
-  Customer background/surface/line/text tokens match the reference's neutral grays.
-  Existing filtering, row limits, data feeds and tracking backend preserved.
-- App v106 / styles v65. Backend/frontend syntax and diff checks pass; 11 focused
-  tests pass (date/status/escaping/details plus support/customer regressions).
-  Synthetic browser preview verified at 320/375/414/768px with no page overflow;
-  table scroll stays local, Details expands correctly. Screenshot and standalone
-  preview: artifacts/request-table/. Prepared for Git delivery; production verification remains.
-- Remote fetched before editing; VPS merge 31df344 is not yet on the shared branch.
-  Synchronize production history before pushing this follow-up.
+- Restored every original production homepage section, order, copy, pricing and footer in the isolated preview, retaining only the revised hero and its branded event-flow animation. Hero styles scoped to avoid altering restored sections.
+- Kept original disclosure/reveal/menu behavior. Preview excludes live GTM and geo requests, with signup/assets pointing to the live site. Production unchanged.
+- Checked 320/375/768/1280px: no page overflow and all three brand assets load. Syntax and diff checks pass.
+
+## 2026-10-11 — Preview mobile navigation fix
+
+- Fixed the restored stylesheet’s mobile navigation: the menu panel opened but a shared mobile `nav` rule hid its inner links. Explicitly display the mobile nav as flex.
+- Added controls association, open/close labels, inert closed navigation, Escape closing with focus return, and closing on all links. Preview only; production unchanged.
+
+## 2026-10-11 — Simplify hero signup area
+
+- Removed the hero’s extra pitch, secondary link, allowance note and benefit list as requested. Restored the original email signup form and Start for free button, submitting to the existing live signup page. No other homepage sections or production files changed.
+
+## 2026-10-11 — Hero signup placement and page trimming
+
+- Moved signup immediately below the hero description on every screen, with the illustration centered underneath. Removed the requested outcome/workflow section, tracking-operations section and floating WhatsApp shortcut.
+- Added animated SVG connectors to the mobile stacked flow alongside the alternating event cards; existing pause, offscreen and reduced-motion handling applies. Production unchanged.
+
+## 2026-10-11 — Plain-language positioning and setup copy
+
+- Broadened the hero badge to stores, lead generation and agencies. Added the connection between better conversion signals, ROAS, sales and profit without promising an outcome.
+- Shortened all nine platform feature descriptions and headings. Setup now emphasizes no coding for supported integrations, familiar account creation and a 10-minute target with DNS/verification timing noted. Preview only.
+
+## 2026-10-11 — Requested setup copy and platform badges
+
+- Replaced setup introduction with the owner’s exact sentence. Added LinkedIn, Snapchat, Pinterest, Klaviyo, Bing Ads and ActiveCampaign badges to the preview integrations strip.
+- Copy-only preview change; does not add or verify integrations. Production unchanged.
+
+## 2026-10-12 — Dashboard headline and centered integrations
+
+- Used the requested dashboard headline. Centered the integrations label and badges; added subtle staggered badge movement with reduced-motion support. Preview only; production unchanged.
+
+## 2026-10-12 — SEO foundation and six original launch articles
+
+- Added canonical URLs to eight marketing/legal pages; search titles/descriptions to six, aligned social metadata and homepage Organization/WebSite schema. Preserved existing local design changes and the separate approved homepage preview.
+- Added pre-auth public robots/sitemap/blog handling, app-host/app-shell noindex headers, a 15-URL sitemap, crawlable blog index, six original articles (3,376 words), BlogPosting/breadcrumb schema and related/signup links. No Stape article bodies scraped or rewritten; its public listing used only for topic coverage research.
+- Added `docs/marketing/tagioo-seo-plan.md`: audit evidence, keyword map, publishing/review gates, 90-day editorial plan, indexing/performance checks and measurement. Editable article sources: `docs/marketing/blog/`.
+- Direct live fetches returned 403; live crawler/indexing and sitemap availability remain unverified. Search Console access, actual tenant implementation screenshots and Meta primary dedup documentation review remain launch checks. No deployment, outreach or spending performed.
+- Preview: http://127.0.0.1:8769/blog (separate loopback server, noindex). Route/metadata/security smoke tests and backend syntax pass; mobile index/article show no overflow. No backend tracking layers changed.
+
+## 2026-10-12 — Connect homepage review to blog preview
+
+- Added Blog links to the isolated homepage preview’s desktop/mobile navigation and footer, pointing to the local SEO blog at port 8769. The production marketing files already use `/blog`; no deployment changed.
+
+## 2026-10-12 — Unify homepage/blog preview navigation
+
+- Blog preview root now redirects to the approved homepage on port 8768 instead of showing the unrelated local marketing redesign. Local preview wiring only; canonical production links unchanged.
+
+## 2026-10-12 — Editorial blog polish
+
+- Reworked blog index as Tagioo Journal: asymmetric title, illustrated lead guide, topic filters, search with result count/empty state, and quieter editorial article rows. Original vector/event artwork and brand logos; no borrowed competitor graphics.
+- Rewrote all six titles and opening paragraphs around concrete reader problems; preserved existing article URLs, canonical tags and schema. Added sticky article contents on desktop and collapsible contents after the title on phones.
+- Examined Stape’s search-visible listing and WooCommerce guide for specificity and structure; no ranking position claimed and no competitor article rewritten. Search/filter behavior, route/schema checks and backend syntax validated. Production unchanged.
+
+## 2026-10-12 — Shared mobile menu visibility fix
+
+- Reproduced on live tagioo.com: menu toggles open, but the generic mobile `nav { display: none }` hides its links. Added explicit flex display to `.mobile-nav nav` in shared landing CSS; bumped stylesheet version across eight marketing/legal pages.
+- Local fix only; live deployment remains pending. Backend syntax and diff checks pass.
+
+## 2026-10-12 — Homepage journal section
+
+- Added six article previews between pricing and FAQs in the approved isolated homepage, with topic labels, practical summaries and a View all guides link. Responsive three/two/one-column layout; links use the existing blog preview. Production unchanged.
+
+## 2026-10-12 — Homepage blog slider
+
+- Replaced the six-row journal grid with an illustrated horizontal card rail. Swipe/scroll snapping, next/previous buttons with boundary states and keyboard arrows; three cards desktop, two tablet and one with next-card preview on mobile. No autoplay, reduced-motion respected, article links remain crawlable. Preview only.
+
+## 2026-10-12 — Prepare approved site for GitHub/deployment
+
+- Promoted approved homepage preview into public/landing.html, including hero animation, restored sections, requested copy, journal slider and responsive menu. Copied isolated assets into public/assets/home-*. Production routes replace loopback links; removed preview noindex and preserved production SEO metadata/schema and GTM.
+- GitHub push requested by owner; deployment command provided separately. Private local screenshots and video experiments excluded from source upload.

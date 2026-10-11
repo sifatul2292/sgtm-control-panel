@@ -4,14 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="description" content="Tagioo vs Stape.io and DIY VPS server-side GTM hosting. BDIX-hosted, bKash/Nagad payment, purchase gap alerts, offline conversions, and Brave/ad-blocker bypass — full feature comparison." />
-    <meta property="og:title" content="Compare — Tagioo vs Stape.io, DIY VPS" />
-    <meta property="og:description" content="See exactly how Tagioo's server-side GTM hosting compares to Stape.io and a self-hosted VPS setup." />
-    <title>Compare — Tagioo vs Stape.io, DIY VPS</title>
+    <meta name="description" content="Compare managed Tagioo hosting with running server-side GTM yourself: setup, infrastructure, domains, SSL, event inspection and maintenance." />
+    <meta property="og:title" content="Managed vs Self-Hosted Server-Side GTM | Tagioo" />
+    <meta property="og:description" content="Compare managed Tagioo hosting with running server-side GTM yourself: setup, infrastructure, domains, SSL, event inspection and maintenance." />
+    <title>Managed vs Self-Hosted Server-Side GTM | Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/landing.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/landing.css?v=5" />
+    <link rel="stylesheet" href="/assets/marketing.css?v=3" />
       <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -19,8 +20,14 @@
     'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
     })(window,document,'script','dataLayer','GTM-MCR3FD4W');</script>
     <!-- End Google Tag Manager -->
+
+    <link rel="canonical" href="https://tagioo.com/compare" />
+    <meta property="og:url" content="https://tagioo.com/compare" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
   </head>
-  <body>
+  <body class="marketing-site">
+    <a class="skip-link" href="#main-content">Skip to content</a>
     <!-- Google Tag Manager (noscript) -->
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MCR3FD4W"
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
@@ -35,7 +42,7 @@
             <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="white" opacity="0.9"/>
           </svg>
         </span>
-        <span>Tagioo</span>
+        <span>Tag<span class="brand-accent">ioo</span></span>
       </a>
       <nav aria-label="Primary navigation">
         <a href="/features">Platform</a>
@@ -43,6 +50,7 @@
         <a href="/pricing">Pricing</a>
         <a href="/compare">Compare</a>
         <a href="/docs">Docs</a>
+        <a href="/blog">Blog</a>
         <a href="/login" class="nav-login">Sign in</a>
         <a class="nav-cta" href="/signup">Get started free</a>
       </nav>
@@ -64,7 +72,7 @@
       </nav>
     </div>
 
-    <main>
+    <main id="main-content">
 
       <!-- ── HERO ───────────────────────────────────────────────── -->
       <section class="hero hero-sub">
@@ -76,127 +84,22 @@
           <div class="hero-content">
             <div class="hero-copy">
               <p class="eyebrow">Why Tagioo</p>
-              <h1>The best server-side tracking<br>in Bangladesh.</h1>
-              <p class="section-sub">Most platforms run every customer on the same shared server. Tagioo gives every customer an isolated container with dedicated resources — BDIX-hosted for the fastest response times in Bangladesh.</p>
+              <h1>Less infrastructure.<br>More room for your work.</h1>
+              <p class="section-sub">Choose how much of your tracking infrastructure you want to manage. Here’s what Tagioo takes care of and what stays in your hands.</p>
             </div>
           </div>
         </div>
       </section>
 
       <!-- ── FULL COMPARISON TABLE ──────────────────────────────── -->
-      <section class="section comparison-section">
-        <div class="section-heading centered" data-reveal>
-          <p class="eyebrow">Feature by feature</p>
-          <h2>Tagioo vs Stape.io, DIY VPS.</h2>
-        </div>
-        <div class="comparison-table-wrap" data-reveal>
-          <table class="comparison-table">
-            <thead>
-              <tr>
-                <th>Feature</th>
-                <th class="col-tagioo">Tagioo</th>
-                <th>Stape.io</th>
-                <th>DIY VPS</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Brave &amp; ad-blocker bypass (gtm.js <em>+</em> gtag.js first-party)</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-neutral">Manual</span></td>
-              </tr>
-              <tr>
-                <td>BDIX-hosted (Bangladesh fast)</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-neutral">Depends</span></td>
-              </tr>
-              <tr>
-                <td>bKash / Nagad payment</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-neutral">N/A</span></td>
-              </tr>
-              <tr>
-                <td>WhatsApp support in Bengali</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-neutral">N/A</span></td>
-              </tr>
-              <tr>
-                <td>Smart purchase gap alerts</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-no">✗</span></td>
-              </tr>
-              <tr>
-                <td>GTM template generator (GA4, Meta CAPI, Ads, TikTok)</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-yes-muted">Partial</span></td>
-                <td><span class="tbl-no">✗</span></td>
-              </tr>
-              <tr>
-                <td>Zero server management</td>
-                <td class="col-tagioo"><span class="tbl-yes"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Yes</span></td>
-                <td><span class="tbl-yes-muted">✓</span></td>
-                <td><span class="tbl-no">✗</span></td>
-              </tr>
-              <tr>
-                <td>Starting price</td>
-                <td class="col-tagioo price-cell">৳1,200/mo</td>
-                <td class="price-cell">$15+/mo</td>
-                <td class="price-cell">৳2,000+/mo</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- ── PER-COMPETITOR BREAKDOWN ───────────────────────────── -->
-      <section class="section status-quo-section">
-        <div class="section-heading centered" data-reveal>
-          <p class="eyebrow">The specifics</p>
-          <h2>Where each alternative<br>falls short for Bangladesh.</h2>
-        </div>
-        <div class="sq-grid sq-grid-2">
-          <article class="sq-card" data-reveal>
-            <div class="sq-card-icon" style="--sqc:#D97706">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L20 7V12C20 17 16 21 12 22C8 21 4 17 4 12V7L12 2Z" stroke="currentColor" stroke-width="1.5"/><path d="M8 12L11 15L16 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="sq-card-label">Stape.io</div>
-            <h3>Solid platform, priced and built for elsewhere</h3>
-            <p>Stape is a capable international sGTM host with genuinely good first-party loading support. But it runs on global cloud infrastructure with no BDIX peering for Bangladesh, only takes cards, and doesn't have a purchase gap alert or revenue dashboard built for ecommerce owners — it's built for developers managing infrastructure, not store owners checking their sales. Tagioo starts at the same ~$30/mo for international customers (card via Paddle), or bKash/Nagad in Bangladesh, with BDIX peering either way.</p>
-          </article>
-          <article class="sq-card" data-reveal>
-            <div class="sq-card-icon" style="--sqc:#5B21B6">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L20 7V12C20 17 16 21 12 22C8 21 4 17 4 12V7L12 2Z" stroke="currentColor" stroke-width="1.5"/><path d="M8 12L11 15L16 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="sq-card-label">DIY VPS</div>
-            <h3>You become the DevOps team</h3>
-            <p>Renting a VPS and self-hosting sGTM means you own the container runtime, Nginx, SSL renewal, monitoring, and restarts — plus no built-in analytics, alerts, or GTM templates. Cheapest sticker price, most ongoing work, and the first outage is on you at 2am.</p>
-          </article>
-        </div>
-      </section>
-
-      <!-- ── MIGRATION CTA ──────────────────────────────────────── -->
-      <section class="section monitoring-section">
-        <div class="monitoring-inner">
-          <div class="monitoring-content">
-            <p class="eyebrow">Switching is easy</p>
-            <h2>Already on Stape.io<br>or a DIY VPS?</h2>
-            <p class="monitoring-sub">We'll help you migrate your GTM containers and re-point your DNS free of charge — most stores are fully switched over in under an hour, with zero tracking downtime.</p>
-            <a class="button button-primary" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Get migration help on WhatsApp →</a>
-          </div>
-        </div>
-      </section>
-
+      <section class="section comparison-section"><div class="section-heading centered"><h2>Decide what you want to manage.</h2><p class="section-sub">A practical comparison of responsibilities, rather than promises about competitors.</p></div><div class="comparison-table-wrap"><table class="comparison-table"><caption class="visually-hidden">Managed Tagioo hosting compared with self-managed server GTM</caption><thead><tr><th scope="col">Responsibility</th><th scope="col" class="col-tagioo">With Tagioo</th><th scope="col">Self-managed hosting</th></tr></thead><tbody><tr><th scope="row">Server GTM hosting</th><td class="col-tagioo">Managed by Tagioo</td><td>You provision and operate it</td></tr><tr><th scope="row">Tracking domain and SSL</th><td class="col-tagioo">DNS guidance and automatic SSL</td><td>You configure DNS and certificate renewal</td></tr><tr><th scope="row">GTM configuration</th><td class="col-tagioo">Generated templates and setup instructions</td><td>You build or source your configuration</td></tr><tr><th scope="row">Incoming event inspection</th><td class="col-tagioo">Dashboard, Event Logs and Purchase Inspector</td><td>You choose and maintain monitoring tools</td></tr><tr><th scope="row">Container operations</th><td class="col-tagioo">Provisioning and restart handling</td><td>You manage the runtime and restarts</td></tr><tr><th scope="row">Destination verification</th><td class="col-tagioo">You preview, publish and verify tags</td><td>You preview, publish and verify tags</td></tr><tr><th scope="row">Consent and data configuration</th><td class="col-tagioo">Your responsibility, with your selected tools</td><td>Your responsibility, with your selected tools</td></tr></tbody></table></div></section>
+      <section class="section studio-fit"><div><h2>Keep control.<br><em>Share the workload.</em></h2></div><div class="studio-fit-list"><article><h3>Choose managed hosting</h3><p>Use Tagioo when you want hosting, guided setup and incoming event visibility in the same workspace.</p></article><article><h3>Choose self-managed infrastructure</h3><p>Run your own stack when you need direct infrastructure control and have someone responsible for security, updates and recovery.</p></article><article><h3>Moving an existing setup?</h3><p>Discuss your container configuration and DNS cutover with support before making changes to live tracking.</p><a class="studio-text-link" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Discuss your setup →</a></article></div></section>
       <!-- ── FINAL CTA ───────────────────────────────────────────── -->
       <section class="section cta-section">
         <div class="cta-inner">
           <p class="eyebrow eyebrow-onpurple">Start today</p>
           <h2>See the difference<br>in your own dashboard.</h2>
-          <p class="cta-sub">Free plan available. No credit card required. Setup takes under 10 minutes.</p>
+          <p class="cta-sub">Start with the Free plan. No credit card required.</p>
           <div class="cta-actions">
             <a class="button button-cta-primary button-lg" href="/signup">Create free account →</a>
             <a class="button button-cta-ghost button-lg" href="/pricing">See pricing</a>
@@ -217,12 +120,12 @@
                 <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
               </svg>
             </span>
-            <span>Tagioo</span>
+            <span>Tag<span class="brand-accent">ioo</span></span>
           </a>
-          <p>First-party server-side tracking infrastructure for Bangladesh ecommerce and agencies.</p>
+          <p>Managed server-side tracking for ecommerce teams, marketers and agencies.</p>
           <div class="footer-payments">
-            <span class="trust-badge bkash sm">bKash</span>
-            <span class="trust-badge nagad sm">Nagad</span>
+            <span class="trust-badge sm footer-tb">Card checkout</span>
+            <span class="trust-badge sm footer-tb">USD monthly plans</span>
             <span class="trust-badge sm footer-tb">Visa / MC</span>
           </div>
         </div>
@@ -238,8 +141,10 @@
           <div class="footer-col">
             <strong>Support</strong>
             <a href="/docs">Docs</a>
+        <a href="/blog">Blog</a>
             <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
             <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
+            <a href="/#faq">FAQ</a>
           </div>
           <div class="footer-col">
             <strong>Legal</strong>
@@ -252,8 +157,8 @@
         <span class="footer-wordmark">Tagioo</span>
       </div>
       <div class="footer-bottom">
-        <span>© 2025 Tagioo. All rights reserved. &nbsp;·&nbsp; Made in Bangladesh 🇧🇩</span>
-        <p class="footer-disclaimer">Figures illustrating potential savings, profit, or ROAS improvement on this site are illustrative examples, not guarantees or audited results. Actual results depend on your ad spend, traffic, and current tracking setup.</p>
+        <span>© 2026 Tagioo. All rights reserved.</span>
+        <p class="footer-disclaimer">Tracking results depend on your implementation, traffic, consent settings and destination configuration.</p>
       </div>
     </footer>
 
@@ -293,5 +198,6 @@
         revealObs.observe(el);
       });
     </script>
+    <script src="/assets/marketing.js?v=1" defer></script>
   </body>
 </html>

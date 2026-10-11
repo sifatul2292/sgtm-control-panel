@@ -4,14 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="description" content="Tagioo pricing — Free 15,000 events/month forever, Starter ৳1,200/mo, Pro ৳2,900/mo, Enterprise ৳5,900/mo. Pay via bKash or Nagad. No credit card required." />
-    <meta property="og:title" content="Pricing — Tagioo" />
-    <meta property="og:description" content="Simple, transparent pricing for server-side GTM hosting in Bangladesh. Free forever tier, no card required, pay via bKash/Nagad." />
-    <title>Pricing — Tagioo</title>
+    <meta name="description" content="Compare Tagioo server-side GTM hosting plans by event volume, containers and features. Start free, then choose the capacity your tracking needs." />
+    <meta property="og:title" content="Server-Side GTM Hosting Pricing: Free &amp; Paid Plans | Tagioo" />
+    <meta property="og:description" content="Compare Tagioo server-side GTM hosting plans by event volume, containers and features. Start free, then choose the capacity your tracking needs." />
+    <title>Server-Side GTM Hosting Pricing: Free &amp; Paid Plans | Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/landing.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/landing.css?v=5" />
+    <link rel="stylesheet" href="/assets/marketing.css?v=3" />
       <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -19,8 +20,14 @@
     'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
     })(window,document,'script','dataLayer','GTM-MCR3FD4W');</script>
     <!-- End Google Tag Manager -->
+
+    <link rel="canonical" href="https://tagioo.com/pricing" />
+    <meta property="og:url" content="https://tagioo.com/pricing" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
   </head>
-  <body>
+  <body class="marketing-site">
+    <a class="skip-link" href="#main-content">Skip to content</a>
     <!-- Google Tag Manager (noscript) -->
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MCR3FD4W"
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
@@ -35,7 +42,7 @@
             <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="white" opacity="0.9"/>
           </svg>
         </span>
-        <span>Tagioo</span>
+        <span>Tag<span class="brand-accent">ioo</span></span>
       </a>
       <nav aria-label="Primary navigation">
         <a href="/features">Platform</a>
@@ -43,6 +50,7 @@
         <a href="/pricing">Pricing</a>
         <a href="/compare">Compare</a>
         <a href="/docs">Docs</a>
+        <a href="/blog">Blog</a>
         <a href="/login" class="nav-login">Sign in</a>
         <a class="nav-cta" href="/signup">Get started free</a>
       </nav>
@@ -64,7 +72,7 @@
       </nav>
     </div>
 
-    <main>
+    <main id="main-content">
 
       <!-- ── HERO ───────────────────────────────────────────────── -->
       <section class="hero hero-sub">
@@ -76,20 +84,27 @@
           <div class="hero-content">
             <div class="hero-copy">
               <p class="eyebrow">Simple pricing</p>
-              <h1 id="pricingHeadline">No card. No lock-in.<br>Just server-side tracking.</h1>
-              <p class="section-sub" id="pricingSubhead">Start free with 15,000 events a month, forever. Upgrade when you need more volume — pay monthly via bKash or Nagad, cancel anytime.</p>
+              <h1 id="pricingHeadline">Start small.<br>Make room to grow.</h1>
+              <p class="section-sub" id="pricingSubhead">Start with 15,000 events per 30-day cycle. Choose a paid plan for more volume and container capacity. USD card subscriptions are monthly; local BDT payment is also available.</p>
             </div>
           </div>
         </div>
       </section>
 
       <!-- ── PRICING GRID ───────────────────────────────────────── -->
-      <section class="section pricing-section">
+      <section id="pricing" class="section pricing-section">
+        <div class="section-heading centered" data-reveal>
+          <p class="eyebrow">Simple pricing</p>
+          <h2>Plans that grow with your event volume.</h2>
+          <p class="section-sub">Start with managed hosting, a first-party domain and guided GTM templates. Choose a paid plan for more event volume and additional tracking tools.</p>
+        </div>
+        <div id="pricingCurrencySwitch" style="text-align:center;margin:0 0 8px;font-size:13px">In Bangladesh? <a href="/bd?next=/pricing">See local BDT pricing →</a></div>
 
-        <div class="billing-toggle" id="billingToggle" role="tablist" aria-label="Billing cycle">
+        <div class="billing-toggle" id="billingToggle" style="display:none" role="tablist" aria-label="Billing cycle">
           <button class="billing-tab is-active" type="button" data-cycle="1" role="tab" aria-selected="true">Monthly</button>
           <button class="billing-tab" type="button" data-cycle="3" role="tab" aria-selected="false">3 Months <span class="billing-save">Save 10% + free setup</span></button>
           <button class="billing-tab" type="button" data-cycle="6" role="tab" aria-selected="false">6 Months <span class="billing-save">Save 20%</span></button>
+          <button class="billing-tab" type="button" data-cycle="12" role="tab" aria-selected="false">Yearly <span class="billing-save">Save 25%</span></button>
         </div>
 
         <div class="pricing-grid">
@@ -97,17 +112,17 @@
           <article class="pricing-card" data-reveal>
             <div class="plan-tier-badge" style="--tb:#5B21B6">Free</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display data-usd="0">৳0</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="0">$0</strong><span data-price-unit>/month</span></div>
               <p>Test with real events. No credit card required.</p>
             </div>
             <ul class="plan-features">
-              <li><span class="pf-check">✓</span> 15,000 events/month</li>
+              <li><span class="pf-check">✓</span> 15,000 events per 30-day cycle</li>
               <li><span class="pf-check">✓</span> 1 domain · 1 sGTM container</li>
               <li><span class="pf-check">✓</span> First-party domain + SSL</li>
-              <li><span class="pf-check">✓</span> Custom Loader (Brave bypass)</li>
-              <li><span class="pf-check">✓</span> Consent Mode v2 (GDPR)</li>
+              <li><span class="pf-check">✓</span> GTM Setup Assistant</li>
+              <li><span class="pf-check">✓</span> Web + Server GTM template generation</li>
               <li><span class="pf-check">✓</span> Real-time dashboard + event logs</li>
-              <li><span class="pf-check">✓</span> Email support · 3-day log retention</li>
+              <li><span class="pf-check">✓</span> Email support</li>
             </ul>
             <a class="button button-outline full-width" href="/signup">Get started free</a>
           </article>
@@ -115,18 +130,18 @@
           <article class="pricing-card" data-reveal data-monthly="1200">
             <div class="plan-tier-badge" style="--tb:#059669">Starter</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display data-usd="30">৳1,200</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="30">$30</strong><span data-price-unit>/month</span></div>
               <p class="plan-cycle-note" data-cycle-note></p>
               <p>For stores starting with server-side tracking.</p>
             </div>
             <ul class="plan-features">
-              <li><span class="pf-check">✓</span> 500,000 events/month</li>
+              <li><span class="pf-check">✓</span> 500,000 events per billing cycle</li>
               <li><span class="pf-check">✓</span> 1 domain · 1 sGTM container</li>
               <li><span class="pf-check">✓</span> Everything in Free</li>
               <li><span class="pf-check">✓</span> Full-funnel Meta CAPI + dedup</li>
               <li><span class="pf-check">✓</span> Server-side purchase recovery</li>
               <li><span class="pf-check">✓</span> Cookie life extension</li>
-              <li><span class="pf-check">✓</span> WhatsApp support · 7-day retention</li>
+              <li><span class="pf-check">✓</span> Email &amp; WhatsApp support</li>
             </ul>
             <a class="button button-outline full-width" data-plan-cta href="/signup?plan=Starter&cycle=monthly">Start Starter</a>
           </article>
@@ -135,18 +150,18 @@
             <div class="plan-popular-tag">Most popular</div>
             <div class="plan-tier-badge" style="--tb:#F97316">Pro</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display data-usd="50">৳2,900</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="50">$50</strong><span data-price-unit>/month</span></div>
               <p class="plan-cycle-note" data-cycle-note></p>
               <p>For stores running serious ad campaigns.</p>
             </div>
             <ul class="plan-features">
-              <li><span class="pf-check">✓</span> 2,000,000 events/month</li>
-              <li><span class="pf-check">✓</span> 2 domains · 3 sGTM containers</li>
+              <li><span class="pf-check">✓</span> 2,000,000 events per billing cycle</li>
+              <li><span class="pf-check">✓</span> Up to 3 sGTM containers</li>
               <li><span class="pf-check">✓</span> Everything in Starter</li>
               <li><span class="pf-check">✓</span> Offline conversions to Meta</li>
-              <li><span class="pf-check">✓</span> Bot detection &amp; filtering</li>
+              <li><span class="pf-check">✓</span> Bot headers for sGTM filtering</li>
               <li><span class="pf-check">✓</span> Advanced reports + diagnostics</li>
-              <li><span class="pf-check">✓</span> Priority WhatsApp + call · 15-day retention</li>
+              <li><span class="pf-check">✓</span> Tracking diagnostics</li>
             </ul>
             <a class="button button-primary full-width" data-plan-cta href="/signup?plan=Pro&cycle=monthly">Start Pro</a>
           </article>
@@ -154,159 +169,32 @@
           <article class="pricing-card" data-reveal data-monthly="5900">
             <div class="plan-tier-badge" style="--tb:#D97706">Enterprise</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display data-usd="100">৳5,900</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><strong data-price-display data-usd="100">$100</strong><span data-price-unit>/month</span></div>
               <p class="plan-cycle-note" data-cycle-note></p>
               <p>For agencies and high-volume stores.</p>
             </div>
             <ul class="plan-features">
-              <li><span class="pf-check">✓</span> 5,000,000 events/month</li>
-              <li><span class="pf-check">✓</span> 3 domains · 5 sGTM containers</li>
+              <li><span class="pf-check">✓</span> 5,000,000 events per billing cycle</li>
+              <li><span class="pf-check">✓</span> Up to 5 sGTM containers</li>
               <li><span class="pf-check">✓</span> Everything in Pro</li>
-              <li><span class="pf-check">✓</span> Multi-domain management</li>
-              <li><span class="pf-check">✓</span> Dedicated support line + SLA</li>
-              <li><span class="pf-check">✓</span> Free migration + setup</li>
-              <li><span class="pf-check">✓</span> 30-day log retention</li>
+              <li><span class="pf-check">✓</span> Multiple container workspaces</li>
+              <li><span class="pf-check">✓</span> Container status monitoring</li>
+              <li><span class="pf-check">✓</span> Guided GTM setup</li>
+              <li><span class="pf-check">✓</span> Event history and purchase inspection</li>
             </ul>
             <a class="button button-outline full-width" data-plan-cta href="/signup?plan=Enterprise&cycle=monthly">Start Enterprise</a>
           </article>
 
         </div>
         <div class="pricing-footer">
-          <p id="pricingFooterNote">Pay via <strong>bKash</strong> or <strong>Nagad</strong>. After you pick a plan and cycle, send the payment and enter your transaction ID — we verify and activate within hours. Cancel anytime.</p>
-          <p>Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
-          <p id="pricingCurrencySwitch" style="margin-top:8px;font-size:13px"></p>
+          <p id="pricingFooterNote">Prices in USD. Card subscriptions are billed monthly through Paddle and renew automatically until canceled. Bangladesh customers can also choose local BDT payment.</p>
+          <p id="pricingCycleNote" hidden>Local BDT plans also offer longer billing cycles. <a href="/pricing">See local plan details →</a></p>
+          <p><a href="#faq">Billing questions →</a> &nbsp;·&nbsp; Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
         </div>
       </section>
 
       <!-- ── FEATURE MATRIX ─────────────────────────────────────── -->
-      <section class="section comparison-section">
-        <div class="section-heading centered" data-reveal>
-          <p class="eyebrow">Compare plans</p>
-          <h2>Every feature,<br>side by side.</h2>
-          <p class="section-sub">All plans include the Custom Loader that loads gtm.js and gtag.js first-party, so Brave and ad-blockers can't strip your tracking.</p>
-        </div>
-        <div class="plan-matrix-wrap">
-          <table class="comparison-table">
-            <thead>
-              <tr>
-                <th>Feature</th>
-                <th>Free</th>
-                <th>Starter</th>
-                <th class="col-tagioo">Pro</th>
-                <th>Enterprise</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Events / month</td>
-                <td>15,000</td>
-                <td>500,000</td>
-                <td class="col-tagioo">2,000,000</td>
-                <td>5,000,000</td>
-              </tr>
-              <tr>
-                <td>Domains</td>
-                <td>1</td>
-                <td>1</td>
-                <td class="col-tagioo">2</td>
-                <td>10</td>
-              </tr>
-              <tr>
-                <td>sGTM containers</td>
-                <td>1</td>
-                <td>1</td>
-                <td class="col-tagioo">3</td>
-                <td>10</td>
-              </tr>
-              <tr>
-                <td>Custom Loader (Brave bypass)</td>
-                <td><span class="tbl-yes">Yes</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-              </tr>
-              <tr>
-                <td>Consent Mode v2 (GDPR)</td>
-                <td><span class="tbl-yes">Yes</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-              </tr>
-              <tr>
-                <td>Full-funnel Meta CAPI + dedup</td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-              </tr>
-              <tr>
-                <td>Server-side purchase recovery</td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-              </tr>
-              <tr>
-                <td>Cookie life extension</td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-              </tr>
-              <tr>
-                <td>Offline conversions to Meta</td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-              </tr>
-              <tr>
-                <td>Bot detection &amp; filtering</td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-              </tr>
-              <tr>
-                <td>Advanced reports &amp; diagnostics</td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td class="col-tagioo"><span class="tbl-yes">Yes</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-              </tr>
-              <tr>
-                <td>Multi-domain management</td>
-                <td><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-no">✗</span></td>
-                <td class="col-tagioo"><span class="tbl-no">✗</span></td>
-                <td><span class="tbl-yes">Yes</span></td>
-              </tr>
-              <tr>
-                <td>Support</td>
-                <td><span class="tbl-yes-muted">Email</span></td>
-                <td><span class="tbl-yes-muted">WhatsApp</span></td>
-                <td class="col-tagioo"><span class="tbl-yes-muted">Priority WhatsApp + call</span></td>
-                <td><span class="tbl-yes-muted">Dedicated line + SLA</span></td>
-              </tr>
-              <tr>
-                <td>Log retention</td>
-                <td>3 days</td>
-                <td>7 days</td>
-                <td class="col-tagioo">15 days</td>
-                <td>30 days</td>
-              </tr>
-              <tr>
-                <td>Price</td>
-                <td class="price-cell" data-table-price data-usd="0">৳0/mo</td>
-                <td class="price-cell" data-table-price data-usd="30">৳1,200/mo</td>
-                <td class="col-tagioo price-cell" data-table-price data-usd="50">৳2,900/mo</td>
-                <td class="price-cell" data-table-price data-usd="100">৳5,900/mo</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
+      <section class="section comparison-section"><div class="section-heading centered"><h2>The essentials, at a glance.</h2><p class="section-sub">Each plan includes managed hosting, a first-party domain with SSL, Setup Assistant and incoming event logs.</p></div><div class="comparison-table-wrap"><table class="comparison-table"><caption class="visually-hidden">Plan event limits and included container counts</caption><thead><tr><th scope="col">Included capacity</th><th scope="col">Free</th><th scope="col">Starter</th><th scope="col">Pro</th><th scope="col">Enterprise</th></tr></thead><tbody><tr><th scope="row">Events per cycle</th><td>15,000</td><td>500,000</td><td>2,000,000</td><td>5,000,000</td></tr><tr><th scope="row">sGTM containers</th><td>1</td><td>1</td><td>3</td><td>5</td></tr></tbody></table></div><p class="studio-fine">Multi-domain management, dedicated IP and BigQuery Export are coming soon and are not included as available features.</p></section>
       <!-- ── ENTERPRISE CTA ─────────────────────────────────────── -->
       <section class="section monitoring-section">
         <div class="monitoring-inner">
@@ -328,7 +216,7 @@
         <div class="faq-grid">
           <details class="faq-item">
             <summary>How do I pay — is there a card option?</summary>
-            <p>Yes. In Bangladesh, send the amount via <strong>bKash</strong> or <strong>Nagad</strong> "Send Money" to the number shown in your dashboard and enter the transaction ID — we verify it and activate your plan, usually within a few hours, always same day. Everywhere else, pay by card (Visa, Mastercard, and more) via Paddle — your plan activates instantly.</p>
+            <p>Yes. In Bangladesh, send the amount via <strong>bKash</strong> or <strong>Nagad</strong> "Send Money" to the number shown in your dashboard and enter the transaction ID — we verify it and activate your plan, after owner review. Everywhere else, pay by card (Visa, Mastercard, and more) via Paddle — activation follows successful payment processing.</p>
           </details>
           <details class="faq-item">
             <summary>What happens right after I submit a transaction ID?</summary>
@@ -336,11 +224,11 @@
           </details>
           <details class="faq-item">
             <summary>What happens when my Free plan hits 15,000 events?</summary>
-            <p>We email and WhatsApp you at 80% usage so you're not surprised. At 15,000 events your container pauses until either your 30-day cycle resets (free tracking resumes automatically) or you upgrade to a paid plan. No data is deleted — it just stops collecting new events until the cycle rolls over or you upgrade.</p>
+            <p>We send an email notice at 80% usage. At 15,000 events your container pauses until either your 30-day cycle resets (free tracking resumes automatically) or you upgrade to a paid plan. No data is deleted — it just stops collecting new events until the cycle rolls over or you upgrade.</p>
           </details>
           <details class="faq-item">
             <summary>How does renewal work?</summary>
-            <p>bKash/Nagad plans run for whichever cycle you pick — 30, 90, or 180 days — from the date we confirm your payment. We send reminders before your renewal date; if it lapses, you get a short grace period with tracking still running, then the container pauses until you renew via the same bKash/Nagad flow as your first payment. Card subscriptions via Paddle are monthly and renew automatically — no action needed unless you cancel.</p>
+            <p>bKash/Nagad plans run for whichever cycle you pick — 30, 90, or 180 days — from the date we confirm your payment. We send reminders before your renewal date; if it lapses, you get a short grace period with tracking still running, then your account falls back to Free; a container can pause if it exceeds the Free allowance. Card subscriptions via Paddle are monthly and renew automatically — no action needed unless you cancel.</p>
           </details>
           <details class="faq-item">
             <summary>How do the 3-month and 6-month discounts work?</summary>
@@ -348,11 +236,11 @@
           </details>
           <details class="faq-item">
             <summary>Can I cancel or downgrade anytime?</summary>
-            <p>Yes. There's no lock-in contract — simply don't renew when your 30-day window ends, or downgrade to Free at any time and keep the 15,000 events/month tier forever.</p>
+            <p>You can request cancellation or a downgrade. Paddle subscriptions renew automatically until canceled; use Manage card &amp; invoices in your account. Check the effective date shown in your billing details. Manual plans require a new payment to renew.</p>
           </details>
           <details class="faq-item">
             <summary>Do you offer refunds?</summary>
-            <p>Message us on WhatsApp if something's wrong with your billing — we handle it case by case, same day.</p>
+            <p>Message us on WhatsApp if something's wrong with your billing — we review requests according to our <a href="/terms">Terms of Service</a>.</p>
           </details>
         </div>
       </section>
@@ -383,12 +271,12 @@
                 <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
               </svg>
             </span>
-            <span>Tagioo</span>
+            <span>Tag<span class="brand-accent">ioo</span></span>
           </a>
-          <p>First-party server-side tracking infrastructure for Bangladesh ecommerce and agencies.</p>
+          <p>Managed server-side tracking for ecommerce teams, marketers and agencies.</p>
           <div class="footer-payments">
-            <span class="trust-badge bkash sm">bKash</span>
-            <span class="trust-badge nagad sm">Nagad</span>
+            <span class="trust-badge sm footer-tb">Card checkout</span>
+            <span class="trust-badge sm footer-tb">USD monthly plans</span>
             <span class="trust-badge sm footer-tb">Visa / MC</span>
           </div>
         </div>
@@ -404,6 +292,7 @@
           <div class="footer-col">
             <strong>Support</strong>
             <a href="/docs">Docs</a>
+        <a href="/blog">Blog</a>
             <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
             <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
             <a href="#faq">FAQ</a>
@@ -419,8 +308,8 @@
         <span class="footer-wordmark">Tagioo</span>
       </div>
       <div class="footer-bottom">
-        <span>© 2025 Tagioo. All rights reserved. &nbsp;·&nbsp; Made in Bangladesh 🇧🇩</span>
-        <p class="footer-disclaimer">Figures illustrating potential savings, profit, or ROAS improvement on this site are illustrative examples, not guarantees or audited results. Actual results depend on your ad spend, traffic, and current tracking setup.</p>
+        <span>© 2026 Tagioo. All rights reserved.</span>
+        <p class="footer-disclaimer">Tracking results depend on your implementation, traffic, consent settings and destination configuration.</p>
       </div>
     </footer>
 
@@ -470,78 +359,67 @@
         revealObs.observe(el);
       });
 
-      const billingTabs = document.querySelectorAll(".billing-tab");
-      const cycleCards = document.querySelectorAll(".pricing-card[data-monthly]");
-      billingTabs.forEach(tab => {
+      const cycleMeta = {
+        1:  { id: "monthly",    disc: 0,    unit: "/month" },
+        3:  { id: "quarterly",  disc: 0.10, unit: "/month" },
+        6:  { id: "semiannual", disc: 0.20, unit: "/month" },
+        12: { id: "yearly",     disc: 0.25, unit: "/month" }
+      };
+      const bt = (n) => "৳" + Math.round(n).toLocaleString();
+      document.querySelectorAll(".billing-tab").forEach((tab) => {
         tab.addEventListener("click", () => {
-          billingTabs.forEach(t => { t.classList.remove("is-active"); t.setAttribute("aria-selected", "false"); });
-          tab.classList.add("is-active");
-          tab.setAttribute("aria-selected", "true");
-          const cycle = Number(tab.dataset.cycle);
-          const cycleId = cycle === 3 ? "quarterly" : cycle === 6 ? "semiannual" : "monthly";
-          document.querySelectorAll("[data-plan-cta]").forEach(cta => {
+          const months = Number(tab.dataset.cycle);
+          const meta = cycleMeta[months] || cycleMeta[1];
+          document.querySelectorAll(".billing-tab").forEach((t) => {
+            const on = t === tab;
+            t.classList.toggle("is-active", on);
+            t.setAttribute("aria-selected", on ? "true" : "false");
+          });
+          document.querySelectorAll("[data-plan-cta]").forEach((cta) => {
             const u = new URL(cta.getAttribute("href"), window.location.origin);
-            u.searchParams.set("cycle", cycleId);
+            u.searchParams.set("cycle", meta.id);
             cta.setAttribute("href", u.pathname + u.search);
           });
-          cycleCards.forEach(card => {
+          document.querySelectorAll(".pricing-card[data-monthly]").forEach((card) => {
             const monthly = Number(card.dataset.monthly);
+            const perMonth = Math.round(monthly * (1 - meta.disc));
             const priceEl = card.querySelector("[data-price-display]");
             const unitEl = card.querySelector("[data-price-unit]");
             const noteEl = card.querySelector("[data-cycle-note]");
-            if (cycle === 1) {
-              priceEl.textContent = "৳" + monthly.toLocaleString();
-              unitEl.textContent = "/month";
-              noteEl.textContent = "";
-            } else {
-              const discount = cycle === 3 ? 0.10 : 0.20;
-              const total = Math.round(monthly * cycle * (1 - discount));
-              const perMonth = Math.round(total / cycle);
-              priceEl.textContent = "৳" + perMonth.toLocaleString();
-              unitEl.textContent = "/month";
-              noteEl.textContent = `Billed ৳${total.toLocaleString()} every ${cycle} months`
-                + (cycle === 3 ? " · Free guided setup included" : "");
+            if (priceEl) priceEl.textContent = bt(perMonth);
+            if (unitEl) unitEl.textContent = meta.unit;
+            if (noteEl) {
+              if (months === 1) { noteEl.textContent = ""; }
+              else {
+                const total = Math.round(monthly * months * (1 - meta.disc));
+                const span = months === 12 ? "per year" : `every ${months} months`;
+                noteEl.textContent = `Billed ${bt(total)} ${span}`
+                  + (months === 3 ? " · Free setup by the Tagioo team" : "");
+              }
             }
           });
         });
       });
 
-      // International visitors (anyone not detected as Bangladesh) see USD
-      // pricing — Paddle card checkout, monthly-only, so the multi-month
-      // billing toggle (BDT/bKash-Nagad only) is hidden rather than shown
-      // with a "Save 20%" that Paddle can't actually offer yet.
+      // USD is the safe default, including when geo detection is unavailable.
       fetch("/api/geo").then(r => r.json()).then(({ currency }) => {
+        if (currency !== "BDT") return;
         const switchEl = document.getElementById("pricingCurrencySwitch");
-        if (switchEl) {
-          switchEl.innerHTML = currency === "USD"
-            ? '🇧🇩 In Bangladesh? <a href="/bd?next=/pricing">See BDT pricing →</a>'
-            : '🌍 Outside Bangladesh? <a href="/global?next=/pricing">See USD pricing →</a>';
-        }
-        if (currency !== "USD") return;
+        if (switchEl) switchEl.innerHTML = 'Prefer card checkout? <a href="/global?next=/pricing">See USD monthly pricing →</a>';
         const toggle = document.getElementById("billingToggle");
-        if (toggle) toggle.style.display = "none";
-        const headline = document.getElementById("pricingHeadline");
-        if (headline) headline.innerHTML = "Cancel anytime. Instant setup.<br>Just server-side tracking.";
-        const subhead = document.getElementById("pricingSubhead");
-        if (subhead) subhead.textContent = "Start free with 15,000 events a month, forever. Upgrade when you need more volume — pay monthly by card, cancel anytime.";
+        if (toggle) toggle.style.display = "";
+        const cycleNote = document.getElementById("pricingCycleNote");
+        if (cycleNote) cycleNote.hidden = false;
         const footerNote = document.getElementById("pricingFooterNote");
-        if (footerNote) footerNote.innerHTML = "Pay by <strong>card</strong> — Visa, Mastercard, and more, billed in USD via Paddle. Pick a plan, checkout, and your account activates instantly.";
-        document.querySelectorAll("[data-usd]").forEach(el => {
-          const usd = el.dataset.usd;
-          if (el.hasAttribute("data-table-price")) {
-            el.textContent = "$" + usd + "/mo";
-          } else {
-            el.textContent = "$" + usd;
-            const unitEl = el.closest(".plan-price")?.querySelector("[data-price-unit]");
-            if (unitEl) unitEl.textContent = "/month";
-          }
+        if (footerNote) footerNote.innerHTML = 'Local prices in BDT. Pay manually via <strong>bKash</strong> or <strong>Nagad</strong>; payment is reviewed before activation. USD monthly card subscriptions are also available through Paddle.';
+        document.querySelectorAll(".pricing-card[data-monthly]").forEach(card => {
+          const priceEl = card.querySelector("[data-price-display]");
+          if (priceEl) priceEl.textContent = bt(Number(card.dataset.monthly));
         });
-        document.querySelectorAll("[data-plan-cta]").forEach(cta => {
-          const u = new URL(cta.getAttribute("href"), window.location.origin);
-          u.searchParams.set("cycle", "monthly");
-          cta.setAttribute("href", u.pathname + u.search);
-        });
+        const freePrice = document.querySelector('[data-usd="0"]');
+        if (freePrice) freePrice.textContent = bt(0);
       }).catch(() => {});
     </script>
+    <script src="/assets/marketing.js?v=1" defer></script>
   </body>
 </html>

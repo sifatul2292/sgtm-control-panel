@@ -5,5 +5,23 @@
     "theme": "restrained dark",
     "enrichment": "none",
     "brief": "Redesign SGTM dashboard and settings like a dark SaaS operations console"
+  },
+  {
+    "date": "2026-10-09",
+    "scope": "app",
+    "macrostructure": "Split product studio",
+    "theme": "Tagioo warm white and purple editorial",
+    "design_system": "design.md",
+    "enrichment": "HTML event-flow diagram; existing concealed-URL product capture",
+    "brief": "Redesign public marketing pages, preserve routes and billing; adapt public reference storytelling"
+  },
+  {
+    "date": "2026-10-09",
+    "scope": "app",
+    "macrostructure": "Centered headline with compact split architecture hero",
+    "theme": "Tagioo pale green, lime, navy and blue-gray",
+    "design_system": "design.md",
+    "enrichment": "Original tracking architecture diagram and existing concealed-URL interface capture",
+    "brief": "Screenshot-guided revision after owner rejected the first visual direction; tighter widths and section rhythm"
   }
 ]

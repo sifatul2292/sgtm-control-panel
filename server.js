@@ -308,6 +308,8 @@ const mimeTypes = {
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".xml": "application/xml; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png"
 };
@@ -12242,6 +12244,31 @@ const server = createServer(async (req, res) => {
     const reqUrl = new URL(req.url || "/", `http://${req.headers.host}`);
     const pathname = reqUrl.pathname;
     const hostname = String(req.headers.host || "").split(":")[0].toLowerCase();
+
+    // Marketing discovery must work before customer authentication.
+    if (hostname.startsWith("app.") || pathname === "/index.html") {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
+    if ((pathname === "/robots.txt" || pathname === "/sitemap.xml") && (req.method === "GET" || req.method === "HEAD")) {
+      if (pathname === "/robots.txt" && hostname.startsWith("app.")) {
+        res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+        res.end(req.method === "HEAD" ? "" : "User-agent: *\nDisallow: /\n");
+      } else {
+        await serveStatic(req, res);
+      }
+      return;
+    }
+    if ((pathname === "/blog" || pathname === "/blog/") && req.method === "GET") {
+      await servePublicPage(res, "blog/index.html");
+      return;
+    }
+    if (pathname.startsWith("/blog/") && req.method === "GET") {
+      const slug = pathname.slice(6);
+      if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+        await servePublicPage(res, `blog/${slug}.html`);
+        return;
+      }
+    }
 
     if (pathname === "/" && !isAuthenticated(req)) {
       if (hostname.startsWith("app.")) {
