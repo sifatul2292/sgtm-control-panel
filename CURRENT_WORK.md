@@ -1641,3 +1641,7 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 ## 2026-10-12 — Restore original inner-page design
 
 - Removed the green/Jakarta marketing theme from eight inner marketing/legal pages. Restored original Inter typography, visible hexagon logo, base homepage colors/buttons/layouts while preserving current content, pricing behavior, SEO, legal policy and blog links. Added minimal screenshot/focus/header compatibility styles.
+
+## 2026-10-12 — Inner-page hero, blog access and footer
+
+- Fixed dark inner hero contrast and centered heading/description with deliberate spacing and responsive CTAs. Homepage hero unchanged. Added missing Blog links to mobile menus and installed the homepage footer across all eight inner marketing/legal pages with readable footer text.
