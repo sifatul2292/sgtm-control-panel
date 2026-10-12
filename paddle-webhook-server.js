@@ -24,6 +24,11 @@ export function createPaddleReceiver(inbox, secret) {
       if (!verifyPaddleSignature({ header: req.headers["paddle-signature"], rawBody: raw, secret })) {
         reply(401, { error: "Invalid Paddle webhook signature." }); return;
       }
+      // Acknowledge Paddle's simulator without allowing fake payments into billing.
+      const event = JSON.parse(raw.toString());
+      if (/^ntfsimevt_[a-z0-9]+$/i.test(event.event_id || "")) {
+        reply(200, { received: true, simulation: true, billingChanged: false }); return;
+      }
       const result = inbox.accept(raw);
       reply(200, { received: true, ...result });
     } catch (error) {

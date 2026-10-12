@@ -53,6 +53,13 @@ test("receiver acknowledges durable acceptance, rejects signatures and never ack
     assert.equal((await response.json()).duplicate, false);
     response = await fetch(url, { method: "POST", headers, body });
     assert.equal((await response.json()).duplicate, true);
+    const simulated = body.replace("evt_http", "ntfsimevt_test");
+    const simulationSignature = createHmac("sha256", secret).update(`${ts}:${simulated}`).digest("hex");
+    assert.equal((await fetch(url, { method: "POST", body: simulated })).status, 401);
+    response = await fetch(url, { method: "POST", headers: { "Paddle-Signature": `ts=${ts};h1=${simulationSignature}` }, body: simulated });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { received: true, simulation: true, billingChanged: false });
+    assert.deepEqual(inbox.stats(), [{ status: "pending", count: 1 }]);
     inbox.close();
     response = await fetch(url, { method: "POST", headers, body });
     assert.equal(response.status, 503);

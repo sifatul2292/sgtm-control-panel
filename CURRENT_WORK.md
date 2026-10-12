@@ -1645,3 +1645,12 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 ## 2026-10-12 — Inner-page hero, blog access and footer
 
 - Fixed dark inner hero contrast and centered heading/description with deliberate spacing and responsive CTAs. Homepage hero unchanged. Added missing Blog links to mobile menus and installed the homepage footer across all eight inner marketing/legal pages with readable footer text.
+
+## 2026-10-12 — Paddle production configuration
+
+- Owner approved creation of scoped live API key, client token and seven-event billing notification destination. Created live monthly USD Starter $30, Pro $50 and Enterprise $100 prices and verified their active amounts/cycles via Paddle API. Checkout domain tagioo.com approved.
+- Installed credentials only in VPS .env, protected rollback backup under /var/backups/tagioo-pre-live-1791779523/, switched PADDLE_ENV to production and reloaded/saved both PM2 services. API key expires January 10, 2027; rotate before expiry.
+- Public webhook synthetic harmless signed event returned 200, replay returned 200/duplicate, unsigned request returned 401. Durable inbox worker completed it once and cleared payload. This proves signature/inbox handling, not delivery from Paddle or real paid activation.
+- Syntax gate and all 11 billing/inbox tests passed. Real checkout, paid activation and actual signup/reset email delivery remain pending user-assisted end-to-end test. No live purchase or customer tracking changes performed.
+- User created a test account. Opened Starter upgrade through customer Billing; live checkout initially failed with transaction_default_checkout_url_not_set. Saved approved https://tagioo.com/checkout as Paddle default payment link and retested successfully: live buy.paddle.com payment form offers card/PayPal, $30 total today including displayed Bangladesh VAT. Payment left to owner; actual webhook activation still pending.
+- Owner requested no-charge testing. Paddle simulator uses ntfsimevt_ identities; receiver now acknowledges signed simulations explicitly without queueing them or changing billing. Real evt_ validation/persistence unchanged. Added regression assertions for simulation signature and inbox isolation; all 17 billing/inbox/activation/signup checks and syntax gate pass. Live destination temporarily enables simulation usage for delivery testing.
