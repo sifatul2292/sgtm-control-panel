@@ -12323,6 +12323,11 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    if (pathname === "/refunds") {
+      await servePublicPage(res, "refunds.html");
+      return;
+    }
+
     if (pathname === "/terms") {
       await servePublicPage(res, "terms.html");
       return;

@@ -1633,3 +1633,7 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 
 - Promoted approved homepage preview into public/landing.html, including hero animation, restored sections, requested copy, journal slider and responsive menu. Copied isolated assets into public/assets/home-*. Production routes replace loopback links; removed preview noindex and preserved production SEO metadata/schema and GTM.
 - GitHub push requested by owner; deployment command provided separately. Private local screenshots and video experiments excluded from source upload.
+
+## 2026-10-12 — Refund policy route
+
+- Added public /refunds with matching legal-page layout, support instructions, Paddle policy references, cancellation distinction, Shopify/local payment handling and statutory-rights preservation. No new money-back guarantee or refund automation. Added footer/pricing links and sitemap entry.
