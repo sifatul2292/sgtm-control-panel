@@ -1661,3 +1661,8 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 
 - Renamed Paddle portal button to Manage subscription so cancellation is discoverable. Replaced customer Settings icon with sliders and supplied matching SVG chat/bell icons for Support tickets and Notifications, which previously fell back to font glyphs. Existing SVG size/color rules reused; bumped app.js cache version to 108.
 - Syntax and diff checks passed. No billing behavior changed. Test subscription renewal was canceled in Paddle at owner's request, effective November 12, 2026; paid month remains active.
+
+## 2026-10-12 — Tax-exclusive Paddle pricing
+
+- Owner requested applicable tax on top of subscription prices. Changed live Paddle account Sales tax preference from automatic location-based pricing to Price excludes tax; save confirmed. All three live prices use account_setting. Added tax-exclusive disclosure to homepage/pricing notes and card checkout. Existing test subscription remains scheduled for cancellation.
+- Syntax/diff checks passed. Website wording deployment remains pending VPS terminal access.

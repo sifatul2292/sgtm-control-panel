@@ -2866,7 +2866,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           ${paddle.env === "sandbox" ? `<p class="lf-notice" role="status">Paddle sandbox test mode. No real payment will be collected. Use test card details only.</p>` : ""}
           <button type="button" id="coPayCard" class="co-card-btn su-anim" style="--d:70ms">Pay with card — $${paddle.usdAmount}/mo</button>
           <p id="coActivationStatus" role="status" aria-live="polite" hidden></p>
-          <p class="co-card-note su-anim" style="--d:75ms">Visa, Mastercard, and more — billed in USD via Paddle.</p>
+          <p class="co-card-note su-anim" style="--d:75ms">Visa, Mastercard, and more — billed in USD via Paddle. Applicable taxes are added at checkout.</p>
           ` : ""}
           ${!paddle.enabled || paddle.localPaymentEnabled ? `
           ${paddle.enabled ? `<details id="coLocalPayment"${error ? " open" : ""}><summary>Or pay with bKash / Nagad — ${money(instructions.amount)} ${cycleLabel} (BDT)</summary><p class="co-card-note">Local payment requires owner confirmation. Choose one payment method only.</p>` : ""}
