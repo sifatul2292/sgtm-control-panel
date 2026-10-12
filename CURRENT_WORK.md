@@ -1637,3 +1637,7 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 ## 2026-10-12 — Refund policy route
 
 - Added public /refunds with matching legal-page layout, support instructions, Paddle policy references, cancellation distinction, Shopify/local payment handling and statutory-rights preservation. No new money-back guarantee or refund automation. Added footer/pricing links and sitemap entry.
+
+## 2026-10-12 — Restore original inner-page design
+
+- Removed the green/Jakarta marketing theme from eight inner marketing/legal pages. Restored original Inter typography, visible hexagon logo, base homepage colors/buttons/layouts while preserving current content, pricing behavior, SEO, legal policy and blog links. Added minimal screenshot/focus/header compatibility styles.
