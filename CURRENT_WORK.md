@@ -1665,4 +1665,25 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 ## 2026-10-12 — Tax-exclusive Paddle pricing
 
 - Owner requested applicable tax on top of subscription prices. Changed live Paddle account Sales tax preference from automatic location-based pricing to Price excludes tax; save confirmed. All three live prices use account_setting. Added tax-exclusive disclosure to homepage/pricing notes and card checkout. Existing test subscription remains scheduled for cancellation.
-- Syntax/diff checks passed. Website wording deployment remains pending VPS terminal access.
+- Syntax/diff checks passed. Deployed dfd618e to VPS, syntax gate passed and main PM2 service reloaded. This also publishes Manage subscription and customer SVG icon updates.
+
+
+## 2026-10-12 — Compact mobile purchase animation
+
+- Shortened the homepage phone illustration: compact event row, server/domain/pipeline card and two-column destinations instead of tall artwork and workspace feature list. Purchase and destination labels explicitly describe customer checkout and data transfer.
+- Event cycle reduced from eight to four seconds; packets from 3.8 to 1.6 seconds. Destination borders pulse after the purchase appears. Pause/offscreen handling and reduced-motion remain supported; bumped homepage flow CSS cache version.
+- Removed default figure margins and reduced phone hero side padding. Browser checks at 320/375/414/520/768/1280px found no page overflow or escaped cards; pause and reduced-motion checks pass. Screenshot: artifacts/mobile-purchase/mobile.png. Backend/frontend syntax and diff checks pass. Local only; deployment and physical-device verification pending.
+
+## 2026-10-12 — Distinct purchase transfer color
+
+- Both mobile transfer connectors and desktop packets now use vivid purple, matching the purchase badge and destination pulse. Longer packet trails move every 0.75 seconds for clearer, faster transmission. Cache version bumped; pause/reduced-motion preserved.
+
+## 2026-10-12 — Orange and charcoal brand logo
+
+- Adopted owner-supplied Downloads/Tagioo/Tagioo logo in orange and charcoal.png. Self-contained SVG viewports preserve supplied pixels, framing full wordmark and orange icon without redrawing. Light backing preserves charcoal contrast on dark surfaces.
+- Replaced homepage/inner-page/blog headers and footers, dashboard branding/loading mark, authentication/checkout page logos, invoice icon, hero server icon and favicon. Compact dashboard sidebar uses icon at tablet widths. App/styles cache versions 109/68 and favicon version bumped. New shared assets: public/assets/tagioo-logo.svg and tagioo-icon.svg.
+- Backend/frontend syntax, diff and responsive animation checks pass. Logo loading/sizing checked on homepage, features, pricing, blog and dashboard at 320/768/1280px; preview screenshot artifacts/mobile-purchase/new-brand.png. Local preview updated. Not deployed.
+
+## 2026-10-12 — Transparent website logo variants
+
+- Removed header/footer logo backing and padding across marketing/legal pages. Added transparent orange/white wordmark for dark footers, preserving original orange icon. Browser verified transparent backgrounds and rendered both variants at 485px; syntax and diff checks pass. Local only.

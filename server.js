@@ -2423,7 +2423,7 @@ function loginPage(error = "", opts = {}) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=brand-2" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Sign in — Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -2439,13 +2439,7 @@ function loginPage(error = "", opts = {}) {
       <!-- ── Brand panel ── -->
       <aside class="login-brand">
         <a class="lb-logo" href="/">
-          <span class="lb-mark">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
-              <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
-            </svg>
-          </span>
-          <span>Tagioo</span>
+          <img src="/assets/tagioo-logo.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box">
         </a>
         <div class="lb-hero">
           <h2>Track every purchase.<br>Boost every campaign.</h2>
@@ -2586,7 +2580,7 @@ function resetPasswordPage(token = "", error = "") {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=brand-2" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Reset password — Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -2598,13 +2592,7 @@ function resetPasswordPage(token = "", error = "") {
     <div class="login-layout">
       <aside class="login-brand">
         <a class="lb-logo" href="/">
-          <span class="lb-mark">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
-              <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
-            </svg>
-          </span>
-          <span>Tagioo</span>
+          <img src="/assets/tagioo-logo.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box">
         </a>
         <div class="lb-hero">
           <h2>Track every purchase.<br>Boost every campaign.</h2>
@@ -2702,7 +2690,7 @@ function verifyPage({ email = "", error = "", info = "" } = {}) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=brand-2" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Verify your email — Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -2716,13 +2704,7 @@ function verifyPage({ email = "", error = "", info = "" } = {}) {
     <div class="login-layout">
       <aside class="login-brand">
         <a class="lb-logo" href="/">
-          <span class="lb-mark">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
-              <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
-            </svg>
-          </span>
-          <span>Tagioo</span>
+          <img src="/assets/tagioo-logo.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box">
         </a>
         <div class="lb-hero">
           <h2>Check your inbox.<br>Confirm it's you.</h2>
@@ -2784,7 +2766,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=brand-2" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Complete payment — Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -2826,13 +2808,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
     <div class="login-layout">
       <aside class="login-brand">
         <a class="lb-logo" href="/">
-          <span class="lb-mark">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
-              <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
-            </svg>
-          </span>
-          <span>Tagioo</span>
+          <img src="/assets/tagioo-logo.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box">
         </a>
         <div class="lb-hero">
           <h2>One last step.<br>Activate your plan.</h2>
@@ -3004,7 +2980,7 @@ function signupPage(error = "", values = {}, { leadEventId = "" } = {}) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=brand-2" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Create account — Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -3020,13 +2996,7 @@ function signupPage(error = "", values = {}, { leadEventId = "" } = {}) {
       <!-- ── Brand panel ── -->
       <aside class="login-brand">
         <a class="lb-logo" href="/">
-          <span class="lb-mark">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
-              <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
-            </svg>
-          </span>
-          <span>Tagioo</span>
+          <img src="/assets/tagioo-logo.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box">
         </a>
         <div class="lb-hero">
           <h2>Start tracking smarter.<br>Launch in minutes.</h2>

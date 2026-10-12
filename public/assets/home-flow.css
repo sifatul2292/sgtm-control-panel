@@ -11,6 +11,7 @@
  --diagram-lime: #B9EF58;
  --diagram-green: #47782B;
  --diagram-lines: #A1BE77;
+ --diagram-transfer: #7544E8;
  --diagram-deep: #172A3A;
  --diagram-deep-text: #CBD8E4;
  --diagram-meta: #1769F6;
@@ -19,6 +20,8 @@
  --diagram-shadow: 0 20px 48px rgba(18,35,50,.15);
  --diagram-server-shadow: 0 18px 34px rgba(20,39,39,.22);
  --diagram-pill-shadow: 0 12px 22px rgba(36,59,37,.16);
+ margin:0;
+ min-width:0;
  container-type: inline-size;
  background: var(--diagram-paper);
  background-image: radial-gradient(var(--diagram-dots) 1px,transparent 1px);
@@ -45,15 +48,15 @@
 .signal-dest-label { position:absolute; left:76.5%; top:12%; }
 .signal-lines { position:absolute; inset:0; width:100%; height:100%; }
 .signal-line-base { fill:none; stroke:var(--diagram-lines); stroke-width:1.8; }
-.signal-line-packets { fill:none; stroke:var(--diagram-lime); stroke-width:7; stroke-linecap:round; }
-.signal-diagram .packet { stroke-dasharray:1 99; animation:signalTravel 3.8s linear infinite; }
+.signal-line-packets { fill:none; stroke:var(--diagram-transfer); stroke-width:7; stroke-linecap:round; }
+.signal-diagram .packet { stroke-dasharray:8 92; animation:signalTravel .75s linear infinite; }
 .signal-diagram .packet:nth-child(2) { animation-delay:-1s; }.signal-diagram .packet:nth-child(3) { animation-delay:-1.35s; }.signal-diagram .packet:nth-child(4) { animation-delay:-1.7s; }.signal-diagram .packet:nth-child(5) { animation-delay:-2.05s; }
 @keyframes signalTravel { from { stroke-dashoffset:0; } to { stroke-dashoffset:-100; } }
 .signal-store { position:absolute; left:3%; top:27%; width:23%; border:1px solid var(--diagram-border); border-radius:15px; background:var(--diagram-white); box-shadow:var(--diagram-shadow); }
 .signal-store-head { display:flex; justify-content:space-between; align-items:center; gap:4px; padding:10px; font-size:clamp(7px,1.5cqw,10px); color:var(--diagram-muted); border-bottom:1px solid var(--diagram-border); }
 .signal-sample-label { font-family:var(--flow-mono); font-size:7px; background:var(--diagram-lime); color:var(--diagram-ink); padding:2px 4px; border-radius:4px; }
 .signal-store-states { position:relative; aspect-ratio:155/225; }
-.signal-store-state { position:absolute; inset:0; display:flex; flex-direction:column; gap:7px; padding:12px; animation:signalView 8s ease-in-out infinite; }
+.signal-store-state { position:absolute; inset:0; display:flex; flex-direction:column; gap:7px; padding:12px; animation:signalView 4s ease-in-out infinite; }
 .signal-purchase { animation-name:signalPurchase; }
 .signal-product-art,.signal-order-art { display:grid; place-items:center; background:var(--diagram-paper); border-radius:10px; flex:1; min-height:0; color:var(--diagram-green); }
 .signal-product-art svg,.signal-order-art svg { width:75%; max-height:80px; fill:none; stroke:currentColor; stroke-width:3; stroke-linejoin:round; }
@@ -64,8 +67,8 @@
 .signal-store-state code { display:block; font-family:var(--flow-mono); font-size:clamp(7px,1.5cqw,10px); padding:5px 8px; background:var(--diagram-lime); color:var(--diagram-ink); border:0; border-radius:5px; }
 .signal-store-pill { position:absolute; bottom:-14px; left:7%; display:flex; align-items:center; justify-content:center; gap:5px; padding:7px 9px; border-radius:30px; white-space:nowrap; background:var(--diagram-deep); color:var(--diagram-white); font-size:clamp(7px,1.4cqw,10px); font-weight:600; box-shadow:var(--diagram-pill-shadow); }
 .signal-store-pill > span { color:var(--diagram-lime); }
-@keyframes signalView { 0%,43% {opacity:1;} 48%,93% {opacity:0;} 98%,100% {opacity:1;} }
-@keyframes signalPurchase { 0%,43% {opacity:0;} 48%,93% {opacity:1;} 98%,100% {opacity:0;} }
+@keyframes signalView { 0%,23% {opacity:1;} 28%,93% {opacity:0;} 98%,100% {opacity:1;} }
+@keyframes signalPurchase { 0%,23% {opacity:0;} 28%,93% {opacity:1;} 98%,100% {opacity:0;} }
 .signal-server { position:absolute; left:31%; top:12%; width:36.5%; background:var(--diagram-deep); color:var(--diagram-deep-text); border:1px solid var(--diagram-ink); border-radius:19px; box-shadow:var(--diagram-server-shadow); overflow:hidden; }
 .signal-server-head { display:flex; align-items:center; gap:9px; padding:15px 12px; background:var(--diagram-lime); color:var(--diagram-ink); }
 .signal-brand-mark { display:grid; place-items:center; width:30px; height:30px; font-size:18px; font-weight:700; border-radius:8px; background:var(--accent); color:var(--diagram-white); flex-shrink:0; }
@@ -152,8 +155,57 @@
 @media(max-width:520px) {
  .signal-scene { gap:0; }
  .signal-mobile-lines { display:block; width:100%; height:40px; overflow:visible; }
- .signal-mobile-lines .signal-line-base { fill:none; stroke:var(--diagram-green); stroke-width:1.5; opacity:.4; }
- .signal-mobile-lines .signal-line-packets { fill:none; stroke:var(--diagram-lime); stroke-width:5; stroke-linecap:round; }
+ .signal-mobile-lines .signal-line-base { fill:none; stroke:var(--diagram-transfer); stroke-width:2; opacity:.35; }
+ .signal-mobile-lines .signal-line-packets { fill:none; stroke:var(--diagram-transfer); stroke-width:5; stroke-linecap:round; }
  .signal-server::before,.signal-destinations::before { content:none; }
  .signal-destinations { margin-top:0; }
 }
+
+/* Keep the purchase and its destinations visible together on phones. */
+.signal-purchase code { font-weight:700; }
+.signal-destination { animation:signalDelivery 4s ease-in-out infinite; }
+.signal-destination:nth-child(2) { animation-delay:.12s; }
+.signal-destination:nth-child(3) { animation-delay:.24s; }
+.signal-destination:nth-child(4) { animation-delay:.36s; }
+@keyframes signalDelivery {
+  0%,40%,90%,100% { border-color:var(--diagram-border); box-shadow:0 3px 8px #1424340d; }
+  50%,75% { border-color:var(--diagram-transfer); box-shadow:0 0 0 3px #7544e833; }
+}
+.signal-diagram.is-paused .signal-destination { animation-play-state:paused; }
+@media(max-width:520px) {
+ .hero .copy-hero-body { width:100%; }
+ .signal-diagram { border-radius:16px; }
+ .signal-controls { padding:10px 12px; gap:6px; }
+ .signal-diagram #motionToggle { padding:6px 8px; border-radius:6px; min-height:32px; }
+ .signal-banner { margin:0 12px; padding:10px 12px; border-radius:12px; box-shadow:none; }
+ .signal-banner strong { font-size:15px; }
+ .signal-scene { padding:12px; }
+ .signal-store { max-width:none; margin:0; border-radius:12px; box-shadow:none; }
+ .signal-store-head { padding:7px 10px; }
+ .signal-store-states { aspect-ratio:auto; height:108px; }
+ .signal-store-state { display:grid; grid-template-columns:58px minmax(0,1fr); grid-template-rows:auto auto auto auto; column-gap:10px; row-gap:3px; padding:10px; }
+ .signal-product-art,.signal-order-art { grid-column:1; grid-row:1 / 5; }
+ .signal-product-art svg,.signal-order-art svg { width:48px; max-height:64px; }
+ .signal-store-state > :not(.signal-product-art):not(.signal-order-art) { grid-column:2; }
+ .signal-store-state strong { font-size:15px; }
+ .signal-store-description { font-size:11px; }
+ .signal-store-state code { padding:4px 7px; }
+ .signal-store-pill { display:none; }
+ .signal-mobile-lines { height:24px; }
+ .signal-server { border-radius:12px; box-shadow:none; overflow:hidden; }
+ .signal-server-head { padding:10px 12px; border-radius:0; }
+ .signal-server-head strong { font-size:20px; }
+ .signal-brand-mark { width:28px; height:28px; font-size:17px; }
+ .signal-domain { padding:8px 12px; }
+ .signal-server-body { display:none; }
+ .signal-pipeline { margin:0 12px; padding:9px 0; border-top:0; }
+ .signal-destination { min-height:54px; padding:9px 8px; }
+ .signal-destination div > span { white-space:normal; }
+ .signal-summary { padding:10px; margin:0 12px 10px; }
+ .signal-diagram figcaption { padding:9px 12px; line-height:1.5; }
+}
+@media(prefers-reduced-motion:reduce) {
+ .signal-destination { animation:none; border-color:var(--diagram-green); }
+}
+
+.signal-purchase code { background:var(--diagram-transfer); color:var(--diagram-white); }

@@ -192,3 +192,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .copy-hero-body { display:block; width:min(100%,850px); margin:10px auto 0; }
 
 @scope (.hero) to (.signal-diagram) { .copy-hero-body { display:block; width:min(100%,850px); margin:10px auto 0; } }
+
+@scope (.hero) to (.signal-diagram) {
+ @media(max-width:520px) { .hero-inner.copy-hero { padding-left:16px; padding-right:16px; } }
+}

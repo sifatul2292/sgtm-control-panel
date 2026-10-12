@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=brand-2" />
     <meta name="description" content="Connect browser and backend signals with managed server-side GTM hosting. First-party domains, guided setup and event inspection. Start Tagioo free." />
     <meta property="og:title" content="Server-Side GTM Hosting &amp; Conversion Tracking | Tagioo" />
     <meta property="og:description" content="Connect browser and backend signals with managed server-side GTM hosting. First-party domains, guided setup and event inspection. Start Tagioo free." />
@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/assets/home-production-style.css?v=mobile-menu-2"><link rel="stylesheet" href="/assets/home-hero-only.css?v=top-3"><link rel="stylesheet" href="/assets/home-flow.css?v=top-3"><link rel="stylesheet" href="/assets/home-integrations.css?v=1">
+    <link rel="stylesheet" href="/assets/home-production-style.css?v=mobile-menu-2"><link rel="stylesheet" href="/assets/home-hero-only.css?v=mobile-4"><link rel="stylesheet" href="/assets/home-flow.css?v=purchase-5"><link rel="stylesheet" href="/assets/home-integrations.css?v=1">
 
   <link rel="stylesheet" href="/assets/home-homepage-guides.css?v=2">
 <link rel="canonical" href="https://tagioo.com/" />
@@ -37,13 +37,7 @@
     <!-- ── HEADER ─────────────────────────────────────────────── -->
     <header class="site-header" id="siteHeader">
       <a class="brand" href="/" aria-label="Tagioo home">
-        <span class="brand-mark">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="currentColor"/>
-            <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="white" opacity="0.9"/>
-          </svg>
-        </span>
-        <span>Tagioo</span>
+        <img src="/assets/tagioo-logo.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box">
       </a>
       <nav aria-label="Primary navigation">
         <a href="/features">Platform</a>
@@ -94,8 +88,8 @@
             </form></div>
       <div class="copy-hero-body">
 <figure id="tracking-flow" class="event-flow signal-diagram" aria-labelledby="flow-title flow-caption">
-  <div class="signal-controls"><span id="flow-title">A first-party path for your events</span><button type="button" id="motionToggle" aria-pressed="false">Pause animation</button></div>
-  <div class="signal-banner"><span class="signal-banner-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Z"/><path d="m8 12 3 3 5-6"/></svg></span><div><span>MANAGED SGTM</span><strong>Your tracking. Connected.</strong></div></div>
+  <div class="signal-controls"><span id="flow-title">Follow a customer purchase</span><button type="button" id="motionToggle" aria-pressed="false">Pause animation</button></div>
+  <div class="signal-banner"><span class="signal-banner-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Z"/><path d="m8 12 3 3 5-6"/></svg></span><div><span>MANAGED SGTM</span><strong>Purchase → Tagioo → Ad platforms</strong></div></div>
   <div class="signal-scene">
     <span class="signal-label signal-store-label">YOUR STORE</span><span class="signal-label signal-dest-label">DESTINATIONS</span>
     <svg class="signal-lines" viewBox="0 0 680 520" aria-hidden="true">
@@ -106,21 +100,21 @@
       <div class="signal-store-head"><span>Store events</span><span class="signal-sample-label">DEMO</span></div>
       <div class="signal-store-states" aria-label="Illustrative browser product view and backend purchase events">
         <div class="signal-store-state signal-view"><div class="signal-product-art" aria-hidden="true"><svg viewBox="0 0 100 85"><path d="M29 23h42l6 51H23l6-51Z"/><path d="M38 26V16a12 12 0 0 1 24 0v10"/><path d="m39 49 8 8 16-18"/></svg></div><span class="signal-event-type">BROWSER EVENT</span><strong>Product viewed</strong><span class="signal-store-description">A visitor explores your store</span><code>view_item</code></div>
-        <div class="signal-store-state signal-purchase"><div class="signal-order-art" aria-hidden="true"><svg viewBox="0 0 100 85"><rect x="25" y="8" width="50" height="68" rx="8"/><path d="M37 22h26M37 31h16"/><circle cx="50" cy="55" r="13"/><path d="m43 55 5 5 10-11"/></svg></div><span class="signal-event-type">BACKEND EVENT</span><strong>Order completed</strong><span class="signal-store-description">The purchase reaches your backend</span><code>purchase</code></div>
+        <div class="signal-store-state signal-purchase"><div class="signal-order-art" aria-hidden="true"><svg viewBox="0 0 100 85"><rect x="25" y="8" width="50" height="68" rx="8"/><path d="M37 22h26M37 31h16"/><circle cx="50" cy="55" r="13"/><path d="m43 55 5 5 10-11"/></svg></div><span class="signal-event-type">BACKEND EVENT</span><strong>Customer completes purchase</strong><span class="signal-store-description">Purchase data sent to Tagioo</span><code>purchase</code></div>
       </div>
       <span class="signal-store-pill"><span aria-hidden="true">✓</span> Browser + backend</span>
     </div>
     <svg class="signal-mobile-lines" viewBox="0 0 300 40" aria-hidden="true"><g class="signal-line-base"><path d="M150 0V40"/></g><g class="signal-line-packets"><path class="packet" pathLength="100" d="M150 0V40"/></g></svg><div class="signal-server">
-      <div class="signal-server-head"><span class="signal-brand-mark" aria-hidden="true">T</span><div><strong>Tagioo</strong><span>FIRST-PARTY SERVER</span></div><span class="signal-sgtm">sGTM</span></div>
+      <div class="signal-server-head"><img src="/assets/tagioo-icon.svg" alt="" width="32" height="32" style="display:block;width:32px;height:32px;object-fit:contain"><div><strong>Tagioo</strong><span>FIRST-PARTY SERVER</span></div><span class="signal-sgtm">sGTM</span></div>
       <div class="signal-domain"><span class="signal-dot" aria-hidden="true"></span><code>track.yourstore.com</code></div>
       <div class="signal-server-body"><span class="signal-label">YOUR TRACKING WORKSPACE</span><ul><li><span aria-hidden="true">✓</span> Your own tracking domain</li><li><span aria-hidden="true">✓</span> Managed container hosting</li><li><span aria-hidden="true">✓</span> Web + Server GTM templates</li><li><span aria-hidden="true">✓</span> Incoming event logs</li><li><span aria-hidden="true">✓</span> Purchase inspection</li></ul></div>
       <div class="signal-pipeline"><span>Collect</span><b aria-hidden="true">→</b><span>Inspect</span><b aria-hidden="true">→</b><span>Route</span></div>
     </div>
     <svg class="signal-mobile-lines" viewBox="0 0 300 40" aria-hidden="true"><g class="signal-line-base"><path d="M150 0V12Q150 20 140 20H85Q75 20 75 30V40"/><path d="M150 0V12Q150 20 160 20H215Q225 20 225 30V40"/></g><g class="signal-line-packets"><path class="packet" pathLength="100" d="M150 0V12Q150 20 140 20H85Q75 20 75 30V40"/><path class="packet" pathLength="100" d="M150 0V12Q150 20 160 20H215Q225 20 225 30V40"/></g></svg><div class="signal-destinations">
-      <div class="signal-destination signal-meta"><span class="signal-destination-icon" aria-hidden="true"><img src="/assets/home-meta.svg" alt="" width="24" height="24"></span><div><strong>Meta CAPI</strong><span>Conversions API</span></div></div>
-      <div class="signal-destination signal-ads"><span class="signal-destination-icon" aria-hidden="true"><img src="/assets/home-google-ads.svg" alt="" width="24" height="24"></span><div><strong>Google Ads</strong><span>Conversion tags</span></div></div>
-      <div class="signal-destination signal-tiktok"><span class="signal-destination-icon" aria-hidden="true"><img src="/assets/home-tiktok.svg" alt="" width="24" height="24"></span><div><strong>TikTok</strong><span>Events API</span></div></div>
-      <div class="signal-destination signal-ga4"><span class="signal-destination-icon" aria-hidden="true"><svg viewBox="0 0 28 28"><rect x="3" y="17" width="5" height="8" rx="2"/><rect x="11" y="10" width="5" height="15" rx="2"/><rect x="19" y="2" width="5" height="23" rx="2"/></svg></span><div><strong>GA4</strong><span>Analytics</span></div></div>
+      <div class="signal-destination signal-meta"><span class="signal-destination-icon" aria-hidden="true"><img src="/assets/home-meta.svg" alt="" width="24" height="24"></span><div><strong>Meta CAPI</strong><span>Purchase via CAPI</span></div></div>
+      <div class="signal-destination signal-ads"><span class="signal-destination-icon" aria-hidden="true"><img src="/assets/home-google-ads.svg" alt="" width="24" height="24"></span><div><strong>Google Ads</strong><span>Purchase conversion</span></div></div>
+      <div class="signal-destination signal-tiktok"><span class="signal-destination-icon" aria-hidden="true"><img src="/assets/home-tiktok.svg" alt="" width="24" height="24"></span><div><strong>TikTok</strong><span>Purchase via Events API</span></div></div>
+      <div class="signal-destination signal-ga4"><span class="signal-destination-icon" aria-hidden="true"><svg viewBox="0 0 28 28"><rect x="3" y="17" width="5" height="8" rx="2"/><rect x="11" y="10" width="5" height="15" rx="2"/><rect x="19" y="2" width="5" height="23" rx="2"/></svg></span><div><strong>GA4</strong><span>Purchase event</span></div></div>
     </div>
   </div>
   <div class="signal-summary"><div><span class="signal-label">INPUT</span><strong>Browser + backend</strong></div><span class="signal-summary-arrow" aria-hidden="true">→</span><div><span class="signal-label">OUTPUT</span><strong>Your chosen destinations</strong></div></div>
@@ -808,13 +802,7 @@
       <div class="footer-inner">
         <div class="footer-brand">
           <a class="brand brand-light" href="/">
-            <span class="brand-mark brand-mark-light">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" fill="white"/>
-                <path d="M9 5L13 7.5V12.5L9 15L5 12.5V7.5L9 5Z" fill="#3B0764" opacity="0.8"/>
-              </svg>
-            </span>
-            <span>Tagioo</span>
+            <img src="/assets/tagioo-logo-light.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box">
           </a>
           <p>Managed server-side tracking for ecommerce teams, marketers and agencies.</p>
           <div class="footer-payments">

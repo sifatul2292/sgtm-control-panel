@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=brand-2" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Tagioo Control Panel</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=67" />
+    <link rel="stylesheet" href="/styles.css?v=68" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -32,13 +32,12 @@
   </head>
   <body class="app-loading">
     <div class="app-splash" aria-hidden="true">
-      <span class="app-splash-mark">T</span>
+      <img src="/assets/tagioo-icon.svg" alt="" width="32" height="32" style="display:block;width:32px;height:32px;object-fit:contain">
     </div>
     <div class="app-shell">
       <aside class="sidebar" aria-label="Primary">
         <a class="brand" href="#dashboard" aria-label="Tagioo Control Panel home">
-          <span class="brand-mark">T</span>
-          <span>Tagioo</span>
+          <picture class="dashboard-logo"><source media="(min-width:621px) and (max-width:1100px)" srcset="/assets/tagioo-icon.svg"><img src="/assets/tagioo-logo.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box"></picture>
         </a>
 
         <button id="mobileMenuToggle" class="button mobile-menu-toggle" type="button" aria-controls="workspaceNavigation" aria-expanded="false">☰ Menu</button>
@@ -2622,6 +2621,6 @@ window.dataLayer.push({
       <div id="customerSearchResults" class="customer-search-results"></div>
       <p class="customer-search-hint">↑ ↓ to choose · Enter to open · Esc to close</p>
     </dialog>
-    <script src="/app.js?v=108" type="module"></script>
+    <script src="/app.js?v=109" type="module"></script>
   </body>
 </html>

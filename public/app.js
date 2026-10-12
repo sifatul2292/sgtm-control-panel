@@ -5367,7 +5367,7 @@ function openInvoice(payment, billing) {
   doc.innerHTML = `
     <div class="inv-head">
       <div class="inv-brand">
-        <div class="inv-logo">◆</div>
+        <div><img src="/assets/tagioo-icon.svg" alt="" width="32" height="32" style="display:block;width:32px;height:32px;object-fit:contain"></div>
         <div><strong>Tagioo</strong><span>Server-side GTM hosting</span></div>
       </div>
       <div class="inv-title">
