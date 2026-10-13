@@ -1,4 +1,5 @@
 import { communicationFeed, updateCommunication } from "./communication.js";
+import { scanWebsite } from "./tracking-checker.js";
 import { createServer } from "node:http";
 import { mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { extname, join, normalize, resolve } from "node:path";
@@ -12265,6 +12266,26 @@ const server = createServer(async (req, res) => {
 
     if (pathname === "/landing.css" || pathname === "/terms.css" || pathname.startsWith("/assets/") || pathname.startsWith("/images/docs/")) {
       await serveStatic(req, res);
+      return;
+    }
+
+    if (pathname === "/website-tracking-checker" && req.method === "GET") {
+      await servePublicPage(res, "tracking-checker.html");
+      return;
+    }
+    if (pathname === "/api/public/tracking-checker" && req.method === "POST") {
+      res.setHeader("cache-control", "no-store");
+      if (!checkRateLimit(req, "tracking-checker", 8, 10 * 60 * 1000)) {
+        res.setHeader("retry-after", "600");
+        jsonResponse(res, 429, { error: "Scan limit reached. Please try again in ten minutes." });
+        return;
+      }
+      try {
+        const body = await readJson(req, 4096);
+        jsonResponse(res, 200, await scanWebsite(body.url));
+      } catch (error) {
+        jsonResponse(res, error.status || 400, { error: error.status ? error.message : "Enter a valid website URL." });
+      }
       return;
     }
 

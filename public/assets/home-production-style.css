@@ -2177,3 +2177,10 @@ thead .col-tagioo { color: var(--accent) !important; }
   line-height: 1.75;
 }
 .section-dark .testi-card .eyebrow { color: var(--accent); }
+
+/* Keep the expanded marketing navigation clear of the wordmark. */
+@media (min-width:821px) and (max-width:1100px) {
+ .site-header > nav { display:none; }
+ .menu-btn { display:flex; }
+ .mobile-nav { display:block; }
+}

@@ -929,7 +929,7 @@
                   <div class="panel-header">
                     <div>
                       <h2>Choose Type</h2>
-                      <p>Select the business type and store platform so the templates use the right ecommerce events.</p>
+                      <p>Choose your business type and platform.</p>
                     </div>
                   </div>
                   <div class="assistant-form-grid">
@@ -955,12 +955,12 @@
                     <label>
                       Default currency
                       <input name="currency" value="USD" placeholder="USD" />
-                      <span class="field-help">Use your store’s actual currency. USD is the default; this does not convert order amounts.</span>
+                      <span class="field-help">Your store’s currency.</span>
                     </label>
                     <label>
                       Tracking domain
                       <input name="trackingDomain" placeholder="https://track.example.com" />
-                      <span class="field-help">Use the HTTPS tracking subdomain of the container you just created.</span>
+                      <span class="field-help">Your container’s HTTPS tracking URL.</span>
                     </label>
                   </div>
                   <div class="assistant-laravel-settings" data-laravel-settings hidden>
@@ -1085,14 +1085,12 @@
                   <div class="panel-header">
                     <div>
                       <h2>Add Details</h2>
-                      <p>Leave fields blank if a destination is not ready. Tagioo will create placeholders you can fill inside GTM.</p>
                     </div>
                   </div>
                   <div class="assistant-form-grid">
                     <label data-assistant-destination="ga4">
                       GA4 Measurement ID
                       <input name="ga4MeasurementId" placeholder="G-XXXXXXXXXX" />
-                      <span class="field-help">Google Analytics → Admin → Data streams → your Web stream → Measurement ID (G-). <a href="/assets/setup-guide/index.html" target="_blank" rel="noopener">Illustrated instructions ↗</a></span>
                     </label>
                     <label data-shopify-web-gtm hidden>
                       Web GTM Container ID <span class="label-optional">required for Shopify manual pixel</span>
@@ -1105,12 +1103,10 @@
                     <label data-assistant-destination="meta">
                       Meta Dataset / Pixel ID
                       <input name="metaPixelId" placeholder="1234567890" />
-                      <span class="field-help"><strong>Events Manager → Data sources / Datasets → your website dataset → Settings → Dataset ID / Pixel ID.</strong> Copy the numeric ID, not your ad account or Page ID.</span>
                     </label>
                     <label data-assistant-destination="meta">
                       Meta CAPI Access Token
                       <input name="metaAccessToken" placeholder="EAAB..." />
-                      <span class="field-help"><strong>Same dataset → Settings → Conversions API → manual setup → Generate access token.</strong> Ask your business admin for access if unavailable. Keep the token private.</span>
                     </label>
                     <label data-assistant-destination="meta">
                       Meta Test Event Code <span class="label-optional">optional</span>

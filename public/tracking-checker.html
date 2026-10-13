@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Website Tracking Checker — Tagioo</title>
+<meta name="description" content="Check a public website for analytics tags, tracking IDs, consent configuration and first-party routing clues. Get evidence and practical next steps, without an email gate.">
+<link rel="canonical" href="https://tagioo.com/website-tracking-checker">
+<meta property="og:title" content="Website Tracking Checker — Tagioo"><meta property="og:description" content="See the tracking clues your website exposes, with evidence and next steps."><meta property="og:url" content="https://tagioo.com/website-tracking-checker"><meta property="og:type" content="website">
+<link rel="icon" href="/favicon.svg?v=brand-2" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/home-production-style.css?v=mobile-menu-3">
+<link rel="stylesheet" href="/assets/tracking-checker.css?v=2">
+</head><body class="checker-page"><a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="site-header" id="siteHeader">
+      <a class="brand" href="/" aria-label="Tagioo home">
+        <img src="/assets/tagioo-logo.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box">
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/features">Platform</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/compare">Compare</a>
+        <a href="/website-tracking-checker" aria-current="page">Tracking checker</a>
+        <a href="/docs">Docs</a>
+        <a href="/blog">Blog</a>
+        <a href="/login" class="nav-login">Sign in</a>
+        <a class="nav-cta" href="/signup">Get started free</a>
+      </nav>
+      <button class="menu-btn" id="menuBtn" aria-controls="mobileNav" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </header>
+
+    <!-- ── MOBILE NAV ─────────────────────────────────────────── -->
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true" inert>
+      <nav>
+        <a href="/features" >Platform</a>
+        <a href="/how-it-works" >How it works</a>
+        <a href="/pricing" >Pricing</a>
+        <a href="/compare" >Compare</a>
+        <a href="/docs" >Docs</a>
+        <a href="/blog" >Blog</a>
+        <a href="/login">Sign in</a>
+        <a class="mobile-cta" href="/signup">Get started free →</a>
+      </nav>
+    </div>
+
+
+<main class="checker-main" id="main-content">
+<section class="checker-intro" aria-labelledby="checker-title">
+<p class="checker-eyebrow">Free tool · Website tracking checker</p>
+<h1 id="checker-title">See what your website<br>reveals about its tracking.</h1>
+<p class="checker-lead">Find analytics tags, advertising pixels and first-party tracking clues. Get the evidence, then know what to check next.</p>
+<form class="scan-form" id="scanForm">
+<div class="scan-field"><label for="scanUrl">Website URL</label><input id="scanUrl" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://yourwebsite.com" required maxlength="2048" aria-describedby="scanNote"></div>
+<button id="scanButton" type="submit">Check website →</button>
+</form>
+<p class="scan-note" id="scanNote">Public pages only. No login or email needed. One page per scan.</p>
+</section>
+<p class="scan-status" id="scanStatus" role="status" aria-live="polite"></p>
+<section class="report" id="scanReport" aria-label="Tracking scan report" tabindex="-1" hidden></section>
+<section class="checker-scope" id="scanScope">
+<div><h2>Evidence you can inspect.</h2><p>Recognizable tracker references and IDs, website technology, consent clues, data-layer references, first-party endpoints and HTTP cookie attributes.</p></div>
+<div><h2>A starting point for verification.</h2><p>Tags can load after consent or through a published GTM container. A source scan cannot confirm live purchases or delivery to your ad platforms. Each finding includes a next step.</p></div>
+</section>
+<section class="checker-faq" id="faq"><h2>Before you read your report</h2>
+<details><summary>Does “Not observed” mean tracking is broken?</summary><p>No. This checker reads public HTML and up to three same-origin JavaScript files. It does not run JavaScript, accept cookies, log in, or inspect tags loaded by external containers. Use GTM Preview and your destination’s test-event tools to confirm actual behavior.</p></details>
+<details><summary>Can you verify server-side tracking?</summary><p>We look for first-party loader URLs and server transport configuration. These are implementation clues. Only a real event in Server GTM Preview and acceptance in GA4, Meta or another destination can confirm delivery.</p></details>
+<details><summary>Why isn’t there a tracking quality score?</summary><p>Counting tags is not a measure of tracking quality. The report shows how many visible checks were observed, the evidence behind them, and what to verify. It does not estimate lost conversions, ad-spend impact or browser cookie lifetime.</p></details>
+<details><summary>What happens to my scan?</summary><p>Reports are temporarily cached in server memory for up to five minutes and are not saved to customer accounts. Website URLs are sent to Tagioo’s server to retrieve the public page. Cookie values and raw page source are not included in the report. Download a JSON copy or print your report if you want to keep it.</p></details>
+<details><summary>What if the site blocks the scan?</summary><p>Some websites reject automated requests or serve a challenge page. Try a different public page, or inspect the site in your browser’s developer tools. Private networks, custom ports and oversized responses are blocked.</p></details>
+</section>
+</main>
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <a class="brand brand-light" href="/">
+            <img src="/assets/tagioo-logo-light.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box">
+          </a>
+          <p>Managed server-side tracking for ecommerce teams, marketers and agencies.</p>
+          <div class="footer-payments">
+            <span class="trust-badge sm footer-tb">Card checkout</span>
+            <span class="trust-badge sm footer-tb">USD monthly plans</span>
+            <span class="trust-badge sm footer-tb">Visa / MC</span>
+          </div>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <strong>Product</strong>
+            <a href="/features">Platform</a>
+            <a href="/how-it-works">How it works</a>
+            <a href="/pricing">Pricing</a>
+            <a href="/compare">Compare</a>
+            <a href="/signup">Sign up</a>
+          </div>
+          <div class="footer-col">
+            <strong>Support</strong>
+            <a href="/website-tracking-checker" aria-current="page">Tracking checker</a>
+        <a href="/docs">Docs</a>
+        <a href="/blog">Blog</a>
+            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="mailto:hello@tagioo.com">Email support</a>
+            <a href="#faq">Checker FAQ</a>
+          </div>
+          <div class="footer-col">
+            <strong>Legal</strong>
+            <a href="/terms">Terms of Service</a>
+            <a href="/privacy">Privacy Policy</a> <a href="/refunds">Refund Policy</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-wordmark-wrap" aria-hidden="true">
+        <span class="footer-wordmark">Tagioo</span>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 Tagioo. All rights reserved.</span>
+        <p class="footer-disclaimer">Dashboard previews use example data. Tracking results depend on your implementation, traffic, consent settings and destination configuration.</p>
+      </div>
+    </footer>
+<script src="/assets/tracking-checker.js?v=2" defer></script>
+</body></html>

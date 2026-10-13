@@ -1747,3 +1747,23 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 ## 2026-10-13 — Publish dashboard and onboarding changes
 
 - Prepared dashboard logo, Step 4 WooCommerce plugin card, Change Plan subscription management and pending illustrated onboarding/container-upgrade work for GitHub. Included required guide assets/docs and focused regression tests; excluded local artifacts and assistant settings. Backend/frontend syntax, focused tests and staged diff checks pass. Server deployment remains owner-run.
+
+## 2026-10-13 — Public website tracking checker
+
+- User requested a Stape-style checker, public only. Reviewed Stape's public tool, scan start and email gate; no competitor implementation/artwork copied. Added original /website-tracking-checker page and public POST API with no email/account requirement. Linked from homepage mobile navigation/footer and sitemap.
+- Reads HTML plus up to three same-origin scripts: tracker references/IDs, platform clues, consent/data layer, first-party routing hints, response-cookie attributes, next-step recommendations, JSON export and print styling. Evidence coverage explicitly differs from tracking quality; not-observed clues do not assert missing/broken tracking. Cookie values/raw source never returned. No runtime event, page-speed, conversion/ad-spend or server-delivery claims.
+- Standard-library scan module isolates network work from server route chain; validates every DNS answer, pins selected IP, revalidates redirects, blocks private/reserved networks, credentials/custom ports and HTTPS downgrades. Script redirects stay same-origin. 15-second deadline, 2MB decoded response cap, three concurrent scans, eight requests/IP/ten minutes, bounded five-minute memory cache. No new deps or live-tracking changes.
+- Eight focused tests pass for address variants/DNS/redirect boundaries, scope limits, tracker evidence, cookie-value redaction and Ads-only versus GA4 detection. Backend/frontend syntax and diff gates pass. Real example.com and stape.io scans, JSON download, private-URL errors, API rate limit, mobile menu and 320/375/414/768/1024/1100/1280px overflow checks verified. tagioo.com timed out from this machine in both scanner and curl.
+- Separate empty-data Node 20 preview runs at http://127.0.0.1:8780/website-tracking-checker. Screenshot: artifacts/tracking-checker-preview.jpg. Documentation: docs/marketing/tracking-checker.md. Local only; not pushed/deployed. Browser runtime crawling would need a separate isolated worker with outbound enforcement, not execution inside the panel monolith.
+
+## 2026-10-13 — Shorten setup assistant instructions
+
+- Reduced Step 1 description/currency/tracking-domain hints to short phrases. Removed Step 3 explanatory paragraph and inline GA4/Meta instructions; field labels, optional markers, placeholders and illustrated guide remain. No form behavior changed. Backend syntax, existing setup tests and diff checks pass. Local only.
+
+## 2026-10-13 — Tracking checker in website menus
+
+- Added Tracking checker to desktop/mobile navigation across homepage and eight marketing/legal pages; checker page already includes its own active link. No dashboard link, per public-only scope. Homepage header switches to mobile menu through 1100px to fit the additional link; shared homepage stylesheet cache bumped. Syntax and diff checks pass. Local only.
+
+## 2026-10-13 — Publish tracking checker and menu updates
+
+- Prepared public checker/routes/assets/docs/tests, marketing/legal menu links and shorter assistant instructions for GitHub on feat/saas-phase1-payments. Ten focused tests, syntax checks and diff gate pass. Local artifacts and assistant settings excluded. Deployment requires pulling then reloading sgtm-control-panel to register the new public routes; no package installation or environment changes needed.
