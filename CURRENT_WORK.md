@@ -1767,3 +1767,23 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 ## 2026-10-13 — Publish tracking checker and menu updates
 
 - Prepared public checker/routes/assets/docs/tests, marketing/legal menu links and shorter assistant instructions for GitHub on feat/saas-phase1-payments. Ten focused tests, syntax checks and diff gate pass. Local artifacts and assistant settings excluded. Deployment requires pulling then reloading sgtm-control-panel to register the new public routes; no package installation or environment changes needed.
+
+## 2026-10-13 — Alurkohv live GTM loader/domain repair
+
+- Reproduced store's GTM-not-found symptom: plugin injected GTM-P9DMZG7T correctly through tagioo.alurkohv.com, but TLS served connect.tagioo.com's certificate. DNS correctly pointed to worker 147.79.67.213; sgtm-alurkohv was running on 127.0.0.1:8203, with no matching Nginx vhost or certificate.
+- Temporarily disabled WordPress Custom Loader to restore direct Google loading; verified public source changed. User reconnected Hostinger worker terminal. Backed up Nginx under /var/backups/tagioo-alurkohv-20261013/nginx-before.tar.gz. Tested isolated loopback routing against throwaway review container on 8225 (health 200), then removed test listener.
+- Restored only /etc/nginx/sites-available/tagioo.alurkohv.com + enabled symlink, port 8203 proxy, dedicated alurkohv logs, working existing first-party loader stanza and ACME webroot. Issued valid Let's Encrypt certificate expiring January 11, 2027; installed domain-specific certificate renewal deploy hook to syntax-check/reload Nginx. Nginx checks passed before reloads. No container restarts, GTM publishing or customer purchase events.
+- Restored original WordPress Custom Loader checkbox. Public source again points to first-party loader. HTTPS health, gtm.js and gtag/js return 200 with normal TLS validation; fresh browser inserted first-party GA4 library without console errors. Fresh Tag Assistant found GTM-P9DMZG7T and G-85ZC4NM8FW; GA4 Config, page_view and Meta Pixel Base fired. Existing Amolbooks health also 200. Screenshot artifacts/alurkohv-tagassistant-fixed.png captured after closing temporary debug popup, hence its Not Connected notice; successful detected tags/event history remain visible.
+- Live incident fixed operationally; no plugin/backend source code change needed. Local status note not committed. Real purchase/destination acceptance still requires end-to-end verification; missing vhost's historical cause not determined.
+
+## 2026-10-13 — Follow-up domain audit and incident explanation
+
+- Read-only HTTPS /healthz audit of 13 known tracking domains: 11 return 200 (including repaired Alurkohv and Amolbooks); server.zenovacarebd.xyz returns 502; server.happinessbd.com fails DNS lookup. These results are reachability checks, not destination-delivery proof or a complete active-account inventory. Inactive/stopped accounts may explain the two exceptions; no changes made to them.
+- Identified candidate lifecycle risk in deleteProvisionedContainer: domain Nginx cleanup/certificate deletion run even if Docker shutdown/removal failed. Fits live Docker plus missing vhost/cert, but incident's actual removal event remains unproven without production deletion/provisioning audit history. Local history has no Alurkohv record.
+- Existing customer Run tracking test performs HTTPS collection and reports DNS/SSL connection failures; past saved green checks are historical, not ongoing domain health. Customer recovery should escalate worker-side route/TLS failures to support; source-only public checker cannot repair host infrastructure. No code/config changes in follow-up.
+
+## 2026-10-13 — Failed tracking check support draft
+
+- Customer tracking test failures now offer Create support ticket with reported failed checks, selected container, tracking domain and test timestamp prefilled in the existing support form. Saved failures and incomplete API/network tests also offer escalation; passing checks do not. Customer reviews and submits manually.
+- Preserve existing subject/message drafts, avoid duplicate diagnostic blocks, and leave oversized drafts intact with guidance. Ignore test responses after switching containers. Copy distinguishes reported errors from a confirmed root cause. No infrastructure changes or live conversion tests performed.
+- App asset version bumped to 113. Three focused support-draft tests, frontend syntax, npm run check and diff checks pass. Local changes only; not pushed/deployed.

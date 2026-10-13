@@ -3476,6 +3476,54 @@ async function generateSetupAssistantTemplates() {
   }
 }
 
+function trackingFailureReport(result, containerId, domain) {
+  const labels = { container: "sGTM container", ga4: "GA4 forwarding", meta: "Meta Conversions API", test: "Tracking test" };
+  const failures = Object.entries(result.checks || {})
+    .filter(([, check]) => !check?.ok)
+    .map(([key, check]) => `${labels[key] || key}: ${check?.detail || "Not checked."}`);
+  return ["Please help me resolve these tracking test failures.",
+    `Container: ${containerId || "Default container"}`,
+    `Tracking domain: ${domain || "Not configured"}`,
+    `Test time: ${result.at || "Not recorded"}`,
+    "", ...failures].join("\n");
+}
+
+function attachTrackingSupportAction(result) {
+  const box = els.verifyTrackingResult;
+  if (!box || result.ok) return;
+  const containerId = selectedCustomerContainerId;
+  const domain = latestData?.tracking?.domain || els.setupAssistantForm?.elements.trackingDomain?.value || "";
+  const report = trackingFailureReport(result, containerId, domain);
+  const prompt = document.createElement("p");
+  prompt.className = "verify-stamp";
+  prompt.textContent = "Need help? Create a support ticket with the reported issues below. These errors may need further investigation.";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "button button-primary";
+  button.textContent = "Create support ticket";
+  button.addEventListener("click", () => {
+    const form = document.getElementById("ticketCreateForm");
+    if (!form || currentSession.role !== "customer") return;
+    if (!form.elements.subject.value.trim()) {
+      form.elements.subject.value = `Tracking test failed${domain ? ` — ${domain}` : ""}`.slice(0, 160);
+    }
+    const draft = form.elements.text.value;
+    if (!draft.includes(report)) {
+      const combined = draft.trim() ? `${draft}\n\n${report}` : report;
+      if (combined.length > 5000) {
+        setView("support");
+        document.getElementById("supportMessage").textContent = "Your existing draft is too long to add the test details. Shorten it, then return to the test and create the support draft again.";
+        return;
+      }
+      form.elements.text.value = combined;
+    }
+    setView("support");
+    document.getElementById("supportMessage").textContent = "Test details added. Review your message, then select Create ticket to send it.";
+    form.elements.text.focus();
+  });
+  box.append(prompt, button);
+}
+
 function renderVerifyResult(result) {
   const box = els.verifyTrackingResult;
   if (!box) return;
@@ -3494,7 +3542,8 @@ function renderVerifyResult(result) {
     ${row("sGTM container (live)", result.checks.container)}
     ${row("GA4 forwarding (ID + secret)", result.checks.ga4)}
     ${row("Meta Conversions API", result.checks.meta)}
-    <p class="verify-stamp">${result.ok ? "All checks passed." : "Some checks failed — fix the items above and re-run."}${when ? ` · ${when}` : ""}</p>`;
+    <p class="verify-stamp">${result.ok ? "All checks passed." : "Some checks failed — review the reported issues above."}${when ? ` · ${when}` : ""}</p>`;
+  attachTrackingSupportAction(result);
 }
 
 async function verifyTracking() {
@@ -3504,16 +3553,18 @@ async function verifyTracking() {
     els.verifyTrackingResult.hidden = false;
     els.verifyTrackingResult.innerHTML = `<p class="verify-stamp">Sending test events to GA4 and Meta…</p>`;
   }
+  const testedContainerId = selectedCustomerContainerId;
   try {
-    const query = selectedCustomerContainerId ? `?container=${encodeURIComponent(selectedCustomerContainerId)}` : "";
+    const query = testedContainerId ? `?container=${encodeURIComponent(testedContainerId)}` : "";
     const response = await fetch(`/api/customer/verify-tracking${query}`, { method: "POST" });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Verification failed.");
-    renderVerifyResult(result);
+    if (selectedCustomerContainerId === testedContainerId) renderVerifyResult(result);
   } catch (error) {
-    if (els.verifyTrackingResult) {
+    if (selectedCustomerContainerId === testedContainerId && els.verifyTrackingResult) {
       els.verifyTrackingResult.hidden = false;
-      els.verifyTrackingResult.innerHTML = `<p class="verify-stamp is-fail">${escapeHtml(error.message)}</p>`;
+      els.verifyTrackingResult.innerHTML = `<p class="verify-stamp is-fail">Tracking test could not complete: ${escapeHtml(error.message)}</p>`;
+      attachTrackingSupportAction({ ok: false, at: new Date().toISOString(), checks: { test: { ok: false, detail: error.message } } });
     }
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "Run tracking test"; }
