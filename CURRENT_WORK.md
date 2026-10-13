@@ -1688,6 +1688,36 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 
 - Removed header/footer logo backing and padding across marketing/legal pages. Added transparent orange/white wordmark for dark footers, preserving original orange icon. Browser verified transparent backgrounds and rendered both variants at 485px; syntax and diff checks pass. Local only.
 
+## 2026-10-13 — Free/Starter container upgrade prompt
+
+- New Container opens an upgrade dialog for customer Free/Starter plans with an existing non-deleted container. Upgrade plan opens Billing; Not now/Escape dismiss. Other plans and owner behavior preserved. Existing backend container-limit enforcement unchanged. App v110.
+- Focused regression tests cover plans, first container, deleted/deleting/pending containers and owner scope; browser popup/Billing/Escape checks at 375px plus syntax/diff gates pass. Local only; not pushed/deployed.
+
+## 2026-10-13 — Illustrated container and platform onboarding
+
+- Removed both setup video cards and their YouTube playback handler. Added linked illustrated customer guide with four original SVG diagrams: first-party DNS, Server GTM config, GA4 Measurement ID and post-creation sequence. Editable documentation: docs/customer-container-setup.md; browser guide: /assets/setup-guide/index.html. Google navigation checked against primary documentation.
+- Setup Assistant defaults currency to USD and explains actual store currency. Web GTM ID shown/enabled only for Shopify; WooCommerce plugin download directly underneath template actions. Plugin’s Web GTM ID still belongs in WooCommerce → Tagioo settings, documented with sGTM URL, GA4 ID/secret and injection behavior. Fixed misleading no-configuration plugin instructions.
+- Guide covers WooCommerce, Shopify manual/app paths, Laravel/custom/Wix/BigCommerce and purchase verification, without changing ingestion/provisioning behavior. App v111. Platform/default/video regression tests, earlier upgrade tests and backend/frontend syntax/diff gates pass; browser checks at 320/375/768/1280px verify guide images/no overflow and platform controls. Local only; not pushed or deployed.
+
+## 2026-10-13 — Screenshot-based setup walkthrough
+
+- Added all seven owner-supplied screenshots to the customer guide in task order, with container config values removed from the two published copies. DNS explicitly specifies CNAME track → bd.tagioo.com, DNS only, TTL Auto and Save.
+- Says Go to Setup Guide Menu, then walks through Choose type, Select destinations, Add details and Download templates one by one. Notes old screenshot Web GTM field and deletion message so customers follow current behavior. Markdown synchronized; container sidebar uses actual DNS/config screenshots.
+- Browser image-loading/overflow checks at 320/375/768/1280px, focused regression tests, syntax and diff gates pass. Local only.
+
+## 2026-10-13 — Account prerequisites and Meta IDs
+
+- Guide includes Google sign-in/account, GTM account plus Server/Web container creation and Analytics account/property/Web stream creation. Added Meta Events Manager data source Settings path to Pixel/Dataset ID, CAPI token, Test Events code and missing-data-source creation flow; labels/permissions caveats included.
+- Highlighted DNS-only/save, matching IDs/currency/domain, separate Web/Server imports, private secrets and destination verification. Markdown synchronized. Responsive guide image/overflow checks, syntax and diff gates pass. Local only.
+
+## 2026-10-13 — Meta credential emphasis
+
+- Highlighted Dataset/Pixel ID and CAPI token navigation together in the guide; added exact-location help beside both assistant fields. Meta Test Event Code labeled optional in the form and guide. Documentation synchronized; syntax/diff checks pass. Local only.
+
+## 2026-10-13 — GTM import instructions
+
+- Expanded guide Step 4 with separate Web/Server import steps, workspace selection, Merge/conflict review, detailed-change confirmation, placeholder checks, Preview and Submit/Publish. Explained import versus publish and preserved Shopify app server-only path. Linked official Google import/publishing documentation; Markdown synchronized. Local only.
+
 ## 2026-10-13 — Balanced desktop homepage hero
 
 - Replaced desktop hero stacking with a two-column layout from 1100px: left-aligned headline/copy/signup beside a bounded purchase animation. Tablet illustration capped at 640px; phone layout preserved.
@@ -1701,3 +1731,19 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Checked 320/375/414/768/1100/1250/1440/1782px for overflow, desktop centering and card clearance. At 1250px the illustration is now 632px tall; pause/reduced-motion checks and backend syntax/diff gates pass. Local preview remains on port 8779; not deployed.
 
 - Homepage-only commit prepared for GitHub on feat/saas-phase1-payments; dashboard/setup-guide work and local preview artifacts remain uncommitted.
+
+## 2026-10-13 — Step 4 plugin card and transparent dashboard logo
+
+- Moved WooCommerce plugin download into its own card directly underneath Download Templates in Step 4, before import instructions. Existing platform visibility and download handler reused.
+- Dashboard sidebar now uses existing transparent orange/white wordmark; removed white backing, padding and rounded rectangle. Tablet icon behavior preserved.
+- Existing platform/setup regression tests, backend/frontend syntax and diff gates pass. Browser DOM confirms Step 4 card ordering and loaded transparent logo; visually checked white text/orange icon. Local only; no authenticated plugin ZIP download exercised.
+
+## 2026-10-13 — Subscription management in Change Plan
+
+- Moved Manage subscription from Monthly Usage to the Change Plan header; visible for non-Free plans. Paddle retains authenticated customer portal; Shopify uses its existing plan-management link.
+- Manual customers receive an explicit management dialog explaining no automatic charges. Stop renewal submits Free through the existing plan-change route, scheduling at paid-cycle end when eligible; otherwise Free applies immediately. Escape/Keep current plan dismiss; no backend billing changes. App cache v112.
+- Assert-based smoke checks cover manual dialog/Free selection, Paddle portal routing, Shopify routing and unique Change Plan button placement. Existing setup tests, backend/frontend syntax and diff checks pass. Local only; no live cancellation performed.
+
+## 2026-10-13 — Publish dashboard and onboarding changes
+
+- Prepared dashboard logo, Step 4 WooCommerce plugin card, Change Plan subscription management and pending illustrated onboarding/container-upgrade work for GitHub. Included required guide assets/docs and focused regression tests; excluded local artifacts and assistant settings. Backend/frontend syntax, focused tests and staged diff checks pass. Server deployment remains owner-run.

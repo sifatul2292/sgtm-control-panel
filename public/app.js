@@ -2465,6 +2465,13 @@ function renderCustomerAnalytics(summary, dailyHistory = [], range = "24h", even
   }
 }
 
+function needsContainerUpgrade(data, role) {
+  const plan = String(data?.usage?.plan || "").trim().toLowerCase();
+  return role === "customer" && ["free", "starter"].includes(plan) &&
+    (data?.customerSetup?.requests || []).some((request) =>
+      !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()));
+}
+
 function renderCustomerContainers(data) {
   const requests = (data.customerSetup?.requests || []).filter((request) => !["deleted", "delete_requested"].includes(String(request.status || "").toLowerCase()));
   const dnsTarget = data.config?.provisionDnsTarget || data.config?.publicBaseUrl || window.location.host || "the SGTM server";
@@ -3344,6 +3351,13 @@ function updateLaravelAssistantFields() {
   if (!els.setupAssistantForm) return;
   const isLaravel = els.setupAssistantForm.elements.platform?.value === "laravel";
   const isShopify = els.setupAssistantForm.elements.platform?.value === "shopify";
+  const webGtmField = els.setupAssistantForm.querySelector("[data-shopify-web-gtm]");
+  if (webGtmField) {
+    webGtmField.hidden = !isShopify;
+    webGtmField.querySelector("input").disabled = !isShopify;
+  }
+  const wooDownload = els.setupAssistantForm.querySelector("[data-woo-plugin-download]");
+  if (wooDownload) wooDownload.hidden = els.setupAssistantForm.elements.platform?.value !== "woocommerce";
   const settings = els.setupAssistantForm.querySelector("[data-laravel-settings]");
   if (settings) settings.hidden = !isLaravel;
   const shopifyManualCard = document.querySelector("#shopifyManualPixelCard");
@@ -5088,7 +5102,7 @@ function renderBilling(data) {
   const currency = usage.billingCurrency || (billingProvider ? "USD" : "BDT");
   const activePlanName = usage.plan || "Starter";
   customerActivePlanName = activePlanName;
-  if (els.managePaddleBilling) els.managePaddleBilling.hidden = billingProvider !== "paddle";
+  if (els.managePaddleBilling) els.managePaddleBilling.hidden = activePlanName === "Free";
   const activePlan = subscriptionPlans.find((plan) => plan.name === activePlanName) || subscriptionPlans[1];
   const requestsMonth = Number(usage.requestsMonth || 0);
   const requestLimit = Number(usage.requestLimit || activePlan.requests || 0);
@@ -5285,6 +5299,17 @@ async function selectPaddleSubscriptionPlan(planName) {
 }
 
 els.managePaddleBilling?.addEventListener("click", async () => {
+  const provider = externalBillingProvider(latestData || {});
+  if (provider === "shopify") {
+    const url = latestData?.usage?.shopifyPlanSelectionUrl;
+    if (url) window.location.assign(url);
+    else window.alert("Manage your subscription from the Tagioo app in Shopify admin.");
+    return;
+  }
+  if (provider !== "paddle") {
+    document.getElementById("manageSubscriptionDialog").showModal();
+    return;
+  }
   const button = els.managePaddleBilling;
   button.disabled = true;
   const previous = button.textContent;
@@ -5298,6 +5323,20 @@ els.managePaddleBilling?.addEventListener("click", async () => {
     window.alert(error.message);
     button.disabled = false;
     button.textContent = previous;
+  }
+});
+
+document.getElementById("manageSubscriptionClose").addEventListener("click", () => {
+  document.getElementById("manageSubscriptionDialog").close();
+});
+document.getElementById("stopSubscriptionRenewal").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  try {
+    await selectSubscriptionPlan("Free");
+    document.getElementById("manageSubscriptionDialog").close();
+  } finally {
+    button.disabled = false;
   }
 });
 
@@ -6603,6 +6642,12 @@ document.addEventListener("click", (event) => {
   if (shortcut) setView(shortcut.dataset.viewShortcut);
   const scrollTarget = event.target.closest("[data-scroll-target]");
   if (scrollTarget) {
+    if (scrollTarget.dataset.scrollTarget === "customerContainerCreate" && needsContainerUpgrade(latestData, currentSession.role)) {
+      const dialog = document.getElementById("containerUpgradeDialog");
+      document.getElementById("containerUpgradePlan").textContent = latestData.usage.plan;
+      if (!dialog.open) dialog.showModal();
+      return;
+    }
     const targetEl = document.querySelector(`#${CSS.escape(scrollTarget.dataset.scrollTarget)}`);
     if (targetEl) {
       targetEl.hidden = false;
@@ -6717,7 +6762,7 @@ document.querySelector("#laravelMapItemsTable")?.addEventListener("change", (eve
 document.querySelector("#startLaravelSelfService")?.addEventListener("click", async (event) => {
   const button = event.currentTarget;
   const storeUrl = document.querySelector("#laravelManagedStoreUrl")?.value.trim() || "";
-  const currency = els.setupAssistantForm?.elements.currency?.value.trim() || "BDT";
+  const currency = els.setupAssistantForm?.elements.currency?.value.trim() || "USD";
   const message = document.querySelector("#laravelManagedSetupMessage");
   button.disabled = true;
   button.textContent = "Creating package…";
@@ -6877,19 +6922,6 @@ els.copyShopifyCustomPixel?.addEventListener("click", async () => {
   } catch {
     if (els.shopifyCustomPixelMessage) els.shopifyCustomPixelMessage.textContent = "Copy was blocked. Select the code below and copy it manually.";
   }
-});
-function playSetupVideo(trigger) {
-  const preview = trigger.closest("[data-setup-video-card]")?.querySelector("[data-setup-video-preview]");
-  if (!preview || preview.querySelector("iframe")) return;
-  const iframe = document.createElement("iframe");
-  iframe.src = "https://www.youtube-nocookie.com/embed/vSvpiK4vXdc?autoplay=1&rel=0";
-  iframe.title = "Tagioo server-side tracking setup video";
-  iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-  iframe.allowFullscreen = true;
-  preview.replaceChildren(iframe);
-}
-document.querySelectorAll("[data-setup-video-play]").forEach((button) => {
-  button.addEventListener("click", () => playSetupVideo(button));
 });
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest(".download-plugin-btn");
@@ -7375,3 +7407,10 @@ document.getElementById("notificationsReadButton").addEventListener("click", eve
     setInterval(() => { loadOwnerPayments().catch(() => {}); }, 30000);
   }
 })();
+
+const containerUpgradeDialog = document.getElementById("containerUpgradeDialog");
+document.getElementById("containerUpgradeClose").addEventListener("click", () => containerUpgradeDialog.close());
+document.getElementById("containerUpgradeBilling").addEventListener("click", () => {
+  containerUpgradeDialog.close();
+  setView("billing");
+});

@@ -37,7 +37,7 @@
     <div class="app-shell">
       <aside class="sidebar" aria-label="Primary">
         <a class="brand" href="#dashboard" aria-label="Tagioo Control Panel home">
-          <picture class="dashboard-logo"><source media="(min-width:621px) and (max-width:1100px)" srcset="/assets/tagioo-icon.svg"><img src="/assets/tagioo-logo.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box"></picture>
+          <picture class="dashboard-logo"><source media="(min-width:621px) and (max-width:1100px)" srcset="/assets/tagioo-icon.svg"><img src="/assets/tagioo-logo-light.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain"></picture>
         </a>
 
         <button id="mobileMenuToggle" class="button mobile-menu-toggle" type="button" aria-controls="workspaceNavigation" aria-expanded="false">☰ Menu</button>
@@ -753,27 +753,17 @@
                     <p>Four steps, no code required.</p>
                   </div>
                 </div>
-                <div class="onboard-video" data-setup-video-card>
-                  <div class="setup-video-preview setup-video-preview--compact" data-setup-video-preview>
-                    <img src="https://i.ytimg.com/vi/vSvpiK4vXdc/hqdefault.jpg" alt="Tagioo container setup video preview" loading="lazy" />
-                    <button class="setup-video-play setup-video-play--compact" type="button" data-setup-video-play aria-label="Play the Tagioo container setup guide">
-                      <span aria-hidden="true">▶</span>
-                    </button>
-                  </div>
-                  <div class="onboard-video-copy">
-                    <strong>Follow along with the video</strong>
-                    <span>See where to find your GTM config and complete each field correctly.</span>
-                    <button class="button" type="button" data-setup-video-play>Watch setup guide</button>
-                  </div>
-                </div>
+                <p style="padding:0 20px"><a href="/assets/setup-guide/index.html" target="_blank" rel="noopener">Read the illustrated container setup guide ↗</a></p>
+                <img src="/assets/setup-guide/dns-record.png" alt="Example first-party tracking CNAME record" style="width:100%;height:auto;padding:12px;box-sizing:border-box" loading="lazy">
+                <img src="/assets/setup-guide/container-config.png" alt="Where to copy Server GTM Container Config" style="width:100%;height:auto;padding:12px;box-sizing:border-box" loading="lazy">
                 <ol class="onboard-guide-steps">
                   <li>
                     <strong>Point a subdomain at Tagioo</strong>
-                    <span>Create a subdomain like <code>server.yourdomain.com</code>, then add a <strong>CNAME record</strong> in your domain's DNS: Host = your subdomain, Value = <code id="customerDnsTargetInline">bd.tagioo.com</code>.</span>
+                    <span>Create a subdomain like <code>server.yourdomain.com</code>, then add a <strong>CNAME record</strong>: Name = <code>track</code> for track.yourdomain.com, Target = <code id="customerDnsTargetInline">bd.tagioo.com</code>. Set Cloudflare proxy to <strong>DNS only</strong>, TTL to <strong>Auto</strong>, then click <strong>Save</strong>.</span>
                   </li>
                   <li>
                     <strong>Copy your GTM container config</strong>
-                    <span>In Google Tag Manager: Admin → Container Settings → Manually provision tagging server. Copy the full value shown there.</span>
+                    <span>In Google Tag Manager: open your Server container and click its container ID at the top right → Manually provision tagging server. Copy the full Container Config value.</span>
                   </li>
                   <li>
                     <strong>Fill in the form</strong>
@@ -910,23 +900,7 @@
             </ol>
           </section>
 
-          <section class="setup-video-card panel" data-setup-video-card aria-labelledby="setupVideoTitle">
-            <div class="setup-video-preview" data-setup-video-preview>
-              <img src="https://i.ytimg.com/vi/vSvpiK4vXdc/hqdefault.jpg" alt="Tagioo server-side tracking setup video preview" loading="lazy" />
-              <button class="setup-video-play" type="button" data-setup-video-play aria-label="Play the complete Tagioo setup guide">
-                <span aria-hidden="true">▶</span>
-              </button>
-            </div>
-            <div class="setup-video-copy">
-              <span class="setup-video-eyebrow">Video walkthrough</span>
-              <h2 id="setupVideoTitle">Watch the complete setup guide</h2>
-              <p>Follow the full Tagioo server-side tracking setup from container configuration through GTM import and verification.</p>
-              <div class="setup-video-actions">
-                <button class="button button-primary" type="button" data-setup-video-play>Watch setup video</button>
-                <a class="button" href="https://youtu.be/vSvpiK4vXdc" target="_blank" rel="noopener noreferrer">Open on YouTube ↗</a>
-              </div>
-            </div>
-          </section>
+          <section class="panel"><div class="panel-header"><div><h2>Set up your website after creating a container</h2><p>Choose your platform, enter your tracking URL and destination IDs, then generate templates, install the integration and verify a purchase. Go to Setup Guide Menu and follow each step.</p><a class="button" href="/assets/setup-guide/index.html" target="_blank" rel="noopener">Open illustrated setup instructions ↗</a></div></div></section>
 
           <section class="assistant-layout">
             <aside class="panel assistant-steps" aria-label="Setup steps">
@@ -980,11 +954,13 @@
                     </label>
                     <label>
                       Default currency
-                      <input name="currency" value="BDT" placeholder="BDT" />
+                      <input name="currency" value="USD" placeholder="USD" />
+                      <span class="field-help">Use your store’s actual currency. USD is the default; this does not convert order amounts.</span>
                     </label>
                     <label>
                       Tracking domain
                       <input name="trackingDomain" placeholder="https://track.example.com" />
+                      <span class="field-help">Use the HTTPS tracking subdomain of the container you just created.</span>
                     </label>
                   </div>
                   <div class="assistant-laravel-settings" data-laravel-settings hidden>
@@ -1116,8 +1092,9 @@
                     <label data-assistant-destination="ga4">
                       GA4 Measurement ID
                       <input name="ga4MeasurementId" placeholder="G-XXXXXXXXXX" />
+                      <span class="field-help">Google Analytics → Admin → Data streams → your Web stream → Measurement ID (G-). <a href="/assets/setup-guide/index.html" target="_blank" rel="noopener">Illustrated instructions ↗</a></span>
                     </label>
-                    <label>
+                    <label data-shopify-web-gtm hidden>
                       Web GTM Container ID <span class="label-optional">required for Shopify manual pixel</span>
                       <input name="webGtmContainerId" placeholder="GTM-XXXXXXX" autocomplete="off" />
                     </label>
@@ -1126,15 +1103,17 @@
                       <input name="ga4ApiSecret" placeholder="Required for server-side purchase recovery" />
                     </label>
                     <label data-assistant-destination="meta">
-                      Meta Pixel ID
+                      Meta Dataset / Pixel ID
                       <input name="metaPixelId" placeholder="1234567890" />
+                      <span class="field-help"><strong>Events Manager → Data sources / Datasets → your website dataset → Settings → Dataset ID / Pixel ID.</strong> Copy the numeric ID, not your ad account or Page ID.</span>
                     </label>
                     <label data-assistant-destination="meta">
                       Meta CAPI Access Token
                       <input name="metaAccessToken" placeholder="EAAB..." />
+                      <span class="field-help"><strong>Same dataset → Settings → Conversions API → manual setup → Generate access token.</strong> Ask your business admin for access if unavailable. Keep the token private.</span>
                     </label>
                     <label data-assistant-destination="meta">
-                      Meta Test Event Code
+                      Meta Test Event Code <span class="label-optional">optional</span>
                       <input name="metaTestEventCode" placeholder="TEST12345" />
                     </label>
                     <label data-assistant-destination="googleAds">
@@ -1175,6 +1154,13 @@
                       <button id="downloadServerTemplate" class="button" type="button" disabled>⇣ server.json</button>
                     </div>
                     <p id="setupAssistantResult" class="form-message" role="status" aria-live="polite"></p>
+                  </div>
+                  <div class="assistant-download-card" data-woo-plugin-download hidden>
+                    <h2>WooCommerce plugin</h2>
+                    <p>Install in WordPress → Plugins → Add New → Upload Plugin. Then open WooCommerce → Tagioo to configure your Web GTM ID, tracking URL and GA4 credentials.</p>
+                    <div class="assistant-download-actions">
+                      <button class="button button-primary download-plugin-btn" type="button">⇣ Download WooCommerce plugin</button>
+                    </div>
                   </div>
                   <div id="shopifyManualPixelCard" class="assistant-download-card" hidden>
                     <span class="assistant-download-icon" aria-hidden="true">M</span>
@@ -1685,7 +1671,7 @@ Do not use Checkout “Additional scripts”; Shopify retired that integration p
                   <ol class="woo-webhook-steps">
                     <li>Click <strong>Download Plugin</strong> above to get <code>tagioo-woocommerce.zip</code>.</li>
                     <li>In WordPress admin go to <strong>Plugins → Add New → Upload Plugin</strong>, choose the zip, click <strong>Install Now</strong>, then <strong>Activate</strong>.</li>
-                    <li>Done — no configuration needed. Plugin automatically pushes <code>page_view</code>, <code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code>, <code>purchase</code>, and <code>user_data</code> on every event.</li>
+                    <li>Open <strong>WooCommerce → Tagioo</strong>, enter your Web GTM ID, sGTM domain, GA4 Measurement ID and API secret, then save. Enable GTM injection only if the same container is not already installed. The plugin pushes <code>page_view</code>, <code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code>, <code>purchase</code>, and <code>user_data</code> on every event.</li>
                   </ol>
                   <p class="woo-webhook-note">Plugin uses GA4 ecommerce structure (<code>items[]</code>) and includes <code>event_id</code> on every event for browser↔server deduplication.</p>
                 </div>
@@ -2544,7 +2530,6 @@ window.dataLayer.push({
                 <p>Live usage against your current billing period.</p>
               </div>
               <div class="subscription-actions">
-                <button id="managePaddleBilling" class="button" type="button" hidden>Manage subscription</button>
                 <span id="billingBadge" class="status-dot" hidden>Checking</span>
                 <span id="planBadge" class="badge" hidden>Plan</span>
               </div>
@@ -2567,6 +2552,9 @@ window.dataLayer.push({
               <div>
                 <h2 id="planSectionTitle">Available Plans</h2>
                 <p>Choose the package that fits your monthly traffic and number of containers.</p>
+              </div>
+              <div class="subscription-actions">
+                <button id="managePaddleBilling" class="button" type="button" hidden>Manage subscription</button>
               </div>
             </div>
             <div id="subscriptionPlans" class="subscription-plan-section"></div>
@@ -2615,12 +2603,28 @@ window.dataLayer.push({
       </main>
     </div>
 
+    <dialog id="manageSubscriptionDialog" class="customer-search-dialog" aria-labelledby="manageSubscriptionTitle" style="padding:24px">
+      <h2 id="manageSubscriptionTitle">Manage subscription</h2>
+      <p style="margin:16px 0 24px">Your plan is paid manually and does not charge automatically. Choose Stop renewal to switch to Free at the end of an active paid period. If no paid period is active, Free applies immediately.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end">
+        <button id="manageSubscriptionClose" class="button" type="button" autofocus>Keep current plan</button>
+        <button id="stopSubscriptionRenewal" class="button button-primary" type="button">Stop renewal</button>
+      </div>
+    </dialog>
+    <dialog id="containerUpgradeDialog" class="customer-search-dialog" aria-labelledby="containerUpgradeTitle" aria-describedby="containerUpgradeDescription" style="padding:24px">
+      <h2 id="containerUpgradeTitle">Upgrade to create more containers</h2>
+      <p id="containerUpgradeDescription" style="margin:16px 0 24px">Your <span id="containerUpgradePlan">current</span> plan includes one container, and you already have one. Upgrade your plan to connect more websites.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end">
+        <button id="containerUpgradeClose" class="button" type="button" autofocus>Not now</button>
+        <button id="containerUpgradeBilling" class="button button-primary" type="button">Upgrade plan</button>
+      </div>
+    </dialog>
     <dialog id="customerSearchDialog" class="customer-search-dialog" aria-labelledby="customerSearchTitle">
       <div class="customer-search-head"><h2 id="customerSearchTitle">Go to a page</h2><button class="button" id="customerSearchClose" type="button" aria-label="Close search">Esc</button></div>
       <label class="customer-search-input"><span class="visually-hidden">Search dashboard pages</span><input id="customerPageSearch" type="search" placeholder="Search pages, settings, billing…" autocomplete="off" /></label>
       <div id="customerSearchResults" class="customer-search-results"></div>
       <p class="customer-search-hint">↑ ↓ to choose · Enter to open · Esc to close</p>
     </dialog>
-    <script src="/app.js?v=109" type="module"></script>
+    <script src="/app.js?v=112" type="module"></script>
   </body>
 </html>
