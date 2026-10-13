@@ -12,6 +12,8 @@
   --flow-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 @scope (.hero) to (.signal-diagram) {
+ .hero-intro { display:contents; }
+
 /* Hallmark · pre-emit critique: P4 H5 E4 S5 R5 V4
  * Production theme retained; content revision + original event-flow component.
  * Reference: user video, movement concept only. No reference artwork or claims reused.
@@ -195,4 +197,25 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 
 @scope (.hero) to (.signal-diagram) {
  @media(max-width:520px) { .hero-inner.copy-hero { padding-left:16px; padding-right:16px; } }
+}
+
+ .hero-intro { display:contents; }
+
+/* Hallmark · pre-emit critique: P4 H5 E4 S5 R5 V4
+ * Desktop split hero keeps signup beside the purchase illustration.
+ */
+@scope (.hero) to (.signal-diagram) {
+ @media (min-width:1100px) {
+  .hero-inner.copy-hero { max-width:1440px; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); grid-template-rows:auto; column-gap:48px; row-gap:24px; padding:64px 48px; }
+  .hero-intro { display:grid; gap:24px; align-self:center; min-width:0; }
+  .copy-hero .hero-content { justify-items:start; text-align:left; }
+  .copy-hero h1 { font-size:clamp(2.5rem,3.4vw,3.25rem); }
+  .copy-hero .hero-copy { font-size:1.05rem; }
+  .copy-hero .hero-badge { font-size:.68rem; }
+  .hero-top-signup { margin:0; }
+  .copy-hero-body { grid-column:2; grid-row:1; width:100%; max-width:600px; margin:0; justify-self:end; }
+ }
+ @media (min-width:521px) and (max-width:1099px) {
+  .copy-hero-body { max-width:640px; }
+ }
 }

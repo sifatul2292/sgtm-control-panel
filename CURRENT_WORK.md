@@ -1687,3 +1687,17 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 ## 2026-10-12 — Transparent website logo variants
 
 - Removed header/footer logo backing and padding across marketing/legal pages. Added transparent orange/white wordmark for dark footers, preserving original orange icon. Browser verified transparent backgrounds and rendered both variants at 485px; syntax and diff checks pass. Local only.
+
+## 2026-10-13 — Balanced desktop homepage hero
+
+- Replaced desktop hero stacking with a two-column layout from 1100px: left-aligned headline/copy/signup beside a bounded purchase animation. Tablet illustration capped at 640px; phone layout preserved.
+- Tightened desktop banner/workspace spacing and preserved the scene proportions so animated connectors continue to meet the cards. Bumped both homepage CSS cache versions.
+- Browser checked 320/375/414/768/1100/1280/1440/1782px: no horizontal overflow; desktop cards contained, pause and reduced-motion pass. Screenshot: artifacts/desktop-hero.png. Backend syntax and diff checks pass. Local only; not deployed.
+
+## 2026-10-13 — Center hero copy and trim animation whitespace
+
+- Grouped headline/copy/signup into one desktop grid item so its combined height centers exactly against the illustration. Mobile wrapper uses display:contents to preserve the stacked layout.
+- Reduced desktop illustration cap to 600px and control-row padding; restored the compact scene ratio at narrow desktop sizes and trimmed unused canvas margins while keeping card/connector coordinates together. CSS versions desktop-6/desktop-7.
+- Checked 320/375/414/768/1100/1250/1440/1782px for overflow, desktop centering and card clearance. At 1250px the illustration is now 632px tall; pause/reduced-motion checks and backend syntax/diff gates pass. Local preview remains on port 8779; not deployed.
+
+- Homepage-only commit prepared for GitHub on feat/saas-phase1-payments; dashboard/setup-guide work and local preview artifacts remain uncommitted.

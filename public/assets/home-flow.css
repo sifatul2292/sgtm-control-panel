@@ -209,3 +209,21 @@
 }
 
 .signal-purchase code { background:var(--diagram-transfer); color:var(--diagram-white); }
+
+/* Compact desktop details without scaling the text or clipping the flow. */
+@media (min-width:521px) {
+ .signal-banner { margin:0 4%; padding:10px 14px; box-shadow:none; }
+ .signal-server-head { padding:10px; }
+ .signal-domain { padding:10px; }
+ .signal-server-body { padding:10px; }
+ .signal-server-body ul { gap:9px; margin-top:10px; }
+ .signal-pipeline { margin:0 10px; padding:10px 0; }
+ .signal-summary { padding:12px 14px; }
+}
+
+@media (min-width:1100px) {
+ .signal-controls { padding:8px 16px; }
+ /* Trim the canvas margins while keeping connector and card coordinates aligned. */
+ .signal-scene { aspect-ratio:680/520; margin-top:-16px; margin-bottom:-25px; }
+ .signal-banner { position:relative; z-index:1; }
+}
