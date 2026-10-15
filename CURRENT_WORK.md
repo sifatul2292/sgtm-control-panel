@@ -1793,3 +1793,9 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Embedded the supplied container setup video in the Container guide and WooCommerce/Shopify video in Setup Guide, with YouTube fallback links and responsive existing video styles.
 - Moved DNS screenshot below step 1 and Container Config screenshot below step 2. Added Copy beside the displayed DNS target with accessible success/blocked feedback. App asset bumped to v114.
 - npm run check, frontend syntax, diff checks and guide ordering/image asset assertions pass. Browser playback and clipboard interaction not verified. Prepared for GitHub push; production deployment pending.
+
+## 2026-10-15 — Compact Setup Guide video card
+
+- Combined the platform video and introduction into one compact card titled “Check our setup guide”. Short copy and existing button styles sit beside a 280px-wide video; narrow screens stack the content while keeping the video capped.
+- Removed the separate oversized video panel. Illustrated instructions and YouTube fallback remain available; Container tab unchanged. Styles cache bumped to v69.
+- Backend/frontend syntax and diff checks pass. Browser layout/playback not verified. Prepared for GitHub push; production deployment pending.

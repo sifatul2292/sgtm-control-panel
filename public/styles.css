@@ -6473,3 +6473,20 @@ body.modal-open { overflow: hidden; }
 @media (min-width:621px) and (max-width:1100px) {
  .dashboard-logo img { width:40px !important; height:40px !important; }
 }
+
+/* Keep the setup walkthrough compact beside its instructions. */
+.setup-guide-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: 20px;
+}
+.setup-guide-copy { min-width: 0; }
+.setup-guide-copy h2 { margin: 0 0 6px; font-size: var(--text-md); }
+.setup-guide-copy p { margin: 0 0 12px; color: var(--color-muted); font-size: var(--text-sm); line-height: 1.55; }
+.setup-guide-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.setup-guide-card .setup-video-preview { width: 100%; max-width: 280px; box-shadow: none; border-radius: var(--radius-sm); }
+@media (max-width: 640px) {
+  .setup-guide-card { grid-template-columns: minmax(0, 1fr); }
+}
