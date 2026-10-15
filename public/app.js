@@ -7465,3 +7465,13 @@ document.getElementById("containerUpgradeBilling").addEventListener("click", () 
   containerUpgradeDialog.close();
   setView("billing");
 });
+
+document.querySelector("#copyCustomerDnsTarget")?.addEventListener("click", async () => {
+  const message = document.querySelector("#customerDnsCopyMessage");
+  try {
+    await navigator.clipboard.writeText(els.customerDnsTargetInline.textContent);
+    message.textContent = "DNS target copied.";
+  } catch {
+    message.textContent = "Copy was blocked. Select the DNS target and copy it manually.";
+  }
+});

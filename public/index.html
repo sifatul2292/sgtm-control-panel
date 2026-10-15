@@ -754,16 +754,21 @@
                   </div>
                 </div>
                 <p style="padding:0 20px"><a href="/assets/setup-guide/index.html" target="_blank" rel="noopener">Read the illustrated container setup guide ↗</a></p>
-                <img src="/assets/setup-guide/dns-record.png" alt="Example first-party tracking CNAME record" style="width:100%;height:auto;padding:12px;box-sizing:border-box" loading="lazy">
-                <img src="/assets/setup-guide/container-config.png" alt="Where to copy Server GTM Container Config" style="width:100%;height:auto;padding:12px;box-sizing:border-box" loading="lazy">
+                <div class="setup-video-preview" style="margin:20px">
+                  <iframe src="https://www.youtube-nocookie.com/embed/MiDSS1VDTlc" title="Container setup guide" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                </div>
+                <p style="padding:0 20px"><a href="https://youtu.be/MiDSS1VDTlc" target="_blank" rel="noopener">Watch Container setup guide on YouTube ↗</a></p>
                 <ol class="onboard-guide-steps">
                   <li>
                     <strong>Point a subdomain at Tagioo</strong>
-                    <span>Create a subdomain like <code>server.yourdomain.com</code>, then add a <strong>CNAME record</strong>: Name = <code>track</code> for track.yourdomain.com, Target = <code id="customerDnsTargetInline">bd.tagioo.com</code>. Set Cloudflare proxy to <strong>DNS only</strong>, TTL to <strong>Auto</strong>, then click <strong>Save</strong>.</span>
+                    <span>Create a subdomain like <code>server.yourdomain.com</code>, then add a <strong>CNAME record</strong>: Name = <code>track</code> for track.yourdomain.com, Target = <code id="customerDnsTargetInline">bd.tagioo.com</code> <button id="copyCustomerDnsTarget" class="button button-small" type="button" aria-label="Copy DNS target">Copy</button>. Set Cloudflare proxy to <strong>DNS only</strong>, TTL to <strong>Auto</strong>, then click <strong>Save</strong>.</span>
+                    <span id="customerDnsCopyMessage" role="status" aria-live="polite"></span>
+                    <img src="/assets/setup-guide/dns-record.png" alt="Example first-party tracking CNAME record" style="width:100%;height:auto;margin-top:12px" loading="lazy">
                   </li>
                   <li>
                     <strong>Copy your GTM container config</strong>
                     <span>In Google Tag Manager: open your Server container and click its container ID at the top right → Manually provision tagging server. Copy the full Container Config value.</span>
+                    <img src="/assets/setup-guide/container-config.png" alt="Where to copy Server GTM Container Config" style="width:100%;height:auto;margin-top:12px" loading="lazy">
                   </li>
                   <li>
                     <strong>Fill in the form</strong>
@@ -901,6 +906,14 @@
           </section>
 
           <section class="panel"><div class="panel-header"><div><h2>Set up your website after creating a container</h2><p>Choose your platform, enter your tracking URL and destination IDs, then generate templates, install the integration and verify a purchase. Go to Setup Guide Menu and follow each step.</p><a class="button" href="/assets/setup-guide/index.html" target="_blank" rel="noopener">Open illustrated setup instructions ↗</a></div></div></section>
+
+          <section class="panel">
+            <div class="panel-header"><h2>WooCommerce and Shopify setup guide</h2></div>
+                <div class="setup-video-preview" style="margin:20px">
+                  <iframe src="https://www.youtube-nocookie.com/embed/9PGfxptCQtk" title="WooCommerce and Shopify setup guide" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                </div>
+                <p style="padding:0 20px"><a href="https://youtu.be/9PGfxptCQtk" target="_blank" rel="noopener">Watch WooCommerce and Shopify setup guide on YouTube ↗</a></p>
+          </section>
 
           <section class="assistant-layout">
             <aside class="panel assistant-steps" aria-label="Setup steps">
@@ -2621,6 +2634,6 @@ window.dataLayer.push({
       <div id="customerSearchResults" class="customer-search-results"></div>
       <p class="customer-search-hint">↑ ↓ to choose · Enter to open · Esc to close</p>
     </dialog>
-    <script src="/app.js?v=113" type="module"></script>
+    <script src="/app.js?v=114" type="module"></script>
   </body>
 </html>

@@ -1787,3 +1787,9 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Customer tracking test failures now offer Create support ticket with reported failed checks, selected container, tracking domain and test timestamp prefilled in the existing support form. Saved failures and incomplete API/network tests also offer escalation; passing checks do not. Customer reviews and submits manually.
 - Preserve existing subject/message drafts, avoid duplicate diagnostic blocks, and leave oversized drafts intact with guidance. Ignore test responses after switching containers. Copy distinguishes reported errors from a confirmed root cause. No infrastructure changes or live conversion tests performed.
 - App asset version bumped to 113. Three focused support-draft tests, frontend syntax, npm run check and diff checks pass. Local changes only; not pushed/deployed.
+
+## 2026-10-15 — Container and platform video guides
+
+- Embedded the supplied container setup video in the Container guide and WooCommerce/Shopify video in Setup Guide, with YouTube fallback links and responsive existing video styles.
+- Moved DNS screenshot below step 1 and Container Config screenshot below step 2. Added Copy beside the displayed DNS target with accessible success/blocked feedback. App asset bumped to v114.
+- npm run check, frontend syntax, diff checks and guide ordering/image asset assertions pass. Browser playback and clipboard interaction not verified. Prepared for GitHub push; production deployment pending.
