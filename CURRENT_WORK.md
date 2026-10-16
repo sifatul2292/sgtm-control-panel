@@ -1849,3 +1849,11 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   creating a new subscription. No completed trial checkout, actual post-trial
   charge or live cancellation was performed during this rollout; verification is
   provider sandbox previews, live catalog/render assertions and automated checks.
+
+## 2026-10-17 — Show the live trial on public plan cards
+
+- Homepage and Pricing paid cards now show “3 days free” with the subsequent
+  monthly price and “Start 3-day free trial” buttons. Shared pricing disclosure
+  explains payment details, automatic charging, tax and cancellation before expiry.
+- Local BDT mode restores the original plan buttons and removes card-trial notes;
+  manual-payment prices and multi-cycle behavior retained. Free plan unchanged.

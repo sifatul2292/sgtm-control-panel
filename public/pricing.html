@@ -128,7 +128,7 @@
             <div class="plan-tier-badge" style="--tb:#059669">Starter</div>
             <div class="plan-header">
               <div class="plan-price"><strong data-price-display data-usd="30">$30</strong><span data-price-unit>/month</span></div>
-              <p class="plan-cycle-note" data-cycle-note></p>
+              <p class="plan-cycle-note" data-cycle-note><strong>3 days free</strong> · then $30/month</p>
               <p>For stores starting with server-side tracking.</p>
             </div>
             <ul class="plan-features">
@@ -140,7 +140,7 @@
               <li><span class="pf-check">✓</span> Cookie life extension</li>
               <li><span class="pf-check">✓</span> Email &amp; WhatsApp support</li>
             </ul>
-            <a class="button button-outline full-width" data-plan-cta href="/signup?plan=Starter&cycle=monthly">Start Starter</a>
+            <a class="button button-outline full-width" data-plan-cta href="/signup?plan=Starter&cycle=monthly">Start 3-day free trial</a>
           </article>
 
           <article class="pricing-card featured" data-reveal data-monthly="2900">
@@ -148,7 +148,7 @@
             <div class="plan-tier-badge" style="--tb:#F97316">Pro</div>
             <div class="plan-header">
               <div class="plan-price"><strong data-price-display data-usd="50">$50</strong><span data-price-unit>/month</span></div>
-              <p class="plan-cycle-note" data-cycle-note></p>
+              <p class="plan-cycle-note" data-cycle-note><strong>3 days free</strong> · then $50/month</p>
               <p>For stores running serious ad campaigns.</p>
             </div>
             <ul class="plan-features">
@@ -160,14 +160,14 @@
               <li><span class="pf-check">✓</span> Advanced reports + diagnostics</li>
               <li><span class="pf-check">✓</span> Tracking diagnostics</li>
             </ul>
-            <a class="button button-primary full-width" data-plan-cta href="/signup?plan=Pro&cycle=monthly">Start Pro</a>
+            <a class="button button-primary full-width" data-plan-cta href="/signup?plan=Pro&cycle=monthly">Start 3-day free trial</a>
           </article>
 
           <article class="pricing-card" data-reveal data-monthly="5900">
             <div class="plan-tier-badge" style="--tb:#D97706">Enterprise</div>
             <div class="plan-header">
               <div class="plan-price"><strong data-price-display data-usd="100">$100</strong><span data-price-unit>/month</span></div>
-              <p class="plan-cycle-note" data-cycle-note></p>
+              <p class="plan-cycle-note" data-cycle-note><strong>3 days free</strong> · then $100/month</p>
               <p>For agencies and high-volume stores.</p>
             </div>
             <ul class="plan-features">
@@ -179,12 +179,12 @@
               <li><span class="pf-check">✓</span> Guided GTM setup</li>
               <li><span class="pf-check">✓</span> Event history and purchase inspection</li>
             </ul>
-            <a class="button button-outline full-width" data-plan-cta href="/signup?plan=Enterprise&cycle=monthly">Start Enterprise</a>
+            <a class="button button-outline full-width" data-plan-cta href="/signup?plan=Enterprise&cycle=monthly">Start 3-day free trial</a>
           </article>
 
         </div>
         <div class="pricing-footer">
-          <p id="pricingFooterNote">Prices in USD, excluding applicable taxes. Tax is calculated at checkout. Card subscriptions are billed monthly through Paddle and renew automatically until canceled. Bangladesh customers can also choose local BDT payment.</p>
+          <p id="pricingFooterNote">New card subscriptions include a 3-day free trial. Payment details required. After 3 days, your plan is charged automatically at the monthly price shown, plus applicable taxes. Cancel before the trial ends to avoid charges. Subscriptions renew monthly through Paddle until canceled. Bangladesh customers can also choose local BDT payment.</p>
           <p id="pricingCycleNote" hidden>Local BDT plans also offer longer billing cycles. <a href="/pricing">See local plan details →</a></p>
           <p><a href="/#faq">Billing questions →</a> &nbsp;·&nbsp; Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
         </div>
@@ -406,6 +406,10 @@
         document.querySelectorAll(".pricing-card[data-monthly]").forEach(card => {
           const priceEl = card.querySelector("[data-price-display]");
           if (priceEl) priceEl.textContent = bt(Number(card.dataset.monthly));
+          const noteEl = card.querySelector("[data-cycle-note]");
+          if (noteEl) noteEl.textContent = "";
+          const cta = card.querySelector("[data-plan-cta]");
+          if (cta) cta.textContent = "Start " + new URL(cta.href).searchParams.get("plan");
         });
         const freePrice = document.querySelector('[data-usd="0"]');
         if (freePrice) freePrice.textContent = bt(0);
