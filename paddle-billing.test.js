@@ -42,13 +42,12 @@ test("card-update transactions do not activate plans or create purchase invoices
   const source = readFileSync(new URL("./server.js", import.meta.url), "utf8");
   const start = source.indexOf('  if (eventType === "transaction.completed")');
   const handler = source.slice(start, source.indexOf('  if (eventType === "subscription.canceled"', start));
-  let activations = 0, lastActivation, subscriptionStatus = "trialing";
+  let activations = 0;
   let response;
   const context = vm.createContext({
     config: { paddlePriceIds: {} },
     paddlePlanNameFromItems: () => "Starter",
-    activatePaddleTenant: async (event) => { activations += 1; lastActivation = event; return { ok: true }; },
-    callPaddleApi: async () => ({ ok: true, data: { status: subscriptionStatus, next_billed_at: "2026-10-20T00:00:00Z" } }),
+    activatePaddleTenant: async () => { activations += 1; return { ok: true }; },
     invalidateOwnerDashboardCache() {},
     response: (status, body) => { response = { status, body }; return response; },
   });
@@ -66,12 +65,11 @@ test("card-update transactions do not activate plans or create purchase invoices
   assert.equal(response.status, 202);
   const trialCheckout = { origin: "web", subscription_id: "sub_trial", items: [{ price: { trial_period: { frequency: 3, interval: "day" } } }], details: { totals: { total: "0" } } };
   await context.handle(trialCheckout);
-  assert.equal(lastActivation.trialEndsAt, "2026-10-20T00:00:00Z");
-  subscriptionStatus = "active";
-  await context.handle(trialCheckout);
-  assert.equal(lastActivation.trialEndsAt, "");
-  await context.handle({ ...trialCheckout, subscription_id: "" });
-  assert.equal(response.status, 409);
+  assert.equal(activations, 1);
+  assert.equal(response.body.awaiting, "subscription.trialing");
+  await context.handle({ ...trialCheckout, origin: "subscription_recurring" });
+  assert.equal(activations, 2);
+
 });
 
 test("Paddle activation, replay, renewal, and cancellation preserve tenant state", async () => {
@@ -150,4 +148,27 @@ test("Paddle plan changes use supported proration fields", async () => {
   assert.equal(request.proration_billing_mode, "prorated_next_billing_period");
   await context.updatePaddleSubscriptionPlan({ plan: "Starter", paddleSubscriptionId: "sub_test", paddleSubscriptionStatus: "trialing" }, "Pro");
   assert.equal(request.proration_billing_mode, "do_not_bill");
+});
+
+test("signed trial event grants access without subscription API permissions", async () => {
+  const source = readFileSync(new URL("./server.js", import.meta.url), "utf8");
+  const start = source.indexOf("async function processPaddleWebhook(");
+  let activation;
+  const context = vm.createContext({
+    config: { paddlePriceIds: { Starter: "pri_starter" } }, paddlePlanNameFromItems,
+    activatePaddleTenant: async (event) => { activation = event; return { ok: true }; },
+    invalidateOwnerDashboardCache() {},
+  });
+  vm.runInContext(source.slice(start, source.indexOf("\n}\n", start) + 3), context);
+  const event = { event_type: "subscription.trialing", occurred_at: "2026-10-17T00:00:00Z", data: {
+    id: "sub_trial", status: "trialing", next_billed_at: "2026-10-20T00:00:00Z",
+    custom_data: { tenantId: "test", invoiceNo: "test-001", planName: "Enterprise" },
+    items: [{ price: { id: "pri_starter" } }],
+  } };
+  assert.equal((await context.processPaddleWebhook(event)).status, 202);
+  assert.equal(activation.planName, "Starter");
+  assert.equal(activation.amount, 0);
+  assert.equal(activation.trialEndsAt, "2026-10-20T00:00:00Z");
+  assert.equal(activation.paddleTransactionId, "trial_sub_trial");
+  assert.equal((await context.processPaddleWebhook({ ...event, data: { ...event.data, next_billed_at: "" } })).status, 400);
 });

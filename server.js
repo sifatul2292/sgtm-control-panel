@@ -12161,6 +12161,29 @@ async function processPaddleWebhook(payload) {
   const eventType = String(payload.event_type || "");
   const eventData = payload.data || {};
 
+  if (eventType === "subscription.trialing") {
+    const customData = eventData.custom_data || {};
+    const planName = paddlePlanNameFromItems(eventData.items, config.paddlePriceIds);
+    if (!eventData.id || eventData.status !== "trialing" || !eventData.next_billed_at) {
+      return response(400, { errors: ["Paddle trial is missing its status or end date."] });
+    }
+    const result = await activatePaddleTenant({
+      tenantId: String(customData.tenantId || "").trim(),
+      planName,
+      amount: 0,
+      currency: eventData.currency_code || "USD",
+      // Trial access is granted by the signed subscription event, not a charge.
+      paddleTransactionId: `trial_${eventData.id}`,
+      paddleSubscriptionId: eventData.id || "",
+      paddleCustomerId: eventData.customer_id || "",
+      paddleInvoiceNo: String(customData.invoiceNo || ""),
+      occurredAt: payload.occurred_at,
+      trialEndsAt: eventData.next_billed_at
+    });
+    if (result.ok) invalidateOwnerDashboardCache();
+    return response(result.ok ? 202 : (result.status || 400), result.ok ? { trial: true, duplicate: Boolean(result.duplicate) } : { errors: result.errors });
+  }
+
   if (eventType === "transaction.completed") {
     // Updating a card creates a zero-value transaction, not a plan purchase.
     // Its items can reflect an older plan; never use it to change access.
@@ -12176,22 +12199,15 @@ async function processPaddleWebhook(payload) {
       return response(400, { errors: ["Paddle transaction does not contain a configured Tagioo price."] });
     }
     const totalMinor = Number(eventData.details?.totals?.total || 0);
-    let trialEndsAt = "";
-    // A zero-total discount is still a purchase. Only the provider's current
-    // subscription state establishes a trial, never browser custom_data.
-    if (totalMinor === 0 && eventData.items?.some((item) => item.price?.trial_period)) {
-      if (!eventData.subscription_id) return response(409, { errors: ["Trial subscription is not linked yet."] });
-      const subscription = await callPaddleApi(`/subscriptions/${eventData.subscription_id}`, "GET");
-      if (!subscription.ok) return response(502, { errors: subscription.errors });
-      if (subscription.data?.status === "trialing") {
-        trialEndsAt = subscription.data.next_billed_at || "";
-        if (!trialEndsAt) return response(409, { errors: ["Trial end date is not available yet."] });
-      }
+    // Paddle completes a zero-value checkout before sending subscription.trialing.
+    // Wait for that signed event to grant access with the authoritative trial end.
+    if (totalMinor === 0 && !String(eventData.origin || "").startsWith("subscription_")
+      && eventData.items?.some((item) => item.price?.trial_period && !item.price.trial_period.unit_price)) {
+      return response(200, { ignored: "trial_checkout", awaiting: "subscription.trialing" });
     }
     const result = await activatePaddleTenant({
       tenantId,
       planName,
-      trialEndsAt,
       amount: totalMinor / 100,
       currency: eventData.currency_code || "USD",
       paddleTransactionId: eventData.id,
@@ -12215,7 +12231,7 @@ async function processPaddleWebhook(payload) {
   // Fires on any subscription change — the customer-initiated plan-change
   // path (POST /api/customer/subscription/paddle below) only calls
   // Paddle's API; this webhook is what actually applies the new plan/limits.
-  if (["subscription.updated", "subscription.trialing", "subscription.activated", "subscription.resumed", "subscription.past_due"].includes(eventType)) {
+  if (["subscription.updated", "subscription.activated", "subscription.resumed", "subscription.past_due"].includes(eventType)) {
     const result = await syncPaddleSubscriptionPlan(eventData, payload.occurred_at);
     if (result.ok && !result.skipped && !result.unchanged) invalidateOwnerDashboardCache();
     return response(result.ok ? 202 : (result.status || 400), result.ok ? { synced: true } : { errors: result.errors });

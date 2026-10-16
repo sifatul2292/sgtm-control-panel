@@ -1817,3 +1817,9 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 
 - Owner authorized live rollout on October 17. Preparing focused code deployment
   before provider price updates; keeping the operator-managed Preview pilot intact.
+
+- Live key has price-read but no subscription-read permission. Replaced the
+  subscription lookup with authoritative signed subscription.trialing activation;
+  zero-value trial checkout waits for that event. Eight-event production webhook
+  subscription saved; all three sandbox previews show zero today and regular
+  monthly totals after trial. Fourteen focused checks pass.

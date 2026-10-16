@@ -101,8 +101,8 @@ then production, update each existing Starter/Pro/Enterprise monthly price with
 and no trial unit price. Retain existing price IDs, monthly amounts, tax mode
 and billing cycle. Do not change existing subscriptions' next billing dates.
 Enable `subscription.trialing` on the existing notification destination. The API
-key needs price read permission for checkout terms and subscription read permission
-for authoritative trial activation; grant through the owner's normal key process.
+key needs price read permission for checkout terms. Trial activation uses the signed
+subscription.trialing event and needs no subscription read permission.
 
 Checkout reads the configured price and displays the promotion only for a verified
 three-day, free, payment-method-required trial. Paddle collects payment details
