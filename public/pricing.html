@@ -127,7 +127,7 @@
           <article class="pricing-card" data-reveal data-monthly="1200">
             <div class="plan-tier-badge" style="--tb:#059669">Starter</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display data-usd="30">$30</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><s data-regular-price style="font-size:1.25rem;color:var(--muted);margin-right:4px">$30</s><strong data-price-display data-usd="30">$0</strong><span data-price-unit>for 3 days</span></div>
               <p class="plan-cycle-note" data-cycle-note><strong>3 days free</strong> · then $30/month</p>
               <p>For stores starting with server-side tracking.</p>
             </div>
@@ -147,7 +147,7 @@
             <div class="plan-popular-tag">Most popular</div>
             <div class="plan-tier-badge" style="--tb:#F97316">Pro</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display data-usd="50">$50</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><s data-regular-price style="font-size:1.25rem;color:var(--muted);margin-right:4px">$50</s><strong data-price-display data-usd="50">$0</strong><span data-price-unit>for 3 days</span></div>
               <p class="plan-cycle-note" data-cycle-note><strong>3 days free</strong> · then $50/month</p>
               <p>For stores running serious ad campaigns.</p>
             </div>
@@ -166,7 +166,7 @@
           <article class="pricing-card" data-reveal data-monthly="5900">
             <div class="plan-tier-badge" style="--tb:#D97706">Enterprise</div>
             <div class="plan-header">
-              <div class="plan-price"><strong data-price-display data-usd="100">$100</strong><span data-price-unit>/month</span></div>
+              <div class="plan-price"><s data-regular-price style="font-size:1.25rem;color:var(--muted);margin-right:4px">$100</s><strong data-price-display data-usd="100">$0</strong><span data-price-unit>for 3 days</span></div>
               <p class="plan-cycle-note" data-cycle-note><strong>3 days free</strong> · then $100/month</p>
               <p>For agencies and high-volume stores.</p>
             </div>
@@ -406,6 +406,10 @@
         document.querySelectorAll(".pricing-card[data-monthly]").forEach(card => {
           const priceEl = card.querySelector("[data-price-display]");
           if (priceEl) priceEl.textContent = bt(Number(card.dataset.monthly));
+          const regularPrice = card.querySelector("[data-regular-price]");
+          if (regularPrice) regularPrice.hidden = true;
+          const unitEl = card.querySelector("[data-price-unit]");
+          if (unitEl) unitEl.textContent = "/month";
           const noteEl = card.querySelector("[data-cycle-note]");
           if (noteEl) noteEl.textContent = "";
           const cta = card.querySelector("[data-plan-cta]");

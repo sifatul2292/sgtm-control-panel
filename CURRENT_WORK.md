@@ -1857,3 +1857,9 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   explains payment details, automatic charging, tax and cancellation before expiry.
 - Local BDT mode restores the original plan buttons and removes card-trial notes;
   manual-payment prices and multi-cycle behavior retained. Free plan unchanged.
+
+## 2026-10-17 — Make trial price the primary price
+
+- Paid USD cards on homepage and Pricing show crossed-out regular prices beside
+  $0 for 3 days. Monthly prices after trial and auto-charge disclosure retained.
+- BDT mode hides crossed-out USD prices and restores /month and manual amounts.
