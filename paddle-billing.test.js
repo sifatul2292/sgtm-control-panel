@@ -42,12 +42,13 @@ test("card-update transactions do not activate plans or create purchase invoices
   const source = readFileSync(new URL("./server.js", import.meta.url), "utf8");
   const start = source.indexOf('  if (eventType === "transaction.completed")');
   const handler = source.slice(start, source.indexOf('  if (eventType === "subscription.canceled"', start));
-  let activations = 0;
+  let activations = 0, lastActivation, subscriptionStatus = "trialing";
   let response;
   const context = vm.createContext({
     config: { paddlePriceIds: {} },
     paddlePlanNameFromItems: () => "Starter",
-    activatePaddleTenant: async () => { activations += 1; return { ok: true }; },
+    activatePaddleTenant: async (event) => { activations += 1; lastActivation = event; return { ok: true }; },
+    callPaddleApi: async () => ({ ok: true, data: { status: subscriptionStatus, next_billed_at: "2026-10-20T00:00:00Z" } }),
     invalidateOwnerDashboardCache() {},
     response: (status, body) => { response = { status, body }; return response; },
   });
@@ -63,6 +64,14 @@ test("card-update transactions do not activate plans or create purchase invoices
   await context.handle({ origin: "web", details: { totals: { total: "0" } } });
   assert.equal(activations, 1);
   assert.equal(response.status, 202);
+  const trialCheckout = { origin: "web", subscription_id: "sub_trial", items: [{ price: { trial_period: { frequency: 3, interval: "day" } } }], details: { totals: { total: "0" } } };
+  await context.handle(trialCheckout);
+  assert.equal(lastActivation.trialEndsAt, "2026-10-20T00:00:00Z");
+  subscriptionStatus = "active";
+  await context.handle(trialCheckout);
+  assert.equal(lastActivation.trialEndsAt, "");
+  await context.handle({ ...trialCheckout, subscription_id: "" });
+  assert.equal(response.status, 409);
 });
 
 test("Paddle activation, replay, renewal, and cancellation preserve tenant state", async () => {
@@ -87,13 +96,31 @@ test("Paddle activation, replay, renewal, and cancellation preserve tenant state
   const event = { tenantId: "test", planName: "Starter", amount: 0, currency: "USD", paddleTransactionId: "txn_test", paddleSubscriptionId: "sub_test", paddleInvoiceNo: "test-001", occurredAt: "2026-10-07T01:00:00Z" };
   assert.equal((await context.activatePaddleTenantLocked({ ...event, paddleInvoiceNo: "wrong" })).ok, false);
   assert.equal(data.payments.length, 0);
-  assert.equal((await context.activatePaddleTenantLocked(event)).ok, true);
+  const trialEnd = new Date(Date.now() + 3 * 86400000).toISOString();
+  let purchases = 0, activationEmails = 0;
+  context.forwardTagiooOwnEvent = async () => { purchases += 1; };
+  context.emailCustomerActivated = async () => { activationEmails += 1; };
+  assert.equal((await context.activatePaddleTenantLocked({ ...event, trialEndsAt: "invalid" })).ok, false);
+  assert.equal((await context.activatePaddleTenantLocked({ ...event, trialEndsAt: trialEnd, amount: 30 })).ok, false);
+  const trialEvent = { ...event, trialEndsAt: trialEnd };
+  assert.equal((await context.activatePaddleTenantLocked(trialEvent)).ok, true);
+  assert.equal(data.tenants[0].subscriptionStatus, "trial");
+  assert.equal(data.tenants[0].paymentStatus, "trial");
+  assert.equal(data.tenants[0].renewalDate, trialEnd);
+  assert.equal(data.tenants[0].paidAt, "");
+  assert.equal(data.payments[0].status, "trial");
+  assert.equal(purchases, 0);
+  assert.equal(activationEmails, 0);
   assert.equal(data.tenants[0].paymentProvider, "paddle");
   assert.equal(data.payments[0].amount, 0);
   assert.equal((await context.activatePaddleTenantLocked(event)).duplicate, true);
   assert.equal(data.payments.length, 1);
   assert.equal((await context.activatePaddleTenantLocked({ ...event, tenantId: "", paddleTransactionId: "txn_renew", amount: 30, occurredAt: "2026-10-07T02:00:00Z" })).ok, true);
   assert.equal(data.payments.length, 2);
+  assert.equal(data.tenants[0].subscriptionStatus, "active");
+  assert.equal(data.tenants[0].trialEndsAt, "");
+  assert.equal(purchases, 1);
+  assert.equal(activationEmails, 1);
   assert.equal((await context.deactivatePaddleTenantLocked("sub_test", "2026-10-07T03:00:00Z")).ok, true);
   assert.equal(data.tenants[0].plan, "Free");
   const cycleStart = data.tenants[0].cycleStart;
@@ -121,4 +148,6 @@ test("Paddle plan changes use supported proration fields", async () => {
   assert.equal("effective_from" in request, false);
   await context.updatePaddleSubscriptionPlan({ plan: "Pro", paddleSubscriptionId: "sub_test" }, "Starter");
   assert.equal(request.proration_billing_mode, "prorated_next_billing_period");
+  await context.updatePaddleSubscriptionPlan({ plan: "Starter", paddleSubscriptionId: "sub_test", paddleSubscriptionStatus: "trialing" }, "Pro");
+  assert.equal(request.proration_billing_mode, "do_not_bill");
 });

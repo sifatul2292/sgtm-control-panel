@@ -2813,7 +2813,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
         </a>
         <div class="lb-hero">
           <h2>One last step.<br>Activate your plan.</h2>
-          <p>${paddle.enabled ? "Pay by card — Visa, Mastercard, and more. We activate your plan after payment confirmation." : "Send the amount via bKash or Nagad, then enter your transaction ID. We verify it and activate your plan — usually within a few hours."}</p>
+          <p>${paddle.trialDays ? "Start your 3-day free trial with a payment method. Your monthly subscription starts automatically after 3 days unless you cancel." : paddle.enabled ? "Pay by card — Visa, Mastercard, and more. We activate your plan after payment confirmation." : "Send the amount via bKash or Nagad, then enter your transaction ID. We verify it and activate your plan — usually within a few hours."}</p>
         </div>
         <div class="su-steps">
           <div class="su-step su-step--done"><span class="su-step-num">1</span>Create your account</div>
@@ -2841,9 +2841,9 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
 
           ${paddle.enabled ? `
           ${paddle.env === "sandbox" ? `<p class="lf-notice" role="status">Paddle sandbox test mode. No real payment will be collected. Use test card details only.</p>` : ""}
-          <button type="button" id="coPayCard" class="co-card-btn su-anim" style="--d:70ms">Pay with card — $${paddle.usdAmount}/mo</button>
+          <button type="button" id="coPayCard" class="co-card-btn su-anim" style="--d:70ms">${paddle.trialDays ? "Start 3-day free trial" : `Pay with card — $${paddle.usdAmount}/mo`}</button>
           <p id="coActivationStatus" role="status" aria-live="polite" hidden></p>
-          <p class="co-card-note su-anim" style="--d:75ms">Visa, Mastercard, and more — billed in USD via Paddle. Applicable taxes are added at checkout.</p>
+          <p class="co-card-note su-anim" style="--d:75ms">${paddle.trialDays ? `Nothing charged today. After 3 days: $${paddle.usdAmount}/month plus applicable taxes, charged automatically. Cancel before the trial ends through Manage subscription in Billing to avoid charges.` : "Visa, Mastercard, and more — billed in USD via Paddle. Applicable taxes are added at checkout."}</p>
           ` : ""}
           ${!paddle.enabled || paddle.localPaymentEnabled ? `
           ${paddle.enabled ? `<details id="coLocalPayment"${error ? " open" : ""}><summary>Or pay with bKash / Nagad — ${money(instructions.amount)} ${cycleLabel} (BDT)</summary><p class="co-card-note">Local payment requires owner confirmation. Choose one payment method only.</p>` : ""}
@@ -2901,7 +2901,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           var localPayment = document.getElementById("coLocalPayment");
           if (localPayment) localPayment.hidden = true;
           status.hidden = false;
-          status.textContent = "Payment received — activating your plan. Please do not pay again.";
+          status.textContent = "Checkout completed — activating your plan. Please do not pay again.";
           var started = Date.now();
           async function poll() {
             try {
@@ -2916,7 +2916,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
               }
             } catch (_) {}
             if (Date.now() - started > 120000) {
-              status.textContent = "Payment received. Activation is taking longer than expected. Do not pay again. Refresh to check again or contact Tagioo support.";
+              status.textContent = "Checkout completed. Activation is taking longer than expected. Do not pay again. Refresh to check again or contact Tagioo support.";
               return;
             }
             setTimeout(poll, 3000);
@@ -6710,6 +6710,16 @@ function paddleCheckoutConfigFor(tenant) {
   };
 }
 
+async function paddleCheckoutPageConfig(tenant) {
+  const checkout = paddleCheckoutConfigFor(tenant);
+  if (!checkout.enabled) return checkout;
+  const result = await callPaddleApi(`/prices/${checkout.priceId}`, "GET");
+  const trial = result.data?.trial_period;
+  checkout.trialDays = result.ok && trial?.interval === "day" && trial.frequency === 3
+    && trial.requires_payment_method !== false && !trial.unit_price ? 3 : 0;
+  return checkout;
+}
+
 // A paid-plan signup must submit a transaction ID before reaching the dashboard.
 // True while the tenant has a staged pending paid plan and no payment record yet
 // (pending or confirmed). Once they submit a claim, the gate lifts.
@@ -7232,7 +7242,7 @@ async function activatePaddleTenant(paddleEvent) {
   return withDbLock(() => activatePaddleTenantLocked(paddleEvent));
 }
 
-async function activatePaddleTenantLocked({ tenantId, planName, amount, currency, paddleTransactionId, paddleSubscriptionId, paddleCustomerId, paddleNextBilledAt, paddleInvoiceNo, occurredAt }) {
+async function activatePaddleTenantLocked({ tenantId, planName, amount, currency, paddleTransactionId, paddleSubscriptionId, paddleCustomerId, paddleNextBilledAt, paddleInvoiceNo, occurredAt, trialEndsAt = "" }) {
   if (!tenantId && !paddleSubscriptionId && !paddleCustomerId) {
     return { ok: false, status: 400, errors: ["Paddle transaction is not linked to a Tagioo customer."] };
   }
@@ -7266,7 +7276,11 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     planName
   });
   if (!checkoutMatch.ok && !paddleEventIsStale(tenant, paddleSubscriptionId, occurredAt)) return { ok: false, status: 409, errors: [checkoutMatch.error] };
-  const renewalDate = paddleRenewalDate(paddleNextBilledAt, now.getTime());
+  const isTrial = Boolean(trialEndsAt);
+  if (isTrial && (!Number.isFinite(Date.parse(trialEndsAt)) || Number(amount) !== 0)) {
+    return { ok: false, status: 400, errors: ["Invalid free trial transaction."] };
+  }
+  const renewalDate = isTrial ? new Date(trialEndsAt).toISOString() : paddleRenewalDate(paddleNextBilledAt, now.getTime());
   const profile = resourceProfileForPlan(planName);
   const request = (data.provisioning?.requests || []).find((item) => item.tenantId === tenant.id && item.containerName);
 
@@ -7281,7 +7295,7 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     method: "paddle",
     paddleTransactionId,
     paddleSubscriptionId: paddleSubscriptionId || "",
-    status: "confirmed",
+    status: isTrial ? "trial" : "confirmed",
     claimedAt: now.toISOString(),
     confirmedBy: "paddle-webhook",
     confirmedAt: now.toISOString(),
@@ -7305,8 +7319,8 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     domainLimit: profile.domainLimit,
     monthlyAmount: paddleUsdMonthly[planName] || 0,
     resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
-    subscriptionStatus: "active",
-    paymentStatus: "paid",
+    subscriptionStatus: isTrial ? "trial" : "active",
+    paymentStatus: isTrial ? "trial" : "paid",
     paymentProvider: "paddle",
     lifetimeAccess: false,
     lifetimePreviousBilling: null,
@@ -7315,10 +7329,11 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
     lifetimeRevokedAt: tenant.lifetimeAccess ? now.toISOString() : (tenant.lifetimeRevokedAt || ""),
     paddleSubscriptionId: paddleSubscriptionId || tenant.paddleSubscriptionId || "",
     paddleCustomerId: paddleCustomerId || tenant.paddleCustomerId || "",
-    paddleSubscriptionStatus: "active",
+    paddleSubscriptionStatus: isTrial ? "trialing" : "active",
     paddleStateOccurredAt: occurredAt || tenant.paddleStateOccurredAt || "",
     paddleScheduledChange: null,
-    paidAt: now.toISOString(),
+    paidAt: isTrial ? (tenant.paidAt || "") : now.toISOString(),
+    trialEndsAt: isTrial ? renewalDate : "",
     renewalDate,
     renewalReminder: 99,
     overdueAt: "",
@@ -7335,21 +7350,23 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
 
   await writeDatabase(data);
 
-  const purchaseEventId = `purchase_${payment.id}`;
-  const purchaseVisitor = storedTagiooVisitor(tenant);
-  forwardTagiooOwnEvent("purchase", {
-    seed: payment.id,
-    visitor: purchaseVisitor,
-    eventParams: {
-      cu: payment.currency,
-      "ep.transaction_id": String(payment.id),
-      "epn.value": String(payment.amount),
-      "ep.plan": payment.plan,
-      "ep.tenant_id": payment.tenantId,
-      "ep.event_id": purchaseEventId
-    }
-  }).catch(() => {});
-  sendTagiooPurchaseToMetaCapi(tenant, payment, purchaseEventId).catch(() => {});
+  if (!isTrial) {
+    const purchaseEventId = `purchase_${payment.id}`;
+    const purchaseVisitor = storedTagiooVisitor(tenant);
+    forwardTagiooOwnEvent("purchase", {
+      seed: payment.id,
+      visitor: purchaseVisitor,
+      eventParams: {
+        cu: payment.currency,
+        "ep.transaction_id": String(payment.id),
+        "epn.value": String(payment.amount),
+        "ep.plan": payment.plan,
+        "ep.tenant_id": payment.tenantId,
+        "ep.event_id": purchaseEventId
+      }
+    }).catch(() => {});
+    sendTagiooPurchaseToMetaCapi(tenant, payment, purchaseEventId).catch(() => {});
+  }
 
   let container = null;
   if (request?.containerName) {
@@ -7362,7 +7379,7 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
   }
 
   const account = (data.customerAccounts || []).find((a) => a.tenantId === tenant.id);
-  emailCustomerActivated(account?.email || account?.username, payment, renewalDate).catch(() => {});
+  if (!isTrial) emailCustomerActivated(account?.email || account?.username, payment, renewalDate).catch(() => {});
   return { ok: true, payment, tenant: data.tenants[tenantIndex], container };
 }
 
@@ -7460,7 +7477,7 @@ async function updatePaddleSubscriptionPlan(tenant, newPlanName) {
   const isUpgrade = planRankFor(newPlanName) > planRankFor(tenant.plan);
   return callPaddleApi(`/subscriptions/${tenant.paddleSubscriptionId}`, "PATCH", {
     items: [{ price_id: priceId, quantity: 1 }],
-    proration_billing_mode: isUpgrade ? "prorated_immediately" : "prorated_next_billing_period",
+    proration_billing_mode: tenant.paddleSubscriptionStatus === "trialing" ? "do_not_bill" : isUpgrade ? "prorated_immediately" : "prorated_next_billing_period",
     on_payment_failure: "prevent_change"
   });
 }
@@ -7540,8 +7557,11 @@ async function syncPaddleSubscriptionPlanLocked(paddleSubscription = {}, occurre
     monthlyAmount: paddleUsdMonthly[planName] || 0,
     resourceLimits: { ...(tenant.resourceLimits || {}), memoryMb: profile.memoryMb, cpuLimit: profile.cpuLimit },
     paddleSubscriptionStatus: String(paddleSubscription.status || "active"),
+    ...(paddleSubscription.status === "trialing" ? {
+      subscriptionStatus: "trial", paymentStatus: "trial", trialEndsAt: nextBilledAt
+    } : {}),
     ...(paddleSubscription.status === "active" ? {
-      paddleSubscriptionId, paymentProvider: "paddle", subscriptionStatus: "active", paymentStatus: "paid"
+      paddleSubscriptionId, paymentProvider: "paddle", subscriptionStatus: "active", paymentStatus: "paid", trialEndsAt: ""
     } : {}),
     paddleStateOccurredAt: occurredAt || tenant.paddleStateOccurredAt || "",
     renewalDate: Number.isFinite(nextBilledTime) && nextBilledTime > now.getTime()
@@ -10140,7 +10160,7 @@ async function enforcePaidRenewals(data) {
     }
     // Any paid activation can race with a temporary Docker outage. Retry its
     // durable resume marker even for lifetime and provider-managed tenants.
-    if (tenant.plan !== "Free" && tenant.subscriptionStatus === "active" && tenant.suspensionEnforcedAt
+    if (tenant.plan !== "Free" && ["active", "trial"].includes(tenant.subscriptionStatus) && tenant.suspensionEnforcedAt
       && (tenant.lifetimeAccess || ["paddle", "shopify"].includes(tenant.paymentProvider))) {
       const name = tenantContainerName(data, tenant.id);
       if (name) renewalActions.push({ type: "resume", tenantId: tenant.id, containerName: name });
@@ -12156,9 +12176,22 @@ async function processPaddleWebhook(payload) {
       return response(400, { errors: ["Paddle transaction does not contain a configured Tagioo price."] });
     }
     const totalMinor = Number(eventData.details?.totals?.total || 0);
+    let trialEndsAt = "";
+    // A zero-total discount is still a purchase. Only the provider's current
+    // subscription state establishes a trial, never browser custom_data.
+    if (totalMinor === 0 && eventData.items?.some((item) => item.price?.trial_period)) {
+      if (!eventData.subscription_id) return response(409, { errors: ["Trial subscription is not linked yet."] });
+      const subscription = await callPaddleApi(`/subscriptions/${eventData.subscription_id}`, "GET");
+      if (!subscription.ok) return response(502, { errors: subscription.errors });
+      if (subscription.data?.status === "trialing") {
+        trialEndsAt = subscription.data.next_billed_at || "";
+        if (!trialEndsAt) return response(409, { errors: ["Trial end date is not available yet."] });
+      }
+    }
     const result = await activatePaddleTenant({
       tenantId,
       planName,
+      trialEndsAt,
       amount: totalMinor / 100,
       currency: eventData.currency_code || "USD",
       paddleTransactionId: eventData.id,
@@ -12182,7 +12215,7 @@ async function processPaddleWebhook(payload) {
   // Fires on any subscription change — the customer-initiated plan-change
   // path (POST /api/customer/subscription/paddle below) only calls
   // Paddle's API; this webhook is what actually applies the new plan/limits.
-  if (["subscription.updated", "subscription.activated", "subscription.resumed", "subscription.past_due"].includes(eventType)) {
+  if (["subscription.updated", "subscription.trialing", "subscription.activated", "subscription.resumed", "subscription.past_due"].includes(eventType)) {
     const result = await syncPaddleSubscriptionPlan(eventData, payload.occurred_at);
     if (result.ok && !result.skipped && !result.unchanged) invalidateOwnerDashboardCache();
     return response(result.ok ? 202 : (result.status || 400), result.ok ? { synced: true } : { errors: result.errors });
@@ -12638,7 +12671,7 @@ const server = createServer(async (req, res) => {
       const tenant = loaded.available ? (loaded.data.tenants || []).find((t) => t.id === session.tenantId) : null;
       // Nothing to pay for (free, already claimed, or already active) → dashboard.
       if (!tenant || !checkoutRequired(tenant, loaded.data)) { redirect(res, "/"); return; }
-      htmlResponse(res, 200, checkoutPage({ instructions: paymentInstructionsFor(tenant, loaded.data), paddle: paddleCheckoutConfigFor(tenant) }));
+      htmlResponse(res, 200, checkoutPage({ instructions: paymentInstructionsFor(tenant, loaded.data), paddle: await paddleCheckoutPageConfig(tenant) }));
       return;
     }
 
@@ -12675,7 +12708,7 @@ const server = createServer(async (req, res) => {
       if (!tenant || !checkoutRequired(tenant, loaded.data)) { redirect(res, "/"); return; }
       htmlResponse(res, 400, checkoutPage({
         instructions: paymentInstructionsFor(tenant, loaded.data),
-        paddle: paddleCheckoutConfigFor(tenant),
+        paddle: await paddleCheckoutPageConfig(tenant),
         error: (result.errors || ["Payment submission failed."]).join(" "),
         values
       }));
@@ -13258,7 +13291,7 @@ const server = createServer(async (req, res) => {
       const loaded = await readDatabaseCached();
       if (!loaded.available) { jsonResponse(res, 503, { error: "Billing status temporarily unavailable." }); return; }
       const tenant = (loaded.data.tenants || []).find((t) => t.id === session.tenantId);
-      jsonResponse(res, 200, { active: Boolean(tenant?.paymentProvider === "paddle" && tenant.subscriptionStatus === "active" && !tenant.pendingPlan) });
+      jsonResponse(res, 200, { active: Boolean(tenant?.paymentProvider === "paddle" && ["active", "trial"].includes(tenant.subscriptionStatus) && !tenant.pendingPlan) });
       return;
     }
 

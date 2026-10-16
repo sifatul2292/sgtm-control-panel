@@ -37,3 +37,15 @@ test("completed checkout disables repeat payment and waits for server activation
   assert.equal(window.location.href, "/");
   assert.equal(storage.size, 0);
 });
+
+test("trial checkout discloses automatic monthly billing and cancellation", () => {
+  const source = readFileSync(new URL("../server.js", import.meta.url), "utf8");
+  const start = source.indexOf("function checkoutPage(");
+  const ctx = vm.createContext({ escapeHtml: String, gtmHead: () => "", gtmNoscript: () => "", billingCycleConfig: { monthly: { months: 1 } } });
+  vm.runInContext(source.slice(start, source.indexOf("\n}\n", start) + 3), ctx);
+  const html = ctx.checkoutPage({ instructions: { billingCycle: "monthly", plan: "Pro" }, paddle: { enabled: true, trialDays: 3, usdAmount: 50 } });
+  assert.match(html, /Start 3-day free trial/);
+  assert.match(html, /Nothing charged today/);
+  assert.match(html, /After 3 days: \$50\/month plus applicable taxes, charged automatically/);
+  assert.match(html, /Cancel before the trial ends/);
+});

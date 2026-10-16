@@ -92,3 +92,32 @@ Production activation is an operator action, not a code deployment:
 Rollback is one variable change: return `PADDLE_ENV` to `sandbox` with the
 sandbox credentials still present, or clear `PADDLE_CLIENT_TOKEN` to hide card
 checkout while leaving existing webhook records intact.
+
+## Three-day promotional trial (new card subscriptions)
+
+Deploy trial-aware code before enabling the offer. In Paddle sandbox first,
+then production, update each existing Starter/Pro/Enterprise monthly price with
+`trial_period: { interval: "day", frequency: 3, requires_payment_method: true }`
+and no trial unit price. Retain existing price IDs, monthly amounts, tax mode
+and billing cycle. Do not change existing subscriptions' next billing dates.
+Enable `subscription.trialing` on the existing notification destination. The API
+key needs price read permission for checkout terms and subscription read permission
+for authoritative trial activation; grant through the owner's normal key process.
+
+Checkout reads the configured price and displays the promotion only for a verified
+three-day, free, payment-method-required trial. Paddle collects payment details
+and charges the regular monthly amount plus applicable tax after the trial unless
+canceled. Manual bKash/Nagad and Shopify billing are excluded. Price trials apply
+to newly created subscriptions, including returning customers creating a new
+subscription; this is not a once-per-person offer or a dated campaign.
+
+Before live rollout, exercise a throwaway sandbox customer: complete zero-charge
+checkout, verify trial access/renewal date and no paid purchase event/email, replay
+webhooks, change plans without charging, cancel through the portal before trial
+end, and verify conversion/failed collection behavior. The panel retains a trial
+receipt separately from confirmed payments. Existing paid subscriptions retain
+Paddle's current schedule. Disable the promotion by removing trial_period from
+prices for future checkouts; existing trials stay provider-managed.
+
+Local automated checks do not prove a live automatic charge. Do not advertise
+this offer publicly until all three production prices and deployment are verified.

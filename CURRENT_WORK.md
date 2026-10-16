@@ -1799,3 +1799,21 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Combined the platform video and introduction into one compact card titled “Check our setup guide”. Short copy and existing button styles sit beside a 280px-wide video; narrow screens stack the content while keeping the video capped.
 - Removed the separate oversized video panel. Illustrated instructions and YouTube fallback remain available; Container tab unchanged. Styles cache bumped to v69.
 - Backend/frontend syntax and diff checks pass. Browser layout/playback not verified. Prepared for GitHub push; production deployment pending.
+
+## 2026-10-17 — Prepare three-day card subscription promotion
+
+- Owner selected new card subscriptions only. Added Paddle trial access/status,
+  authoritative trial end lookup, checkout polling support and verified catalog
+  trial disclosures. Trial signup creates a trial receipt without paid purchase
+  events or paid activation email; successful renewal clears trial status.
+- Trial plan changes use do_not_bill; existing provider-managed cancellation and
+  renewal paths retained. Manual/Shopify billing excluded. Existing price IDs,
+  amounts, secrets and production configuration untouched.
+- Added trial/replay/conversion/invalid-payload/no-charge plan change and checkout
+  disclosure assertions; syntax and focused Paddle checks pass. Deployment,
+  provider sandbox checkout/charge/cancel verification and three production
+  price trial settings remain outstanding. Offer is NOT live. See
+  docs/paddle-launch.md for activation and rollback. Existing user work preserved.
+
+- Owner authorized live rollout on October 17. Preparing focused code deployment
+  before provider price updates; keeping the operator-managed Preview pilot intact.
