@@ -1823,3 +1823,29 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   zero-value trial checkout waits for that event. Eight-event production webhook
   subscription saved; all three sandbox previews show zero today and regular
   monthly totals after trial. Fourteen focused checks pass.
+
+## 2026-10-17 — Three-day card trial live
+
+- Deployed 40756ba then b881522 to /var/www/tagioo via fast-forward with syntax
+  and fourteen focused billing/inbox/checkout checks before panel reload. PM2
+  panel and receiver online; origin/public login and happy.alurkohv.com/healthz
+  return 200. No Nginx, Docker, tracking configuration or Preview override edits.
+- Updated the existing live Starter $30, Pro $50 and Enterprise $100 monthly
+  prices in Paddle: three-day free trial, payment method required. Existing price
+  IDs, amounts, currency, billing cycle, tax mode and quantity bounds verified
+  unchanged against the private pre-change snapshot. Existing notification
+  destination now subscribes to subscription.trialing (eight events total).
+- All three sandbox price previews show zero due initially and ordinary monthly
+  totals after trial. Production catalog plus deployed checkout functions verified
+  for all three plans: trial CTA, nothing charged today, automatic monthly charge
+  and cancellation disclosure. Production key cannot preview transactions or read
+  subscriptions; no permissions/credentials changed. Signed trial webhook grants
+  access, so subscription-read permission is unnecessary.
+- Rollback/code backup, price snapshot, server test log and verified live catalog
+  report retained privately under /var/backups/tagioo-trial-20261017. Disable future
+  trials by switching off Trials on the same three Paddle prices; retain trial-aware
+  code and event handling for existing trials. Manual/Shopify billing excluded.
+- Offer is LIVE for newly created card subscriptions, including returning customers
+  creating a new subscription. No completed trial checkout, actual post-trial
+  charge or live cancellation was performed during this rollout; verification is
+  provider sandbox previews, live catalog/render assertions and automated checks.
