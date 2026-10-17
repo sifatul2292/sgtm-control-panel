@@ -1895,3 +1895,20 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   request window; dedicated multi-day purchase retention is unchanged.
 - Syntax and four focused inspector tests pass, including old signup labels,
   trial visibility, snapshot overlap and unchanged purchase-only totals.
+
+## 2026-10-17 — SaaS setup assistant option
+
+- Added SaaS / Subscription business type with custom application platform,
+  preserved per container. Web exports include signup, trial, subscription,
+  checkout, payment info and purchase, without cart/shipping/product tags.
+- Server Meta mapping supports StartTrial and Subscribe. Meta-only SaaS exports
+  include the GA4 transport client without GA4 destination forwarding.
+- Included a SaaS implementation guide with confirmed-action dataLayer examples,
+  billing webhook authority, shared IDs, GA4 single-sender guidance, consent and
+  no-PII instructions. Existing Tagioo backend remains authoritative; GTM import
+  and app instrumentation are separate deployment steps.
+- SaaS GA4 events exclude personal user_data parameters. Ecommerce generation
+  remains unchanged. TikTok includes signup/subscription/payment, not trial mapping;
+  Google Ads signup/trial labels require separate configuration.
+- Syntax and eleven focused generator/assistant/inspector checks passed locally.
+  Live deployment and actual GTM import/publish verification outstanding.

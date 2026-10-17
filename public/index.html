@@ -955,6 +955,7 @@
                       <select name="businessType">
                         <option value="ecommerce">Ecommerce</option>
                         <option value="lead">Lead generation</option>
+                        <option value="saas">SaaS / Subscription</option>
                         <option value="general">General analytics</option>
                       </select>
                     </label>
@@ -972,7 +973,7 @@
                     <label>
                       Default currency
                       <input name="currency" value="USD" placeholder="USD" />
-                      <span class="field-help">Your store’s currency.</span>
+                      <span class="field-help">Your billing or store currency.</span>
                     </label>
                     <label>
                       Tracking domain
@@ -1175,6 +1176,7 @@
                       <button class="button button-primary download-plugin-btn" type="button">⇣ Download WooCommerce plugin</button>
                     </div>
                   </div>
+                  <details id="saasSetupGuide" class="assistant-download-card" hidden><summary>SaaS event implementation guide</summary><pre class="assistant-code-preview"><code></code></pre></details>
                   <div id="shopifyManualPixelCard" class="assistant-download-card" hidden>
                     <span class="assistant-download-icon" aria-hidden="true">M</span>
                     <h2>Install manually with Shopify Custom Pixel</h2>
@@ -2638,6 +2640,6 @@ window.dataLayer.push({
       <div id="customerSearchResults" class="customer-search-results"></div>
       <p class="customer-search-hint">↑ ↓ to choose · Enter to open · Esc to close</p>
     </dialog>
-    <script src="/app.js?v=115" type="module"></script>
+    <script src="/app.js?v=116" type="module"></script>
   </body>
 </html>

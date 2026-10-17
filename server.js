@@ -1146,6 +1146,8 @@ const eventMap = {
   purchase: 'Purchase',
   search: 'Search',
   sign_up: 'CompleteRegistration',
+  start_trial: 'StartTrial',
+  subscribe: 'Subscribe',
   generate_lead: 'Lead'
 };
 
@@ -1427,6 +1429,7 @@ const eventMap = {
   purchase: 'CompletePayment',
   search: 'Search',
   sign_up: 'CompleteRegistration',
+  subscribe: 'Subscribe',
   generate_lead: 'SubmitForm'
 };
 
@@ -1760,13 +1763,14 @@ function metaPixelBaseScript() {
 
 // Browser-side Meta Pixel event tag. eventID is omitted entirely when no id
 // exists, to avoid sending the literal string "undefined".
-function metaPixelEventScript(metaEventName) {
+function metaPixelEventScript(metaEventName, saas = false) {
   const orderId = metaEventName === "Purchase" ? "if(ec.transaction_id)p.order_id=ec.transaction_id;" : "";
   return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + META_PIXEL_BOOTSTRAP_SCRIPT +
+    (saas && ["CompleteRegistration", "Subscribe"].includes(metaEventName) ? "ec={};" : "") +
     "var sent=window.__tagiooMetaSent=window.__tagiooMetaSent||{};var key=pixel+'|" + metaEventName + "|'+(eid||location.href);" +
     "if(sent[key])return;var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});" +
     "var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});" +
-    "var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;" +
+    (saas ? "var p={};if(ec.currency)p.currency=ec.currency;" : "var p={content_type:'product',content_ids:ids,contents:contents};if(ec.currency)p.currency=ec.currency;") +
     "if(ec.value!=null&&ec.value!=='')p.value=ec.value;" + orderId +
     "fbq('track','" + metaEventName + "',p,eid?{eventID:String(eid)}:{});sent[key]=1;})();</script>";
 }
@@ -1826,6 +1830,7 @@ function initialScan(){setTimeout(function(){scan(0);},150);}if(document.readySt
 }
 
 function buildWebGtmTemplate(input) {
+  if (input.businessType === "saas") input = { ...input, platform: "custom" };
   const destinations = selectedDestinations(input);
   const payload = {
     businessType: cleanTemplateValue(input.businessType, "ecommerce"),
@@ -1906,6 +1911,7 @@ function buildWebGtmTemplate(input) {
       fingerprint: String(Date.now()), parentFolderId: "2"
     }
   ];
+  if (payload.businessType === "saas") variables.push(gtmDataLayerVariable(90, "dlv - plan", "plan"));
   const triggers = [
     payload.platform === "shopify"
       ? gtmTrigger(1, "Tagioo - Shopify page_view", "page_view")
@@ -1921,6 +1927,12 @@ function buildWebGtmTemplate(input) {
     gtmTrigger(10, "Tagioo - view_cart", "view_cart"),
     gtmTrigger(11, "Tagioo - search", "search")
   ];
+  if (payload.businessType === "saas") {
+    triggers.splice(0, triggers.length,
+      { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - DOM Ready PageView", type: "DOM_READY", fingerprint: String(Date.now()) },
+      ...[["sign_up", 12], ["start_trial", 13], ["subscribe", 14], ["begin_checkout", 4], ["add_payment_info", 6], ["purchase", 5]]
+        .map(([name, id]) => gtmTrigger(id, "Tagioo - " + name, name)));
+  }
   const tags = [];
   if (payload.businessType === "ecommerce" && payload.platform === "laravel") {
     tags.push(gtmTag(900, "Tagioo - Laravel Auto Tracker", "html", [
@@ -1935,7 +1947,9 @@ function buildWebGtmTemplate(input) {
         { parameter: "send_page_view", parameterValue: "false" }
       ])
     ], ["2147479573"], "3"));
-    const eventMap = [
+    const eventMap = payload.businessType === "saas" ? [
+      ["page_view", "1"], ["sign_up", "12"], ["start_trial", "13"], ["subscribe", "14"], ["begin_checkout", "4"], ["add_payment_info", "6"], ["purchase", "5"]
+    ] : [
       ["page_view", "1"], ["view_item", "2"], ["add_to_cart", "3"],
       ["begin_checkout", "4"], ["purchase", "5"],
       ["add_payment_info", "6"], ["add_shipping_info", "7"], ["view_item_list", "8"],
@@ -1956,6 +1970,18 @@ function buildWebGtmTemplate(input) {
         { parameter: "user_data.postal_code", parameterValue: "{{dlv - user_data.postal_code}}" },
         { parameter: "user_data.region", parameterValue: "{{dlv - user_data.region}}" }
       ];
+      if (payload.businessType === "saas") {
+        // Personal identifiers must not be forwarded as GA4 event parameters.
+        for (let i = eventSettingsRows.length - 1; i >= 0; i--) {
+          if (eventSettingsRows[i].parameter.startsWith("user_data.")) eventSettingsRows.splice(i, 1);
+        }
+        eventSettingsRows.push({ parameter: "plan", parameterValue: "{{dlv - plan}}" });
+        if (["start_trial", "subscribe"].includes(eventName)) {
+          eventSettingsRows.push(
+            { parameter: "currency", parameterValue: "{{dlv - ecommerce.currency}}" },
+            { parameter: "value", parameterValue: "{{dlv - ecommerce.value}}" });
+        }
+      }
       // WooCommerce has an authoritative backend Purchase recovery hit. Mark
       // browser events so the server container can keep forwarding them to GA4
       // while suppressing only the redundant browser-origin CAPI Purchase.
@@ -2001,7 +2027,7 @@ function buildWebGtmTemplate(input) {
       // Livewire/Inertia and WooCommerce AJAX storefronts can legitimately push
       // the same event type several times without a page load. Keep other legacy
       // templates unchanged, but let those platforms fire per dataLayer event.
-      if (!["laravel", "woocommerce", "shopify"].includes(payload.platform)) tagObj.tagFiringOption = "ONCE_PER_LOAD";
+      if (payload.businessType !== "saas" && !["laravel", "woocommerce", "shopify"].includes(payload.platform)) tagObj.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tagObj);
     }
   }
@@ -2010,7 +2036,10 @@ function buildWebGtmTemplate(input) {
       gtmTemplateParam("html", metaPixelBaseScript())
     ], [payload.platform === "shopify" ? "1" : "2147479553"], "4"));
     // Browser pixel events, deduped with server CAPI via event_id.
-    const metaEventMap = [
+    const metaEventMap = payload.businessType === "saas" ? [
+      ["sign_up", "CompleteRegistration", "12"], ["start_trial", "StartTrial", "13"], ["subscribe", "Subscribe", "14"],
+      ["begin_checkout", "InitiateCheckout", "4"], ["add_payment_info", "AddPaymentInfo", "6"], ["purchase", "Purchase", "5"]
+    ] : [
       ["view_item", "ViewContent", "2"],
       ["add_to_cart", "AddToCart", "3"],
       ["begin_checkout", "InitiateCheckout", "4"],
@@ -2019,9 +2048,9 @@ function buildWebGtmTemplate(input) {
     ];
     for (const [eventName, metaEventName, triggerId] of metaEventMap) {
       const metaTag = gtmTag(tags.length + 1, `Tagioo Meta - ${metaEventName}`, "html", [
-        gtmTemplateParam("html", metaPixelEventScript(metaEventName))
+        gtmTemplateParam("html", metaPixelEventScript(metaEventName, payload.businessType === "saas"))
       ], [triggerId], "4");
-      if (!["laravel", "woocommerce", "shopify"].includes(payload.platform)) metaTag.tagFiringOption = "ONCE_PER_LOAD";
+      if (payload.businessType !== "saas" && !["laravel", "woocommerce", "shopify"].includes(payload.platform)) metaTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(metaTag);
     }
   }
@@ -2030,7 +2059,10 @@ function buildWebGtmTemplate(input) {
       gtmTemplateParam("html", "<script>!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=['page','track','identify','instances','debug','on','off','once','ready','alias','group','enableCookie','disableCookie'];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.load=function(e){var i='https://analytics.tiktok.com/i18n/pixel/events.js';ttq._i=ttq._i||{};ttq._i[e]=[];var n=d.createElement('script');n.type='text/javascript';n.async=!0;n.src=i;var a=d.getElementsByTagName('script')[0];a.parentNode.insertBefore(n,a)};ttq.load('{{Tagioo - tiktok_pixel_id}}');ttq.page();}(window,document,'ttq');</script>")
     ], [payload.platform === "shopify" ? "1" : "2147479553"], "6"));
     // Browser pixel events, deduped with server Events API via event_id.
-    const tiktokEventMap = [
+    const tiktokEventMap = payload.businessType === "saas" ? [
+      ["sign_up", "CompleteRegistration", "12"], ["subscribe", "Subscribe", "14"],
+      ["begin_checkout", "InitiateCheckout", "4"], ["add_payment_info", "AddPaymentInfo", "6"], ["purchase", "CompletePayment", "5"]
+    ] : [
       ["view_item", "ViewContent", "2"],
       ["add_to_cart", "AddToCart", "3"],
       ["begin_checkout", "InitiateCheckout", "4"],
@@ -2041,7 +2073,7 @@ function buildWebGtmTemplate(input) {
       const tiktokTag = gtmTag(tags.length + 1, `Tagioo TikTok - ${tiktokEventName}`, "html", [
         gtmTemplateParam("html", tiktokPixelEventScript(tiktokEventName))
       ], [triggerId], "6");
-      if (!["laravel", "woocommerce", "shopify"].includes(payload.platform)) tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
+      if (payload.businessType !== "saas" && !["laravel", "woocommerce", "shopify"].includes(payload.platform)) tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tiktokTag);
     }
   }
@@ -2058,6 +2090,7 @@ function buildWebGtmTemplate(input) {
 }
 
 function buildServerGtmTemplate(input) {
+  if (input.businessType === "saas") input = { ...input, platform: "custom" };
   const destinations = selectedDestinations(input);
   const ga4ApiSecret = String(input.ga4ApiSecret || "").trim();
   const metaTestEventCode = String(input.metaTestEventCode || "").trim();
@@ -2117,6 +2150,11 @@ function buildServerGtmTemplate(input) {
     gtmTrigger(5, "Tagioo - GA4 add_payment_info", "add_payment_info", "GA4"),
     gtmTrigger(6, "Tagioo - GA4 view_item_list", "view_item_list", "GA4")
   ];
+  if (payload.businessType === "saas") {
+    triggers.splice(0, triggers.length, triggers[0],
+      ...[["purchase", 2], ["begin_checkout", 4], ["add_payment_info", 5], ["sign_up", 12], ["start_trial", 13], ["subscribe", 14]]
+        .map(([name, id]) => gtmTrigger(id, "Tagioo - GA4 " + name, name, "GA4")));
+  }
   if (payload.platform === "woocommerce") {
     const browserPurchase = gtmTrigger(7, "Tagioo - Woo browser Purchase", "purchase", "GA4");
     browserPurchase.filter.push({
@@ -2127,7 +2165,7 @@ function buildServerGtmTemplate(input) {
   }
   const tags = [];
   const clients = [];
-  if (destinations.includes("ga4")) {
+  if (destinations.includes("ga4") || payload.businessType === "saas") {
     clients.push({
       accountId: "0",
       containerId: "0",
@@ -2153,7 +2191,7 @@ function buildServerGtmTemplate(input) {
     if (ga4ApiSecret) {
       ga4Params.push(gtmTemplateParam("apiSecret", "{{Tagioo - ga4_api_secret}}"));
     }
-    tags.push(gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", ga4Params, ["1"], "3"));
+    if (destinations.includes("ga4")) tags.push(gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", ga4Params, ["1"], "3"));
   }
   if (destinations.includes("meta")) {
     const metaTag = gtmTag(tags.length + 1, "Tagioo Meta CAPI - All Events", "cvt_0_101", [
@@ -2195,7 +2233,7 @@ function buildServerGtmTemplate(input) {
     ], ["1"], "5"));
     // Optional micro-conversions — only emitted when a label is supplied (wires the
     // previously-unused add_to_cart / begin_checkout server triggers).
-    if (String(input.googleAdsAddToCartLabel || "").trim()) {
+    if (payload.businessType !== "saas" && String(input.googleAdsAddToCartLabel || "").trim()) {
       tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Add to Cart", "sgtmadsct", [
         gtmTemplateParam("productReportingDataSource", "EVENT"),
         gtmBooleanParam("enableConversionLinker", true),
@@ -2383,7 +2421,35 @@ analytics.subscribe('checkout_completed', function(event){
 });`;
 }
 
+function saasSetupGuide() {
+  return `SaaS / Subscription setup
+Import web.json and server.json into the corresponding GTM containers using Merge. Preview before publishing. Pause overlapping old tags to prevent duplicate sends.
+Your application must push events only AFTER the action succeeds; installing GTM does not detect account creation or billing automatically.
+window.dataLayer = window.dataLayer || [];
+// After successful, verified account creation:
+dataLayer.push({event:"sign_up", event_id:"signup_ACCOUNT_ID", plan:"Free"});
+// After the billing provider confirms trial activation:
+dataLayer.push({ecommerce:null});
+dataLayer.push({event:"start_trial", event_id:"trial_SUBSCRIPTION_ID", plan:"Pro", ecommerce:{value:0,currency:"USD"}});
+// When subscription checkout actually opens:
+dataLayer.push({ecommerce:null});
+dataLayer.push({event:"begin_checkout", event_id:"checkout_CHECKOUT_ID", plan:"Pro", ecommerce:{value:50,currency:"USD"}});
+// After the first successful paid subscription activation:
+dataLayer.push({event:"subscribe", event_id:"subscribe_SUBSCRIPTION_ID", plan:"Pro"});
+// Only after a successful charge, including renewals:
+dataLayer.push({ecommerce:null});
+dataLayer.push({event:"purchase", event_id:"purchase_PAYMENT_ID", plan:"Pro", ecommerce:{transaction_id:"PAYMENT_ID",value:50,currency:"USD",items:[{item_id:"pro",item_name:"Pro subscription",price:50,quantity:1}]}});
+Replace example IDs, plans, currency and prices with real confirmed values. Never fire registration or trial on a button click or form view. Never treat a free signup or trial as a Purchase.
+Use the SAME event_id and event name for browser and backend copies of one action. For GA4, choose one authoritative sender per conversion; GA4 does not generally deduplicate custom events by event_id. For Meta, matching event IDs allow Pixel/CAPI deduplication. Do not send an extra direct CAPI copy if Server GTM already sends it.
+Keep webhooks authoritative for trial activation and paid charges; persist browser attribution for delayed events. A webhook cannot push into a closed browser.
+Mark sign_up and start_trial as key events in GA4 Admin. Subscribe is a separate lifecycle event; do not sum it with Purchase as paid-customer count.
+Do not put email, phone, passwords or server access tokens in these pushes. Keep server credentials in server.json only. Respect visitor consent.
+For Tagioo itself, existing backend sign_up/start_trial/purchase sends remain authoritative. Importing these templates does not add browser pushes to Tagioo or replace its direct CAPI sender; coordinate those before publishing.
+TikTok trial-start mapping and Google Ads signup/trial conversion labels are not included; configure those destination rules separately if needed.`;
+}
+
 function buildSetupAssistantTemplates(input) {
+  if (input.businessType === "saas") input = { ...input, platform: "custom" };
   const destinations = selectedDestinations(input);
   const web = buildWebGtmTemplate({ ...input, destinations });
   const server = buildServerGtmTemplate({ ...input, destinations });
@@ -2413,6 +2479,7 @@ function buildSetupAssistantTemplates(input) {
     web,
     server,
     shopifyCustomPixel,
+    saasGuide: input.businessType === "saas" ? saasSetupGuide() : "",
     warnings
   };
 }
@@ -5796,7 +5863,8 @@ async function saveTenantTrackingConfig(tenantId, input, containerId = "") {
       if (measurementId) tracking.measurementId = measurementId;
       if (apiSecret) tracking.apiSecret = apiSecret;
       if (domain) tracking.domain = domain;
-      if (platform) tracking.platform = platform;
+      if (platform) tracking.platform = input.businessType === "saas" ? "custom" : platform;
+      if (["ecommerce", "lead", "general", "saas"].includes(input.businessType)) tracking.businessType = input.businessType;
       if (input.setupAssistantCompleted) {
         tracking.setupAssistantCompletedAt = new Date().toISOString();
         tracking.webGtmContainerId = String(input.webGtmContainerId || "").trim().toUpperCase();
@@ -5847,6 +5915,7 @@ function publicTenantTracking(tenant, scopedTracking = null) {
     domain: tracking.domain || "",
     measurementId: tracking.measurementId || "",
     platform: tracking.platform || "",
+    businessType: tracking.businessType || "ecommerce",
     setupAssistantCompletedAt: tracking.setupAssistantCompletedAt || "",
     webGtmContainerId: tracking.webGtmContainerId || "",
     shopify: tracking.shopify?.shop ? {

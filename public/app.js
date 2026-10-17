@@ -3161,6 +3161,8 @@ function renderSetupAssistant(data) {
       if (code) code.textContent = "";
     }
     if (els.shopifyCustomPixelMessage) els.shopifyCustomPixelMessage.textContent = "";
+    const saasGuide = document.querySelector("#saasSetupGuide");
+    if (saasGuide) { saasGuide.hidden = true; saasGuide.querySelector("code").textContent = ""; }
     if (els.setupAssistantResult) els.setupAssistantResult.textContent = "";
     if (els.verifyTrackingResult) els.verifyTrackingResult.hidden = true;
   }
@@ -3174,6 +3176,7 @@ function renderSetupAssistant(data) {
     if (form.webGtmContainerId) form.webGtmContainerId.value = tenantTracking.webGtmContainerId || "";
     if (form.metaPixelId) form.metaPixelId.value = tenantTracking.meta?.pixelId || "";
     if (form.metaTestEventCode) form.metaTestEventCode.value = tenantTracking.meta?.testEventCode || "";
+    if (form.businessType) form.businessType.value = tenantTracking.businessType || "ecommerce";
     if (form.platform && tenantTracking.platform) form.platform.value = tenantTracking.platform;
   }
   const wooUrlEl = document.querySelector("[data-woo-webhook-url]");
@@ -3361,6 +3364,8 @@ async function refreshLaravelSelfService(showMessage = true) {
 
 function updateLaravelAssistantFields() {
   if (!els.setupAssistantForm) return;
+  const isSaas = els.setupAssistantForm.elements.businessType?.value === "saas";
+  if (isSaas && els.setupAssistantForm.elements.platform) els.setupAssistantForm.elements.platform.value = "custom";
   const isLaravel = els.setupAssistantForm.elements.platform?.value === "laravel";
   const isShopify = els.setupAssistantForm.elements.platform?.value === "shopify";
   const webGtmField = els.setupAssistantForm.querySelector("[data-shopify-web-gtm]");
@@ -3463,6 +3468,11 @@ async function generateSetupAssistantTemplates() {
     updateSetupAssistantStep();
     if (els.downloadWebTemplate) els.downloadWebTemplate.disabled = false;
     if (els.downloadServerTemplate) els.downloadServerTemplate.disabled = false;
+    const saasGuide = document.querySelector("#saasSetupGuide");
+    if (saasGuide) {
+      saasGuide.hidden = !result.saasGuide;
+      saasGuide.querySelector("code").textContent = result.saasGuide || "";
+    }
     const customPixel = String(result.shopifyCustomPixel || "");
     if (els.copyShopifyCustomPixel) els.copyShopifyCustomPixel.disabled = !customPixel;
     if (els.shopifyCustomPixelPreview) {
@@ -6966,6 +6976,7 @@ document.querySelector("#saveLaravelMapping")?.addEventListener("click", (event)
 });
 els.setupAssistantForm?.addEventListener("change", (event) => {
   if (event.target.name === "destinations") updateSetupAssistantDestinationFields();
+  if (event.target.name === "businessType") updateLaravelAssistantFields();
 });
 els.assistantNext?.addEventListener("click", () => {
   if (setupAssistantStep < 4) {
