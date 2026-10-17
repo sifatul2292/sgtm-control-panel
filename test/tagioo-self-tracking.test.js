@@ -45,3 +45,29 @@ test("own Meta purchases preserve USD Paddle currency and BDT manual fallback", 
   await ctx.sendTagiooPurchaseToMetaCapi({ email: "buyer@example.com" }, { id: "p2", amount: 3000 }, "purchase_p2");
   assert.equal(sent.custom_data.currency, "BDT");
 });
+
+test("verified completion queues one signup before GTM and continues once even when blocked", () => {
+  const ctx = vm.createContext({ gtmHead: () => '<script>/* GTM loader */</script>' });
+  vm.runInContext(extract("signupCompletePage"), ctx);
+  const html = ctx.signupCompletePage('signup_test</script>', '/checkout');
+  assert.ok(html.indexOf('window.dataLayer.push(signup)') < html.indexOf('GTM loader'));
+  assert.doesNotMatch(html, /signup_test<\/script>/);
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const redirects = [], timers = [];
+  const window = { location: { replace: path => redirects.push(path) } };
+  vm.runInNewContext(script, { window, setTimeout: callback => timers.push(callback) });
+  assert.equal(window.dataLayer.length, 1);
+  const event = window.dataLayer[0];
+  assert.equal(event.event, 'sign_up');
+  assert.equal(event.event_id, 'signup_test</script>');
+  assert.equal(event.plan, 'Free');
+  assert.equal(event.eventTimeout, 2000);
+  assert.equal(redirects.length, 0);
+  event.eventCallback();
+  timers[0]();
+  assert.deepEqual(redirects, ['/checkout']);
+  const verify = source.slice(source.indexOf('if (pathname === "/verify" && req.method === "POST")'), source.indexOf('if (pathname === "/checkout" && req.method === "GET")'));
+  assert.doesNotMatch(verify, /forwardTagiooOwnEvent\("sign_up"/);
+  assert.match(verify, /sendTagiooSignupToMetaCapi\(values, signupEventId, signupVisitor\)/);
+  assert.ok(verify.indexOf('if (!result.ok)') < verify.indexOf('signupCompletePage(signupEventId, landing)'));
+});

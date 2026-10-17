@@ -2751,6 +2751,34 @@ function gtmNoscript() {
     <!-- End Google Tag Manager (noscript) -->`;
 }
 
+// Render only after verified account creation; refresh cannot replay the consumed signup.
+function signupCompletePage(eventId, landing) {
+  const payload = JSON.stringify({ event: "sign_up", event_id: eventId, plan: "Free" }).replace(/</g, "\\u003c");
+  const destination = JSON.stringify(landing).replace(/</g, "\\u003c");
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><title>Registration complete — Tagioo</title>
+<link rel="stylesheet" href="/login.css">
+<script>
+window.dataLayer=window.dataLayer||[];
+(function(){
+  var destination=${destination}, continued=false;
+  function proceed(){if(!continued){continued=true;window.location.replace(destination);}}
+  var signup=${payload};
+  signup.eventCallback=proceed;
+  signup.eventTimeout=2000;
+  window.dataLayer.push(signup);
+  setTimeout(proceed,2500);
+})();
+</script>
+${gtmHead()}
+</head><body class="login-body"><main style="margin:auto;padding:32px">
+<h1>Registration complete</h1><p>Your account is ready. Continuing…</p>
+<a href=${JSON.stringify(landing)}>Continue to your account</a>
+<noscript><meta http-equiv="refresh" content="0;url=${landing}"></noscript>
+</main></body></html>`;
+}
+
 function verifyPage({ email = "", error = "", info = "" } = {}) {
   const masked = email.replace(/^(.)(.*)(.@.*)$/, (_, a, b, c) => a + "*".repeat(Math.max(b.length, 1)) + c);
   return `<!doctype html>
@@ -12708,23 +12736,9 @@ const server = createServer(async (req, res) => {
       pendingSignupStore.delete(token);
       invalidateOwnerDashboardCache();
 
-      // Self-signup is always plan "Free" (addCustomerSignup hardcodes it) — this
-      // is tagioo's own acquisition-funnel conversion, forwarded to tagioo's own
-      // GA4/Meta (TAGIOO_OWN_TRACKING), never the new tenant's own tracking. Seed
-      // with tg_vid (set on the GET /signup Lead hit) when present so GA4/Meta
-      // tie this CompleteRegistration to the same visitor as the earlier Lead.
+      // Account creation precedes checkout; signup is not a paid conversion.
       const signupEventId = `signup_${result.account.id}`;
-      forwardTagiooOwnEvent("sign_up", {
-        seed: parseCookies(req.headers.cookie).tg_vid || result.account.tenantId,
-        visitor: signupVisitor,
-        eventParams: {
-          "ep.plan": "Free",
-          "ep.tenant_id": result.account.tenantId,
-          "ep.event_id": signupEventId
-        }
-      }).catch(() => {});
-      // Same event_id as above so Meta dedupes into one CompleteRegistration and
-      // merges in the hashed email/phone/name plus the visitor's IP/UA/fbp/fbc.
+      // Browser GTM owns GA4 signup delivery. Meta CAPI shares its event ID for deduplication.
       sendTagiooSignupToMetaCapi(values, signupEventId, signupVisitor).catch(() => {});
       // Keep the snapshot: a paid upgrade is confirmed later in an owner session,
       // where the buyer's own request context is no longer available.
@@ -12761,15 +12775,13 @@ const server = createServer(async (req, res) => {
         tenantId: result.account.tenantId,
         accountId: result.account.id
       };
-      res.writeHead(302, {
-        location: landing,
+      htmlResponse(res, 200, signupCompletePage(signupEventId, landing), {
         "set-cookie": [
           `sgtm_session=${makeSessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`,
           `tg_signup=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
         ],
         "cache-control": "no-store"
       });
-      res.end();
       return;
     }
 

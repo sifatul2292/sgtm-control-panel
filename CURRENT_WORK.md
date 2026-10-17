@@ -1922,3 +1922,17 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   Guide closes/reset on regeneration and container change.
 - Bumped app/styles immutable asset versions to 117/70. Syntax and nine focused
   guide, generator and assistant checks pass. Deployment/visual check pending.
+
+## 2026-10-17 — Fire browser GTM signup on verification success
+
+- Preview reproduced missing sign_up: only config/pageview/pixel base fired;
+  verification sent conversions server-side then redirected without a dataLayer event.
+- Verified signup now returns a short completion page that queues sign_up with
+  signup_ACCOUNT_ID before GTM loads, waits for tag callback (bounded timeout),
+  then continues to the existing dashboard/checkout destination. Invalid codes
+  and failed account creation never render it; consumed signup cannot replay.
+- Removed duplicate backend GA signup forwarding. Direct Meta CAPI retains the
+  shared ID for browser/server deduplication. Trial/purchase handling unchanged.
+- Syntax and eight focused signup/self-tracking tests pass. Browser GA signup
+  now depends on GTM loading; Meta retains backend delivery. Deployment and fresh
+  real-registration Preview verification pending.
