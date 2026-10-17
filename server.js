@@ -2993,6 +2993,29 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
         var status = document.getElementById("coActivationStatus");
         var receiptKey = "tagioo-paddle-paid:" + ${JSON.stringify(paddle.invoiceNo)};
         var checking = false;
+        // Browser GTM owns GA4 for these Paddle steps; backend Meta CAPI reuses the
+        // same event IDs. Purchase is never pushed here: only a paid charge,
+        // confirmed by signed webhook, sends it from the backend.
+        var plan = ${JSON.stringify(paddle.planName || instructions.plan || "")};
+        var price = Number(${JSON.stringify(paddle.usdAmount || 0)});
+        var orderRef = ${JSON.stringify(paddle.invoiceNo || paddle.tenantId || "")};
+        window.dataLayer = window.dataLayer || [];
+        function pushStep(name, eventId, value, done) {
+          var key = "tagioo-dl:" + eventId;
+          var sent = false;
+          try { sent = Boolean(sessionStorage.getItem(key)); sessionStorage.setItem(key, "1"); } catch (_) {}
+          if (sent) { if (done) done(); return; }
+          var payload = { event: name, event_id: eventId, plan: plan, ecommerce: { currency: "USD", value: value, items: [{ item_id: plan, item_name: "Tagioo " + plan, price: value, quantity: 1 }] } };
+          if (done) {
+            var finished = false;
+            var finish = function () { if (!finished) { finished = true; done(); } };
+            payload.eventCallback = finish;
+            payload.eventTimeout = 2000;
+            setTimeout(finish, 2500);
+          }
+          window.dataLayer.push({ ecommerce: null });
+          window.dataLayer.push(payload);
+        }
         function awaitActivation() {
           if (checking) return;
           checking = true;
@@ -3012,7 +3035,12 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
               var result = await response.json();
               if (result.active) {
                 sessionStorage.removeItem(receiptKey);
-                window.location.href = "/";
+                // Trial start is confirmed only by the signed subscription.trialing webhook.
+                if (result.trial && result.trialEventId) {
+                  pushStep("start_trial", result.trialEventId, 0, function () { window.location.href = "/"; });
+                } else {
+                  window.location.href = "/";
+                }
                 return;
               }
             } catch (_) {}
@@ -3028,6 +3056,8 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
         Paddle.Initialize({
           token: ${JSON.stringify(paddle.clientToken)},
           eventCallback: function (event) {
+            if (event.name === "checkout.loaded") pushStep("begin_checkout", "initiate_checkout_" + orderRef, price);
+            if (event.name === "checkout.payment.initiated") pushStep("add_payment_info", "add_payment_info_" + orderRef, price);
             if (event.name === "checkout.completed") {
               try { sessionStorage.setItem(receiptKey, "1"); } catch (_) {}
               awaitActivation();
@@ -5640,6 +5670,13 @@ async function trackTagiooCheckoutStep(step, { tenantId, plan, amount, orderId, 
     if (!tenant) return;
     if (visitor) await saveTagiooVisitorContext(tenantId, visitor);
     const eventId = `${step}_${orderId || tenantId}`;
+    // Paddle checkout pushes GA4 begin_checkout from Paddle.js; send only the
+    // deduplicating Meta event here, in the USD amount shown at checkout.
+    const paddle = step === "initiate_checkout" ? paddleCheckoutConfigFor(tenant) : { enabled: false };
+    if (paddle.enabled) {
+      await sendTagiooFunnelEventToMetaCapi(spec.meta, tenant, { eventId, plan, amount: paddle.usdAmount, currency: "USD", orderId, when, visitor });
+      return;
+    }
     const value = Number(amount);
     await forwardTagiooOwnEvent(spec.ga, {
       seed: tenantId,
@@ -7475,10 +7512,8 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
   if (isTrial) {
     const eventId = `trial_${paddleSubscriptionId}`;
     const visitor = storedTagiooVisitor(tenant);
-    forwardTagiooOwnEvent("start_trial", {
-      seed: tenant.id, visitor,
-      eventParams: { cu: payment.currency, "epn.value": "0", "ep.plan": planName, "ep.event_id": eventId }
-    }).catch(() => {});
+    // Checkout browser GTM sends GA4 start_trial after polling this activation;
+    // Meta CAPI shares its event ID for deduplication.
     sendTagiooFunnelEventToMetaCapi("StartTrial", tenant, {
       eventId, plan: planName, amount: 0, currency: payment.currency,
       orderId: paddleSubscriptionId, when: occurredAt, visitor
@@ -13419,7 +13454,11 @@ const server = createServer(async (req, res) => {
       const loaded = await readDatabaseCached();
       if (!loaded.available) { jsonResponse(res, 503, { error: "Billing status temporarily unavailable." }); return; }
       const tenant = (loaded.data.tenants || []).find((t) => t.id === session.tenantId);
-      jsonResponse(res, 200, { active: Boolean(tenant?.paymentProvider === "paddle" && ["active", "trial"].includes(tenant.subscriptionStatus) && !tenant.pendingPlan) });
+      const active = Boolean(tenant?.paymentProvider === "paddle" && ["active", "trial"].includes(tenant.subscriptionStatus) && !tenant.pendingPlan);
+      // Trial state is set only by signed subscription.trialing activation; the
+      // event ID matches the backend StartTrial CAPI send for Meta deduplication.
+      const trial = active && tenant.subscriptionStatus === "trial" && Boolean(tenant.paddleSubscriptionId);
+      jsonResponse(res, 200, { active, trial, ...(trial ? { trialEventId: `trial_${tenant.paddleSubscriptionId}` } : {}) });
       return;
     }
 

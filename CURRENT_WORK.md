@@ -1788,6 +1788,11 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Preserve existing subject/message drafts, avoid duplicate diagnostic blocks, and leave oversized drafts intact with guidance. Ignore test responses after switching containers. Copy distinguishes reported errors from a confirmed root cause. No infrastructure changes or live conversion tests performed.
 - App asset version bumped to 113. Three focused support-draft tests, frontend syntax, npm run check and diff checks pass. Local changes only; not pushed/deployed.
 
+## 2026-10-13 — Deploy tracking failure support action
+
+- Pushed a00dc82 to feat/saas-phase1-payments and fast-forwarded /var/www/tagioo on srv1736566 using the existing Hostinger web console. Server syntax and all three support-draft tests passed before reloading only sgtm-control-panel.
+- Verified deployed app.js SHA-256 matches local source, index references v113, PM2 panel is online and public homepage returns HTTP 200. Existing untracked environment backup preserved. No customer tracking tests or tickets submitted. Deployment proof: artifacts/tracking-support-deployed.png.
+
 ## 2026-10-15 — Container and platform video guides
 
 - Embedded the supplied container setup video in the Container guide and WooCommerce/Shopify video in Setup Guide, with YouTube fallback links and responsive existing video styles.
@@ -1799,6 +1804,23 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Combined the platform video and introduction into one compact card titled “Check our setup guide”. Short copy and existing button styles sit beside a 280px-wide video; narrow screens stack the content while keeping the video capped.
 - Removed the separate oversized video panel. Illustrated instructions and YouTube fallback remain available; Container tab unchanged. Styles cache bumped to v69.
 - Backend/frontend syntax and diff checks pass. Browser layout/playback not verified. Prepared for GitHub push; production deployment pending.
+
+## 2026-10-16 — Prepare one-tenant server GTM Preview pilot
+
+- Added preparation-only scripts/prepare-preview-pilot.mjs: reads exactly one running Compose container, generates a separate resource-limited/loopback preview service, same-domain reserved-path Nginx snippet and single-service connection/rollback overrides. Pins the running image; no pulls, tracking restarts, Nginx writes or history mutations during preparation. Private output files; refuses reused directories, existing preview configuration and ambiguous Compose layouts.
+- Runbook docs/sgtm-preview-pilot.md covers tenant mapping, private backups, Compose/runtime drift checks, staging, collection/preview/outage/rollback verification and neighboring tenant checks. Pilot is operator-managed; automatic provisioning, billing/capacity/lifecycle integration remains deferred. Panel regeneration/redeploy must be frozen for the pilot tenant.
+- Read-only Hostinger worker inspection on srv1736566 confirms screenshot tenant sgtm-ovoniia121 is healthy on loopback 8230, RUN_AS_PREVIEW_SERVER=false and PREVIEW_SERVER_URL unconfigured. No production files/settings changed. Worker console connected; requested owner selection of a disposable pilot tenant and domain is pending.
+- Six focused tests pass, including CLI Docker-inspect-only behavior, secret output suppression, 0700/0600 permissions, overwrite refusal, isolation and rollback generation; npm run check, script syntax and diff checks pass. Actual Docker/Compose/Nginx/Preview browser tests have NOT run. No local Docker runtime. Next: select pilot tenant, review worker-specific files/backups, validate generated Compose, exercise throwaway deployment before any live customer migration.
+
+
+## 2026-10-16 — Alukohv Happy server GTM Preview pilot enabled
+
+- Owner selected `alukohv-happy`; verified `sgtm-alukohv-happy`, `happy.alurkohv.com`, GTM-MP3KJB4L and original loopback 8203 mapping. Private backups, Docker baseline and resolved Compose captured under `/var/backups/tagioo-preview-alukohv-happy-20261016` on worker srv1736566. Original Compose/env files preserved.
+- Exercised separate disposable tagging clone and loopback Nginx first. Google rejected HTTP PREVIEW_SERVER_URL; HTTPS reserved-path route passed. Real GTM debug URL returned 200. Stopping only preview left disposable normal health/request handling working; restart recovered preview. No fake purchases sent.
+- Added only selected HTTPS vhost's `/__tagioo_preview/` proxy to loopback 18200, syntax checked and gracefully reloaded. Started separate pinned-image preview service with 256MB / 0.5 CPU limits. Recreated only selected tagging service using scoped Compose override, preserving its 320MB / 0.25 CPU limits, image, ports and environment except added PREVIEW_SERVER_URL. Local/HTTPS health passed; rollback override retained.
+- Saved selected domain as GTM Server container URL (previously absent). Actual Chrome Preview now loads debugger; harmless unclaimed probe appears with HTTP400, no client and no outgoing requests. No GTM tag changes or publication. Selected/preview and two neighboring HTTPS health checks pass; no OOM/restart loops observed. Destination delivery not independently proven by this test.
+- Pilot remains operator-managed and limited to this tenant. Freeze panel reprovision/configuration/power-up regeneration/deletion for it; these can discard manual overrides. See docs/sgtm-preview-pilot.md and private worker pilot/OPERATIONS.md for scoped rollback. Lifecycle/capacity/billing integration and broader rollout deferred. Local tooling/docs not committed or pushed.
+- Final isolation check: all 15 other pre-existing container IDs/start times unchanged and running. One real /g/collect returned 200 since connection; destination acceptance remains unverified. Sample memory main ~37MiB, preview ~15MiB; no load-capacity claim. Disposable tagging clone and isolated test Nginx stopped; production preview retained. Private verification.json saved.
 
 ## 2026-10-17 — Prepare three-day card subscription promotion
 
@@ -1857,12 +1879,34 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   explains payment details, automatic charging, tax and cancellation before expiry.
 - Local BDT mode restores the original plan buttons and removes card-trial notes;
   manual-payment prices and multi-cycle behavior retained. Free plan unchanged.
+- Published 02264bb via production fast-forward. Syntax/inline-script and copy
+  assertions pass; refreshed live /pricing shows all three trial notes/buttons
+  with correct signup plan URLs and intact desktop card layout. No billing or
+  tracking backend changes in this follow-up. Mobile layout not rechecked.
 
 ## 2026-10-17 — Make trial price the primary price
 
 - Paid USD cards on homepage and Pricing show crossed-out regular prices beside
   $0 for 3 days. Monthly prices after trial and auto-charge disclosure retained.
 - BDT mode hides crossed-out USD prices and restores /month and manual amounts.
+- Published 9ff4956; syntax/inline scripts and markup assertions pass. Live
+  pricing browser confirms $0 for 3 days across Starter/Pro/Enterprise and
+  retained monthly renewal notes. No payment settings changed in this follow-up.
+
+## 2026-10-17 — Read-only Tagioo self-tracking audit
+
+- Live GTM-MCR3FD4W published version 3 includes GA4 G-BS35TPGHR8 routed to
+  server.tagioo.com and Meta pixel 1039411801891124. Tracking GET /healthz returns
+  200. Production self-tracking Meta token is present; no self-track warnings in
+  the last 2,000 lines of the configured panel error log (not delivery proof).
+- Found missing trial-start conversion in trial activation; direct Meta purchase
+  and checkout helpers hardcode BDT despite USD Paddle amounts. Backend GA4 own
+  events derive cid from seeds instead of preserving browser GA client/session;
+  attribution continuity needs verification/fix. Published browser GTM has ecommerce
+  triggers but no Lead/sign_up/CompleteRegistration/StartTrial conversion tags.
+- Code/production configuration audit only; no signup/trial/purchase events created,
+  GTM publishing or tracking changes. Meta Events Manager/GA4 destination receipt,
+  deduplication and ad-click-to-conversion attribution remain unverified.
 
 ## 2026-10-17 — Fix Tagioo own conversion events
 
@@ -1913,6 +1957,14 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Syntax and eleven focused generator/assistant/inspector checks passed locally.
   Live deployment and actual GTM import/publish verification outstanding.
 
+- Deployed 3f0d2e0 to /var/www/tagioo via fast-forward from 8275329 after
+  backup to /var/backups/tagioo-saas-20261017. All eleven focused checks passed
+  on production; PM2 panel reload succeeded. Public login, self-tracking health
+  and separate Preview pilot health return HTTP 200. Includes prior a99f2a8
+  conversion inspector fix. No GTM container publishing or customer lifecycle edits.
+- Live authenticated wizard visual verification and actual GTM import remain
+  outstanding; public app.js probe redirects without a customer session.
+
 ## 2026-10-17 — Fix SaaS guide layout and stale downloads
 
 - Replaced download-card grid styling on the guide with a dedicated disclosure,
@@ -1922,6 +1974,13 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   Guide closes/reset on regeneration and container change.
 - Bumped app/styles immutable asset versions to 117/70. Syntax and nine focused
   guide, generator and assistant checks pass. Deployment/visual check pending.
+
+- Deployed 55e4e83 via production fast-forward after static-file backup under
+  /var/backups/tagioo-saas-guide-20261017. All nine focused checks pass on VPS.
+  Static-only change, no process reload or tracking/container mutations.
+- Chrome fixture using actual CSS, renderer and generated guide confirms expanded
+  content wraps within the panel and disclosure collapses cleanly. Full live
+  authenticated wizard and mobile viewport not visually rechecked.
 
 ## 2026-10-17 — Fire browser GTM signup on verification success
 
@@ -1937,6 +1996,10 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   now depends on GTM loading; Meta retains backend delivery. Deployment and fresh
   real-registration Preview verification pending.
 
+- Deployed e963101 via production fast-forward after server.js backup under
+  /var/backups/tagioo-signup-20261017. All eight focused checks passed on VPS,
+  followed by successful panel PM2 reload. Real registration Preview pending.
+
 ## 2026-10-17 — Fix Free upgrade pricing, navigation and checkout exit
 
 - Free accounts default to USD card plan prices when Paddle is configured,
@@ -1948,3 +2011,65 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   polls. Trial checkout header now says Start your free trial.
 - Syntax and eleven focused checkout/activation/signup tests pass. Deployment and
   live checkout exit/Billing UI verification pending; no card submission performed.
+
+- Deployed dd8f064 by fast-forward after backup under
+  /var/backups/tagioo-upgrade-20261017; eleven focused checks passed on VPS,
+  panel reload succeeded and login/tracking/Preview pilot health return 200.
+- Live Chrome checkout shows Start your free trial and Continue on Free.
+  Exercised exit on the user's blocked rahim test signup: dashboard restored on
+  Free, Billing displays Starter $30 / Pro $50 / Enterprise $100 monthly.
+  No card submission or trial activation performed; upgrade navigation tested
+  with a focused mocked response, not another live checkout conversion.
+
+## 2026-10-17 — Actual Paddle sandbox funnel verification
+
+- Owner authorized sandbox checkout and restoring live afterward. Saved exact
+  live .env privately at /var/backups/tagioo-event-test-20261017/live.env;
+  armed a 15-minute restore failsafe before switching six Paddle settings and
+  restarting panel/receiver. Added missing subscription.trialing to sandbox
+  notification ntfset_01m00p2atskxsxh07djhb96vt0; live notification unchanged.
+- Completed real Paddle sandbox checkout with published 4242 test card, tenant
+  rahim, subscription sub_01m554rk8ahyv6qzdvkrvchscb. Signed webhook granted
+  Starter trial with one zero-USD trial receipt, no paid receipt at trial start.
+- GTM Preview remained connected: prior signup tags succeeded once each; after
+  sandbox checkout, begin_checkout/add_payment_info/start_trial and corresponding
+  Meta browser tags remained Not Fired. Current checkoutPage has no dataLayer
+  pushes for these actions. This test FAILS the full browser funnel requirement.
+- Used sandbox-only activate endpoint to simulate post-trial payment; provider
+  returned active and panel recorded confirmed USD30 (pay_mvci736f_f3176c),
+  following zero trial receipt pay_mvci420o_69e3c8. Canceled sandbox subscription
+  immediately; cancellation webhook restored tenant to Free. No real charge.
+- Restored exact live .env and restarted both processes successfully, stopped
+  failsafe timer. PADDLE_ENV=production confirmed; both PM2 processes online.
+  One pending inbox event is pre-existing tagioo-test transaction
+  evt_01m4aqq53868yc80at19ewa046 (pending invoice mismatch); preserved untouched.
+- Refreshed Meta Overview shows older CompleteRegistration/InitiateCheckout/
+  StartTrial events; current test receipt not yet confirmed. Own CAPI sender
+  hardcodes useTestCode:false, so sandbox billing alone does not route Meta
+  events to Test Events. No delivery-error warnings observed (not receipt proof).
+- Next: wire Paddle browser checkout/payment/trial events with explicit GA4
+  single-sender ownership, confirm trial only after signed webhook activation,
+  and use a scoped Meta test-event path for end-to-end receipt verification.
+  No source code changes made for this test; full funnel is NOT verified working.
+
+## 2026-10-17 — Wire Paddle browser checkout/trial events
+
+- checkoutPage Paddle.js callbacks now push browser dataLayer events: checkout.loaded →
+  begin_checkout (event_id initiate_checkout_<invoice>), checkout.payment.initiated →
+  add_payment_info (add_payment_info_<invoice>), USD plan value, once per event ID
+  via sessionStorage. checkout.completed pushes nothing by itself.
+- start_trial pushes only after /api/customer/payment-status reports trial, which is
+  set solely by signed subscription.trialing activation; endpoint returns
+  trialEventId trial_<subscription> matching backend StartTrial CAPI. Redirect waits
+  for GTM eventCallback (2s timeout, single navigation). Paid activation pushes no
+  browser trial/purchase.
+- GA4 single sender: backend no longer forwards GA4 start_trial; for Paddle-enabled
+  tenants backend initiate_checkout sends only Meta InitiateCheckout (USD amount,
+  shared ID), no GA4. Manual/bKash checkout and add_payment_info claims unchanged.
+  Purchase remains backend-only on confirmed paid charge (never trial).
+- Known gaps: GA4 start_trial lost if the tab closes before webhook activation; BD
+  dual-rail tenants who pay bKash without opening Paddle get no GA4 begin_checkout.
+- Four new focused tests; 29 focused checks and npm run check pass. NOT deployed.
+  GTM Preview firing and Meta Events Manager receipt NOT verified (needs deploy +
+  owner-authorized sandbox switch with backup/restore). GTM tag variable mapping for
+  event_id/ecommerce on begin_checkout/add_payment_info/start_trial unconfirmed.
