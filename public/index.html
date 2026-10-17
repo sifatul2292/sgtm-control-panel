@@ -528,14 +528,14 @@
           <section class="panel">
             <div class="panel-header">
               <div>
-                <h2>Purchase Inspector</h2>
-                <p>Search recent purchase requests by event ID, transaction ID, value, URL, or host.</p>
+                <h2>Conversion Inspector</h2>
+                <p>Inspect purchases, completed registrations and trial starts by event ID, URL or host.</p>
               </div>
-              <span id="purchaseInspectorBadge" class="badge">Recent purchases</span>
+              <span id="purchaseInspectorBadge" class="badge">Recent conversions</span>
             </div>
             <div class="inspector-tools">
-              <input id="purchaseSearch" type="search" placeholder="Search purchase metadata" />
-              <div class="chart-range-toggle" role="group" aria-label="Purchase time range">
+              <input id="purchaseSearch" type="search" placeholder="Search conversion metadata" />
+              <div class="chart-range-toggle" role="group" aria-label="Conversion time range">
                 <button class="chart-range-btn is-active" type="button" data-purchase-range="day">Day</button>
                 <button class="chart-range-btn" type="button" data-purchase-range="week">Week</button>
                 <button class="chart-range-btn" type="button" data-purchase-range="month">Month</button>
@@ -2638,6 +2638,6 @@ window.dataLayer.push({
       <div id="customerSearchResults" class="customer-search-results"></div>
       <p class="customer-search-hint">↑ ↓ to choose · Enter to open · Esc to close</p>
     </dialog>
-    <script src="/app.js?v=114" type="module"></script>
+    <script src="/app.js?v=115" type="module"></script>
   </body>
 </html>

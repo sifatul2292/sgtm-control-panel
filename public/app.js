@@ -694,7 +694,11 @@ function normalizeEventName(value) {
     purchase: "Purchase",
     ordercomplete: "Purchase",
     lead: "Lead",
-    signup: "Lead",
+    signup: "CompleteRegistration",
+    completeregistration: "CompleteRegistration",
+    register: "CompleteRegistration",
+    starttrial: "StartTrial",
+    generatelead: "Lead",
     search: "Search",
     scriptload: "ScriptLoad"
   };
@@ -1037,7 +1041,7 @@ function mapServerEventRow(item) {
     host: item.host || "Unknown host",
     requestUrl: item.requestUrl || item.path || "",
     tracking: true,
-    eventName: item.eventName || "Other",
+    eventName: queryEventName(item.path || item.requestUrl || "") || item.eventName || "Other",
     value: item.value,
     currency: item.currency,
     eventId: item.eventId,
@@ -1111,6 +1115,7 @@ function renderEventLogStats(allItems, visibleItems, summary) {
     { label: "Filtered", value: visible.toLocaleString(), detail: `${total.toLocaleString()} latest loaded` },
     { label: "Success", value: Math.max(0, visible - errors).toLocaleString(), detail: "2xx / 3xx requests" },
     { label: "Errors", value: errors.toLocaleString(), detail: "4xx / 5xx requests" },
+    { label: "Registrations", value: new Set(allItems.filter((item) => item.eventName === "CompleteRegistration" && Number(item.status) < 400).map((item) => item.eventId || item.requestUrl)).size.toLocaleString(), detail: "completed · loaded requests" },
     { label: "Purchases", value: purchases.toLocaleString(), detail: summary?.retentionDays ? `unique · last ${summary.retentionDays} days` : `${clients.toLocaleString()} client${clients === 1 ? "" : "s"} · today` }
   ]);
 }
@@ -1222,9 +1227,15 @@ function purchaseCompleteness(item) {
   ].filter(Boolean).length;
 }
 
-function cleanPurchaseRows(data) {
+function cleanPurchaseRows(data, includeConversions = false) {
   const fallbackHost = customerFallbackHost(data);
-  const rows = inspectorPurchaseRows(data)
+  const conversions = includeConversions
+    ? [...(data.nginx?.retainedEvents?.recentEvents || []), ...(data.nginx?.todayEvents?.recentEvents || [])]
+      .map(mapServerEventRow)
+      .filter((item) => ["CompleteRegistration", "StartTrial"].includes(item.eventName))
+      .filter((item, index, rows) => rows.findIndex((other) => other.path === item.path && Number(other.date) === Number(item.date) && other.status === item.status) === index)
+    : [];
+  const rows = [...inspectorPurchaseRows(data), ...conversions]
     .map((item) => ({
       ...item,
       displayHost: item.host && item.host !== "Unknown host" ? item.host : fallbackHost || "Tracking domain",
@@ -1289,7 +1300,7 @@ function renderPurchaseInspector(data) {
     month: todayStart - 29 * 86400000,
     all: 0
   }[purchaseRange] || 0;
-  const rows = cleanPurchaseRows(data).filter((item) => {
+  const rows = cleanPurchaseRows(data, true).filter((item) => {
     if (cutoff) {
       // Day range: show any purchase with a hit today (lastDate), so an order
       // first sent server-side yesterday but also browser-fired today appears.
@@ -1303,6 +1314,7 @@ function renderPurchaseInspector(data) {
       if (ts && ts < cutoff) return false;
     }
     const haystack = [
+      item.eventName,
       item.eventId,
       item.transactionId,
       item.value,
@@ -1329,24 +1341,24 @@ function renderPurchaseInspector(data) {
   els.purchaseInspectorBadge.textContent = `${rows.length} tracked · ${rangeWord}${realPart}`;
 
   if (!rows.length) {
-    els.purchaseInspector.innerHTML = '<div class="empty-log">No purchase requests matched.</div>';
+    els.purchaseInspector.innerHTML = '<div class="empty-log">No purchase, registration or trial requests matched.</div>';
     return;
   }
 
   els.purchaseInspector.innerHTML = `
     <div class="purchase-table-wrap"><table class="purchase-table">
-      <thead><tr><th>Date</th><th>Purchase</th><th>Transaction ID</th><th>Client</th><th>Domain</th><th>Status</th><th>Requests</th><th>More</th></tr></thead>
+      <thead><tr><th>Date</th><th>Conversion</th><th>Transaction ID</th><th>Client</th><th>Domain</th><th>Status</th><th>Requests</th><th>More</th></tr></thead>
       <tbody>${rows.map((item, index) => {
         const sentCount = Number(item.sentCount || 1);
         const firstDate = item.firstDate instanceof Date ? item.firstDate : item.date;
         return `<tr>
           <td class="purchase-date">${escapeHtml(requestDateLabel({ ...item, date: firstDate }))}</td>
-          <td><strong>${escapeHtml(item.value && item.currency ? formatMoney(item.value, item.currency) : "Purchase")}</strong></td>
+          <td><strong>${escapeHtml(item.eventName === "CompleteRegistration" ? "Registration completed" : item.eventName === "StartTrial" ? "Trial started" : item.value && item.currency ? formatMoney(item.value, item.currency) : "Purchase")}</strong></td>
           <td>${escapeHtml(item.transactionId || "—")}</td>
           <td>${escapeHtml(item.client || "Other")}</td>
           <td><span class="purchase-domain" title="${escapeHtml(item.displayHost)}">${escapeHtml(item.displayHost)}</span></td>
           <td><span class="status-code ${requestStatusClass(item.status)}">${escapeHtml(item.status || "Unknown")}</span></td>
-          <td>${sentCount > 1 ? `<span class="badge warn" title="This purchase reached sGTM ${sentCount} times.">re-sent ×${sentCount}</span>` : "1"}</td>
+          <td>${sentCount > 1 ? `<span class="badge warn" title="This conversion reached sGTM ${sentCount} times.">re-sent ×${sentCount}</span>` : "1"}</td>
           <td><button type="button" class="more-button" aria-expanded="false" aria-controls="purchase-detail-${index}" aria-label="Toggle purchase details ${index + 1}">Details</button></td>
         </tr><tr id="purchase-detail-${index}" class="purchase-detail-row" hidden><td colspan="8">
           <div class="event-detail-box"><strong>Event ID:</strong> ${escapeHtml(item.eventId || "Not provided")}<br>

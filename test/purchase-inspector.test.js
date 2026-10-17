@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 const source = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-const functions = source.slice(source.indexOf('function mapServerEventRow('), source.indexOf('function renderEventLogStats('))
+const functions = source.slice(source.indexOf('function normalizeEventName('), source.indexOf('function queryEventName('))
+  + source.slice(source.indexOf('function queryEventName('), source.indexOf('\n}\n', source.indexOf('function queryEventName(')) + 3)
+  + source.slice(source.indexOf('function mapServerEventRow('), source.indexOf('function renderEventLogStats('))
   + source.slice(source.indexOf('function requestDateLabel('), source.indexOf('function renderEventRows('))
   + source.slice(source.indexOf('function customerFallbackHost('), source.indexOf('function setLog('));
 function harness() {
@@ -43,4 +45,23 @@ test('duplicate sends collapse into one purchase and search/range remain functio
   context.els.purchaseSearch.value = 'order-2'; context.renderPurchaseInspector(data(events));
   assert.match(badge.textContent, /^1 tracked/);
   assert.match(inspector.innerHTML, /order-2/);
+});
+
+test('registrations and trials appear separately without changing purchase totals', () => {
+  const { context, inspector, badge } = harness();
+  const signup = event(10, { eventName: 'Lead', path: '/g/collect?en=sign_up', transactionId: '', eventId: 'signup_test', value: null, currency: '' });
+  const trial = event(11, { eventName: 'Tracking Request', path: '/g/collect?en=start_trial', transactionId: '', eventId: 'trial_test', value: 0, currency: 'USD' });
+  const input = data([event(1)]);
+  input.nginx.retainedEvents.recentEvents = [signup, trial];
+  input.nginx.todayEvents = { recentEvents: [signup, trial] };
+  context.renderPurchaseInspector(input);
+  assert.match(badge.textContent, /^3 tracked/);
+  assert.match(inspector.innerHTML, /Registration completed/);
+  assert.match(inspector.innerHTML, /Trial started/);
+  assert.match(inspector.innerHTML, /signup_test/);
+  assert.equal(context.cleanPurchaseRows(input).length, 1);
+  context.els.purchaseSearch.value = 'completeregistration';
+  context.renderPurchaseInspector(input);
+  assert.match(badge.textContent, /^1 tracked/);
+  assert.equal(context.normalizeEventName('generate_lead'), 'Lead');
 });

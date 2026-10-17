@@ -4215,7 +4215,11 @@ function normalizeEventName(value) {
     purchase: "Purchase",
     ordercomplete: "Purchase",
     lead: "Lead",
-    signup: "Lead",
+    signup: "CompleteRegistration",
+    completeregistration: "CompleteRegistration",
+    register: "CompleteRegistration",
+    starttrial: "StartTrial",
+    generatelead: "Lead",
     search: "Search",
     scriptload: "ScriptLoad"
   };
@@ -4444,7 +4448,7 @@ function estimatedPurchaseSignature(item) {
 }
 
 function isTrackedBusinessEvent(name) {
-  return ["PageView", "ViewItem", "ViewCart", "AddToCart", "BeginCheckout", "Purchase", "Lead", "Search"].includes(name);
+  return ["PageView", "ViewItem", "ViewCart", "AddToCart", "BeginCheckout", "Purchase", "CompleteRegistration", "StartTrial", "Lead", "Search"].includes(name);
 }
 
 function eventExactIdentity(item) {

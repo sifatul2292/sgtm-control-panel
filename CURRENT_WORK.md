@@ -1882,3 +1882,16 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   production and PM2 panel reload succeeded. Public login, server.tagioo.com/healthz
   and the separate operator Preview pilot health each return HTTP 200.
   No production test conversions, customer container or Nginx changes made.
+
+## 2026-10-17 — Registration visibility in event logs
+
+- Corrected sign_up / CompleteRegistration and start_trial event classification
+  separately from Lead and Purchase; generate_lead now has an explicit Lead map.
+- Conversion Inspector includes retained/live registration and trial requests,
+  labelled separately from purchases, and a completed-registration summary count
+  explicitly scoped to loaded requests. Existing purchase/revenue math preserved.
+- Explicit request event names correct old saved Lead labels in the UI without
+  rewriting customer history. Inspector conversion rows use the retained recent
+  request window; dedicated multi-day purchase retention is unchanged.
+- Syntax and four focused inspector tests pass, including old signup labels,
+  trial visibility, snapshot overlap and unchanged purchase-only totals.
