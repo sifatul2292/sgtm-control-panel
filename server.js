@@ -6891,8 +6891,11 @@ function checkoutRequired(tenant, data) {
   // admin-granted) account's dashboard over an optional upgrade invoice.
   if (tenant.subscriptionStatus !== "pending_payment") return false;
   if (!["Starter", "Pro", "Enterprise", "Growth", "Agency"].includes(tenant.pendingPlan)) return false;
+  // Only a claim for THIS staged invoice lifts the gate; an older paid receipt
+  // (returning customer back on Free) must not skip the new checkout.
   const hasClaim = (data.payments || []).some(
     (p) => p.tenantId === tenant.id && (p.status === "pending" || p.status === "confirmed")
+      && (!tenant.pendingInvoiceNo || p.invoiceNo === tenant.pendingInvoiceNo)
   );
   return !hasClaim;
 }

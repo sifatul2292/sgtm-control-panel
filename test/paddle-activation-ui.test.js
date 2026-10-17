@@ -145,3 +145,13 @@ test("backend keeps GA4 single-sender: Paddle checkout and trial send Meta only"
   assert.doesNotMatch(trialBranch, /forwardTagiooOwnEvent/);
   assert.match(source, /trialEventId: `trial_\$\{tenant\.paddleSubscriptionId\}`/);
 });
+
+test("returning customer with an older paid receipt still reaches the new checkout", () => {
+  const source = readFileSync(new URL("../server.js", import.meta.url), "utf8");
+  const s = source.indexOf("function checkoutRequired(");
+  const ctx = vm.createContext({ requiresShopifyBilling: () => false });
+  vm.runInContext(source.slice(s, source.indexOf("\n}\n", s) + 3), ctx);
+  const tenant = { id: "t1", pendingPlan: "Starter", subscriptionStatus: "pending_payment", pendingInvoiceNo: "t1-INV003" };
+  assert.equal(ctx.checkoutRequired(tenant, { payments: [{ tenantId: "t1", status: "confirmed", invoiceNo: "t1-INV002" }] }), true);
+  assert.equal(ctx.checkoutRequired(tenant, { payments: [{ tenantId: "t1", status: "pending", invoiceNo: "t1-INV003" }] }), false);
+});
