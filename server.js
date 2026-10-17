@@ -2921,8 +2921,8 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
       <main class="login-form-panel su-form-panel">
         <div class="login-form-wrap su-form-wrap">
           <div class="lf-header su-anim" style="--d:0ms">
-            <h1>Complete your payment</h1>
-            <p class="lf-subtitle">Pay to activate your <strong>${escapeHtml(instructions.plan)}</strong> plan.</p>
+            <h1>${paddle.trialDays ? "Start your free trial" : "Complete your payment"}</h1>
+            <p class="lf-subtitle">${paddle.trialDays ? "Try" : "Pay to activate your"} <strong>${escapeHtml(instructions.plan)}</strong> ${paddle.trialDays ? "free for 3 days." : "plan."}</p>
           </div>
           ${error ? `<div class="lf-error su-anim" style="--d:40ms">${escapeHtml(error)}</div>` : ""}
 
@@ -2969,6 +2969,10 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           <p class="lf-subtitle su-anim" style="--d:220ms;margin-top:14px;text-align:center">${instructions.ownerWhatsApp ? `Trouble paying? <a class="su-signin-link" href="https://wa.me/${escapeHtml(instructions.ownerWhatsApp.replace(/[^0-9]/g, ""))}" target="_blank" rel="noopener">Message us on WhatsApp →</a>` : ""}</p>
           ${paddle.enabled ? "</details>" : ""}
           ` : ""}
+          <form method="post" action="/checkout/skip" class="co-skip" id="coSkipCheckout">
+            <button type="submit">Not now — continue on the Free plan</button>
+            <small>Your paid plan starts only after checkout is confirmed.</small>
+          </form>
         </div>
       </main>
     </div>
@@ -2992,6 +2996,8 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
         function awaitActivation() {
           if (checking) return;
           checking = true;
+          var skipCheckout = document.getElementById("coSkipCheckout");
+          if (skipCheckout) skipCheckout.hidden = true;
           btn.disabled = true;
           var localPayment = document.getElementById("coLocalPayment");
           if (localPayment) localPayment.hidden = true;
@@ -6818,6 +6824,12 @@ function paddleCheckoutConfigFor(tenant) {
     invoiceNo: tenant.pendingInvoiceNo || "",
     usdAmount: paddleUsdMonthly[planName] || 0
   };
+}
+
+function billingCurrencyForTenant(tenant) {
+  if (requiresShopifyBilling(tenant) || ["paddle", "shopify"].includes(tenant?.paymentProvider)) return "USD";
+  if (paddleCatalogReady() && (tenant?.plan === "Free" || currencyForCountry(tenant?.country) === "USD")) return "USD";
+  return "BDT";
 }
 
 async function paddleCheckoutPageConfig(tenant) {
@@ -11924,14 +11936,9 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
     renewalDate: tenant?.renewalDate || data.usage.renewalDate,
     monthlyAmount: tenant?.monthlyAmount ?? data.usage.monthlyAmount,
     containerLimit: tenant?.containerLimit || data.usage.containerLimit,
-    // Drives which currency "My Subscription" displays — a Paddle tenant sees
-    // USD pricing, Shopify plans are managed in Shopify Admin, and everyone
-    // else sees the BDT bKash/Nagad catalog.
+    // Free accounts see the card catalog; existing manual paid plans retain BDT.
     paymentProvider: requiresShopifyBilling(tenant) ? "shopify" : (tenant?.paymentProvider || ""),
-    billingCurrency: requiresShopifyBilling(tenant) || ["paddle", "shopify"].includes(tenant?.paymentProvider)
-      || (currencyForCountry(tenant?.country) === "USD" && paddleCatalogReady())
-      ? "USD"
-      : "BDT",
+    billingCurrency: billingCurrencyForTenant(tenant),
     shopifyPlanSelectionUrl: connectedShopifyHandle
       ? `https://admin.shopify.com/store/${encodeURIComponent(connectedShopifyHandle)}/charges/tagioo-tracking/pricing_plans`
       : "",

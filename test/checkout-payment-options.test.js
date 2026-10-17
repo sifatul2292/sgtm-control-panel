@@ -48,3 +48,34 @@ test("missing Paddle configuration or unmapped plan keeps manual checkout", () =
   assert.match(html, /id="checkoutForm"/);
   assert.doesNotMatch(html, /id="coPayCard"/);
 });
+
+test("Free BD accounts default to USD card pricing while manual paid accounts retain BDT", () => {
+  const ctx = context();
+  ctx.currencyForCountry = country => country === 'US' ? 'USD' : 'BDT';
+  vm.runInContext(helper('billingCurrencyForTenant'), ctx);
+  assert.equal(ctx.billingCurrencyForTenant({ plan: 'Free', country: 'BD' }), 'USD');
+  assert.equal(ctx.billingCurrencyForTenant({ plan: 'Pro', country: 'BD', paymentProvider: 'manual' }), 'BDT');
+  assert.equal(ctx.billingCurrencyForTenant({ plan: 'Pro', country: 'BD', paymentProvider: 'paddle' }), 'USD');
+  ctx.config.paddleClientToken = '';
+  assert.equal(ctx.billingCurrencyForTenant({ plan: 'Free', country: 'BD' }), 'BDT');
+});
+
+test("Paddle upgrade navigates before a billing refresh can stall or hit the checkout gate", async () => {
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  const start = app.indexOf('async function selectSubscriptionPlan(');
+  const fn = app.slice(start, app.indexOf('\n}\n', start) + 3);
+  let destination, refreshed = false;
+  const button = { dataset: { planSelect: 'Pro' }, textContent: 'Upgrade', hasAttribute: () => false };
+  const ctx = vm.createContext({
+    document: { querySelectorAll: () => [button] }, selectedCycle: { id: 'monthly' },
+    fetch: async () => ({ ok: true, json: async () => ({ payment: {}, checkoutProvider: 'paddle' }) }),
+    window: { location: { assign: value => { destination = value; } }, alert: assert.fail },
+    setView: assert.fail, loadBillingPayment: () => { refreshed = true; }
+  });
+  vm.runInContext(fn, ctx);
+  const pending = ctx.selectSubscriptionPlan('Pro');
+  assert.equal(button.textContent, 'Opening checkout…');
+  await pending;
+  assert.equal(destination, '/checkout');
+  assert.equal(refreshed, false);
+});

@@ -16,7 +16,7 @@ test("completed checkout disables repeat payment and waits for server activation
   const window = { location: { href: "/checkout" } };
   const browser = vm.createContext({
     window, Date, JSON, AbortSignal,
-    document: { getElementById: id => id === "coPayCard" ? button : id === "coLocalPayment" ? localPayment : status, querySelector: () => skip },
+    document: { getElementById: id => id === "coPayCard" ? button : id === "coLocalPayment" ? localPayment : id === "coSkipCheckout" ? skip : status, querySelector: () => skip },
     sessionStorage: { getItem: k => storage.get(k), setItem: (k,v) => storage.set(k,v), removeItem: k => storage.delete(k) },
     Paddle: { Environment: { set() {} }, Initialize: o => { callback = o.eventCallback; }, Checkout: { open() {} } },
     fetch: async () => ({ status: 200, ok: true, json: async () => ({ active }) }),
@@ -26,7 +26,8 @@ test("completed checkout disables repeat payment and waits for server activation
   callback({ name: "checkout.completed" });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(button.disabled, true);
-  assert.doesNotMatch(html, /action="\/checkout\/skip"|Not now — continue/);
+  assert.match(html, /action="\/checkout\/skip"/);
+  assert.equal(skip.hidden, true);
   assert.equal(localPayment.hidden, true);
   assert.match(status.textContent, /do not pay again/i);
   assert.equal(window.location.href, "/checkout");

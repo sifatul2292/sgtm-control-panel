@@ -5350,6 +5350,9 @@ let customerActivePlanName = "";
 async function selectSubscriptionPlan(planName) {
   const buttons = document.querySelectorAll(`[data-plan-select], [data-renew-plan]`);
   buttons.forEach((b) => (b.disabled = true));
+  const selectedButton = Array.from(buttons).find((b) => b.dataset.planSelect === planName || b.hasAttribute("data-renew-plan"));
+  const originalLabel = selectedButton?.textContent;
+  if (selectedButton) selectedButton.textContent = "Opening checkout…";
   try {
     const response = await fetch("/api/customer/subscription", {
       method: "POST",
@@ -5358,6 +5361,10 @@ async function selectSubscriptionPlan(planName) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Plan update failed."]).join(" "));
+    if (result.payment && result.checkoutProvider === "paddle") {
+      window.location.assign("/checkout");
+      return;
+    }
     setView("billing");
     await loadBillingPayment();
     if (result.scheduled) {
@@ -5365,14 +5372,11 @@ async function selectSubscriptionPlan(planName) {
       return;
     }
     if (result.scheduledCancelled) return;
-    if (result.payment && result.checkoutProvider === "paddle") {
-      window.location.assign("/checkout");
-      return;
-    }
     if (result.payment) openPaymentModal(result.payment);
   } catch (error) {
     window.alert(error.message);
   } finally {
+    if (selectedButton) selectedButton.textContent = originalLabel;
     document.querySelectorAll(`[data-plan-select], [data-renew-plan]`).forEach((b) => (b.disabled = false));
   }
 }

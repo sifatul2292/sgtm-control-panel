@@ -1936,3 +1936,15 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Syntax and eight focused signup/self-tracking tests pass. Browser GA signup
   now depends on GTM loading; Meta retains backend delivery. Deployment and fresh
   real-registration Preview verification pending.
+
+## 2026-10-17 — Fix Free upgrade pricing, navigation and checkout exit
+
+- Free accounts default to USD card plan prices when Paddle is configured,
+  including Bangladesh; existing manual paid accounts retain BDT billing.
+- Upgrade shows Opening checkout immediately and navigates before billing reload,
+  avoiding a slow refresh behind the newly staged checkout gate. App v118.
+- Restored Continue on Free checkout action using existing release route; hides
+  after Paddle checkout.completed and on receipt-state refresh while activation
+  polls. Trial checkout header now says Start your free trial.
+- Syntax and eleven focused checkout/activation/signup tests pass. Deployment and
+  live checkout exit/Billing UI verification pending; no card submission performed.
