@@ -1867,7 +1867,7 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 ## 2026-10-17 — Fix Tagioo own conversion events
 
 - Located server.tagioo.com in production: tenant tagioo-sgtm, account
-  sifatulso96@gmail.com, container sgtm-tagioo-tracker (live).
+  sifatuls096@gmail.com, container sgtm-tagioo-tracker (live).
 - Signed Paddle trial activation sends start_trial / Meta StartTrial with shared
   subscription event ID and zero USD value, after existing replay/stale guards.
   Trial remains separate from paid Purchase; renewal behavior unchanged.
@@ -1877,3 +1877,8 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Syntax, 14 Paddle checks and two self-tracking regression checks pass locally.
   Backend changes only; published GTM browser conversion tags and destination
   receipt remain unverified. BDT staged invoice checkout events retain BDT amounts.
+
+- Deployed 8275329 via fast-forward after backup; all 16 focused checks passed on
+  production and PM2 panel reload succeeded. Public login, server.tagioo.com/healthz
+  and the separate operator Preview pilot health each return HTTP 200.
+  No production test conversions, customer container or Nginx changes made.
