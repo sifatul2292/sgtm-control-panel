@@ -3162,7 +3162,7 @@ function renderSetupAssistant(data) {
     }
     if (els.shopifyCustomPixelMessage) els.shopifyCustomPixelMessage.textContent = "";
     const saasGuide = document.querySelector("#saasSetupGuide");
-    if (saasGuide) { saasGuide.hidden = true; saasGuide.querySelector("code").textContent = ""; }
+    if (saasGuide) { saasGuide.hidden = true; saasGuide.open = false; saasGuide.querySelector(".assistant-saas-guide-body").innerHTML = ""; }
     if (els.setupAssistantResult) els.setupAssistantResult.textContent = "";
     if (els.verifyTrackingResult) els.verifyTrackingResult.hidden = true;
   }
@@ -3446,8 +3446,41 @@ function setupAssistantPayload() {
   return payload;
 }
 
+function renderSaasSetupGuide(text) {
+  const guide = document.querySelector("#saasSetupGuide");
+  if (!guide) return;
+  guide.hidden = !text;
+  guide.open = false;
+  const blocks = [];
+  let code = [];
+  const flush = () => {
+    if (code.length) blocks.push("<pre><code>" + escapeHtml(code.join("\n")) + "</code></pre>");
+    code = [];
+  };
+  for (const line of String(text || "").split("\n")) {
+    if (/^(\/\/|window\.dataLayer|dataLayer\.push)/.test(line)) code.push(line);
+    else { flush(); if (line.trim()) blocks.push("<p>" + escapeHtml(line) + "</p>"); }
+  }
+  flush();
+  guide.querySelector(".assistant-saas-guide-body").innerHTML = blocks.join("");
+}
+
+function invalidateSetupAssistantTemplates() {
+  if (!generatedAssistantTemplates) return;
+  generatedAssistantTemplates = null;
+  if (els.downloadWebTemplate) els.downloadWebTemplate.disabled = true;
+  if (els.downloadServerTemplate) els.downloadServerTemplate.disabled = true;
+  if (els.copyShopifyCustomPixel) els.copyShopifyCustomPixel.disabled = true;
+  if (els.shopifyCustomPixelPreview) els.shopifyCustomPixelPreview.hidden = true;
+  renderSaasSetupGuide("");
+  if (els.setupAssistantResult) els.setupAssistantResult.textContent = "Settings changed. Regenerate templates before downloading.";
+}
+
 async function generateSetupAssistantTemplates() {
   if (!els.setupAssistantForm) return;
+  const requestPayload = JSON.stringify(setupAssistantPayload());
+  const requestContainer = setupAssistantContainerId;
+  invalidateSetupAssistantTemplates();
   const button = els.generateTemplates;
   if (button) {
     button.disabled = true;
@@ -3458,21 +3491,22 @@ async function generateSetupAssistantTemplates() {
     const response = await fetch("/api/customer/setup-assistant/templates", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(setupAssistantPayload())
+      body: requestPayload
     });
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Template generation failed."]).join(" "));
+    if (requestContainer !== setupAssistantContainerId || requestPayload !== JSON.stringify(setupAssistantPayload())) {
+      if (els.setupAssistantResult) els.setupAssistantResult.textContent = "Settings changed during generation. Generate templates again.";
+      if (button) button.textContent = "Generate templates";
+      return;
+    }
     generatedAssistantTemplates = result;
     setupAssistantCompleted = true;
     setupAssistantStep = 4;
     updateSetupAssistantStep();
     if (els.downloadWebTemplate) els.downloadWebTemplate.disabled = false;
     if (els.downloadServerTemplate) els.downloadServerTemplate.disabled = false;
-    const saasGuide = document.querySelector("#saasSetupGuide");
-    if (saasGuide) {
-      saasGuide.hidden = !result.saasGuide;
-      saasGuide.querySelector("code").textContent = result.saasGuide || "";
-    }
+    renderSaasSetupGuide(result.saasGuide || "");
     const customPixel = String(result.shopifyCustomPixel || "");
     if (els.copyShopifyCustomPixel) els.copyShopifyCustomPixel.disabled = !customPixel;
     if (els.shopifyCustomPixelPreview) {
@@ -6974,7 +7008,9 @@ document.querySelector("#saveLaravelMapping")?.addEventListener("click", (event)
     successText: "Mapping saved. The next Cron run will detect the selected fields automatically."
   });
 });
+els.setupAssistantForm?.addEventListener("input", invalidateSetupAssistantTemplates);
 els.setupAssistantForm?.addEventListener("change", (event) => {
+  invalidateSetupAssistantTemplates();
   if (event.target.name === "destinations") updateSetupAssistantDestinationFields();
   if (event.target.name === "businessType") updateLaravelAssistantFields();
 });

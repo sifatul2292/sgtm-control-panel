@@ -13,7 +13,7 @@
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" /></noscript>
     <link rel="stylesheet" href="/tokens.css?v=6" />
-    <link rel="stylesheet" href="/styles.css?v=69" />
+    <link rel="stylesheet" href="/styles.css?v=70" />
     <!-- PostHog product analytics: autocapture, session replay, error tracking.
          Watches how customers use the panel — completely separate from tenant
          sGTM tracking. Skipped entirely until a real project key is pasted. -->
@@ -1176,7 +1176,10 @@
                       <button class="button button-primary download-plugin-btn" type="button">⇣ Download WooCommerce plugin</button>
                     </div>
                   </div>
-                  <details id="saasSetupGuide" class="assistant-download-card" hidden><summary>SaaS event implementation guide</summary><pre class="assistant-code-preview"><code></code></pre></details>
+                  <details id="saasSetupGuide" class="assistant-saas-guide" hidden>
+                    <summary>SaaS event implementation guide</summary>
+                    <div class="assistant-saas-guide-body"></div>
+                  </details>
                   <div id="shopifyManualPixelCard" class="assistant-download-card" hidden>
                     <span class="assistant-download-icon" aria-hidden="true">M</span>
                     <h2>Install manually with Shopify Custom Pixel</h2>
@@ -2640,6 +2643,6 @@ window.dataLayer.push({
       <div id="customerSearchResults" class="customer-search-results"></div>
       <p class="customer-search-hint">↑ ↓ to choose · Enter to open · Esc to close</p>
     </dialog>
-    <script src="/app.js?v=116" type="module"></script>
+    <script src="/app.js?v=117" type="module"></script>
   </body>
 </html>

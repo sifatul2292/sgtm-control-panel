@@ -1912,3 +1912,13 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   Google Ads signup/trial labels require separate configuration.
 - Syntax and eleven focused generator/assistant/inspector checks passed locally.
   Live deployment and actual GTM import/publish verification outstanding.
+
+## 2026-10-17 — Fix SaaS guide layout and stale downloads
+
+- Replaced download-card grid styling on the guide with a dedicated disclosure,
+  readable prose and code blocks with wrapping bounded to the wizard.
+- Input changes invalidate old templates, disable downloads and hide the old
+  guide. Regeneration rejects stale results after settings/container changes.
+  Guide closes/reset on regeneration and container change.
+- Bumped app/styles immutable asset versions to 117/70. Syntax and nine focused
+  guide, generator and assistant checks pass. Deployment/visual check pending.
