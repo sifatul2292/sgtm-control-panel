@@ -95,8 +95,12 @@ test("Paddle activation, replay, renewal, and cancellation preserve tenant state
   assert.equal((await context.activatePaddleTenantLocked({ ...event, paddleInvoiceNo: "wrong" })).ok, false);
   assert.equal(data.payments.length, 0);
   const trialEnd = new Date(Date.now() + 3 * 86400000).toISOString();
-  let purchases = 0, activationEmails = 0;
-  context.forwardTagiooOwnEvent = async () => { purchases += 1; };
+  let purchases = 0, trials = 0, metaTrials = 0, activationEmails = 0;
+  context.forwardTagiooOwnEvent = async (name) => { if (name === "purchase") purchases += 1; if (name === "start_trial") trials += 1; };
+  context.sendTagiooFunnelEventToMetaCapi = async (name, tenant, event) => {
+    assert.equal(name, "StartTrial"); assert.equal(event.amount, 0); assert.equal(event.currency, "USD");
+    assert.equal(event.eventId, "trial_sub_test"); metaTrials += 1;
+  };
   context.emailCustomerActivated = async () => { activationEmails += 1; };
   assert.equal((await context.activatePaddleTenantLocked({ ...event, trialEndsAt: "invalid" })).ok, false);
   assert.equal((await context.activatePaddleTenantLocked({ ...event, trialEndsAt: trialEnd, amount: 30 })).ok, false);
@@ -113,6 +117,8 @@ test("Paddle activation, replay, renewal, and cancellation preserve tenant state
   assert.equal(data.payments[0].amount, 0);
   assert.equal((await context.activatePaddleTenantLocked(event)).duplicate, true);
   assert.equal(data.payments.length, 1);
+  assert.equal(trials, 1);
+  assert.equal(metaTrials, 1);
   assert.equal((await context.activatePaddleTenantLocked({ ...event, tenantId: "", paddleTransactionId: "txn_renew", amount: 30, occurredAt: "2026-10-07T02:00:00Z" })).ok, true);
   assert.equal(data.payments.length, 2);
   assert.equal(data.tenants[0].subscriptionStatus, "active");

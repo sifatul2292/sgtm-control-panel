@@ -1863,3 +1863,17 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
 - Paid USD cards on homepage and Pricing show crossed-out regular prices beside
   $0 for 3 days. Monthly prices after trial and auto-charge disclosure retained.
 - BDT mode hides crossed-out USD prices and restores /month and manual amounts.
+
+## 2026-10-17 — Fix Tagioo own conversion events
+
+- Located server.tagioo.com in production: tenant tagioo-sgtm, account
+  sifatulso96@gmail.com, container sgtm-tagioo-tracker (live).
+- Signed Paddle trial activation sends start_trial / Meta StartTrial with shared
+  subscription event ID and zero USD value, after existing replay/stale guards.
+  Trial remains separate from paid Purchase; renewal behavior unchanged.
+- Own Meta Purchase uses payment currency (manual fallback BDT). Own GA forwarding
+  preserves browser GA client/session IDs, falls back to stable visitor identity,
+  and drops stored sessions after 30 minutes. Checkout refreshes visitor snapshot.
+- Syntax, 14 Paddle checks and two self-tracking regression checks pass locally.
+  Backend changes only; published GTM browser conversion tags and destination
+  receipt remain unverified. BDT staged invoice checkout events retain BDT amounts.

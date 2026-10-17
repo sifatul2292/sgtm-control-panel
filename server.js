@@ -5288,6 +5288,11 @@ function tagiooVisitorContext(req) {
     ua: String(req.headers["user-agent"] || ""),
     fbp: cookies._fbp || "",
     fbc,
+    gaClientId: /^GA\d+\.\d+\.(\d+\.\d+)$/.exec(cookies._ga || "")?.[1] || "",
+    gaSessionId: (() => {
+      const value = cookies["_ga_" + TAGIOO_OWN_TRACKING.measurementId.replace(/^G-/, "")] || "";
+      return /^GS1\.\d+\.(\d+)\./.exec(value)?.[1] || /^GS2\.\d+\.s(\d+)/.exec(value)?.[1] || "";
+    })(),
     vid: cookies.tg_vid || "",
     url: `${proto}://${host}${path}`
   };
@@ -5355,11 +5360,12 @@ async function forwardTagiooOwnEvent(eventName, { seed, eventParams = {}, pageLo
   const params = new URLSearchParams({
     v: "2",
     tid: TAGIOO_OWN_TRACKING.measurementId,
-    cid: mpClientId(seed),
+    cid: visitor?.gaClientId || mpClientId(visitor?.vid || seed),
     en: eventName,
     _et: "1",
     ...eventParams
   });
+  if (visitor?.gaSessionId) params.set("sid", visitor.gaSessionId);
   if (pageLocation) params.set("dl", pageLocation);
   else if (visitor?.url) params.set("dl", visitor.url);
   const endpoint = `${TAGIOO_OWN_TRACKING.domain}/g/collect?${params.toString()}`;
@@ -5465,7 +5471,7 @@ async function sendTagiooPurchaseToMetaCapi(tenant, payment, eventId) {
     event_id: eventId,
     user_data: userData,
     custom_data: {
-      currency: "BDT",
+      currency: payment.currency || "BDT",
       order_id: String(payment.id),
       ...(Number.isFinite(value) ? { value } : {})
     }
@@ -5494,7 +5500,7 @@ function tagiooBuyerUserData(tenant) {
   return userData;
 }
 
-async function sendTagiooFunnelEventToMetaCapi(eventName, tenant, { eventId, plan, amount, orderId, when, visitor } = {}) {
+async function sendTagiooFunnelEventToMetaCapi(eventName, tenant, { eventId, plan, amount, currency = "BDT", orderId, when, visitor } = {}) {
   const value = Number(amount);
   const event = applyTagiooVisitorContext({
     event_name: eventName,
@@ -5503,7 +5509,7 @@ async function sendTagiooFunnelEventToMetaCapi(eventName, tenant, { eventId, pla
     event_id: eventId,
     user_data: tagiooBuyerUserData(tenant),
     custom_data: {
-      currency: "BDT",
+      currency,
       ...(plan ? { content_name: String(plan) } : {}),
       ...(orderId ? { order_id: String(orderId) } : {}),
       ...(Number.isFinite(value) ? { value } : {})
@@ -5527,6 +5533,7 @@ async function trackTagiooCheckoutStep(step, { tenantId, plan, amount, orderId, 
     if (!loaded.available) return;
     const tenant = (loaded.data.tenants || []).find((item) => item.id === tenantId);
     if (!tenant) return;
+    if (visitor) await saveTagiooVisitorContext(tenantId, visitor);
     const eventId = `${step}_${orderId || tenantId}`;
     const value = Number(amount);
     await forwardTagiooOwnEvent(spec.ga, {
@@ -5560,6 +5567,8 @@ function storedTagiooVisitor(tenant) {
     ua: fresh ? saved.ua || "" : "",
     fbp: saved.fbp || "",
     fbc: saved.fbc || "",
+    gaClientId: saved.gaClientId || "",
+    gaSessionId: Number.isFinite(savedAt) && Date.now() - savedAt < 30 * 60 * 1000 ? saved.gaSessionId || "" : "",
     vid: saved.vid || "",
     url: saved.url || ""
   };
@@ -7350,7 +7359,18 @@ async function activatePaddleTenantLocked({ tenantId, planName, amount, currency
 
   await writeDatabase(data);
 
-  if (!isTrial) {
+  if (isTrial) {
+    const eventId = `trial_${paddleSubscriptionId}`;
+    const visitor = storedTagiooVisitor(tenant);
+    forwardTagiooOwnEvent("start_trial", {
+      seed: tenant.id, visitor,
+      eventParams: { cu: payment.currency, "epn.value": "0", "ep.plan": planName, "ep.event_id": eventId }
+    }).catch(() => {});
+    sendTagiooFunnelEventToMetaCapi("StartTrial", tenant, {
+      eventId, plan: planName, amount: 0, currency: payment.currency,
+      orderId: paddleSubscriptionId, when: occurredAt, visitor
+    }).catch(() => {});
+  } else {
     const purchaseEventId = `purchase_${payment.id}`;
     const purchaseVisitor = storedTagiooVisitor(tenant);
     forwardTagiooOwnEvent("purchase", {
