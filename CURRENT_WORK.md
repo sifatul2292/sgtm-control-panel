@@ -2,6 +2,18 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-10.
 
+## 2026-10-18 — Marketing site speed (branch perf/marketing-speed, not deployed)
+
+- Local landing.html matched live tagioo.com byte-for-byte; pages were already static
+  HTML (no CSR for hero). Biggest weight: logo/icon/favicon SVGs wrapping a full
+  1922x818 PNG (~2MB of 2MB page). Replaced on marketing pages with AVIF+PNG 2x crops.
+- servePublicPage now inlines local CSS, serves Brotli/gzip + ETag, and sends
+  public s-maxage=3600 / swr=86400. Helpers/app shell send private, no-store.
+- Google Fonts non-blocking; dead CF email-decode script removed (footer email
+  decoded to plain mailto); hero-motion/blog.js deferred; screenshots AVIF.
+- Cloudflare Cache Rule needed for edge HTML caching; MUST bypass on sgtm_session
+  cookie (see docs/marketing-performance.md). Next: self-host Inter, deploy, re-run WPT.
+
 ## 2026-10-11 — Production-style homepage copy review
 
 - Reviewed live tagioo.com (different from the local redesign) and the owner's
@@ -2073,3 +2085,27 @@ Do NOT start with tracking/Nginx/container-lifecycle changes.
   GTM Preview firing and Meta Events Manager receipt NOT verified (needs deploy +
   owner-authorized sandbox switch with backup/restore). GTM tag variable mapping for
   event_id/ecommerce on begin_checkout/add_payment_info/start_trial unconfirmed.
+
+## 2026-10-17 — Deploy + sandbox verify Paddle browser funnel
+
+- Deployed cf776ea then 4d2ff46 by fast-forward after backup under
+  /var/backups/tagioo-paddle-events-20261017 (server.js copies, HEAD, live.env,
+  restore-live.sh, test logs). 34 focused checks pass on VPS; panel reload OK.
+- 4d2ff46: checkoutRequired counted ANY past pending/confirmed payment, so a
+  returning Free customer (rahim, old USD30 sandbox receipt) bounced from /checkout
+  to dashboard and could not start a new card trial. Now only a claim for the current
+  pendingInvoiceNo lifts the gate. Added focused test.
+- Owner-authorized sandbox window ~14:59–15:09 UTC with 25-min systemd restore
+  failsafe. Real sandbox checkout (owner entered Paddle test card) for rahim,
+  Starter, invoice rahim-INV003, sub_01m556c3f9b4q1283hhp66bdq0.
+- GTM Preview (GTM-MCR3FD4W): Tagioo GA4 begin_checkout / add_payment_info /
+  start_trial and Tagioo Meta InitiateCheckout / AddPaymentInfo / StartTrial each
+  fired exactly once; no Purchase tag. start_trial dataLayer event_id
+  trial_sub_01m556c3f9b4q1283hhp66bdq0, value 0 USD; begin_checkout
+  initiate_checkout_rahim-INV003 USD30. start_trial fired only after webhook trial
+  activation (page then continued to dashboard).
+- Server: one $0 USD trial receipt (INV003), no paid receipt. Sandbox subscription
+  canceled immediately via sandbox API (200); cancel webhook returned rahim to Free.
+  Restored exact live.env (cmp identical), PADDLE_ENV=production, both PM2 processes
+  online, failsafe timer stopped; login/server.tagioo.com/pilot health 200.
+  Pre-existing pending inbox event evt_01m4aqq53868yc80at19ewa046 untouched.

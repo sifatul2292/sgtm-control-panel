@@ -6,7 +6,7 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile, spawn } from "node:child_process";
 import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
-import { deflateRawSync, gzip } from "node:zlib";
+import { brotliCompress, constants as zlibConstants, deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
 import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
 import { highestActiveShopifyPlan, normalizeShopifyBillingState, requiresShopifyBilling } from "./shopify-billing.js";
@@ -21,6 +21,7 @@ import { paddleEventIsStale } from "./paddle-billing.js";
 import { attachEventHistory, archiveEventHistory } from "./history-archive.js";
 
 const gzipAsync = promisify(gzip);
+const brotliAsync = promisify(brotliCompress);
 
 // Minimal ZIP builder (no extra deps). Used for the WooCommerce plugin and the
 // multi-file Laravel Bridge source bundle.
@@ -312,13 +313,22 @@ const mimeTypes = {
   ".xml": "application/xml; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
   ".svg": "image/svg+xml",
-  ".png": "image/png"
+  ".png": "image/png",
+  ".avif": "image/avif",
+  ".webp": "image/webp",
+  ".woff2": "font/woff2"
 };
+
+// Marketing HTML is identical for every visitor (currency/geo tweaks happen
+// client-side via /api/geo) and never sets cookies, so a CDN may cache it.
+// Everything user-specific must stay out of shared caches.
+const MARKETING_CACHE_CONTROL = "public, s-maxage=3600, stale-while-revalidate=86400";
+const PRIVATE_CACHE_CONTROL = "private, no-store";
 
 function jsonResponse(res, status, body) {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store"
+    "cache-control": PRIVATE_CACHE_CONTROL
   });
   res.end(JSON.stringify(body));
 }
@@ -328,7 +338,7 @@ async function jsonResponseGzip(req, res, status, body) {
   const acceptsGzip = /gzip/.test(req.headers["accept-encoding"] || "");
   const headers = {
     "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store"
+    "cache-control": PRIVATE_CACHE_CONTROL
   };
   if (acceptsGzip && json.length > 2048) {
     try {
@@ -349,7 +359,7 @@ async function jsonResponseGzip(req, res, status, body) {
 function htmlResponse(res, status, body, headers = {}) {
   res.writeHead(status, {
     "content-type": "text/html; charset=utf-8",
-    "cache-control": "no-store",
+    "cache-control": PRIVATE_CACHE_CONTROL,
     ...headers
   });
   res.end(body);
@@ -358,7 +368,7 @@ function htmlResponse(res, status, body, headers = {}) {
 function redirect(res, location) {
   res.writeHead(302, {
     location,
-    "cache-control": "no-store"
+    "cache-control": PRIVATE_CACHE_CONTROL
   });
   res.end();
 }
@@ -12234,18 +12244,43 @@ async function loadStaticAsset(absolutePath) {
 
   const content = await readFile(absolutePath);
   const mime = mimeTypes[extname(absolutePath)] || "application/octet-stream";
-  const compressible = /javascript|css|html|json|text\//.test(mime);
-  const gzipped = compressible && content.length > 1024 ? await gzipAsync(content) : null;
+  const compressible = /javascript|css|html|json|xml|svg|text\//.test(mime);
+  const { gzipped, brotli } = compressible && content.length > 1024 ? await compressBody(content) : {};
   const entry = {
     sig,
     content,
     gzipped,
+    brotli,
     mime,
     etag: `"${fileStat.mtime.getTime().toString(16)}-${fileStat.size.toString(16)}"`,
     lastModified: fileStat.mtime.toUTCString()
   };
   staticAssetCache.set(absolutePath, entry);
   return entry;
+}
+
+// Compressed once per file change and cached, so max Brotli quality is affordable.
+async function compressBody(content) {
+  const [gzipped, brotli] = await Promise.all([
+    gzipAsync(content),
+    brotliAsync(content, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11, [zlibConstants.BROTLI_PARAM_SIZE_HINT]: content.length } })
+  ]);
+  return { gzipped, brotli };
+}
+
+function sendEncoded(req, res, status, headers, asset) {
+  const accept = String(req.headers["accept-encoding"] || "");
+  let body = asset.content;
+  if (asset.brotli && /\bbr\b/.test(accept)) {
+    headers["content-encoding"] = "br";
+    body = asset.brotli;
+  } else if (asset.gzipped && /gzip/.test(accept)) {
+    headers["content-encoding"] = "gzip";
+    body = asset.gzipped;
+  }
+  if (asset.brotli || asset.gzipped) headers["vary"] = "Accept-Encoding";
+  res.writeHead(status, headers);
+  res.end(req.method === "HEAD" ? undefined : body);
 }
 
 async function serveStatic(req, res) {
@@ -12264,55 +12299,89 @@ async function serveStatic(req, res) {
   try {
     const asset = await loadStaticAsset(absolutePath);
 
+    // Versioned assets (?v=…) are content-addressed by the caller (e.g. app.js?v=3):
+    // serve them immutable for a year so normal navigation (login → dashboard) reuses
+    // the cached copy with zero revalidation round-trips. Unversioned files keep
+    // must-revalidate so edits show up immediately. HTML reaching this fallback is
+    // the logged-in app shell (/ and /index.html), so it stays out of shared caches.
+    const versioned = reqUrl.searchParams.has("v");
+    const cacheControl = asset.mime.startsWith("text/html")
+      ? PRIVATE_CACHE_CONTROL
+      : versioned
+        ? "public, max-age=31536000, immutable"
+        : "public, max-age=0, must-revalidate";
+
     // Ctrl+R sends If-None-Match; 304 means browser uses cached copy → zero download
     if (req.headers["if-none-match"] === asset.etag) {
-      res.writeHead(304);
+      res.writeHead(304, { "cache-control": cacheControl, "etag": asset.etag });
       res.end();
       return;
     }
 
-    // Versioned assets (?v=…) are content-addressed by the caller (e.g. app.js?v=3):
-    // serve them immutable for a year so normal navigation (login → dashboard) reuses
-    // the cached copy with zero revalidation round-trips. Unversioned files keep
-    // must-revalidate so edits show up immediately.
-    const versioned = reqUrl.searchParams.has("v");
-    const cacheControl = versioned
-      ? "public, max-age=31536000, immutable"
-      : "public, max-age=0, must-revalidate";
-
-    const headers = {
+    sendEncoded(req, res, 200, {
       "content-type": asset.mime,
       "cache-control": cacheControl,
       "etag": asset.etag,
       "last-modified": asset.lastModified
-    };
-
-    const acceptsGzip = /gzip/.test(req.headers["accept-encoding"] || "");
-    if (acceptsGzip && asset.gzipped) {
-      headers["content-encoding"] = "gzip";
-      headers["vary"] = "Accept-Encoding";
-      res.writeHead(200, headers);
-      res.end(asset.gzipped);
-    } else {
-      res.writeHead(200, headers);
-      res.end(asset.content);
-    }
+    }, asset);
   } catch {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
     res.end("Not found");
   }
 }
 
-async function servePublicPage(res, filename) {
+// Marketing pages ship their local stylesheets inline: each <link> to /assets/*.css
+// or /landing.css is a render-blocking round trip on slow mobile links, so the
+// served HTML carries the CSS itself and paints from a single response. Source
+// files stay as-is; the rendered page is rebuilt when the HTML or any CSS changes.
+const INLINE_STYLESHEET_RE = /<link\s+rel="stylesheet"\s+href="(\/(?:assets\/[\w.-]+|landing)\.css)(?:\?[^"]*)?"\s*\/?>/g;
+const marketingPageCache = new Map();
+
+async function fileSignature(path) {
+  const fileStat = await stat(path);
+  return `${path}:${fileStat.mtimeMs}-${fileStat.size}`;
+}
+
+async function loadMarketingPage(filename) {
+  const htmlPath = join(publicDir, filename);
+  const cached = marketingPageCache.get(htmlPath);
+  if (cached && (await Promise.all(cached.deps.map(fileSignature))).join("|") === cached.sig) return cached;
+
+  const sigs = [await fileSignature(htmlPath)];
+  const deps = [htmlPath];
+  const html = await readFile(htmlPath, "utf8");
+  const styles = new Map();
+  for (const [, href] of html.matchAll(INLINE_STYLESHEET_RE)) {
+    if (styles.has(href)) continue;
+    const cssPath = join(publicDir, href);
+    sigs.push(await fileSignature(cssPath));
+    deps.push(cssPath);
+    styles.set(href, await readFile(cssPath, "utf8"));
+  }
+  const content = Buffer.from(html.replace(INLINE_STYLESHEET_RE, (_, href) => `<style>${styles.get(href)}</style>`), "utf8");
+  const entry = {
+    sig: sigs.join("|"),
+    deps,
+    content,
+    ...(await compressBody(content)),
+    etag: `"${createHash("sha1").update(content).digest("base64url")}"`
+  };
+  marketingPageCache.set(htmlPath, entry);
+  return entry;
+}
+
+async function servePublicPage(req, res, filename) {
   try {
-    const content = await readFile(join(publicDir, filename));
-    res.writeHead(200, {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store"
-    });
-    res.end(content);
+    const page = await loadMarketingPage(filename);
+    const headers = { "cache-control": MARKETING_CACHE_CONTROL, "etag": page.etag, "vary": "Accept-Encoding" };
+    if (req.headers["if-none-match"] === page.etag) {
+      res.writeHead(304, headers);
+      res.end();
+      return;
+    }
+    sendEncoded(req, res, 200, { ...headers, "content-type": "text/html; charset=utf-8" }, page);
   } catch {
-    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+    res.writeHead(404, { "content-type": "text/plain; charset=utf-8", "cache-control": PRIVATE_CACHE_CONTROL });
     res.end("Not found");
   }
 }
@@ -12445,13 +12514,13 @@ const server = createServer(async (req, res) => {
       return;
     }
     if ((pathname === "/blog" || pathname === "/blog/") && req.method === "GET") {
-      await servePublicPage(res, "blog/index.html");
+      await servePublicPage(req, res, "blog/index.html");
       return;
     }
     if (pathname.startsWith("/blog/") && req.method === "GET") {
       const slug = pathname.slice(6);
       if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
-        await servePublicPage(res, `blog/${slug}.html`);
+        await servePublicPage(req, res, `blog/${slug}.html`);
         return;
       }
     }
@@ -12461,7 +12530,7 @@ const server = createServer(async (req, res) => {
         redirect(res, "/login");
         return;
       }
-      await servePublicPage(res, "landing.html");
+      await servePublicPage(req, res, "landing.html");
       return;
     }
 
@@ -12485,7 +12554,7 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === "/website-tracking-checker" && req.method === "GET") {
-      await servePublicPage(res, "tracking-checker.html");
+      await servePublicPage(req, res, "tracking-checker.html");
       return;
     }
     if (pathname === "/api/public/tracking-checker" && req.method === "POST") {
@@ -12505,42 +12574,42 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === "/features") {
-      await servePublicPage(res, "features.html");
+      await servePublicPage(req, res, "features.html");
       return;
     }
 
     if (pathname === "/pricing") {
-      await servePublicPage(res, "pricing.html");
+      await servePublicPage(req, res, "pricing.html");
       return;
     }
 
     if (pathname === "/compare") {
-      await servePublicPage(res, "compare.html");
+      await servePublicPage(req, res, "compare.html");
       return;
     }
 
     if (pathname === "/how-it-works") {
-      await servePublicPage(res, "how-it-works.html");
+      await servePublicPage(req, res, "how-it-works.html");
       return;
     }
 
     if (pathname === "/docs") {
-      await servePublicPage(res, "docs.html");
+      await servePublicPage(req, res, "docs.html");
       return;
     }
 
     if (pathname === "/refunds") {
-      await servePublicPage(res, "refunds.html");
+      await servePublicPage(req, res, "refunds.html");
       return;
     }
 
     if (pathname === "/terms") {
-      await servePublicPage(res, "terms.html");
+      await servePublicPage(req, res, "terms.html");
       return;
     }
 
     if (pathname === "/privacy") {
-      await servePublicPage(res, "privacy.html");
+      await servePublicPage(req, res, "privacy.html");
       return;
     }
 

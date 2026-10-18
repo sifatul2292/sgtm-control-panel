@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=brand-2" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/assets/tagioo-icon-64.png?v=1" />
     <meta name="description" content="Find Tagioo guidance for tracking domains, Web and Server GTM templates, WooCommerce setup, event verification and troubleshooting." />
     <meta property="og:title" content="Server-Side GTM Setup &amp; Troubleshooting Docs | Tagioo" />
     <meta property="og:description" content="Find Tagioo guidance for tracking domains, Web and Server GTM templates, WooCommerce setup, event verification and troubleshooting." />
     <title>Server-Side GTM Setup &amp; Troubleshooting Docs | Tagioo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'" /><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" /></noscript>
     <link rel="stylesheet" href="/landing.css?v=5" />
     <link rel="stylesheet" href="/assets/legacy-pages.css?v=2" />
       <!-- Google Tag Manager -->
@@ -36,7 +36,7 @@
     <!-- ── HEADER ─────────────────────────────────────────────── -->
     <header class="site-header" id="siteHeader">
       <a class="brand" href="/" aria-label="Tagioo home">
-        <img src="/assets/tagioo-logo.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box">
+        <picture><source srcset="/assets/tagioo-logo-284.avif?v=1" type="image/avif"><img src="/assets/tagioo-logo-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box"></picture>
       </a>
       <nav aria-label="Primary navigation">
         <a href="/features">Platform</a>
@@ -145,7 +145,7 @@
               <li>Open <code>tagioo-bridge/README.txt</code>. It contains the installation rules and the Cron command.</li>
             </ol>
             <figure class="docs-figure">
-              <img src="/images/docs/laravel/package-readme.png" alt="Tagioo cPanel Bridge README showing the safe installation location and Cron command" loading="lazy" decoding="async" />
+              <picture><source srcset="/images/docs/laravel/package-readme.avif" type="image/avif"><img src="/images/docs/laravel/package-readme.png" width="1188" height="1270" alt="Tagioo cPanel Bridge README showing the safe installation location and Cron command" loading="lazy" decoding="async" /></picture>
               <figcaption>The downloaded README explains where the private folder belongs and provides the command format. Replace every placeholder with this customer's cPanel path.</figcaption>
             </figure>
 
@@ -161,7 +161,7 @@
             <p>Use the logging version during setup so any error is visible in <code>cron.log</code>. The log suffix does not make tracking work; it only records output. After the integration is Live, replace it with the production command below so the log does not grow forever.</p>
             <div class="docs-code">/usr/local/bin/php /home/CPANEL_USERNAME/tagioo-bridge/bridge.php run &gt; /dev/null 2&gt;&amp;1</div>
             <figure class="docs-figure">
-              <img src="/images/docs/laravel/cron-job.png" alt="cPanel Cron Jobs form configured to run the Tagioo Bridge once per minute" loading="lazy" decoding="async" />
+              <picture><source srcset="/images/docs/laravel/cron-job.avif" type="image/avif"><img src="/images/docs/laravel/cron-job.png" width="1274" height="1048" alt="cPanel Cron Jobs form configured to run the Tagioo Bridge once per minute" loading="lazy" decoding="async" /></picture>
               <figcaption>Example cPanel schedule. Each customer must use their own home path and the PHP 8.1+ CLI path supplied by their host.</figcaption>
             </figure>
 
@@ -173,7 +173,7 @@
               <li>If the status remains <strong>Not connected</strong>, wait for another run and open <code>tagioo-bridge/cron.log</code> in File Manager.</li>
             </ol>
             <figure class="docs-figure">
-              <img src="/images/docs/laravel/waiting-for-connection.png" alt="Tagioo Laravel setup waiting for the first Cron run" loading="lazy" decoding="async" />
+              <picture><source srcset="/images/docs/laravel/waiting-for-connection.avif" type="image/avif"><img src="/images/docs/laravel/waiting-for-connection.png" width="2066" height="920" alt="Tagioo Laravel setup waiting for the first Cron run" loading="lazy" decoding="async" /></picture>
               <figcaption>“Not connected” immediately after installation normally means Tagioo is waiting for the first Cron run.</figcaption>
             </figure>
             <div class="docs-callout">
@@ -183,7 +183,7 @@
             <h3>Step 5 — Review Advanced mapping before activation</h3>
             <p>When the Bridge connects, Tagioo detects safe schema metadata—table and column names, not the customer's database password or historical customer records. A <strong>Needs mapping</strong> status means the Bridge is working but one or more detected choices need confirmation.</p>
             <figure class="docs-figure">
-              <img src="/images/docs/laravel/needs-mapping.png" alt="Tagioo Laravel Bridge connected with Needs Mapping status and Advanced mapping available" loading="lazy" decoding="async" />
+              <picture><source srcset="/images/docs/laravel/needs-mapping.avif" type="image/avif"><img src="/images/docs/laravel/needs-mapping.png" width="1512" height="1114" alt="Tagioo Laravel Bridge connected with Needs Mapping status and Advanced mapping available" loading="lazy" decoding="async" /></picture>
               <figcaption>Open Advanced mapping whenever Tagioo shows “Needs mapping.” Do not activate tracking until the required fields are correct.</figcaption>
             </figure>
             <ol>
@@ -194,7 +194,7 @@
               <li>Click <strong>Save mapping and detect again</strong>, wait for the next Cron run, and confirm Tagioo reports the mapping as ready.</li>
             </ol>
             <figure class="docs-figure">
-              <img src="/images/docs/laravel/advanced-mapping.png" alt="Laravel Advanced mapping with invoice_id selected as the public Order ID" loading="lazy" decoding="async" />
+              <picture><source srcset="/images/docs/laravel/advanced-mapping.avif" type="image/avif"><img src="/images/docs/laravel/advanced-mapping.png" width="1484" height="788" alt="Laravel Advanced mapping with invoice_id selected as the public Order ID" loading="lazy" decoding="async" /></picture>
               <figcaption>Example mapping: the public <code>invoice_id</code> is selected instead of the internal row ID, and the store's valid COD status values are included.</figcaption>
             </figure>
             <p>Click <strong>Activate tracking</strong> after the mapping is correct. Activation checkpoints existing orders, so only orders created afterward are treated as new purchases.</p>
@@ -217,7 +217,7 @@
               <li>Confirm the corresponding Tagioo tags fire on the correct event. One action should not create several independent browser copies.</li>
             </ol>
             <figure class="docs-figure">
-              <img src="/images/docs/laravel/gtm-preview.png" alt="Web GTM Preview showing Tagioo PageView, ViewContent, AddToCart, InitiateCheckout, and Purchase tags" loading="lazy" decoding="async" />
+              <picture><source srcset="/images/docs/laravel/gtm-preview.avif" type="image/avif"><img src="/images/docs/laravel/gtm-preview.png" width="3528" height="1670" alt="Web GTM Preview showing Tagioo PageView, ViewContent, AddToCart, InitiateCheckout, and Purchase tags" loading="lazy" decoding="async" /></picture>
               <figcaption>Use GTM Preview to confirm that the Tagioo tags fire on the expected storefront actions before publishing.</figcaption>
             </figure>
 
@@ -238,7 +238,7 @@
               <li>For Purchase, compare the Event ID with the public invoice/order ID mapped in Tagioo.</li>
             </ol>
             <figure class="docs-figure">
-              <img src="/images/docs/laravel/meta-test-events.png" alt="Meta Test Events displaying Browser and Server events with Event IDs" loading="lazy" decoding="async" />
+              <picture><source srcset="/images/docs/laravel/meta-test-events.avif" type="image/avif"><img src="/images/docs/laravel/meta-test-events.png" width="1814" height="1010" alt="Meta Test Events displaying Browser and Server events with Event IDs" loading="lazy" decoding="async" /></picture>
               <figcaption>Compare “Received From,” event name, and Event ID. Browser + Server is correct only when the matching pair represents one deduplicated event.</figcaption>
             </figure>
 
@@ -253,7 +253,7 @@
             <p>Keep the Laravel site's standard ecommerce <code>dataLayer</code> pushes, but disable older GTM tags or hard-coded <code>fbq('track', ...)</code>, <code>fbq('trackCustom', ...)</code>, and <code>ttq.track(...)</code> calls that send the same events directly.</p>
             <p>Tagioo funnel Event IDs normally begin with <code>tagioo-</code>. An ID such as <code>ob3_plugin-set_...</code> is created by another script on the Laravel website, not by Tagioo.</p>
             <figure class="docs-figure">
-              <img src="/images/docs/laravel/third-party-event-id.png" alt="Meta event details showing an ob3_plugin-set Event ID from another website script" loading="lazy" decoding="async" />
+              <picture><source srcset="/images/docs/laravel/third-party-event-id.avif" type="image/avif"><img src="/images/docs/laravel/third-party-event-id.png" width="2198" height="1116" alt="Meta event details showing an ob3_plugin-set Event ID from another website script" loading="lazy" decoding="async" /></picture>
               <figcaption>This <code>ob3_plugin-set_</code> Event ID identifies a separate website-side Meta sender. Disable that duplicate sender if Tagioo is responsible for the same event.</figcaption>
             </figure>
 
@@ -308,7 +308,7 @@
       <div class="footer-inner">
         <div class="footer-brand">
           <a class="brand brand-light" href="/">
-            <img src="/assets/tagioo-logo-light.svg" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box">
+            <picture><source srcset="/assets/tagioo-logo-light-284.avif?v=1" type="image/avif"><img src="/assets/tagioo-logo-light-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box" loading="lazy" decoding="async"></picture>
           </a>
           <p>Managed server-side tracking for ecommerce teams, marketers and agencies.</p>
           <div class="footer-payments">
