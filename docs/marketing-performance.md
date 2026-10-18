@@ -17,24 +17,33 @@ Goal: LCP < 2.5s for US mobile visitors while the origin stays in Singapore.
 - Marketing HTML never sets cookies. Currency/geo changes happen client-side via
   `/api/geo` (which is `private, no-store`), so one cached copy is correct for everyone.
 
-## Cloudflare setup (manual, required for the TTFB win)
+## Cloudflare setup (live since 2026-10-19)
 
-Cloudflare does not cache HTML by default (`cf-cache-status: DYNAMIC` today), so the
-origin headers alone change nothing at the edge. Add a **Cache Rule**:
+Cloudflare does not cache HTML by default. One Cache Rule, "Cache marketing pages
+(skip logged-in)", makes it do so:
 
-- **Bypass first (put this rule above the next one):** when `http.cookie contains "sgtm_session="`, set Cache eligibility to **Bypass cache**.
-  `/` serves the landing page to visitors who are not logged in and the dashboard to
-  users who are. Without this bypass, a logged-in user could get the cached landing
-  page at `/`. Their `/login` would then redirect back to `/`, and they would be stuck.
-- **Then cache:** when the hostname is `tagioo.com` and the URI path is one of
-  `/`, `/features`, `/pricing`, `/compare`, `/how-it-works`, `/docs`, `/terms`,
-  `/privacy`, `/refunds`, `/website-tracking-checker`, or starts with `/blog`:
-  set eligibility to **Eligible for cache** and Edge TTL to **Use cache-control header if present**.
-- Optional: turn off Scrape Shield → Email Obfuscation. The footer email is now a plain
-  `mailto:` link. When obfuscation is on, Cloudflare injects `email-decode.min.js`,
-  which rewrites the page's HTML in the browser after it loads.
-- After a content deploy, purge the marketing URLs, or wait up to 1 hour plus the
-  stale-while-revalidate window.
+```
+(http.host eq "tagioo.com" and (http.request.uri.path in {"/" "/features" "/pricing"
+ "/compare" "/how-it-works" "/docs" "/terms" "/privacy" "/refunds"
+ "/website-tracking-checker" "/blog" "/blog/"} or http.request.uri.path wildcard "/blog/*")
+ and not http.cookie contains "sgtm_session=")
+```
+
+- Eligible for cache; Edge TTL follows the origin's `s-maxage`.
+- Cache key: **ignore query string**, so ad-click URLs (`?fbclid=`, `?utm_*`) are
+  served from the same cached copy. Pages are identical server-side whatever the
+  query string, and GTM still reads the full URL in the browser.
+- The logged-in exclusion lives inside this rule on purpose. In Cloudflare, when
+  several Cache Rules match a request, the later rule wins, so a separate "bypass"
+  rule placed first would be overridden. `/` serves the dashboard to logged-in
+  users; without this exclusion they could get the cached landing page and be
+  stuck in a loop between `/` and `/login`.
+- Scrape Shield → Email Address Obfuscation is **off**, so Cloudflare no longer
+  injects `email-decode.min.js`. The footer email is a plain `mailto:` link.
+- "Challenge signup" (Managed Challenge on `/signup`) is an intentional anti-bot
+  custom rule. It stays in place.
+- After a content deploy, purge the marketing URLs (Caching → Configuration →
+  Purge), or wait up to 1 hour plus the stale-while-revalidate window.
 
 ## Front-end changes
 
