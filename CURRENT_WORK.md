@@ -2,6 +2,39 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
 
+## 2026-10-19 — SaaS generator guide; manual GTM import requested
+
+- Owner clarified scope: update Setup Assistant/generate web and server JSON for
+  SaaS; owner imports them. Reverted all three own unpublished GTM draft edits
+  through Chrome; GTM-K89C9H47 workspace 9 now shows Workspace Changes: 0.
+  No GTM version was published and no VPS routing/test-code settings changed.
+- Expanded generated SaaS guide with exact download filenames, GTM delivery path,
+  Lead/registration mappings, server-only test-code setup/removal, payment-info
+  push, and the ordered migration for Tagioo's existing direct backend sender.
+  Existing generated server JSON already includes the Meta prefix mapping and
+  GA4 exception from 4272a13; added assertions for those exported artifacts and
+  ensuring the test code stays out of web JSON. Importing alone does not change
+  existing backend delivery; the guide explicitly explains the later routing flag.
+- Previous Chrome draft/testing notes below are historical; their pending request
+  for a test tenant is superseded. No live GTM work is pending from this session.
+
+## 2026-10-19 — GTM migration draft prepared through Chrome
+
+- User merged 4272a13 on VPS; Chrome Hostinger terminal verified production merge
+  c79590a and all 27 focused tests pass. TAGIOO_META_VIA_GTM is false and the
+  backend test-code variable is unset; production routing remains unchanged.
+- Own GTM-K89C9H47 workspace 9 has three saved, UNPUBLISHED changes: Meta template
+  prefix mapping plus dotted hashed identity fallback, Meta-only Event Name
+  starts-with tagioo_meta_ trigger, and that trigger as a GA4 forwarding exception.
+  Existing Meta tag credentials and test code were not edited.
+- Added isolated GTM template test mocking HTTP/cookies/headers; all seven
+  conversion names, shared ID, hashed email and TEST89864 payload asserted;
+  GTM reports SUCCESS. No real conversion was sent by that test.
+- Asked owner which throwaway tenant/container to use for the AGENTS.md live
+  tracking test requirement. Pending: isolated tenant preview, GTM publish,
+  enable routing flag/reload and fresh Meta receipt verification. Do not enable
+  the VPS flag before publishing the compatible container changes.
+
 ## 2026-10-19 — Route Tagioo Meta conversions through sGTM (local, not activated)
 
 - Owner requested all events through GTM. Added TAGIOO_META_VIA_GTM=true mode:

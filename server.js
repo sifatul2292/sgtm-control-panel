@@ -2614,7 +2614,10 @@ analytics.subscribe('checkout_completed', function(event){
 
 function saasSetupGuide() {
   return `SaaS / Subscription setup
-Import web.json and server.json into the corresponding GTM containers using Merge. Preview before publishing. Pause overlapping old tags to prevent duplicate sends.
+In Setup Assistant choose SaaS / Subscription, select your destinations, and enter your tracking domain, GA4 measurement ID and Meta pixel/access token. For Meta testing, enter the Test Event Code here before generating the templates.
+Generate and download tagioo-web-template.json and tagioo-server-template.json. Import the web file into Web GTM and the server file into Server GTM using Merge. Review the import changes, preview, then publish both containers yourself. Pause overlapping old tags to prevent duplicate sends.
+The normal path is application dataLayer → Web GTM → your tracking domain /g/collect → Server GTM → Meta CAPI and GA4. Browser Meta Pixel events also come from Web GTM. Lead maps from generate_lead; CompleteRegistration maps from sign_up.
+The Meta Test Event Code belongs to the server Meta tag in the generated server file. No VPS test code is needed for events delivered through that tag. Verify Lead and CompleteRegistration in Meta Test Events, then clear the code in Server GTM and publish again after testing.
 Your application must push events only AFTER the action succeeds; installing GTM does not detect account creation or billing automatically.
 window.dataLayer = window.dataLayer || [];
 // After a valid signup/demo/contact form is SUBMITTED (not when it is viewed):
@@ -2627,6 +2630,9 @@ dataLayer.push({event:"start_trial", event_id:"trial_SUBSCRIPTION_ID", plan:"Pro
 // When subscription checkout actually opens:
 dataLayer.push({ecommerce:null});
 dataLayer.push({event:"begin_checkout", event_id:"checkout_CHECKOUT_ID", plan:"Pro", ecommerce:{value:50,currency:"USD"}});
+// After payment details are successfully submitted:
+dataLayer.push({ecommerce:null});
+dataLayer.push({event:"add_payment_info", event_id:"payment_info_CHECKOUT_ID", plan:"Pro", ecommerce:{value:50,currency:"USD"}});
 // After the first successful paid subscription activation:
 dataLayer.push({event:"subscribe", event_id:"subscribe_SUBSCRIPTION_ID", plan:"Pro"});
 // Only after a successful charge, including renewals:
@@ -2637,7 +2643,8 @@ Use the SAME event_id and event name for browser and backend copies of one actio
 Keep webhooks authoritative for trial activation and paid charges; persist browser attribution for delayed events. A webhook cannot push into a closed browser.
 Mark sign_up and start_trial as key events in GA4 Admin. Subscribe is a separate lifecycle event; do not sum it with Purchase as paid-customer count.
 Do not put email, phone, passwords or server access tokens in these pushes. Keep server credentials in server.json only. Respect visitor consent.
-For Tagioo itself, the site already pushes generate_lead (on /verify), sign_up, start_trial and begin_checkout with tagioo_capi_direct:"1", and its backend sends the matching direct CAPI events with hashed email.
+Existing direct backend integrations require a separate switch: importing GTM files alone does not stop a backend from calling Meta directly. Do not set tagioo_capi_direct:"1" on ordinary SaaS events; it makes the server Meta tag skip them.
+For Tagioo's own site, first import and publish the regenerated server file, including its updated Meta template and the Meta-only backend delivery exception on GA4 - Forward Events. Then set TAGIOO_META_VIA_GTM=true on the panel VPS and reload sgtm-control-panel. This is a routing switch, not a test code. Tagioo's backend sends its confirmed conversions to Server GTM as tagioo_meta_generate_lead, tagioo_meta_sign_up and the other tagioo_meta_* lifecycle events, preserving shared event IDs and hashed identity. The generated Meta template maps these to standard Meta events; the GA4 exception keeps these extra Meta deliveries and hashed fields out of GA4. The existing ordinary browser/GA4 hits keep their skip flag so there is only one server Meta copy. Do not enable this switch before the compatible server container is published. Other SaaS applications do not need this Tagioo-specific environment variable.
 TikTok trial-start mapping and Google Ads signup/trial conversion labels are not included; configure those destination rules separately if needed.`;
 }
 

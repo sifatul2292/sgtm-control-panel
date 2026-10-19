@@ -39,6 +39,22 @@ test("existing ecommerce exports keep cart tags and Shopify instrumentation", ()
   assert.match(result.shopifyCustomPixel, /Shopify Custom Pixel/);
   assert.equal(result.saasGuide, "");
 });
+test("SaaS generated files and guide cover GTM-owned Meta testing and backend migration", () => {
+  const result = ctx.buildSetupAssistantTemplates({ ...input, metaTestEventCode: "TEST123" });
+  assert.match(result.saasGuide, /tagioo-web-template\.json/);
+  assert.match(result.saasGuide, /tagioo-server-template\.json/);
+  assert.match(result.saasGuide, /No VPS test code is needed/);
+  assert.match(result.saasGuide, /TAGIOO_META_VIA_GTM=true/);
+  assert.match(result.saasGuide, /Do not enable this switch before/);
+  assert.match(result.saasGuide, /event:"add_payment_info"/);
+  const server = result.server.containerVersion;
+  const ga4 = server.tag.find(t => t.type === "sgtmgaaw");
+  const exception = server.trigger.find(t => t.name === "Tagioo - Meta-only backend delivery");
+  assert.ok(ga4.blockingTriggerId.includes(exception.triggerId));
+  assert.match(server.customTemplate[0].templateData, /replace\('tagioo_meta_', ''\)/);
+  assert.ok(server.variable.some(v => JSON.stringify(v).includes("TEST123")));
+  assert.equal(JSON.stringify(result.web).includes("TEST123"), false);
+});
 test("SaaS web export adds Lead on generate_lead and the direct-CAPI skip flag", () => {
   const result = ctx.buildSetupAssistantTemplates({ ...input, destinations: ["ga4", "meta", "tiktok"], tiktokPixelId: "T1" });
   const web = result.web.containerVersion;
