@@ -17,6 +17,7 @@ import { appendProtectedDataAudit } from "./protected-data-audit.js";
 import { staffPasswordPolicyErrors } from "./staff-password-policy.js";
 import { paddleCheckoutMatchesTenant, paddlePlanNameFromItems, paddleRenewalDate, verifyPaddleSignature } from "./paddle-billing.js";
 import { openPaddleInbox } from "./paddle-inbox.js";
+import { renderMarketingRegion } from "./marketing-region.js";
 import { paddleEventIsStale } from "./paddle-billing.js";
 import { attachEventHistory, archiveEventHistory } from "./history-archive.js";
 import { applyMarketingContent } from "./marketing-content.js";
@@ -320,8 +321,9 @@ const mimeTypes = {
   ".woff2": "font/woff2"
 };
 
-// Marketing HTML is identical for every visitor (currency/geo tweaks happen
-// client-side via /api/geo) and never sets cookies, so a CDN may cache it.
+// International marketing HTML is identical for every visitor and never sets
+// cookies, so a CDN may cache it. Bangladesh-only markup is rendered per request
+// (see servePublicPage) and kept private; BDT prices still switch via /api/geo.
 // Everything user-specific must stay out of shared caches.
 const MARKETING_CACHE_CONTROL = "public, s-maxage=3600, stale-while-revalidate=86400";
 // `/` is the homepage for visitors but the dashboard once logged in, and a
@@ -12622,9 +12624,10 @@ async function fileSignature(path) {
   return `${path}:${fileStat.mtimeMs}-${fileStat.size}`;
 }
 
-async function loadMarketingPage(filename) {
+async function loadMarketingPage(filename, region = "intl") {
   const htmlPath = join(publicDir, filename);
-  const cached = marketingPageCache.get(htmlPath);
+  const cacheKey = `${htmlPath}|${region}`;
+  const cached = marketingPageCache.get(cacheKey);
   if (cached && (await Promise.all(cached.deps.map(fileSignature))).join("|") === cached.sig) return cached;
 
   const sigs = [await fileSignature(htmlPath)];
@@ -12649,6 +12652,7 @@ async function loadMarketingPage(filename) {
     }
     rendered = applyMarketingContent(html, marketingContent);
   }
+  rendered = renderMarketingRegion(rendered, region);
   const content = Buffer.from(rendered.replace(INLINE_STYLESHEET_RE, (_, href) => `<style>${styles.get(href)}</style>`), "utf8");
   const entry = {
     sig: sigs.join("|"),
@@ -12657,14 +12661,27 @@ async function loadMarketingPage(filename) {
     ...(await compressBody(content)),
     etag: `"${createHash("sha1").update(content).digest("base64url")}"`
   };
-  marketingPageCache.set(htmlPath, entry);
+  marketingPageCache.set(cacheKey, entry);
   return entry;
+}
+
+// Same precedence as /api/geo: a manual /bd or /global choice wins over Cloudflare.
+function marketingRegion(req) {
+  const forced = parseCookies(req.headers.cookie).tg_currency;
+  if (forced === "BDT" || forced === "USD") return forced === "BDT" ? "bd" : "intl";
+  return currencyForCountry(detectCountryCode(req)) === "BDT" ? "bd" : "intl";
 }
 
 async function servePublicPage(req, res, filename) {
   try {
-    const page = await loadMarketingPage(filename);
-    const cacheHeaders = filename === "landing.html" ? HOMEPAGE_CACHE_HEADERS : { "cache-control": MARKETING_CACHE_CONTROL };
+    const region = marketingRegion(req);
+    const page = await loadMarketingPage(filename, region);
+    // Only the international render may enter shared caches: Cloudflare's cache
+    // key ignores the visitor's country, so a cached Bangladesh page (WhatsApp,
+    // bKash/Nagad) would be served to everyone.
+    const cacheHeaders = region === "bd"
+      ? { "cache-control": "private, no-cache" }
+      : filename === "landing.html" ? HOMEPAGE_CACHE_HEADERS : { "cache-control": MARKETING_CACHE_CONTROL };
     const headers = { ...cacheHeaders, "etag": page.etag, "vary": "Accept-Encoding" };
     if (req.headers["if-none-match"] === page.etag) {
       res.writeHead(304, headers);

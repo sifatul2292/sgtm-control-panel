@@ -2,6 +2,23 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
 
+## 2026-10-20 — Region-specific marketing HTML rendered server-side
+
+- Raw /docs HTML (curl, no JS) already had the Shopify section server-side; the
+  +880 WhatsApp links were in every visitor's HTML, only hidden by CSS. Live cache
+  was fresh (cf-cache-status HIT/REVALIDATED, age 0), not stale.
+- New marketing-region.js: servePublicPage renders per region. International HTML
+  drops data-bd-only elements (WhatsApp, bKash/Nagad); Bangladesh HTML drops
+  data-intl-only. Markers are removed, so geo.js/CSS no longer hide anything.
+  Region = tg_currency cookie, else CF-IPCountry. Pricing/home bKash footer moved
+  from inline JS to data-bd-only markup.
+- Bangladesh renders are "private, no-cache" so Cloudflare only caches the
+  international copy. REQUIRED Cloudflare cache rule (else a BD visitor on a cache
+  HIT gets the international page): bypass cache when ip.src.country eq "BD" or
+  the cookie contains tg_currency. Then purge /, /docs, /pricing, /shopify etc.
+- Tests: test/marketing-region.test.js (4 pass). seo.test.mjs /blog 500 fails on
+  HEAD too (pre-existing, unrelated).
+
 ## 2026-10-19 — US-visitor audit (no code change)
 
 - Live /docs, /pricing, /shopify bodies match HEAD 90531d7 (only serve-time
@@ -11,7 +28,8 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
   none. The number is still in raw HTML (text-only fetchers see it).
 - BUG: /api/geo returns country "" even from a BD IP (cdn-cgi/trace loc=BD):
   Nginx isn't passing X-Tagioo-Country, so BD visitors get USD + no WhatsApp.
-  Fixed: detectCountryCode falls back to cf-ipcountry (XX → ""). Needs deploy.
+  Fixed b7d20b6: detectCountryCode falls back to cf-ipcountry. Live 2026-10-20
+  as VPS merge da08148; /api/geo from BD returns BD/BDT, from VPS IN/USD.
 - Meta pixel 1039411801891124, last 48h: Lead 11 server / 0 browser,
   CompleteRegistration 9 server / 1 browser. Lead = valid POST /signup (before
   email verify); 2 never verified. Browser Lead copies not arriving.

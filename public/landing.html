@@ -730,7 +730,8 @@
 
         </div>
         <div class="pricing-footer">
-          <p id="pricingFooterNote">New card subscriptions include a 3-day free trial. Payment details required. After 3 days, your plan is charged automatically at the monthly price shown, plus applicable taxes. Cancel before the trial ends to avoid charges. Subscriptions renew monthly through Paddle until canceled. Bangladesh customers can also choose local BDT payment.</p>
+          <p data-bd-only>Local prices in BDT. Pay manually via <strong>bKash</strong> or <strong>Nagad</strong>; payment is reviewed before activation. USD monthly card subscriptions are also available through Paddle.</p>
+          <p id="pricingFooterNote" data-intl-only>New card subscriptions include a 3-day free trial. Payment details required. After 3 days, your plan is charged automatically at the monthly price shown, plus applicable taxes. Cancel before the trial ends to avoid charges. Subscriptions renew monthly through Paddle until canceled. Bangladesh customers can also choose local BDT payment.</p>
           <p id="pricingCycleNote" hidden>Local BDT plans also offer longer billing cycles. <a href="/pricing">See local plan details →</a></p>
           <p><a href="/pricing">Full plan details &amp; billing FAQ →</a> &nbsp;·&nbsp; Need a custom plan? <a href="mailto:hello@tagioo.com" data-intl-only>Email hello@tagioo.com →</a><a href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>Contact us on WhatsApp →</a></p>
         </div>
@@ -994,8 +995,6 @@
         if (toggle) toggle.style.display = "";
         const cycleNote = document.getElementById("pricingCycleNote");
         if (cycleNote) cycleNote.hidden = false;
-        const footerNote = document.getElementById("pricingFooterNote");
-        if (footerNote) footerNote.innerHTML = 'Local prices in BDT. Pay manually via <strong>bKash</strong> or <strong>Nagad</strong>; payment is reviewed before activation. USD monthly card subscriptions are also available through Paddle.';
         document.querySelectorAll(".pricing-card[data-monthly]").forEach(card => {
           const priceEl = card.querySelector("[data-price-display]");
           if (priceEl) priceEl.textContent = bt(Number(card.dataset.monthly));
