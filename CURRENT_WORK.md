@@ -2,6 +2,38 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
 
+## 2026-10-19 — US-visitor audit (no code change)
+
+- Live /docs, /pricing, /shopify bodies match HEAD 90531d7 (only serve-time
+  video/case-study substitutions differ). /docs has #shopify section live.
+- WhatsApp/+880 and bKash/Nagad are all data-bd-only (or inside data-bd-only
+  FAQ); live site-base.css hides them by default; browser render as intl shows
+  none. The number is still in raw HTML (text-only fetchers see it).
+- BUG: /api/geo returns country "" even from a BD IP (cdn-cgi/trace loc=BD):
+  Nginx isn't passing X-Tagioo-Country, so BD visitors get USD + no WhatsApp.
+  Fixed: detectCountryCode falls back to cf-ipcountry (XX → ""). Needs deploy.
+- Meta pixel 1039411801891124, last 48h: Lead 11 server / 0 browser,
+  CompleteRegistration 9 server / 1 browser. Lead = valid POST /signup (before
+  email verify); 2 never verified. Browser Lead copies not arriving.
+- No VPS access from this machine (SSH no route); live server SHA unconfirmed.
+
+## 2026-10-19 — Own Meta GTM routing enabled on VPS
+
+- After owner imported/published the regenerated files and reported another
+  missing registration, verified own server container workspace 11 has no pending
+  changes, GA4 Meta-only exception and compatible tagioo_meta_* mapping with
+  dotted user_data fallback. No GTM edits made in this follow-up.
+- VPS still had routing false, explaining why the import alone did not route
+  registration through the server tag. Enabled TAGIOO_META_VIA_GTM=true in .env
+  atomically after private mode-600 backup under
+  /var/backups/tagioo-meta-routing-1792427083224/panel.env.
+- Reloaded sgtm-control-panel and tagioo-paddle-receiver with the flag and
+  --update-env. Config verifies true; public login and tracking health return 200.
+  Backend test code remains unset. Keep routing enabled; clear only GTM's test
+  code after testing. No Nginx/Docker/customer-container changes.
+- Next: fresh user registration and destination receipt verification. Prior
+  registration ran before this flag was enabled; it was not replayed.
+
 ## 2026-10-19 — SaaS generator guide; manual GTM import requested
 
 - Owner clarified scope: update Setup Assistant/generate web and server JSON for

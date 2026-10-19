@@ -7107,8 +7107,14 @@ const paddleUsdMonthly = { Starter: 30, Pro: 50, Enterprise: 100 };
 // X-Tagioo-Country is Cloudflare's CF-IPCountry header, passed through by
 // tagioo.com's own Nginx vhost (same pattern already used for customer sGTM
 // domains). Missing/unrecognized → "" so currencyForCountry defaults safely.
+// Falls back to CF-IPCountry itself, which Nginx forwards unchanged: the vhost
+// doesn't always set X-Tagioo-Country, and without it every BD visitor was
+// treated as international (USD, no bKash/Nagad, no WhatsApp).
 function detectCountryCode(req) {
-  return String(req.headers["x-tagioo-country"] || "").trim().toUpperCase().slice(0, 2);
+  const raw = req.headers["x-tagioo-country"] || req.headers["cf-ipcountry"] || "";
+  const code = String(raw).trim().toUpperCase().slice(0, 2);
+  // Cloudflare uses XX (unknown) and T1 (Tor); neither is a real country.
+  return /^[A-Z]{2}$/.test(code) && code !== "XX" ? code : "";
 }
 
 // BD sees BDT/bKash-Nagad; everywhere else (including an undetected visitor,
