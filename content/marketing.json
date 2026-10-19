@@ -1,0 +1,42 @@
+{
+  "_readme": "Edited by hand. Rendered into marketing HTML at serve time (marketing-content.js); no restart needed. Video values are YouTube video IDs (the part after watch?v=). Case studies: replace the placeholders with real, approved customer data and set placeholder:false. While showPlaceholders is true, placeholder entries are rendered with a visible PLACEHOLDER label and /case-studies is noindex. Set showPlaceholders:false before deploying if no real study is ready.",
+  "videos": {
+    "shopify": "LX7BDDENcII",
+    "woocommerce": "9PGfxptCQtk"
+  },
+  "showPlaceholders": false,
+  "caseStudies": [
+    {
+      "placeholder": true,
+      "slug": "placeholder-shopify-apparel",
+      "storeName": "[Store name]",
+      "storeType": "[Store type, e.g. apparel]",
+      "platform": "Shopify",
+      "problem": "[The problem in one or two sentences, e.g. Meta Ads Manager showed fewer purchases than Shopify orders.]",
+      "whatWeDid": "[What was set up, e.g. tracking domain, Custom Pixel, Meta CAPI with deduplication.]",
+      "metrics": [
+        { "label": "Meta purchase events received", "before": "[before]", "after": "[after]" },
+        { "label": "Event Match Quality (Purchase)", "before": "[before]", "after": "[after]" }
+      ],
+      "period": "[Measurement period, e.g. 14 days before vs 14 days after]",
+      "quote": "",
+      "quoteAuthor": ""
+    },
+    {
+      "placeholder": true,
+      "slug": "placeholder-woocommerce-electronics",
+      "storeName": "[Store name]",
+      "storeType": "[Store type, e.g. electronics]",
+      "platform": "WooCommerce",
+      "problem": "[The problem in one or two sentences.]",
+      "whatWeDid": "[What was set up, e.g. Tagioo WooCommerce plugin, server-side purchase recovery.]",
+      "metrics": [
+        { "label": "Meta purchase events received", "before": "[before]", "after": "[after]" },
+        { "label": "Event Match Quality (Purchase)", "before": "[before]", "after": "[after]" }
+      ],
+      "period": "[Measurement period]",
+      "quote": "[Optional customer quote — only with written permission]",
+      "quoteAuthor": "[Name, role, store]"
+    }
+  ]
+}

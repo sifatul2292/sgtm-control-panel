@@ -5,20 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/png" sizes="64x64" href="/assets/tagioo-icon-64.png?v=1" />
     <meta name="description" content="Compare managed Tagioo hosting with running server-side GTM yourself: setup, infrastructure, domains, SSL, event inspection and maintenance." />
-    <meta property="og:title" content="Managed vs Self-Hosted Server-Side GTM | Tagioo" />
+    <meta property="og:title" content="Tagioo vs Stape &amp; Self-Hosted Server-Side GTM | Tagioo" />
     <meta property="og:description" content="Compare managed Tagioo hosting with running server-side GTM yourself: setup, infrastructure, domains, SSL, event inspection and maintenance." />
-    <title>Managed vs Self-Hosted Server-Side GTM | Tagioo</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'" /><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" /></noscript>
+    <title>Tagioo vs Stape &amp; Self-Hosted Server-Side GTM | Tagioo</title>
+<link rel="preload" href="/assets/fonts/inter-latin-var.woff2?v=1" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/assets/site-base.css?v=1" />
     <link rel="stylesheet" href="/landing.css?v=5" />
     <link rel="stylesheet" href="/assets/legacy-pages.css?v=2" />
-      <!-- Google Tag Manager -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-MCR3FD4W');</script>
+    <link rel="stylesheet" href="/assets/landing-pages.css?v=1" />
+      <!-- Tagioo boot + Google Tag Manager -->
+    <script>(function(w,d,L,i){var q=new URLSearchParams(L.search),dm=/(^|\.)tagioo\.com$/.test(L.hostname)?';domain=.tagioo.com':'',sc=L.protocol=='https:'?';Secure':'';
+    function ck(n){var m=d.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?m[1]:'';}
+    function set(n,v,s,h){d.cookie=n+'='+v+';path=/;max-age='+s+';SameSite=Lax'+(h?'':dm)+sc;}
+    if(q.get('internal')=='1')set('tg_internal','1',31536000,1);if(q.get('internal')=='0')set('tg_internal','',0,1);
+    if(ck('tg_internal')=='1'){w.tagiooInternal=true;return;}
+    var t=Date.now(),id=q.get('fbclid');if(id&&ck('_fbc').split('.').slice(3).join('.')!=id)set('_fbc','fb.1.'+t+'.'+id,7776000);
+    if(!ck('_fbp'))set('_fbp','fb.1.'+t+'.'+(1e9+Math.floor(Math.random()*9e9)),7776000);
+    if(!/^[0-9a-f]{32}$/.test(ck('tg_vid'))&&w.crypto&&crypto.getRandomValues){var a=crypto.getRandomValues(new Uint8Array(16)),v='';for(var k=0;k<16;k++)v+=(a[k]<16?'0':'')+a[k].toString(16);set('tg_vid',v,7776000,1);}
+    w.dataLayer=w.dataLayer||[];w.dataLayer.push({'gtm.start':t,event:'gtm.js'});var j=d.createElement('script');j.async=true;
+    j.src='https://www.googletagmanager.com/gtm.js?id='+i;d.head.appendChild(j);
+    })(window,document,location,'GTM-MCR3FD4W');</script>
     <!-- End Google Tag Manager -->
 
     <link rel="canonical" href="https://tagioo.com/compare" />
@@ -36,7 +42,7 @@
     <!-- ── HEADER ─────────────────────────────────────────────── -->
     <header class="site-header" id="siteHeader">
       <a class="brand" href="/" aria-label="Tagioo home">
-        <picture><source srcset="/assets/tagioo-logo-284.avif?v=1" type="image/avif"><img src="/assets/tagioo-logo-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box"></picture>
+        <picture><source srcset="/assets/tagioo-logo-284.avif?v=1" type="image/avif"><source srcset="/assets/tagioo-logo-284.webp?v=1" type="image/webp"><img src="/assets/tagioo-logo-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box"></picture>
       </a>
       <nav aria-label="Primary navigation">
         <a href="/features">Platform</a>
@@ -90,7 +96,34 @@
 
       <!-- ── FULL COMPARISON TABLE ──────────────────────────────── -->
       <section class="section comparison-section"><div class="section-heading centered"><h2>Decide what you want to manage.</h2><p class="section-sub">A practical comparison of responsibilities, rather than promises about competitors.</p></div><div class="comparison-table-wrap"><table class="comparison-table"><caption class="visually-hidden">Managed Tagioo hosting compared with self-managed server GTM</caption><thead><tr><th scope="col">Responsibility</th><th scope="col" class="col-tagioo">With Tagioo</th><th scope="col">Self-managed hosting</th></tr></thead><tbody><tr><th scope="row">Server GTM hosting</th><td class="col-tagioo">Managed by Tagioo</td><td>You provision and operate it</td></tr><tr><th scope="row">Tracking domain and SSL</th><td class="col-tagioo">DNS guidance and automatic SSL</td><td>You configure DNS and certificate renewal</td></tr><tr><th scope="row">GTM configuration</th><td class="col-tagioo">Generated templates and setup instructions</td><td>You build or source your configuration</td></tr><tr><th scope="row">Incoming event inspection</th><td class="col-tagioo">Dashboard, Event Logs and Purchase Inspector</td><td>You choose and maintain monitoring tools</td></tr><tr><th scope="row">Container operations</th><td class="col-tagioo">Provisioning and restart handling</td><td>You manage the runtime and restarts</td></tr><tr><th scope="row">Destination verification</th><td class="col-tagioo">You preview, publish and verify tags</td><td>You preview, publish and verify tags</td></tr><tr><th scope="row">Consent and data configuration</th><td class="col-tagioo">Your responsibility, with your selected tools</td><td>Your responsibility, with your selected tools</td></tr></tbody></table></div></section>
-      <section class="section studio-fit"><div><h2>Keep control.<br><em>Share the workload.</em></h2></div><div class="studio-fit-list"><article><h3>Choose managed hosting</h3><p>Use Tagioo when you want hosting, guided setup and incoming event visibility in the same workspace.</p></article><article><h3>Choose self-managed infrastructure</h3><p>Run your own stack when you need direct infrastructure control and have someone responsible for security, updates and recovery.</p></article><article><h3>Moving an existing setup?</h3><p>Discuss your container configuration and DNS cutover with support before making changes to live tracking.</p><a class="studio-text-link" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Discuss your setup →</a></article></div></section>
+      <!-- ── TAGIOO VS STAPE ─────────────────────────────────────── -->
+      <section class="section" id="stape">
+        <div class="section-heading centered"><p class="eyebrow">Tagioo vs Stape</p><h2>Two ways to run server-side GTM.</h2><p class="section-sub">Stape is a well-known server-side GTM hosting provider. Both run your sGTM container on a custom domain. The difference is how much of the setup you do yourself.</p></div>
+        <div class="lp-wrap">
+          <div class="lp-table-wrap">
+            <table class="lp-compare">
+              <caption class="visually-hidden">Tagioo compared with Stape</caption>
+              <thead><tr><th scope="col"></th><th scope="col">Tagioo</th><th scope="col">Stape</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">What it is</th><td>Managed server-side GTM hosting with a guided setup for stores</td><td>Server-side GTM hosting platform</td></tr>
+                <tr><th scope="row">Free plan</th><td>15,000 events per 30-day cycle</td><td>Up to 10,000 requests per month</td></tr>
+                <tr><th scope="row">Entry paid plan</th><td>Starter: $30/month, 500,000 events (3-day free trial)</td><td>Pro: $20/month, or $17/month billed annually; up to 500,000 requests</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3 style="text-align:center;margin:36px 0 16px">What Tagioo includes</h3>
+          <div class="lp-cards">
+            <div class="lp-card"><h3>Guided setup</h3><p>Setup Assistant generates ready-to-import Web and Server GTM files for your platform and destinations.</p></div>
+            <div class="lp-card"><h3>No GTM expertise needed</h3><p>Import, preview, publish. Step-by-step guides for WooCommerce, Shopify and Laravel.</p></div>
+            <div class="lp-card"><h3>Live event log</h3><p>See incoming events and purchases in your dashboard, with a Purchase Inspector for order-level checks.</p></div>
+            <div class="lp-card"><h3>Purchase gap alerts</h3><p>A dashboard alert when today's tracked purchases drop well below your 7-day average.</p></div>
+            <div class="lp-card"><h3>Setup help</h3><p>Free setup help by email from the Tagioo team.</p></div>
+          </div>
+          <p class="lp-source">Stape plan details are from <a href="https://stape.io/price" rel="nofollow noopener" target="_blank">stape.io/price</a>, checked on 19 October 2026; prices may change. Stape counts requests and Tagioo counts events, so the limits are not exactly like-for-like. Stape is a trademark of its owner; Tagioo is not affiliated with Stape.</p>
+          <p style="text-align:center;margin-top:20px"><a class="button button-primary" href="/signup">Start free — no card required</a></p>
+        </div>
+      </section>
+      <section class="section studio-fit"><div><h2>Keep control.<br><em>Share the workload.</em></h2></div><div class="studio-fit-list"><article><h3>Choose managed hosting</h3><p>Use Tagioo when you want hosting, guided setup and incoming event visibility in the same workspace.</p></article><article><h3>Choose self-managed infrastructure</h3><p>Run your own stack when you need direct infrastructure control and have someone responsible for security, updates and recovery.</p></article><article><h3>Moving an existing setup?</h3><p>Discuss your container configuration and DNS cutover with support before making changes to live tracking.</p><a class="studio-text-link" href="mailto:hello@tagioo.com" data-intl-only>Email us about your setup →</a><a class="studio-text-link" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>Discuss your setup →</a></article></div></section>
       <!-- ── FINAL CTA ───────────────────────────────────────────── -->
       <section class="section cta-section">
         <div class="cta-inner">
@@ -111,7 +144,7 @@
       <div class="footer-inner">
         <div class="footer-brand">
           <a class="brand brand-light" href="/">
-            <picture><source srcset="/assets/tagioo-logo-light-284.avif?v=1" type="image/avif"><img src="/assets/tagioo-logo-light-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box" loading="lazy" decoding="async"></picture>
+            <picture><source srcset="/assets/tagioo-logo-light-284.avif?v=1" type="image/avif"><source srcset="/assets/tagioo-logo-light-284.webp?v=1" type="image/webp"><img src="/assets/tagioo-logo-light-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box" loading="lazy" decoding="async"></picture>
           </a>
           <p>Managed server-side tracking for ecommerce teams, marketers and agencies.</p>
           <div class="footer-payments">
@@ -133,7 +166,7 @@
             <strong>Support</strong>
             <a href="/docs">Docs</a>
         <a href="/blog">Blog</a>
-            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>WhatsApp</a>
             <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
             <a href="/#faq">FAQ</a>
           </div>
@@ -154,10 +187,14 @@
     </footer>
 
     <!-- ── WHATSAPP FLOAT ──────────────────────────────────────── -->
-    <a class="whatsapp-float" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+    <a class="whatsapp-float" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only aria-label="Chat on WhatsApp">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
       </svg>
+    </a>
+    <a class="support-float" href="mailto:hello@tagioo.com" data-intl-only aria-label="Email Tagioo support">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+      <span>hello@tagioo.com</span>
     </a>
 
     <script>
@@ -190,5 +227,6 @@
       });
     </script>
     <script src="/assets/marketing.js?v=1" defer></script>
-  </body>
+    <script src="/assets/geo.js?v=1" defer></script>
+</body>
 </html>

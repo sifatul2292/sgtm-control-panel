@@ -39,3 +39,21 @@ test("existing ecommerce exports keep cart tags and Shopify instrumentation", ()
   assert.match(result.shopifyCustomPixel, /Shopify Custom Pixel/);
   assert.equal(result.saasGuide, "");
 });
+test("SaaS web export adds Lead on generate_lead and the direct-CAPI skip flag", () => {
+  const result = ctx.buildSetupAssistantTemplates({ ...input, destinations: ["ga4", "meta", "tiktok"], tiktokPixelId: "T1" });
+  const web = result.web.containerVersion;
+  const lead = web.trigger.find(t => t.name === "Tagioo - generate_lead");
+  assert.ok(lead);
+  const metaLead = web.tag.find(t => t.name === "Tagioo Meta - Lead");
+  assert.equal(JSON.stringify(metaLead.firingTriggerId), JSON.stringify([lead.triggerId]));
+  assert.match(JSON.stringify(metaLead), /fbq\('track','Lead',p,eid\?\{eventID/);
+  assert.ok(web.tag.some(t => t.name === "Tagioo GA4 - generate_lead"));
+  assert.ok(web.tag.some(t => t.name === "Tagioo TikTok - SubmitForm"));
+  assert.ok(web.variable.some(v => v.name === "dlv - tagioo_capi_direct"));
+  for (const tag of web.tag.filter(t => t.type === "gaawe")) {
+    assert.equal(JSON.stringify(tag).includes("{{dlv - tagioo_capi_direct}}"), !tag.name.endsWith("page_view"), tag.name);
+  }
+  assert.match(result.server.containerVersion.customTemplate[0].templateData, /eventData\.tagioo_capi_direct/);
+  assert.match(result.saasGuide, /event:"generate_lead"/);
+  assert.match(result.saasGuide, /tagioo_capi_direct:"1"/);
+});

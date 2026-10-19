@@ -25,7 +25,9 @@ Cloudflare does not cache HTML by default. One Cache Rule, "Cache marketing page
 ```
 (http.host eq "tagioo.com" and (http.request.uri.path in {"/" "/features" "/pricing"
  "/compare" "/how-it-works" "/docs" "/terms" "/privacy" "/refunds"
- "/website-tracking-checker" "/blog" "/blog/"} or http.request.uri.path wildcard "/blog/*")
+ "/website-tracking-checker" "/blog" "/blog/" "/shopify" "/woocommerce" "/case-studies"}
+ (`/case-studies` is currently removed from the site; the path in the rule is harmless.)
+ or http.request.uri.path wildcard "/blog/*")
  and not http.cookie contains "sgtm_session=")
 ```
 
@@ -47,9 +49,17 @@ Cloudflare does not cache HTML by default. One Cache Rule, "Cache marketing page
 
 ## Front-end changes
 
-- The Google Fonts CSS now loads without blocking render (`preload` + `onload`, with a
-  `<noscript>` fallback) and keeps `display=swap`. Self-hosting Inter is a follow-up
-  (it needs the woff2 files downloaded).
+- Inter is self-hosted: `public/assets/fonts/inter-latin-var.woff2` (31 KB, variable
+  weights 400–800, Latin subset, built from the OFL Inter variable font with fontTools).
+  `@font-face` with `font-display: swap` lives in `assets/site-base.css`, inlined into
+  every marketing page, and the font is preloaded. No requests to Google Fonts remain
+  on marketing pages. (Server-rendered login/signup pages still use Google Fonts.)
+- `site-base.css` also holds the region rules: `[data-bd-only]` content (BDT, bKash,
+  Nagad, WhatsApp, +880) is hidden unless `/assets/geo.js` adds `html.geo-bd` from
+  `/api/geo` (Cloudflare CF-IPCountry, or the `/bd` / `/global` manual switch).
+- Case studies and setup videos are rendered server-side from `content/marketing.json`
+  into `<!-- tagioo:... -->` markers before caching (see `marketing-content.js`).
+  YouTube is click-to-load (thumbnail only until play).
 - Logos and the favicon were PNGs of 394–788 KB each, base64-wrapped in SVG. They are
   replaced with 2x-sized AVIF files plus PNG fallbacks (`tagioo-logo-284`,
   `tagioo-logo-light-284`, `tagioo-icon-64`), each 2–21 KB. The old SVGs remain for
@@ -59,5 +69,5 @@ Cloudflare does not cache HTML by default. One Cache Rule, "Cache marketing page
 - Removed the dead Cloudflare `email-decode.min.js` script. `home-hero-motion.js` and
   `blog.js` are now `defer`. GTM is unchanged: it was already async, and Meta Pixel,
   GA4 and CAPI all load through it.
-- WebP was not generated because there is no WebP encoder on the dev machine. AVIF
-  with a PNG fallback covers every current browser.
+- WebP versions of the logos, icon, Features screenshot and Docs screenshots sit
+  between the AVIF and PNG `<source>`s.

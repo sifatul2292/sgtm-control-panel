@@ -1,6 +1,67 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-10-10.
+Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
+
+## 2026-10-19 — US launch readiness (branch feat/us-launch, not committed/deployed)
+
+- Geo: marketing HTML stays one cached copy; `assets/geo.js` adds html.geo-bd from
+  /api/geo. BDT, bKash/Nagad, WhatsApp/+880 are `data-bd-only`; others see email
+  support (hello@tagioo.com). Privacy Policy keeps its WhatsApp disclosure. No chat widget.
+- New pages /shopify, /woocommerce (ad landing), /case-studies; Shopify section in /docs;
+  "Works with Shopify and WooCommerce" on home + pricing; Stape on /compare (pricing
+  from stape.io/price, 2026-10-19). Case studies + videos from content/marketing.json
+  (all PLACEHOLDER; Shopify video ID empty). Set showPlaceholders:false or add real
+  data before deploy.
+- Speed: Inter self-hosted (31 KB woff2), WebP sources added, GTM via shared boot snippet.
+- Meta: Lead moved from GET /signup to valid POST /signup (hashed em/ph/name, once per
+  email/day; browser copy pushed once on /verify with same event_id). external_id =
+  hashed tenant id + tg_vid. Boot snippet writes _fbc from fbclid, first-party _fbp,
+  tg_vid; ?internal=1 / TAGIOO_INTERNAL_IPS exclude internal traffic (GTM skipped,
+  backend sends skipped). Server forwards + browser pushes carry tagioo_capi_direct=1;
+  the Meta CAPI template skips those (needs template re-import + GA4 param mapping in
+  tagioo's own GTM containers to take effect).
+- Meta baseline before deploy (pixel 1039411801891124, web EMQ, 2026-10-19):
+  CompleteRegistration 6.1 (ip/ua/fbp 100%, NO email key listed); Lead 3.5 (fbp 33%,
+  external_id 33%); PageView 6.1 (fbc 36%). Missing email on CompleteRegistration
+  suggests the direct CAPI send may not be landing: confirm TAGIOO_META_CAPI_TOKEN on VPS.
+- Done 2026-10-19: Cloudflare cache rule now includes /shopify /woocommerce
+  /case-studies; Shopify video = LX7BDDENcII.
+- GTM (second Google login, authuser=1), saved in workspaces, NOT published:
+  server GTM-K89C9H47 template "Tagioo Meta CAPI" now has the tagioo_capi_direct skip
+  (live code was identical to repo HEAD before the edit); web GTM-MCR3FD4W has
+  variable "dlv - tagioo_capi_direct" and that param in "Tagioo - ga4 event settings"
+  (used by all 7 GA4 event tags). Web container has NO Meta Lead pixel tag: Lead
+  was server-only. Adding one (copy of CompleteRegistration tag, event 'Lead',
+  trigger custom event tagioo_lead) is still to do. Publish both at deploy time.
+- 2026-10-19 later: GTM changes moved into the Setup Assistant SaaS export instead:
+  web.json adds trigger/GA4 tag/Meta "Lead"/TikTok "SubmitForm" on generate_lead,
+  variable "dlv - tagioo_capi_direct", and that param on every non-page_view GA4 tag;
+  guide text documents both. Tagioo's /verify now pushes generate_lead (browser owns
+  GA4; server GA4 forward for Lead removed; direct CAPI keeps the same event_id).
+  Owner regenerates SaaS templates and re-imports (Merge → Overwrite) both files.
+- /shopify, /woocommerce, /case-studies redesigned with self-contained assets/lp.css
+  (no landing.css inline); generator kept outside repo, pages are plain static HTML.
+- Case studies hidden (showPlaceholders:false), /case-studies page + route removed;
+  template code kept for later.
+- Ecommerce template review (Woo/Shopify/custom), NOT changed, owner to decide:
+  raw email/phone in user_data sent as GA4 event params + server GA4 forwards all
+  params; Meta template country fallback 'bd'; default currency BDT; custom platform
+  ONCE_PER_LOAD; Shopify pixel forces consent granted; TikTok template lacks the
+  tagioo_capi_direct skip.
+- Meta CAPI server template v1.1 (from AlurKohv EMQ review: PageView/ViewContent had
+  no external_id/country, AddToCart/InitiateCheckout email ~10%, Purchase external_id
+  67%): hashed identity remembered in first-party HttpOnly cookie tagioo_ud (90d,
+  skipped when x-ga-gcs says ad_storage denied) and reused on later events;
+  external_id falls back to hashed phone/email for cookie-less backend hits; country =
+  pushed → remembered → x-tagioo-country/cf-ipcountry header → defaultCountry field
+  (BD only for BDT stores; no more hard-coded 'bd'). New set_cookies permission.
+  test/meta-capi-template.test.js runs the sandbox code with mocked APIs. AlurKohv's
+  live containers are Stape-named, so their PV/VC gaps also mean they're not on the
+  current Tagioo template. Customers must regenerate + re-import server.json.
+- /shopify + /woocommerce now use the homepage header/mobile menu (assets/lp.js) and
+  entrance/scroll animations (reduced-motion safe; headline never starts transparent).
+- Tests: test/us-launch.test.js (9) pass; seo sitemap count updated. Pre-existing
+  failures unchanged: seo route test (500 in harness), paddle-billing activation test.
 
 ## 2026-10-18 — Marketing site speed (branch perf/marketing-speed, not deployed)
 

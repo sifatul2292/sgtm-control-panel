@@ -56,7 +56,9 @@ test("verified completion queues one signup before GTM and continues once even w
   const redirects = [], timers = [];
   const window = { location: { replace: path => redirects.push(path) } };
   vm.runInNewContext(script, { window, setTimeout: callback => timers.push(callback) });
-  assert.equal(window.dataLayer.length, 1);
+  assert.equal(window.dataLayer.length, 2);
+  assert.equal(window.dataLayer[0].tagioo_capi_direct, '1');
+  assert.ok('tagioo_capi_direct' in window.dataLayer[1] && window.dataLayer[1].tagioo_capi_direct === undefined);
   const event = window.dataLayer[0];
   assert.equal(event.event, 'sign_up');
   assert.equal(event.event_id, 'signup_test</script>');
@@ -68,6 +70,6 @@ test("verified completion queues one signup before GTM and continues once even w
   assert.deepEqual(redirects, ['/checkout']);
   const verify = source.slice(source.indexOf('if (pathname === "/verify" && req.method === "POST")'), source.indexOf('if (pathname === "/checkout" && req.method === "GET")'));
   assert.doesNotMatch(verify, /forwardTagiooOwnEvent\("sign_up"/);
-  assert.match(verify, /sendTagiooSignupToMetaCapi\(values, signupEventId, signupVisitor\)/);
+  assert.match(verify, /sendTagiooSignupToMetaCapi\(values, signupEventId, signupVisitor, result\.account\.tenantId\)/);
   assert.ok(verify.indexOf('if (!result.ok)') < verify.indexOf('signupCompletePage(signupEventId, landing)'));
 });

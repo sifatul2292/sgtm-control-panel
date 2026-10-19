@@ -8,23 +8,29 @@
     <meta property="og:title" content="Server-Side GTM Hosting &amp; Conversion Tracking | Tagioo" />
     <meta property="og:description" content="Connect browser and backend signals with managed server-side GTM hosting. First-party domains, guided setup and event inspection. Start Tagioo free." />
     <title>Server-Side GTM Hosting &amp; Conversion Tracking | Tagioo</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'" /><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" /></noscript>
+<link rel="preload" href="/assets/fonts/inter-latin-var.woff2?v=1" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/assets/site-base.css?v=1" />
     <link rel="stylesheet" href="/assets/home-production-style.css?v=mobile-menu-3"><link rel="stylesheet" href="/assets/home-hero-only.css?v=desktop-6"><link rel="stylesheet" href="/assets/home-flow.css?v=desktop-7"><link rel="stylesheet" href="/assets/home-integrations.css?v=1">
 
   <link rel="stylesheet" href="/assets/home-homepage-guides.css?v=2">
+    <link rel="stylesheet" href="/assets/landing-pages.css?v=1" />
 <link rel="canonical" href="https://tagioo.com/" />
 <meta property="og:url" content="https://tagioo.com/" />
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary" />
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://tagioo.com/#organization", "name": "Tagioo", "url": "https://tagioo.com/"}, {"@type": "WebSite", "@id": "https://tagioo.com/#website", "name": "Tagioo", "url": "https://tagioo.com/", "publisher": {"@id": "https://tagioo.com/#organization"}}]}</script>
-<!-- Google Tag Manager -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-MCR3FD4W');</script>
+<!-- Tagioo boot + Google Tag Manager -->
+    <script>(function(w,d,L,i){var q=new URLSearchParams(L.search),dm=/(^|\.)tagioo\.com$/.test(L.hostname)?';domain=.tagioo.com':'',sc=L.protocol=='https:'?';Secure':'';
+    function ck(n){var m=d.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?m[1]:'';}
+    function set(n,v,s,h){d.cookie=n+'='+v+';path=/;max-age='+s+';SameSite=Lax'+(h?'':dm)+sc;}
+    if(q.get('internal')=='1')set('tg_internal','1',31536000,1);if(q.get('internal')=='0')set('tg_internal','',0,1);
+    if(ck('tg_internal')=='1'){w.tagiooInternal=true;return;}
+    var t=Date.now(),id=q.get('fbclid');if(id&&ck('_fbc').split('.').slice(3).join('.')!=id)set('_fbc','fb.1.'+t+'.'+id,7776000);
+    if(!ck('_fbp'))set('_fbp','fb.1.'+t+'.'+(1e9+Math.floor(Math.random()*9e9)),7776000);
+    if(!/^[0-9a-f]{32}$/.test(ck('tg_vid'))&&w.crypto&&crypto.getRandomValues){var a=crypto.getRandomValues(new Uint8Array(16)),v='';for(var k=0;k<16;k++)v+=(a[k]<16?'0':'')+a[k].toString(16);set('tg_vid',v,7776000,1);}
+    w.dataLayer=w.dataLayer||[];w.dataLayer.push({'gtm.start':t,event:'gtm.js'});var j=d.createElement('script');j.async=true;
+    j.src='https://www.googletagmanager.com/gtm.js?id='+i;d.head.appendChild(j);
+    })(window,document,location,'GTM-MCR3FD4W');</script>
     <!-- End Google Tag Manager -->
 </head>
   <body>
@@ -37,7 +43,7 @@
     <!-- ── HEADER ─────────────────────────────────────────────── -->
     <header class="site-header" id="siteHeader">
       <a class="brand" href="/" aria-label="Tagioo home">
-        <picture><source srcset="/assets/tagioo-logo-284.avif?v=1" type="image/avif"><img src="/assets/tagioo-logo-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box"></picture>
+        <picture><source srcset="/assets/tagioo-logo-284.avif?v=1" type="image/avif"><source srcset="/assets/tagioo-logo-284.webp?v=1" type="image/webp"><img src="/assets/tagioo-logo-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box"></picture>
       </a>
       <nav aria-label="Primary navigation">
         <a href="/features">Platform</a>
@@ -81,6 +87,7 @@
         <div class="hero-badge"><span class="badge-dot"></span> Server-side tracking for stores, lead generation &amp; agencies</div>
         <h1>Your store records the sale.<br><span class="hero-accent">Does your tracking?</span></h1>
         <p class="hero-copy">Browser pixels can miss purchase events. Tagioo helps you connect browser and backend signals to your ad platforms through your own tracking domain.</p>
+        <p class="works-with"><span>Works with <strong>Shopify</strong> and <strong>WooCommerce</strong></span><a href="/shopify">Shopify setup →</a><a href="/woocommerce">WooCommerce setup →</a></p>
       </div>
       <div class="hero-top-signup"><form class="hero-signup" action="/signup" method="get">
               <input class="hero-signup-input" type="email" name="email" placeholder="Enter your email" autocomplete="email" required aria-label="Email address" />
@@ -109,7 +116,7 @@
       <span class="signal-store-pill"><span aria-hidden="true">✓</span> Browser + backend</span>
     </div>
     <svg class="signal-mobile-lines" viewBox="0 0 300 40" aria-hidden="true"><g class="signal-line-base"><path d="M150 0V40"/></g><g class="signal-line-packets"><path class="packet" pathLength="100" d="M150 0V40"/></g></svg><div class="signal-server">
-      <div class="signal-server-head"><picture><source srcset="/assets/tagioo-icon-64.avif?v=1" type="image/avif"><img src="/assets/tagioo-icon-64.png?v=1" alt="" width="32" height="32" style="display:block;width:32px;height:32px;object-fit:contain"></picture><div><strong>Tagioo</strong><span>FIRST-PARTY SERVER</span></div><span class="signal-sgtm">sGTM</span></div>
+      <div class="signal-server-head"><picture><source srcset="/assets/tagioo-icon-64.avif?v=1" type="image/avif"><source srcset="/assets/tagioo-icon-64.webp?v=1" type="image/webp"><img src="/assets/tagioo-icon-64.png?v=1" alt="" width="32" height="32" style="display:block;width:32px;height:32px;object-fit:contain"></picture><div><strong>Tagioo</strong><span>FIRST-PARTY SERVER</span></div><span class="signal-sgtm">sGTM</span></div>
       <div class="signal-domain"><span class="signal-dot" aria-hidden="true"></span><code>track.yourstore.com</code></div>
       <div class="signal-server-body"><span class="signal-label">YOUR TRACKING WORKSPACE</span><ul><li><span aria-hidden="true">✓</span> Your own tracking domain</li><li><span aria-hidden="true">✓</span> Managed container hosting</li><li><span aria-hidden="true">✓</span> Web + Server GTM templates</li><li><span aria-hidden="true">✓</span> Incoming event logs</li><li><span aria-hidden="true">✓</span> Purchase inspection</li></ul></div>
       <div class="signal-pipeline"><span>Collect</span><b aria-hidden="true">→</b><span>Inspect</span><b aria-hidden="true">→</b><span>Route</span></div>
@@ -556,7 +563,7 @@
         </div>
         <div class="how-guarantee">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1L16 5V9C16 13 12.5 16.5 9 17C5.5 16.5 2 13 2 9V5L9 1Z" stroke="#059669" stroke-width="1.5"/><path d="M6 9L8 11L12 7" stroke="#059669" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          If you get stuck, our team sets it up for you via WhatsApp — free.
+          If you get stuck, email <a href="mailto:hello@tagioo.com">hello@tagioo.com</a><span data-bd-only> or WhatsApp us</span> and our team sets it up for you — free.
         </div>
       </section>
 
@@ -633,6 +640,7 @@
           <h2>Plans that grow with your event volume.</h2>
           <p class="section-sub">Start with managed hosting, a first-party domain and guided GTM templates. Choose a paid plan for more event volume and additional tracking tools.</p>
         </div>
+        <div class="works-with" style="margin:0 auto 12px"><span>Works with <strong>Shopify</strong> and <strong>WooCommerce</strong></span></div>
         <div id="pricingCurrencySwitch" style="text-align:center;margin:0 0 8px;font-size:13px">In Bangladesh? <a href="/bd?next=/#pricing">See local BDT pricing →</a></div>
 
         <div class="billing-toggle" id="billingToggle" style="display:none" role="tablist" aria-label="Billing cycle">
@@ -676,7 +684,7 @@
               <li><span class="pf-check">✓</span> Full-funnel Meta CAPI + dedup</li>
               <li><span class="pf-check">✓</span> Server-side purchase recovery</li>
               <li><span class="pf-check">✓</span> Cookie life extension</li>
-              <li><span class="pf-check">✓</span> Email &amp; WhatsApp support</li>
+              <li><span class="pf-check">✓</span> Email<span data-bd-only> &amp; WhatsApp</span> support</li>
             </ul>
             <a class="button button-outline full-width" data-plan-cta href="/signup?plan=Starter&cycle=monthly">Start 3-day free trial</a>
           </article>
@@ -724,13 +732,14 @@
         <div class="pricing-footer">
           <p id="pricingFooterNote">New card subscriptions include a 3-day free trial. Payment details required. After 3 days, your plan is charged automatically at the monthly price shown, plus applicable taxes. Cancel before the trial ends to avoid charges. Subscriptions renew monthly through Paddle until canceled. Bangladesh customers can also choose local BDT payment.</p>
           <p id="pricingCycleNote" hidden>Local BDT plans also offer longer billing cycles. <a href="/pricing">See local plan details →</a></p>
-          <p><a href="/pricing">Full plan details &amp; billing FAQ →</a> &nbsp;·&nbsp; Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
+          <p><a href="/pricing">Full plan details &amp; billing FAQ →</a> &nbsp;·&nbsp; Need a custom plan? <a href="mailto:hello@tagioo.com" data-intl-only>Email hello@tagioo.com →</a><a href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>Contact us on WhatsApp →</a></p>
         </div>
       </section>
 
 <section id="guides" class="section homepage-guides"><div class="section-heading centered"><div class="eyebrow">THE TAGIOO JOURNAL</div><h2>Make sense of your tracking.</h2><p class="section-sub">Practical guides for missing purchases, duplicate events and your first setup.</p></div><div class="guide-toolbar"><span>Six practical guides. Pick your next step.</span><div class="guide-controls"><button type="button" class="guide-prev" aria-label="Previous guides" aria-controls="guide-track">←</button><button type="button" class="guide-next" aria-label="Next guides" aria-controls="guide-track">→</button></div></div><div class="home-guide-grid" id="guide-track" tabindex="0" aria-label="Tracking guides slider"><article class="home-guide"><div class="guide-art guide-art-0" aria-hidden="true"><span class="art-label">SIGNAL PATH</span><div class="art-flow"><span>Website</span><i>↓</i><strong>Tagioo</strong><i>↓</i><span>Ad platforms</span></div><span class="art-index">01</span></div><div class="guide-copy"><span class="home-guide-topic">Getting started</span><h3><a href="/blog/server-side-tracking-explained">What is server-side tracking? Follow one sale from checkout to your ads</a></h3><p>What changes when you send events through your own server? Follow one purchase and find out.</p><a class="home-guide-link" href="/blog/server-side-tracking-explained">Read guide →</a></div></article><article class="home-guide"><div class="guide-art guide-art-1" aria-hidden="true"><span class="art-label">ORDER CHECK</span><div class="art-flow"><span>Order #1042</span><i>↓</i><strong>Purchase received</strong><i>↓</i><span>Matched</span></div><span class="art-index">02</span></div><div class="guide-copy"><span class="home-guide-topic">Ecommerce</span><h3><a href="/blog/woocommerce-purchase-tracking-checklist">WooCommerce orders missing from your ads? Start with this checklist</a></h3><p>Check one real order, find the missing step and avoid counting retries as new sales.</p><a class="home-guide-link" href="/blog/woocommerce-purchase-tracking-checklist">Read guide →</a></div></article><article class="home-guide"><div class="guide-art guide-art-2" aria-hidden="true"><span class="art-label">META CAPI</span><div class="art-flow"><span>Browser event</span><i>↓</i><strong>Same event ID</strong><i>↓</i><span>Server event</span></div><span class="art-index">03</span></div><div class="guide-copy"><span class="home-guide-topic">Meta</span><h3><a href="/blog/meta-capi-deduplication-checklist">Meta Pixel + CAPI: how to check for duplicate purchases</a></h3><p>Check event IDs, retries and old integrations before trusting your purchase count.</p><a class="home-guide-link" href="/blog/meta-capi-deduplication-checklist">Read guide →</a></div></article><article class="home-guide"><div class="guide-art guide-art-3" aria-hidden="true"><span class="art-label">REPORT CHECK</span><div class="art-flow"><span>Store orders</span><i>↓</i><strong>Compare signals</strong><i>↓</i><span>Ad reports</span></div><span class="art-index">04</span></div><div class="guide-copy"><span class="home-guide-topic">Troubleshooting</span><h3><a href="/blog/conversion-tracking-discrepancies">Why your store, GA4 and ad reports show different sales numbers</a></h3><p>Not every reporting gap is a broken tag. Here’s how to tell the difference.</p><a class="home-guide-link" href="/blog/conversion-tracking-discrepancies">Read guide →</a></div></article><article class="home-guide"><div class="guide-art guide-art-4" aria-hidden="true"><span class="art-label">LEAD TRACKING</span><div class="art-flow"><span>Form submitted</span><i>↓</i><strong>Lead received</strong><i>↓</i><span>CRM connected</span></div><span class="art-index">05</span></div><div class="guide-copy"><span class="home-guide-topic">Lead generation</span><h3><a href="/blog/server-side-tracking-lead-generation">Track form submissions that actually become leads</a></h3><p>Stop treating button clicks as enquiries. Measure the submissions your team receives.</p><a class="home-guide-link" href="/blog/server-side-tracking-lead-generation">Read guide →</a></div></article><article class="home-guide"><div class="guide-art guide-art-5" aria-hidden="true"><span class="art-label">SETUP GUIDE</span><div class="art-flow"><span>Connect domain</span><i>↓</i><strong>Import tags</strong><i>↓</i><span>Test event</span></div><span class="art-index">06</span></div><div class="guide-copy"><span class="home-guide-topic">Getting started</span><h3><a href="/blog/tagioo-server-side-tracking-setup">Set up server-side tracking with Tagioo, step by step</a></h3><p>Connect your domain, import the templates and check your first event.</p><a class="home-guide-link" href="/blog/tagioo-server-side-tracking-setup">Read guide →</a></div></article></div><div class="home-guide-all"><a href="/blog">View all guides →</a></div></section>
 
       <!-- ── FAQ ────────────────────────────────────────────────── -->
+      <!-- tagioo:case-studies limit=2 heading="Results from stores using Tagioo" -->
       <section id="faq" class="section faq-section section-dark">
         <div class="section-heading centered" data-reveal>
           <p class="eyebrow">Questions</p>
@@ -763,7 +772,7 @@
           </details>
           <details class="faq-item">
             <summary>How do I pay?</summary>
-            <p>Choose a paid plan and complete card checkout through Paddle. USD plans are monthly subscriptions that renew automatically until canceled. Customers in Bangladesh can also choose manual bKash or Nagad payment in BDT; that payment is reviewed before activation. The Free plan does not require a card.</p>
+            <p>Choose a paid plan and complete card checkout through Paddle. USD plans are monthly subscriptions that renew automatically until canceled. <span data-bd-only>Customers in Bangladesh can also choose manual bKash or Nagad payment in BDT; that payment is reviewed before activation. </span>The Free plan does not require a card.</p>
           </details>
           <details class="faq-item">
             <summary>Is my tracking data safe and private?</summary>
@@ -780,7 +789,8 @@
           <p class="cta-sub">Build your first tracking workspace, connect your site, and verify your events. Start on Free with no credit card required.</p>
           <div class="cta-actions">
             <a class="button button-cta-primary button-lg" href="/signup">Create free account →</a>
-            <a class="button button-cta-ghost button-lg" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Chat on WhatsApp</a>
+            <a class="button button-cta-ghost button-lg" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>Chat on WhatsApp</a>
+            <a class="button button-cta-ghost button-lg" href="mailto:hello@tagioo.com" data-intl-only>Email support</a>
           </div>
           <div class="cta-trust-row">
             <span>
@@ -793,7 +803,7 @@
             </span>
             <span>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L5.5 10.5L12 3.5" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              WhatsApp setup help
+              Free setup help
             </span>
           </div>
         </div>
@@ -806,7 +816,7 @@
       <div class="footer-inner">
         <div class="footer-brand">
           <a class="brand brand-light" href="/">
-            <picture><source srcset="/assets/tagioo-logo-light-284.avif?v=1" type="image/avif"><img src="/assets/tagioo-logo-light-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box" loading="lazy" decoding="async"></picture>
+            <picture><source srcset="/assets/tagioo-logo-light-284.avif?v=1" type="image/avif"><source srcset="/assets/tagioo-logo-light-284.webp?v=1" type="image/webp"><img src="/assets/tagioo-logo-light-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box" loading="lazy" decoding="async"></picture>
           </a>
           <p>Managed server-side tracking for ecommerce teams, marketers and agencies.</p>
           <div class="footer-payments">
@@ -829,7 +839,7 @@
             <a href="/website-tracking-checker">Tracking checker</a>
             <a href="/docs">Docs</a>
         <a href="/blog">Blog</a>
-            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>WhatsApp</a>
             <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
             <a href="#faq">FAQ</a>
           </div>
@@ -1003,5 +1013,6 @@
       }).catch(() => {});
     </script>
   <script src="/assets/home-hero-motion.js?v=2" defer></script><script src="/assets/home-homepage-guides.js?v=1" defer></script>
+  <script src="/assets/geo.js?v=1" defer></script>
 </body>
 </html>

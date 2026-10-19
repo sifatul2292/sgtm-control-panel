@@ -8,15 +8,22 @@
     <meta property="og:title" content="Privacy Policy — Tagioo" />
     <meta property="og:description" content="How Tagioo collects, isolates, and protects your tracking data." />
     <title>Privacy Policy — Tagioo</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin /><link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'" /><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" /></noscript>
+<link rel="preload" href="/assets/fonts/inter-latin-var.woff2?v=1" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/assets/site-base.css?v=1" />
     <link rel="stylesheet" href="/landing.css?v=5" />
     <link rel="stylesheet" href="/assets/legacy-pages.css?v=2" />
-      <!-- Google Tag Manager -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-MCR3FD4W');</script>
+      <!-- Tagioo boot + Google Tag Manager -->
+    <script>(function(w,d,L,i){var q=new URLSearchParams(L.search),dm=/(^|\.)tagioo\.com$/.test(L.hostname)?';domain=.tagioo.com':'',sc=L.protocol=='https:'?';Secure':'';
+    function ck(n){var m=d.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?m[1]:'';}
+    function set(n,v,s,h){d.cookie=n+'='+v+';path=/;max-age='+s+';SameSite=Lax'+(h?'':dm)+sc;}
+    if(q.get('internal')=='1')set('tg_internal','1',31536000,1);if(q.get('internal')=='0')set('tg_internal','',0,1);
+    if(ck('tg_internal')=='1'){w.tagiooInternal=true;return;}
+    var t=Date.now(),id=q.get('fbclid');if(id&&ck('_fbc').split('.').slice(3).join('.')!=id)set('_fbc','fb.1.'+t+'.'+id,7776000);
+    if(!ck('_fbp'))set('_fbp','fb.1.'+t+'.'+(1e9+Math.floor(Math.random()*9e9)),7776000);
+    if(!/^[0-9a-f]{32}$/.test(ck('tg_vid'))&&w.crypto&&crypto.getRandomValues){var a=crypto.getRandomValues(new Uint8Array(16)),v='';for(var k=0;k<16;k++)v+=(a[k]<16?'0':'')+a[k].toString(16);set('tg_vid',v,7776000,1);}
+    w.dataLayer=w.dataLayer||[];w.dataLayer.push({'gtm.start':t,event:'gtm.js'});var j=d.createElement('script');j.async=true;
+    j.src='https://www.googletagmanager.com/gtm.js?id='+i;d.head.appendChild(j);
+    })(window,document,location,'GTM-MCR3FD4W');</script>
     <!-- End Google Tag Manager -->
 
     <link rel="canonical" href="https://tagioo.com/privacy" />
@@ -32,7 +39,7 @@
     <!-- End Google Tag Manager (noscript) -->
     <header class="site-header" id="siteHeader">
       <a class="brand" href="/" aria-label="Tagioo home">
-        <picture><source srcset="/assets/tagioo-logo-284.avif?v=1" type="image/avif"><img src="/assets/tagioo-logo-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box"></picture>
+        <picture><source srcset="/assets/tagioo-logo-284.avif?v=1" type="image/avif"><source srcset="/assets/tagioo-logo-284.webp?v=1" type="image/webp"><img src="/assets/tagioo-logo-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box"></picture>
       </a>
       <nav aria-label="Primary navigation">
         <a href="/features">Platform</a>
@@ -135,7 +142,7 @@
         <p>We may update this policy periodically. Material changes will be notified via dashboard or email at least 14 days before taking effect. The date at the top of this page reflects the most recent update.</p>
 
         <h2>13. Contact</h2>
-        <p>Privacy questions or data requests: <a href="mailto:hello@tagioo.com">hello@tagioo.com</a> or <a href="https://wa.me/+8801990208987">WhatsApp</a>.</p>
+        <p>Privacy questions or data requests: <a href="mailto:hello@tagioo.com">hello@tagioo.com</a><span data-bd-only> or <a href="https://wa.me/+8801990208987">WhatsApp</a></span>.</p>
       </div>
     </main>
 
@@ -143,7 +150,7 @@
       <div class="footer-inner">
         <div class="footer-brand">
           <a class="brand brand-light" href="/">
-            <picture><source srcset="/assets/tagioo-logo-light-284.avif?v=1" type="image/avif"><img src="/assets/tagioo-logo-light-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box" loading="lazy" decoding="async"></picture>
+            <picture><source srcset="/assets/tagioo-logo-light-284.avif?v=1" type="image/avif"><source srcset="/assets/tagioo-logo-light-284.webp?v=1" type="image/webp"><img src="/assets/tagioo-logo-light-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box" loading="lazy" decoding="async"></picture>
           </a>
           <p>Managed server-side tracking for ecommerce teams, marketers and agencies.</p>
           <div class="footer-payments">
@@ -165,7 +172,7 @@
             <strong>Support</strong>
             <a href="/docs">Docs</a>
         <a href="/blog">Blog</a>
-            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>WhatsApp</a>
             <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
             <a href="/#faq">FAQ</a>
           </div>
@@ -185,5 +192,6 @@
       </div>
     </footer>
     <script src="/assets/marketing.js?v=1" defer></script>
-  </body>
+    <script src="/assets/geo.js?v=1" defer></script>
+</body>
 </html>

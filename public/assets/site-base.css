@@ -1,0 +1,40 @@
+/* Shared by every marketing page; inlined at serve time by servePublicPage(). */
+
+/* Self-hosted Inter (variable, weights 400–800, Latin subset, OFL). */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("/assets/fonts/inter-latin-var.woff2?v=1") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215, U+2713, U+FEFF, U+FFFD;
+}
+
+/* Region-specific content. Pages are cached identically for everyone, so
+   /assets/geo.js adds html.geo-bd for Bangladesh visitors (Cloudflare
+   CF-IPCountry or the /bd switch). Everyone else sees the international copy. */
+[data-bd-only] { display: none !important; }
+html.geo-bd [data-bd-only] { display: revert !important; }
+html.geo-bd [data-intl-only] { display: none !important; }
+html.geo-bd a.whatsapp-float[data-bd-only] { display: flex !important; }
+
+.support-float {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: #5b21b6;
+  color: #fff;
+  font: 600 14px/1 "Inter", ui-sans-serif, system-ui, sans-serif;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+}
+.support-float:hover { background: #4c1d95; }
+.support-float svg { flex: none; }
+
+.currency-switch { font-size: 13px; }

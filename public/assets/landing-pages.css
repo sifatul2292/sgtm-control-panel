@@ -1,0 +1,87 @@
+/* Ad landing pages (/shopify, /woocommerce), /case-studies, and the shared
+   "Works with" line + case-study cards used on the homepage and pricing page. */
+
+/* Inherits the surrounding text colour so it reads on light and dark heroes. */
+.works-with { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 14px; margin: 14px auto 0; font-size: 14px; color: inherit; }
+.works-with strong { color: inherit; font-weight: 700; }
+.works-with a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; opacity: .85; }
+.works-with a:hover { text-decoration: underline; }
+
+/* Case studies */
+.cs-section { padding-top: 64px; padding-bottom: 64px; }
+.cs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 20px; max-width: 1100px; margin: 0 auto; }
+.cs-card { position: relative; display: grid; gap: 12px; align-content: start; padding: 24px; border: 1px solid var(--border, rgba(14,16,21,.09)); border-radius: var(--radius-lg, 14px); background: #fff; text-align: left; }
+.cs-card header { display: flex; flex-wrap: wrap; gap: 8px; }
+.cs-platform, .cs-type { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--accent-soft, rgba(79,70,229,.08)); color: var(--accent-2, #4338ca); }
+.cs-type { background: var(--bg-3, #f4f4f8); color: var(--text-2, #575e6c); }
+.cs-card h3 { margin: 0; font-size: 1.2rem; }
+.cs-card dl { display: grid; gap: 4px; margin: 0; }
+.cs-card dt { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #8a91a0); }
+.cs-card dd { margin: 0 0 8px; color: var(--text-2, #575e6c); line-height: 1.55; }
+.cs-metrics { display: grid; gap: 8px; }
+.cs-metric { display: grid; gap: 4px; padding: 10px 12px; border-radius: var(--radius, 10px); background: var(--bg-2, #f7f7fa); }
+.cs-metric-label { font-size: 13px; font-weight: 600; }
+.cs-metric-values { display: flex; flex-wrap: wrap; gap: 16px; font-size: 15px; font-weight: 700; }
+.cs-metric-values small { font-weight: 500; color: var(--muted, #8a91a0); margin-right: 4px; }
+.cs-period { margin: 0; font-size: 12px; color: var(--muted, #8a91a0); }
+.cs-quote { margin: 0; padding-left: 14px; border-left: 3px solid var(--accent, #4f46e5); }
+.cs-quote p { margin: 0 0 4px; font-style: italic; }
+.cs-quote cite { font-size: 13px; color: var(--text-2, #575e6c); font-style: normal; }
+.cs-placeholder { border-style: dashed; border-color: var(--amber, #d97706); }
+.cs-flag { margin: 0; padding: 6px 10px; border-radius: 6px; background: #fef3c7; color: #92400e; font-size: 12px; font-weight: 700; }
+.cs-more { text-align: center; margin-top: 24px; }
+.cs-empty { text-align: center; color: var(--text-2, #575e6c); }
+
+/* Click-to-load video */
+.video-embed { position: relative; aspect-ratio: 16 / 9; width: 100%; max-width: 860px; margin: 0 auto; border-radius: var(--radius-lg, 14px); overflow: hidden; background: #0a0c12; }
+.video-embed iframe, .video-load, .video-load img { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-load img { object-fit: cover; }
+.video-play { position: absolute; top: 50%; left: 50%; width: 72px; height: 50px; margin: -25px 0 0 -36px; border-radius: 14px; background: rgba(0,0,0,.72); }
+.video-play::after { content: ""; position: absolute; top: 15px; left: 29px; border-style: solid; border-width: 10px 0 10px 17px; border-color: transparent transparent transparent #fff; }
+.video-load:hover .video-play { background: #e11d48; }
+.video-placeholder { display: grid; place-items: center; text-align: center; color: #f3f4f7; font-weight: 600; background: repeating-linear-gradient(45deg, #12141c, #12141c 12px, #1c1f2a 12px, #1c1f2a 24px); }
+.video-placeholder small { font-weight: 500; color: #9ca2b3; }
+
+/* Landing pages */
+.lp-hero { padding: clamp(48px, 9vw, 96px) 20px 56px; text-align: center; background: linear-gradient(180deg, var(--bg-2, #f7f7fa), #fff); }
+.lp-hero h1 { max-width: 820px; margin: 12px auto 16px; font-size: clamp(2rem, 6vw, 3.4rem); line-height: 1.08; letter-spacing: -0.02em; }
+.lp-hero .lp-sub { max-width: 640px; margin: 0 auto; font-size: 1.1rem; line-height: 1.6; color: var(--text-2, #575e6c); }
+.lp-ctas { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 28px; }
+.lp-ctas .button { min-height: 48px; }
+.lp-note { margin-top: 12px; font-size: 13px; color: var(--muted, #8a91a0); }
+.lp-section { padding: 64px 20px; }
+.lp-section.alt { background: var(--bg-2, #f7f7fa); }
+.lp-wrap { max-width: 1000px; margin: 0 auto; }
+.lp-wrap > h2 { margin: 0 0 12px; font-size: clamp(1.6rem, 4vw, 2.3rem); letter-spacing: -0.01em; text-align: center; }
+.lp-wrap > .lp-lead { max-width: 680px; margin: 0 auto 32px; text-align: center; color: var(--text-2, #575e6c); line-height: 1.6; }
+.lp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; }
+.lp-card { padding: 22px; border: 1px solid var(--border, rgba(14,16,21,.09)); border-radius: var(--radius-lg, 14px); background: #fff; }
+.lp-card h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.lp-card p { margin: 0; color: var(--text-2, #575e6c); line-height: 1.55; }
+.lp-steps { display: grid; gap: 12px; max-width: 720px; margin: 0 auto 32px; padding: 0; list-style: none; counter-reset: lp; }
+.lp-steps li { position: relative; padding: 14px 16px 14px 56px; border: 1px solid var(--border, rgba(14,16,21,.09)); border-radius: var(--radius, 10px); background: #fff; line-height: 1.5; counter-increment: lp; }
+.lp-steps li::before { content: counter(lp); position: absolute; left: 14px; top: 12px; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--accent, #4f46e5); color: #fff; font-weight: 700; font-size: 14px; }
+.lp-prices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; }
+.lp-price { padding: 20px; border: 1px solid var(--border, rgba(14,16,21,.09)); border-radius: var(--radius-lg, 14px); background: #fff; text-align: center; }
+.lp-price.featured { border-color: var(--accent, #4f46e5); box-shadow: 0 0 0 3px var(--accent-soft, rgba(79,70,229,.08)); }
+.lp-price h3 { margin: 0; font-size: 1rem; }
+.lp-price .lp-amount { margin: 8px 0 4px; font-size: 2rem; font-weight: 800; }
+.lp-price .lp-amount small { font-size: .9rem; font-weight: 500; color: var(--muted, #8a91a0); }
+.lp-price p { margin: 0; font-size: 14px; color: var(--text-2, #575e6c); }
+.lp-faq { display: grid; gap: 10px; max-width: 760px; margin: 0 auto; }
+.lp-faq details { padding: 16px 18px; border: 1px solid var(--border, rgba(14,16,21,.09)); border-radius: var(--radius, 10px); background: #fff; }
+.lp-faq summary { cursor: pointer; font-weight: 600; }
+.lp-faq p { margin: 10px 0 0; color: var(--text-2, #575e6c); line-height: 1.6; }
+.lp-final { padding: 64px 20px; text-align: center; background: #0a0c12; color: #f3f4f7; }
+.lp-final h2 { margin: 0 0 12px; font-size: clamp(1.6rem, 4vw, 2.3rem); }
+.lp-final p { color: #9ca2b3; }
+.lp-final .button-outline { color: #f3f4f7; border-color: rgba(255,255,255,.3); }
+.lp-header { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; background: rgba(255,255,255,.92); border-bottom: 1px solid var(--border, rgba(14,16,21,.09)); backdrop-filter: blur(8px); }
+.lp-header .button { min-height: 40px; padding: 8px 14px; font-size: 14px; }
+.lp-footer { padding: 28px 20px; text-align: center; font-size: 13px; color: var(--muted, #8a91a0); }
+.lp-footer a { color: inherit; margin: 0 8px; }
+.lp-compare { width: 100%; border-collapse: collapse; background: #fff; border-radius: var(--radius-lg, 14px); overflow: hidden; }
+.lp-compare th, .lp-compare td { padding: 12px 14px; border-bottom: 1px solid var(--border, rgba(14,16,21,.09)); text-align: left; vertical-align: top; font-size: 14px; line-height: 1.5; }
+.lp-compare thead th { background: var(--bg-2, #f7f7fa); }
+.lp-table-wrap { overflow-x: auto; }
+.lp-source { margin-top: 10px; font-size: 12px; color: var(--muted, #8a91a0); }

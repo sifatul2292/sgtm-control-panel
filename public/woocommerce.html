@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/assets/tagioo-icon-64.png?v=1" />
+    <title>Server-Side Tracking for WooCommerce Stores | Tagioo</title>
+    <meta name="description" content="Send WooCommerce purchases to Meta and GA4 from your own tracking domain with the Tagioo plugin. Guided setup, no GTM expertise needed. Start free." />
+    <meta name="theme-color" content="#ffffff" />
+    <meta property="og:title" content="Server-Side Tracking for WooCommerce Stores | Tagioo" />
+    <meta property="og:description" content="Send WooCommerce purchases to Meta and GA4 from your own tracking domain with the Tagioo plugin. Guided setup, no GTM expertise needed. Start free." />
+    <meta property="og:url" content="https://tagioo.com/woocommerce" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="canonical" href="https://tagioo.com/woocommerce" />
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Do I need to know Google Tag Manager?", "acceptedAnswer": {"@type": "Answer", "text": "No GTM expertise needed. Tagioo's Setup Assistant generates ready-made Web and Server GTM container files; you import them, preview and publish. You need a Google account with a Web and a Server GTM container."}}, {"@type": "Question", "name": "Will purchases be counted twice in Meta?", "acceptedAnswer": {"@type": "Answer", "text": "No. The browser pixel and the server event share the same event_id (the order ID for purchases), which Meta uses to merge them into one event."}}, {"@type": "Question", "name": "What happens when the Free plan reaches 15,000 events?", "acceptedAnswer": {"@type": "Answer", "text": "Tagioo emails you as you approach the limit. At 15,000 events the container pauses until your 30-day cycle resets or you upgrade. Nothing is deleted."}}, {"@type": "Question", "name": "How does the 3-day Pro trial work?", "acceptedAnswer": {"@type": "Answer", "text": "Choose Pro and add a card at checkout. You pay $0 for 3 days; after that the plan renews at $50/month plus applicable taxes unless you cancel before the trial ends."}}, {"@type": "Question", "name": "Can I get help with setup?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Email hello@tagioo.com with your store URL and we'll help you finish the setup."}}, {"@type": "Question", "name": "Does it work with my theme?", "acceptedAnswer": {"@type": "Answer", "text": "The plugin hooks into WooCommerce's own cart, checkout and order events rather than your theme's markup. Run a test order after setup to confirm events in GTM Preview and Meta Test Events."}}]}</script>
+    <link rel="preload" href="/assets/fonts/inter-latin-var.woff2?v=1" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/assets/site-base.css?v=1" />
+    <link rel="stylesheet" href="/assets/landing-pages.css?v=1" />
+    <link rel="stylesheet" href="/assets/lp.css?v=1" />
+    <!-- Tagioo boot + Google Tag Manager -->
+    <script>(function(w,d,L,i){var q=new URLSearchParams(L.search),dm=/(^|\.)tagioo\.com$/.test(L.hostname)?';domain=.tagioo.com':'',sc=L.protocol=='https:'?';Secure':'';
+    function ck(n){var m=d.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?m[1]:'';}
+    function set(n,v,s,h){d.cookie=n+'='+v+';path=/;max-age='+s+';SameSite=Lax'+(h?'':dm)+sc;}
+    if(q.get('internal')=='1')set('tg_internal','1',31536000,1);if(q.get('internal')=='0')set('tg_internal','',0,1);
+    if(ck('tg_internal')=='1'){w.tagiooInternal=true;return;}
+    var t=Date.now(),id=q.get('fbclid');if(id&&ck('_fbc').split('.').slice(3).join('.')!=id)set('_fbc','fb.1.'+t+'.'+id,7776000);
+    if(!ck('_fbp'))set('_fbp','fb.1.'+t+'.'+(1e9+Math.floor(Math.random()*9e9)),7776000);
+    if(!/^[0-9a-f]{32}$/.test(ck('tg_vid'))&&w.crypto&&crypto.getRandomValues){var a=crypto.getRandomValues(new Uint8Array(16)),v='';for(var k=0;k<16;k++)v+=(a[k]<16?'0':'')+a[k].toString(16);set('tg_vid',v,7776000,1);}
+    w.dataLayer=w.dataLayer||[];w.dataLayer.push({'gtm.start':t,event:'gtm.js'});var j=d.createElement('script');j.async=true;
+    j.src='https://www.googletagmanager.com/gtm.js?id='+i;d.head.appendChild(j);
+    })(window,document,location,'GTM-MCR3FD4W');</script>
+    <!-- End Google Tag Manager -->
+  </head>
+  <body class="lp">
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MCR3FD4W" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header" id="siteHeader">
+      <a class="brand" href="/" aria-label="Tagioo home">
+        <picture><source srcset="/assets/tagioo-logo-284.avif?v=1" type="image/avif"><source srcset="/assets/tagioo-logo-284.webp?v=1" type="image/webp"><img src="/assets/tagioo-logo-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box"></picture>
+      </a>
+      <nav aria-label="Primary navigation">
+        <a href="/features">Platform</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/compare">Compare</a>
+        <a href="/website-tracking-checker">Tracking checker</a>
+        <a href="/docs">Docs</a>
+        <a href="/blog">Blog</a>
+        <a href="/login" class="nav-login">Sign in</a>
+        <a class="nav-cta" href="/signup">Get started free</a>
+      </nav>
+      <button class="menu-btn" id="menuBtn" aria-controls="mobileNav" aria-label="Open menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </header>
+
+    <!-- ── MOBILE NAV ─────────────────────────────────────────── -->
+    <div class="mobile-nav" id="mobileNav" aria-hidden="true" inert>
+      <nav>
+        <a href="/features">Platform</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/compare">Compare</a>
+        <a href="/website-tracking-checker">Tracking checker</a>
+        <a href="/docs">Docs</a>
+        <a href="/blog">Blog</a>
+        <a href="/login">Sign in</a>
+        <a class="mobile-cta" href="/signup">Get started free →</a>
+      </nav>
+    </div>
+    <main id="main">
+      <section class="hero">
+        <div class="wrap">
+          <div>
+            <span class="pill"><span class="pill-dot"></span>For WooCommerce stores · WordPress plugin included</span>
+            <h1>Server-side tracking for <span class="hl">WooCommerce stores</span></h1>
+            <p class="hero-sub">WooCommerce records the order. Does Meta? Tagioo's plugin and managed server container send purchases through your own tracking domain, so your ads optimize on real sales.</p>
+            <div class="hero-ctas">
+            <a class="btn btn-primary" href="/signup">Start free — no card required <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></a>
+            <a class="btn btn-secondary" href="/signup?plan=Pro&amp;cycle=monthly">Try Pro free for 3 days</a>
+          </div>
+            <ul class="checks"><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>No credit card for Free</li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>15,000 events every 30 days</li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Set up in about 10 minutes</li></ul>
+          </div>
+          <figure class="flow" aria-label="Illustration: how a purchase reaches your ad platforms">
+            <div class="flow-head"><span>How a purchase flows</span><span class="flow-tag">Illustration</span></div>
+            <div class="flow-step"><span class="flow-icon shop"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/></svg></span><div><strong>WooCommerce order placed</strong><span>purchase · order ID as event_id</span></div></div>
+            <div class="flow-link"></div>
+            <div class="flow-step"><span class="flow-icon tg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg></span><div><strong>track.yourstore.com</strong><span>Your Tagioo server container</span></div></div>
+            <div class="flow-link"></div>
+            <div class="flow-dests">
+              <div class="flow-dest"><span>Meta Conversions API</span><span class="badge badge-ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Deduplicated</span></div>
+              <div class="flow-dest"><span>Google Analytics 4</span><span class="badge badge-ok"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg> Received</span></div>
+              <div class="flow-dest"><span>Browser pixel blocked?</span><span class="badge badge-muted">Server copy still sent</span></div>
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      <div class="strip"><div class="wrap" data-reveal><span>Sends events to</span><span>Meta CAPI</span><span>Google Analytics 4</span><span>Google Ads</span><span>TikTok Events API</span></div></div>
+
+      <section class="sec" id="problem">
+        <div class="wrap">
+          <div class="sec-head" data-reveal><span class="eyebrow">The problem</span><h2>Your browser pixel misses purchases</h2><p>WooCommerce saves every order, but a browser pixel only reports what the visitor's browser lets it send.</p></div>
+          <div class="grid grid-3">
+          <article class="card" data-reveal><span class="ico ico-warn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><h3>Ad blockers & browser privacy</h3><p>Blockers and browser tracking protections can stop third-party pixels from loading or sending.</p></article>
+          <article class="card" data-reveal><span class="ico ico-warn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></span><h3>Thank-you page never loads</h3><p>Payment redirects, closed tabs and slow pages mean the purchase pixel may never fire.</p></article>
+          <article class="card" data-reveal><span class="ico ico-warn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></span><h3>Less data, weaker ads</h3><p>Missing purchases and thin match data make it harder for Meta to find buyers and for you to trust ROAS.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec sec-soft" id="how">
+        <div class="wrap">
+          <div class="sec-head" data-reveal><span class="eyebrow">How Tagioo fixes it</span><h2>Send every sale from your own server</h2><p>Tagioo runs a managed server-side Google Tag Manager container on your own subdomain, and the Tagioo plugin feeds it from WooCommerce.</p></div>
+          <div class="compare">
+            <div class="compare-col bad" data-reveal><h3><span class="badge badge-bad">Before</span> Browser pixel only</h3><ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg><span>Purchases lost to ad blockers and browser privacy</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg><span>Pixel depends on the thank-you page loading</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg><span>No way to see which events actually arrived</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg><span>Broken tracking goes unnoticed for weeks</span></li></ul></div>
+            <div class="compare-col good" data-reveal><h3><span class="badge badge-ok">After</span> With Tagioo</h3><ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Events sent through your own first-party subdomain</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Backend purchase recovery on paid plans</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Meta CAPI + pixel deduplicated by order ID</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Live event log and purchase gap alerts</span></li></ul></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec" id="setup">
+        <div class="wrap setup">
+          <div>
+            <span class="eyebrow">Setup</span>
+            <h2 style="font-size:clamp(1.7rem,4.6vw,2.5rem);font-weight:800;margin-bottom:28px">Live in about 10 minutes</h2>
+            <ol class="steps" data-reveal>
+            <li><strong>Create your free account</strong>Add a container and choose a tracking subdomain.</li>
+            <li><strong>Add one DNS record</strong>A single CNAME. SSL is issued automatically.</li>
+            <li><strong>Generate your GTM files</strong>In Setup Assistant choose WooCommerce, then import web.json and server.json.</li>
+            <li><strong>Install the plugin</strong>WordPress → Plugins → Add New → Upload, activate and paste your tracking ID.</li>
+            <li><strong>Test one order</strong>Confirm it in Meta Test Events and your Tagioo event log.</li>
+            </ol>
+            <p class="setup-note">No GTM4WP or manual dataLayer code. The plugin sends page_view, view_item, add_to_cart, begin_checkout and purchase.</p>
+          </div>
+          <div class="setup-media" data-reveal>
+            <!-- tagioo:video woocommerce title="WooCommerce setup with Tagioo" -->
+            <p>Prefer reading? <a href="/docs#woocommerce">Step-by-step WooCommerce docs →</a></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec sec-soft" id="features">
+        <div class="wrap">
+          <div class="sec-head" data-reveal><span class="eyebrow">What you get</span><h2>Built for store owners, not tag engineers</h2></div>
+          <div class="grid grid-4">
+          <article class="card" data-reveal><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22v-5M9 8V2M15 8V2M18 8v5a6 6 0 0 1-12 0V8z"/></svg></span><h3>WordPress plugin</h3><p>Upload, activate, paste your tracking ID. No custom code.</p></article>
+          <article class="card" data-reveal><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg></span><h3>Purchase recovery</h3><p>On paid plans, completed orders are also sent from your store's backend.</p></article>
+          <article class="card" data-reveal><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 6 4-4 4 4M12 2v10.3a4 4 0 0 1-1.17 2.83L4 22M20 22l-5-5"/></svg></span><h3>Meta CAPI + dedup</h3><p>Browser and server copies share the order ID as event_id, so Meta counts each purchase once.</p></article>
+          <article class="card" data-reveal><span class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span><h3>Purchase gap alerts</h3><p>A dashboard alert when today's tracked purchases drop well below your 7-day average.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <!-- tagioo:case-studies limit=2 platform=WooCommerce heading="WooCommerce stores using Tagioo" -->
+
+      <section class="sec" id="pricing">
+        <div class="wrap">
+          <div class="sec-head" data-reveal><span class="eyebrow">Pricing</span><h2>Start free. Upgrade when you grow.</h2><p>Paid plans start with a 3-day free trial, then bill monthly. Cancel any time before the trial ends.</p></div>
+          <div class="prices">
+          <article class="price" data-reveal>
+            <h3>Free</h3><p class="price-amt">$0<small></small></p><p class="price-desc">Test with real events.</p>
+            <ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>15,000 events / 30 days</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>1 sGTM container</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>First-party domain + SSL</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Setup Assistant + live event log</span></li></ul>
+            <a class="btn btn-primary" href="/signup">Start free</a>
+          </article>
+          <article class="price" data-reveal>
+            <h3>Starter</h3><p class="price-amt">$30<small>/mo</small></p><p class="price-desc">For stores starting out.</p>
+            <ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>500,000 events / cycle</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>1 sGTM container</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Meta CAPI + deduplication</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Server-side purchase recovery</span></li></ul>
+            <a class="btn btn-secondary" href="/signup?plan=Starter&amp;cycle=monthly">Start 3-day trial</a>
+          </article>
+          <article class="price featured" data-reveal><span class="price-flag">Most popular</span>
+            <h3>Pro</h3><p class="price-amt">$50<small>/mo</small></p><p class="price-desc">For stores running ads.</p>
+            <ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>2,000,000 events / cycle</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Up to 3 sGTM containers</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Offline conversions to Meta</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Advanced diagnostics</span></li></ul>
+            <a class="btn btn-primary" href="/signup?plan=Pro&amp;cycle=monthly">Try Pro free for 3 days</a>
+          </article>
+          <article class="price" data-reveal>
+            <h3>Enterprise</h3><p class="price-amt">$100<small>/mo</small></p><p class="price-desc">For agencies & high volume.</p>
+            <ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>5,000,000 events / cycle</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Up to 5 sGTM containers</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Multiple container workspaces</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Container status monitoring</span></li></ul>
+            <a class="btn btn-secondary" href="/signup?plan=Enterprise&amp;cycle=monthly">Start 3-day trial</a>
+          </article>
+          </div>
+          <p class="price-note">Prices in USD, excluding applicable taxes. <a href="/pricing">Compare all plan features →</a></p>
+        </div>
+      </section>
+
+      <section class="sec sec-soft" id="faq">
+        <div class="wrap">
+          <div class="sec-head" data-reveal><span class="eyebrow">FAQ</span><h2>Questions, answered</h2></div>
+          <div class="faq" data-reveal>
+          <details><summary>Do I need to know Google Tag Manager?</summary><p>No GTM expertise needed. Tagioo's Setup Assistant generates ready-made Web and Server GTM container files; you import them, preview and publish. You need a Google account with a Web and a Server GTM container.</p></details>
+          <details><summary>Will purchases be counted twice in Meta?</summary><p>No. The browser pixel and the server event share the same <code>event_id</code> (the order ID for purchases), which Meta uses to merge them into one event.</p></details>
+          <details><summary>What happens when the Free plan reaches 15,000 events?</summary><p>Tagioo emails you as you approach the limit. At 15,000 events the container pauses until your 30-day cycle resets or you upgrade. Nothing is deleted.</p></details>
+          <details><summary>How does the 3-day Pro trial work?</summary><p>Choose Pro and add a card at checkout. You pay $0 for 3 days; after that the plan renews at $50/month plus applicable taxes unless you cancel before the trial ends.</p></details>
+          <details><summary>Can I get help with setup?</summary><p>Yes. Email <a href="mailto:hello@tagioo.com">hello@tagioo.com</a> with your store URL and we'll help you finish the setup.</p></details>
+          <details><summary>Does it work with my theme?</summary><p>The plugin hooks into WooCommerce's own cart, checkout and order events rather than your theme's markup. Run a test order after setup to confirm events in GTM Preview and Meta Test Events.</p></details>
+          </div>
+        </div>
+      </section>
+
+      <section class="final">
+        <div class="wrap">
+          <h2 data-reveal>Track every WooCommerce sale your ads drive.</h2>
+          <p>Start on the Free plan with 15,000 events. Upgrade when your volume grows.</p>
+          <div class="hero-ctas">
+            <a class="btn btn-primary" href="/signup">Start free — no card required <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></a>
+            <a class="btn btn-secondary" href="/signup?plan=Pro&amp;cycle=monthly">Try Pro free for 3 days</a>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="lp-foot">
+      <div class="wrap">
+        <div>
+          <p>Questions? <a href="mailto:hello@tagioo.com">hello@tagioo.com</a><span data-bd-only> · <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a></span></p>
+          <p>Prices in USD, excluding applicable taxes. <a href="/bd?next=/pricing">Bangladesh? See BDT pricing</a> · © 2026 Tagioo</p>
+        </div>
+        <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/compare">Compare</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav>
+      </div>
+    </footer>
+    <div class="sticky-cta"><a class="btn btn-primary" href="/signup">Start free — no card</a></div>
+    <script src="/assets/geo.js?v=1" defer></script>
+    <script src="/assets/video.js?v=1" defer></script>
+    <script src="/assets/lp.js?v=1" defer></script>
+  </body>
+</html>

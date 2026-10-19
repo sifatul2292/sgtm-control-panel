@@ -19,6 +19,7 @@ import { paddleCheckoutMatchesTenant, paddlePlanNameFromItems, paddleRenewalDate
 import { openPaddleInbox } from "./paddle-inbox.js";
 import { paddleEventIsStale } from "./paddle-billing.js";
 import { attachEventHistory, archiveEventHistory } from "./history-archive.js";
+import { applyMarketingContent } from "./marketing-content.js";
 
 const gzipAsync = promisify(gzip);
 const brotliAsync = promisify(brotliCompress);
@@ -1105,6 +1106,12 @@ ___TEMPLATE_PARAMETERS___
     "simpleValueType": true
   },
   {
+    "type": "TEXT",
+    "name": "defaultCountry",
+    "displayName": "Default country (2-letter, used when the visitor's country is unknown)",
+    "simpleValueType": true
+  },
+  {
     "type": "SELECT",
     "name": "actionSource",
     "displayName": "Action Source",
@@ -1144,6 +1151,7 @@ const Math = require('Math');
 const makeString = require('makeString');
 const makeNumber = require('makeNumber');
 const sendHttpRequest = require('sendHttpRequest');
+const setCookie = require('setCookie');
 const sha256Sync = require('sha256Sync');
 
 const eventData = getAllEventData();
@@ -1190,6 +1198,17 @@ function addRaw(target, key, value) {
   if (value !== undefined && value !== null && value !== '') target[key] = makeString(value);
 }
 
+// The site's backend already sent this event straight to Meta CAPI with full
+// hashed user data under the same event_id; a second, thinner server copy
+// would only dilute match-quality reporting.
+if (makeString(eventData.tagioo_capi_direct) === '1') {
+  if (data.enableDebugLog) {
+    logToConsole('Tagioo Meta CAPI: skipping ' + eventData.event_name + ' already sent by backend');
+  }
+  data.gtmOnSuccess();
+  return;
+}
+
 const mappedEventName = eventMap[eventData.event_name];
 if (!mappedEventName) {
   if (data.enableDebugLog) {
@@ -1222,21 +1241,47 @@ const event = {
   custom_data: {}
 };
 
-addHashed(event.user_data, 'em', firstValue(userData.email_address, userData.email, eventData.email_address, eventData.email));
-addHashed(event.user_data, 'ph', firstValue(userData.phone_number, eventData.phone_number));
-addHashed(event.user_data, 'fn', firstValue(userData.first_name, eventData.first_name));
-addHashed(event.user_data, 'ln', firstValue(userData.last_name, eventData.last_name));
-// external_id: prefer the storefront-supplied id; else fall back to the stable
-// first-party FPID cookie the GA4 client sets on every visitor. This puts an
-// external_id on every event (incl. PageView/ViewContent) without any storefront
-// change, lifting Meta event match quality.
-addHashed(event.user_data, 'external_id', firstValue(userData.external_id, eventData.external_id, getCookieValues('FPID', true)[0]));
-addHashed(event.user_data, 'ct', firstValue(userData.city, eventData.city));
-addHashed(event.user_data, 'st', firstValue(userData.region, eventData.region));
-addHashed(event.user_data, 'zp', firstValue(userData.postal_code, eventData.postal_code));
-// Country must reflect the actual buyer, not a fixed value. Hash the incoming
-// 2-letter code; fall back to the store default (bd) when none is sent.
-addHashed(event.user_data, 'country', firstValue(userData.country, eventData.country, 'bd'));
+// Returning-visitor identity. Hashed identifiers seen on an earlier event
+// (checkout, purchase, logged-in customer) are kept in a first-party HttpOnly
+// cookie on the tracking domain and reused when a later PageView, ViewContent,
+// AddToCart or InitiateCheckout arrives without them. Only SHA-256 hashes are
+// stored. Nothing is read or written when the hit says ad_storage was denied.
+const UD_KEYS = ['em', 'ph', 'fn', 'ln', 'ct', 'st', 'zp', 'country', 'external_id'];
+const gcs = makeString(eventData['x-ga-gcs'] || '');
+const adStorageDenied = gcs.length >= 3 && gcs.charAt(2) === '0';
+const stored = {};
+const storedRaw = adStorageDenied ? '' : getCookieValues('tagioo_ud', true)[0];
+if (storedRaw) {
+  makeString(storedRaw).split('~').forEach((pair) => {
+    const parts = pair.split(':');
+    if (parts.length === 2 && UD_KEYS.indexOf(parts[0]) !== -1 && isHash(parts[1])) stored[parts[0]] = parts[1];
+  });
+}
+
+addHashed(event.user_data, 'em', firstValue(userData.email_address, userData.email, eventData.email_address, eventData.email, stored.em));
+addHashed(event.user_data, 'ph', firstValue(userData.phone_number, eventData.phone_number, stored.ph));
+addHashed(event.user_data, 'fn', firstValue(userData.first_name, eventData.first_name, stored.fn));
+addHashed(event.user_data, 'ln', firstValue(userData.last_name, eventData.last_name, stored.ln));
+// external_id: storefront id, then the id remembered for this visitor, then the
+// stable first-party FPID cookie the GA4 client sets on every visitor. Backend
+// hits (e.g. WooCommerce purchase recovery) carry no cookies, so a guest order
+// falls back to its hashed phone or email rather than going without one.
+addHashed(event.user_data, 'external_id', firstValue(userData.external_id, eventData.external_id, stored.external_id, getCookieValues('FPID', true)[0], event.user_data.ph, event.user_data.em));
+addHashed(event.user_data, 'ct', firstValue(userData.city, eventData.city, stored.ct));
+addHashed(event.user_data, 'st', firstValue(userData.region, eventData.region, stored.st));
+addHashed(event.user_data, 'zp', firstValue(userData.postal_code, eventData.postal_code, stored.zp));
+// Country must reflect the actual visitor: the pushed value, then the one
+// remembered for them, then Cloudflare's country header (forwarded by Tagioo's
+// Nginx), then the store's configured default. Unknown/Tor codes are ignored.
+let headerCountry = makeString(firstValue(getRequestHeader('x-tagioo-country'), getRequestHeader('cf-ipcountry')) || '');
+if (headerCountry.match('^[A-Za-z]{2}$') === null || headerCountry === 'XX' || headerCountry === 'T1') headerCountry = '';
+addHashed(event.user_data, 'country', firstValue(userData.country, eventData.country, stored.country, headerCountry, data.defaultCountry));
+
+if (!adStorageDenied && (event.user_data.em || event.user_data.ph)) {
+  const remembered = [];
+  UD_KEYS.forEach((key) => { if (event.user_data[key]) remembered.push(key + ':' + event.user_data[key]); });
+  setCookie('tagioo_ud', remembered.join('~'), { domain: 'auto', path: '/', 'max-age': 7776000, secure: true, httpOnly: true, sameSite: 'lax' });
+}
 
 addRaw(event.user_data, 'fbp', firstValue(userData.fbp, eventData.fbp, eventData._fbp, getCookieValues('_fbp', true)[0]));
 // _fbc: prefer the cookie/event value; else reconstruct from the raw fbclid
@@ -1272,7 +1317,7 @@ if (getType(eventData.items) === 'array') {
   if (numItems > 0) event.custom_data.num_items = numItems;
 }
 
-const body = { data: [event], partner_agent: 'tagioo-sgtm-1.0' };
+const body = { data: [event], partner_agent: 'tagioo-sgtm-1.1' };
 if (data.testEventCode) body.test_event_code = data.testEventCode;
 
 const url = 'https://graph.facebook.com/v20.0/' + data.pixelId + '/events?access_token=' + data.accessToken;
@@ -1316,7 +1361,28 @@ ___SERVER_PERMISSIONS___
       "key": { "publicId": "get_cookies", "versionId": "1" },
       "param": [
         { "key": "cookieAccess", "value": { "type": 1, "string": "specific" } },
-        { "key": "cookieNames", "value": { "type": 2, "listItem": [{ "type": 1, "string": "_fbp" }, { "type": 1, "string": "_fbc" }, { "type": 1, "string": "tagioo_fbclid" }, { "type": 1, "string": "FPID" }] } }
+        { "key": "cookieNames", "value": { "type": 2, "listItem": [{ "type": 1, "string": "_fbp" }, { "type": 1, "string": "_fbc" }, { "type": 1, "string": "tagioo_fbclid" }, { "type": 1, "string": "FPID" }, { "type": 1, "string": "tagioo_ud" }] } }
+      ]
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": { "publicId": "set_cookies", "versionId": "1" },
+      "param": [
+        {
+          "key": "allowedCookies",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 3,
+                "mapKey": [{ "type": 1, "string": "name" }, { "type": 1, "string": "domain" }, { "type": 1, "string": "path" }, { "type": 1, "string": "secure" }, { "type": 1, "string": "session" }],
+                "mapValue": [{ "type": 1, "string": "tagioo_ud" }, { "type": 1, "string": "*" }, { "type": 1, "string": "*" }, { "type": 1, "string": "any" }, { "type": 1, "string": "any" }]
+              }
+            ]
+          }
+        }
       ]
     },
     "isRequired": true
@@ -1336,7 +1402,9 @@ ___SERVER_PERMISSIONS___
               { "type": 3, "mapKey": [{ "type": 1, "string": "headerName" }], "mapValue": [{ "type": 1, "string": "x-forwarded-for" }] },
               { "type": 3, "mapKey": [{ "type": 1, "string": "headerName" }], "mapValue": [{ "type": 1, "string": "x-real-ip" }] },
               { "type": 3, "mapKey": [{ "type": 1, "string": "headerName" }], "mapValue": [{ "type": 1, "string": "user-agent" }] },
-              { "type": 3, "mapKey": [{ "type": 1, "string": "headerName" }], "mapValue": [{ "type": 1, "string": "referer" }] }
+              { "type": 3, "mapKey": [{ "type": 1, "string": "headerName" }], "mapValue": [{ "type": 1, "string": "referer" }] },
+              { "type": 3, "mapKey": [{ "type": 1, "string": "headerName" }], "mapValue": [{ "type": 1, "string": "x-tagioo-country" }] },
+              { "type": 3, "mapKey": [{ "type": 1, "string": "headerName" }], "mapValue": [{ "type": 1, "string": "cf-ipcountry" }] }
             ]
           }
         }
@@ -1776,7 +1844,7 @@ function metaPixelBaseScript() {
 function metaPixelEventScript(metaEventName, saas = false) {
   const orderId = metaEventName === "Purchase" ? "if(ec.transaction_id)p.order_id=ec.transaction_id;" : "";
   return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + META_PIXEL_BOOTSTRAP_SCRIPT +
-    (saas && ["CompleteRegistration", "Subscribe"].includes(metaEventName) ? "ec={};" : "") +
+    (saas && ["CompleteRegistration", "Subscribe", "Lead"].includes(metaEventName) ? "ec={};" : "") +
     "var sent=window.__tagiooMetaSent=window.__tagiooMetaSent||{};var key=pixel+'|" + metaEventName + "|'+(eid||location.href);" +
     "if(sent[key])return;var items=ec.items||[];var ids=items.map(function(it){return String(it.item_id||it.id||'');});" +
     "var contents=items.map(function(it){return {id:String(it.item_id||it.id||''),quantity:it.quantity||1,item_price:it.price};});" +
@@ -1921,7 +1989,12 @@ function buildWebGtmTemplate(input) {
       fingerprint: String(Date.now()), parentFolderId: "2"
     }
   ];
-  if (payload.businessType === "saas") variables.push(gtmDataLayerVariable(90, "dlv - plan", "plan"));
+  if (payload.businessType === "saas") {
+    variables.push(gtmDataLayerVariable(90, "dlv - plan", "plan"));
+    // Set to "1" by an app whose backend already sends this event to Meta CAPI
+    // itself; the Tagioo Meta CAPI server template then skips its own copy.
+    variables.push(gtmDataLayerVariable(91, "dlv - tagioo_capi_direct", "tagioo_capi_direct"));
+  }
   const triggers = [
     payload.platform === "shopify"
       ? gtmTrigger(1, "Tagioo - Shopify page_view", "page_view")
@@ -1940,7 +2013,7 @@ function buildWebGtmTemplate(input) {
   if (payload.businessType === "saas") {
     triggers.splice(0, triggers.length,
       { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - DOM Ready PageView", type: "DOM_READY", fingerprint: String(Date.now()) },
-      ...[["sign_up", 12], ["start_trial", 13], ["subscribe", 14], ["begin_checkout", 4], ["add_payment_info", 6], ["purchase", 5]]
+      ...[["generate_lead", 15], ["sign_up", 12], ["start_trial", 13], ["subscribe", 14], ["begin_checkout", 4], ["add_payment_info", 6], ["purchase", 5]]
         .map(([name, id]) => gtmTrigger(id, "Tagioo - " + name, name)));
   }
   const tags = [];
@@ -1958,7 +2031,7 @@ function buildWebGtmTemplate(input) {
       ])
     ], ["2147479573"], "3"));
     const eventMap = payload.businessType === "saas" ? [
-      ["page_view", "1"], ["sign_up", "12"], ["start_trial", "13"], ["subscribe", "14"], ["begin_checkout", "4"], ["add_payment_info", "6"], ["purchase", "5"]
+      ["page_view", "1"], ["generate_lead", "15"], ["sign_up", "12"], ["start_trial", "13"], ["subscribe", "14"], ["begin_checkout", "4"], ["add_payment_info", "6"], ["purchase", "5"]
     ] : [
       ["page_view", "1"], ["view_item", "2"], ["add_to_cart", "3"],
       ["begin_checkout", "4"], ["purchase", "5"],
@@ -1986,6 +2059,7 @@ function buildWebGtmTemplate(input) {
           if (eventSettingsRows[i].parameter.startsWith("user_data.")) eventSettingsRows.splice(i, 1);
         }
         eventSettingsRows.push({ parameter: "plan", parameterValue: "{{dlv - plan}}" });
+        if (eventName !== "page_view") eventSettingsRows.push({ parameter: "tagioo_capi_direct", parameterValue: "{{dlv - tagioo_capi_direct}}" });
         if (["start_trial", "subscribe"].includes(eventName)) {
           eventSettingsRows.push(
             { parameter: "currency", parameterValue: "{{dlv - ecommerce.currency}}" },
@@ -2047,7 +2121,7 @@ function buildWebGtmTemplate(input) {
     ], [payload.platform === "shopify" ? "1" : "2147479553"], "4"));
     // Browser pixel events, deduped with server CAPI via event_id.
     const metaEventMap = payload.businessType === "saas" ? [
-      ["sign_up", "CompleteRegistration", "12"], ["start_trial", "StartTrial", "13"], ["subscribe", "Subscribe", "14"],
+      ["generate_lead", "Lead", "15"], ["sign_up", "CompleteRegistration", "12"], ["start_trial", "StartTrial", "13"], ["subscribe", "Subscribe", "14"],
       ["begin_checkout", "InitiateCheckout", "4"], ["add_payment_info", "AddPaymentInfo", "6"], ["purchase", "Purchase", "5"]
     ] : [
       ["view_item", "ViewContent", "2"],
@@ -2070,7 +2144,7 @@ function buildWebGtmTemplate(input) {
     ], [payload.platform === "shopify" ? "1" : "2147479553"], "6"));
     // Browser pixel events, deduped with server Events API via event_id.
     const tiktokEventMap = payload.businessType === "saas" ? [
-      ["sign_up", "CompleteRegistration", "12"], ["subscribe", "Subscribe", "14"],
+      ["generate_lead", "SubmitForm", "15"], ["sign_up", "CompleteRegistration", "12"], ["subscribe", "Subscribe", "14"],
       ["begin_checkout", "InitiateCheckout", "4"], ["add_payment_info", "AddPaymentInfo", "6"], ["purchase", "CompletePayment", "5"]
     ] : [
       ["view_item", "ViewContent", "2"],
@@ -2104,6 +2178,12 @@ function buildServerGtmTemplate(input) {
   const destinations = selectedDestinations(input);
   const ga4ApiSecret = String(input.ga4ApiSecret || "").trim();
   const metaTestEventCode = String(input.metaTestEventCode || "").trim();
+  // Store-level fallback country for Meta. Kept as BD for BDT stores so existing
+  // Bangladesh setups keep their country match key; others leave it empty and
+  // rely on the visitor's own country (pushed value or Cloudflare header).
+  const metaDefaultCountry = /^[A-Za-z]{2}$/.test(String(input.defaultCountry || "").trim())
+    ? String(input.defaultCountry).trim().toUpperCase()
+    : (String(input.currency || "").trim().toUpperCase() === "BDT" ? "BD" : "");
   // Cookie life extension: drive the GA4 server client's FPID max-age. When the
   // power-up is off we keep the long-lived 730d default; when on, use the chosen days.
   const cookieMaxAgeInSec = String((input.cookieExtensionEnabled ? clampCookieDays(input.cookieExtensionDays) : COOKIE_DAYS_DEFAULT) * 86400);
@@ -2209,6 +2289,7 @@ function buildServerGtmTemplate(input) {
       gtmTemplateParam("accessToken", "{{Tagioo - meta_capi_token}}"),
       gtmTemplateParam("testEventCode", metaTestEventCode ? "{{Tagioo - meta_test_event_code}}" : ""),
       gtmTemplateParam("actionSource", "website"),
+      gtmTemplateParam("defaultCountry", metaDefaultCountry),
       gtmBooleanParam("enableDebugLog", true)
     ], ["1"], "4");
     if (payload.platform === "woocommerce") metaTag.blockingTriggerId = ["7"];
@@ -2436,6 +2517,8 @@ function saasSetupGuide() {
 Import web.json and server.json into the corresponding GTM containers using Merge. Preview before publishing. Pause overlapping old tags to prevent duplicate sends.
 Your application must push events only AFTER the action succeeds; installing GTM does not detect account creation or billing automatically.
 window.dataLayer = window.dataLayer || [];
+// After a valid signup/demo/contact form is SUBMITTED (not when it is viewed):
+dataLayer.push({event:"generate_lead", event_id:"lead_SUBMISSION_ID"});
 // After successful, verified account creation:
 dataLayer.push({event:"sign_up", event_id:"signup_ACCOUNT_ID", plan:"Free"});
 // After the billing provider confirms trial activation:
@@ -2450,11 +2533,11 @@ dataLayer.push({event:"subscribe", event_id:"subscribe_SUBSCRIPTION_ID", plan:"P
 dataLayer.push({ecommerce:null});
 dataLayer.push({event:"purchase", event_id:"purchase_PAYMENT_ID", plan:"Pro", ecommerce:{transaction_id:"PAYMENT_ID",value:50,currency:"USD",items:[{item_id:"pro",item_name:"Pro subscription",price:50,quantity:1}]}});
 Replace example IDs, plans, currency and prices with real confirmed values. Never fire registration or trial on a button click or form view. Never treat a free signup or trial as a Purchase.
-Use the SAME event_id and event name for browser and backend copies of one action. For GA4, choose one authoritative sender per conversion; GA4 does not generally deduplicate custom events by event_id. For Meta, matching event IDs allow Pixel/CAPI deduplication. Do not send an extra direct CAPI copy if Server GTM already sends it.
+Use the SAME event_id and event name for browser and backend copies of one action. For GA4, choose one authoritative sender per conversion; GA4 does not generally deduplicate custom events by event_id. For Meta, matching event IDs allow Pixel/CAPI deduplication. If your backend ALSO sends an event straight to Meta CAPI (for example with hashed email), add tagioo_capi_direct:"1" to that push and then push {tagioo_capi_direct:undefined}; the Tagioo Meta CAPI server tag then skips its thinner copy so Meta gets one server event per event_id. Otherwise leave it out.
 Keep webhooks authoritative for trial activation and paid charges; persist browser attribution for delayed events. A webhook cannot push into a closed browser.
 Mark sign_up and start_trial as key events in GA4 Admin. Subscribe is a separate lifecycle event; do not sum it with Purchase as paid-customer count.
 Do not put email, phone, passwords or server access tokens in these pushes. Keep server credentials in server.json only. Respect visitor consent.
-For Tagioo itself, existing backend sign_up/start_trial/purchase sends remain authoritative. Importing these templates does not add browser pushes to Tagioo or replace its direct CAPI sender; coordinate those before publishing.
+For Tagioo itself, the site already pushes generate_lead (on /verify), sign_up, start_trial and begin_checkout with tagioo_capi_direct:"1", and its backend sends the matching direct CAPI events with hashed email.
 TikTok trial-start mapping and Google Ads signup/trial conversion labels are not included; configure those destination rules separately if needed.`;
 }
 
@@ -2740,18 +2823,35 @@ const TAGIOO_GTM_ID = "GTM-MCR3FD4W";
 // `seed` is pushed to the dataLayer BEFORE gtm.js loads so a tag can read it on the very
 // first container load — used by the signup page to hand the browser the same event_id
 // the server already sent to Meta CAPI (see the Lead forward in GET /signup).
+// Runs before GTM on every tagioo.com page (static marketing pages embed the
+// same text; test/us-launch.test.js keeps them in sync):
+// - ?internal=1 sets tg_internal (?internal=0 clears it); internal visitors
+//   never load GTM, so no GA4/Meta pixel hits. The backend skips its own
+//   GA4/CAPI sends for them too (see tagiooVisitorContext).
+// - Writes _fbc from ?fbclid= and a first-party _fbp before the pixel loads,
+//   so server-side Lead/CompleteRegistration see them even if the pixel is
+//   blocked or slow. fbevents.js adopts existing _fbp/_fbc cookies.
+// - Mints tg_vid (hashed into Meta external_id) on the first page view.
+const TAGIOO_BOOT_SCRIPT = `<!-- Tagioo boot + Google Tag Manager -->
+    <script>(function(w,d,L,i){var q=new URLSearchParams(L.search),dm=/(^|\\.)tagioo\\.com$/.test(L.hostname)?';domain=.tagioo.com':'',sc=L.protocol=='https:'?';Secure':'';
+    function ck(n){var m=d.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?m[1]:'';}
+    function set(n,v,s,h){d.cookie=n+'='+v+';path=/;max-age='+s+';SameSite=Lax'+(h?'':dm)+sc;}
+    if(q.get('internal')=='1')set('tg_internal','1',31536000,1);if(q.get('internal')=='0')set('tg_internal','',0,1);
+    if(ck('tg_internal')=='1'){w.tagiooInternal=true;return;}
+    var t=Date.now(),id=q.get('fbclid');if(id&&ck('_fbc').split('.').slice(3).join('.')!=id)set('_fbc','fb.1.'+t+'.'+id,7776000);
+    if(!ck('_fbp'))set('_fbp','fb.1.'+t+'.'+(1e9+Math.floor(Math.random()*9e9)),7776000);
+    if(!/^[0-9a-f]{32}$/.test(ck('tg_vid'))&&w.crypto&&crypto.getRandomValues){var a=crypto.getRandomValues(new Uint8Array(16)),v='';for(var k=0;k<16;k++)v+=(a[k]<16?'0':'')+a[k].toString(16);set('tg_vid',v,7776000,1);}
+    w.dataLayer=w.dataLayer||[];w.dataLayer.push({'gtm.start':t,event:'gtm.js'});var j=d.createElement('script');j.async=true;
+    j.src='https://www.googletagmanager.com/gtm.js?id='+i;d.head.appendChild(j);
+    })(window,document,location,'${TAGIOO_GTM_ID}');</script>
+    <!-- End Google Tag Manager -->`;
+
 function gtmHead(seed = "") {
   // Escape "<" so no value interpolated into the seed can close this inline <script>.
   // Callers already JSON-stringify their values; this is the belt-and-braces layer.
   const safeSeed = String(seed).replace(/</g, "\\u003c");
   return `${seed ? `<script>window.dataLayer=window.dataLayer||[];window.dataLayer.push(${safeSeed});</script>
-    ` : ""}<!-- Google Tag Manager -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','${TAGIOO_GTM_ID}');</script>
-    <!-- End Google Tag Manager -->`;
+    ` : ""}${TAGIOO_BOOT_SCRIPT}`;
 }
 
 function gtmNoscript() {
@@ -2763,7 +2863,9 @@ function gtmNoscript() {
 
 // Render only after verified account creation; refresh cannot replay the consumed signup.
 function signupCompletePage(eventId, landing) {
-  const payload = JSON.stringify({ event: "sign_up", event_id: eventId, plan: "Free" }).replace(/</g, "\\u003c");
+  // tagioo_capi_direct: the server already sent the rich CompleteRegistration
+  // to Meta CAPI under this event_id (see sendTagiooSignupToMetaCapi).
+  const payload = JSON.stringify({ event: "sign_up", event_id: eventId, plan: "Free", tagioo_capi_direct: "1" }).replace(/</g, "\\u003c");
   const destination = JSON.stringify(landing).replace(/</g, "\\u003c");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -2778,6 +2880,8 @@ window.dataLayer=window.dataLayer||[];
   signup.eventCallback=proceed;
   signup.eventTimeout=2000;
   window.dataLayer.push(signup);
+  // Clear the flag so it can't persist in GTM's data model onto later events.
+  window.dataLayer.push({tagioo_capi_direct:undefined});
   setTimeout(proceed,2500);
 })();
 </script>
@@ -2789,7 +2893,7 @@ ${gtmHead()}
 </main></body></html>`;
 }
 
-function verifyPage({ email = "", error = "", info = "" } = {}) {
+function verifyPage({ email = "", error = "", info = "", leadEventId = "" } = {}) {
   const masked = email.replace(/^(.)(.*)(.@.*)$/, (_, a, b, c) => a + "*".repeat(Math.max(b.length, 1)) + c);
   return `<!doctype html>
 <html lang="en">
@@ -2803,7 +2907,7 @@ function verifyPage({ email = "", error = "", info = "" } = {}) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
-    ${gtmHead()}
+    ${gtmHead(leadEventId ? `{event:'generate_lead',event_id:${JSON.stringify(leadEventId)},tagioo_capi_direct:'1'},{event_id:undefined,tagioo_capi_direct:undefined}` : "")}
   </head>
   <body class="login-body">
     ${gtmNoscript()}
@@ -3023,8 +3127,12 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
             payload.eventTimeout = 2000;
             setTimeout(finish, 2500);
           }
+          // Backend Meta CAPI already sent StartTrial/InitiateCheckout under this
+          // event_id; the flag lets the sGTM Meta tag skip its thinner copy.
+          if (name !== "add_payment_info") payload.tagioo_capi_direct = "1";
           window.dataLayer.push({ ecommerce: null });
           window.dataLayer.push(payload);
+          window.dataLayer.push({ tagioo_capi_direct: undefined });
         }
         function awaitActivation() {
           if (checking) return;
@@ -3094,12 +3202,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
 </html>`;
 }
 
-// `leadEventId` is set only on the request that actually forwarded a Lead to Meta CAPI
-// (GET /signup, first visit of the day — see the tg_lead_sent guard). Passing it through
-// lets GTM fire the browser-side Meta Pixel Lead with the SAME event_id, so Meta dedupes
-// the pair into one event and stops classifying Lead as Conversions-API-only — which is
-// what made it unselectable as an ad set's conversion event.
-function signupPage(error = "", values = {}, { leadEventId = "" } = {}) {
+function signupPage(error = "", values = {}) {
   const selectedCountry = values.country || "BD";
   const countryOptions = [
     ["BD", "Bangladesh (+880)"],
@@ -3129,7 +3232,7 @@ function signupPage(error = "", values = {}, { leadEventId = "" } = {}) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
-    ${gtmHead(leadEventId ? `{event:'tagioo_lead',tagioo_event_id:${JSON.stringify(leadEventId)}}` : "")}
+    ${gtmHead()}
   </head>
   <body class="login-body">
     ${gtmNoscript()}
@@ -5404,8 +5507,15 @@ const TAGIOO_OWN_TRACKING = {
   // safe to default. The CAPI access token IS a secret — env var only, never
   // a hardcoded fallback, since this file is committed to git.
   metaPixelId: process.env.TAGIOO_META_PIXEL_ID || "1039411801891124",
-  metaCapiToken: process.env.TAGIOO_META_CAPI_TOKEN || ""
+  metaCapiToken: process.env.TAGIOO_META_CAPI_TOKEN || "",
+  // Office/VPN IPs whose visits must never reach tagioo's own GA4/Meta.
+  // Comma-separated. Visitors can also opt out with ?internal=1 (tg_internal cookie).
+  internalIps: String(process.env.TAGIOO_INTERNAL_IPS || "").split(",").map((ip) => ip.trim()).filter(Boolean)
 };
+
+// Marks an own-funnel Meta event built from internal/test traffic. A Symbol so
+// it can never be serialized into the payload sent to Meta.
+const TAGIOO_INTERNAL_EVENT = Symbol("tagiooInternal");
 
 // Snapshot the real visitor's match signals off an inbound request. Everything
 // below sends to Meta server-to-server, which by default carries NONE of this —
@@ -5439,23 +5549,26 @@ function tagiooVisitorContext(req) {
       return /^GS1\.\d+\.(\d+)\./.exec(value)?.[1] || /^GS2\.\d+\.s(\d+)/.exec(value)?.[1] || "";
     })(),
     vid: cookies.tg_vid || "",
-    url: `${proto}://${host}${path}`
+    url: `${proto}://${host}${path}`,
+    internal: cookies.tg_internal === "1" || (TAGIOO_OWN_TRACKING.internalIps || []).includes(ip)
   };
 }
 
 // Merge a visitor snapshot into a Meta CAPI event. Mutates and returns `event`.
 function applyTagiooVisitorContext(event, visitor) {
   if (!visitor) return event;
+  if (visitor.internal) event[TAGIOO_INTERNAL_EVENT] = true;
   const ud = (event.user_data ||= {});
   if (visitor.ip) ud.client_ip_address = visitor.ip;
   if (visitor.ua) ud.client_user_agent = visitor.ua;
   if (visitor.fbp) ud.fbp = visitor.fbp;
   if (visitor.fbc) ud.fbc = visitor.fbc;
-  // tg_vid is tagioo's own stable per-visitor cookie (90d, set on first /signup
-  // view). Hashed it's a valid external_id, so every event gets one for free.
-  if (visitor.vid && !ud.external_id) {
+  // tg_vid is tagioo's own stable per-visitor cookie (90d, set on the first
+  // marketing or /signup view). Hashed it's a valid external_id, so every event
+  // gets one for free; post-signup events also carry the hashed tenant id.
+  if (visitor.vid) {
     const ext = sha256Hex(visitor.vid);
-    if (ext) ud.external_id = [ext];
+    if (ext && !(ud.external_id || []).includes(ext)) ud.external_id = [...(ud.external_id || []), ext];
   }
   if (visitor.url) event.event_source_url = visitor.url;
   return event;
@@ -5479,6 +5592,7 @@ function capiEventTime(when) {
 let warnedMissingTagiooCapiToken = false;
 
 async function sendTagiooOwnMetaEvent(event, label) {
+  if (event[TAGIOO_INTERNAL_EVENT]) return;
   if (!TAGIOO_OWN_TRACKING.metaPixelId || !TAGIOO_OWN_TRACKING.metaCapiToken) {
     if (!warnedMissingTagiooCapiToken) {
       warnedMissingTagiooCapiToken = true;
@@ -5502,12 +5616,17 @@ async function sendTagiooOwnMetaEvent(event, label) {
 }
 
 async function forwardTagiooOwnEvent(eventName, { seed, eventParams = {}, pageLocation, visitor } = {}) {
+  if (visitor?.internal) return;
   const params = new URLSearchParams({
     v: "2",
     tid: TAGIOO_OWN_TRACKING.measurementId,
     cid: visitor?.gaClientId || mpClientId(visitor?.vid || seed),
     en: eventName,
     _et: "1",
+    // Every server forward has a richer direct CAPI twin (hashed email etc.).
+    // The Tagioo Meta CAPI template skips flagged hits so Meta gets one server
+    // copy per event_id instead of a second, email-less one.
+    "ep.tagioo_capi_direct": "1",
     ...eventParams
   });
   if (visitor?.gaSessionId) params.set("sid", visitor.gaSessionId);
@@ -5545,17 +5664,24 @@ function tagiooNameParts(fullNameRaw) {
   return { firstName, lastName: rest.join(" ") };
 }
 
-// Direct Meta CAPI send for the Lead fired when a visitor opens /signup. Used to
-// be gtag-forward-only, which meant Meta received the VPS's IP/UA and nothing
-// else on all of them — the visitor context here is the whole point. Shares
-// eventId with the gtag hit so Meta dedupes to a single Lead.
-async function sendTagiooLeadToMetaCapi(visitor, eventId) {
+// Direct Meta CAPI send for the Lead fired when a visitor submits a valid signup
+// form (POST /signup — the verification code is emailed). It used to fire on
+// every GET /signup view, which counted bots, link previews and reloads as leads
+// with no fbp. Shares eventId with the browser pixel copy pushed on /verify.
+async function sendTagiooLeadToMetaCapi(visitor, eventId, values = {}) {
+  const { firstName, lastName } = tagiooNameParts(values.fullName);
+  const userData = {};
+  const em = sha256Hex(values.email); if (em) userData.em = [em];
+  const ph = sha256Hex(values.phone, { digitsOnly: true }); if (ph) userData.ph = [ph];
+  const fn = sha256Hex(firstName); if (fn) userData.fn = [fn];
+  const ln = sha256Hex(lastName); if (ln) userData.ln = [ln];
+  const country = sha256Hex(values.country); if (country) userData.country = [country];
   const event = applyTagiooVisitorContext({
     event_name: "Lead",
     event_time: Math.floor(Date.now() / 1000),
     action_source: "website",
     event_id: eventId,
-    user_data: {}
+    user_data: userData
   }, visitor);
   if (!Object.keys(event.user_data).length) return;
   await sendTagiooOwnMetaEvent(event, "generate_lead");
@@ -5567,10 +5693,11 @@ async function sendTagiooLeadToMetaCapi(visitor, eventId) {
 // visitor's own IP/UA/fbp/fbc/external_id. Shares eventId with the gtag hit's
 // ep.event_id so Meta dedupes to one CompleteRegistration instead of counting
 // both. No-ops silently if TAGIOO_META_CAPI_TOKEN isn't set.
-async function sendTagiooSignupToMetaCapi(values, eventId, visitor) {
+async function sendTagiooSignupToMetaCapi(values, eventId, visitor, tenantId = "") {
   const { firstName, lastName } = tagiooNameParts(values.fullName);
 
   const userData = {};
+  const ext = sha256Hex(tenantId); if (ext) userData.external_id = [ext];
   const em = sha256Hex(values.email); if (em) userData.em = [em];
   const ph = sha256Hex(values.phone, { digitsOnly: true }); if (ph) userData.ph = [ph];
   const fn = sha256Hex(firstName); if (fn) userData.fn = [fn];
@@ -5603,6 +5730,7 @@ async function sendTagiooPurchaseToMetaCapi(tenant, payment, eventId) {
   const fn = sha256Hex(firstName); if (fn) userData.fn = [fn];
   const ln = sha256Hex(lastName); if (ln) userData.ln = [ln];
   const country = sha256Hex(tenant?.country); if (country) userData.country = [country];
+  const ext = sha256Hex(tenant?.id); if (ext) userData.external_id = [ext];
 
   const value = Number(payment.amount);
   const event = applyTagiooVisitorContext({
@@ -5642,6 +5770,7 @@ function tagiooBuyerUserData(tenant) {
   const fn = sha256Hex(firstName); if (fn) userData.fn = [fn];
   const ln = sha256Hex(lastName); if (ln) userData.ln = [ln];
   const country = sha256Hex(tenant?.country); if (country) userData.country = [country];
+  const ext = sha256Hex(tenant?.id); if (ext) userData.external_id = [ext];
   return userData;
 }
 
@@ -5722,7 +5851,8 @@ function storedTagiooVisitor(tenant) {
     gaClientId: saved.gaClientId || "",
     gaSessionId: Number.isFinite(savedAt) && Date.now() - savedAt < 30 * 60 * 1000 ? saved.gaSessionId || "" : "",
     vid: saved.vid || "",
-    url: saved.url || ""
+    url: saved.url || "",
+    internal: Boolean(saved.internal)
   };
 }
 
@@ -12334,6 +12464,7 @@ async function serveStatic(req, res) {
 // or /landing.css is a render-blocking round trip on slow mobile links, so the
 // served HTML carries the CSS itself and paints from a single response. Source
 // files stay as-is; the rendered page is rebuilt when the HTML or any CSS changes.
+const MARKETING_CONTENT_PATH = join(rootDir, "content", "marketing.json");
 const INLINE_STYLESHEET_RE = /<link\s+rel="stylesheet"\s+href="(\/(?:assets\/[\w.-]+|landing)\.css)(?:\?[^"]*)?"\s*\/?>/g;
 const marketingPageCache = new Map();
 
@@ -12358,7 +12489,18 @@ async function loadMarketingPage(filename) {
     deps.push(cssPath);
     styles.set(href, await readFile(cssPath, "utf8"));
   }
-  const content = Buffer.from(html.replace(INLINE_STYLESHEET_RE, (_, href) => `<style>${styles.get(href)}</style>`), "utf8");
+  // Case studies and setup videos come from content/marketing.json (hand-edited).
+  let rendered = html;
+  if (html.includes("<!-- tagioo:")) {
+    sigs.push(await fileSignature(MARKETING_CONTENT_PATH));
+    deps.push(MARKETING_CONTENT_PATH);
+    let marketingContent = {};
+    try { marketingContent = JSON.parse(await readFile(MARKETING_CONTENT_PATH, "utf8")); } catch (error) {
+      console.warn(`[marketing] content/marketing.json unreadable: ${error.message}`);
+    }
+    rendered = applyMarketingContent(html, marketingContent);
+  }
+  const content = Buffer.from(rendered.replace(INLINE_STYLESHEET_RE, (_, href) => `<style>${styles.get(href)}</style>`), "utf8");
   const entry = {
     sig: sigs.join("|"),
     deps,
@@ -12588,6 +12730,12 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Ad landing pages (Meta campaigns).
+    if (pathname === "/shopify" || pathname === "/woocommerce") {
+      await servePublicPage(req, res, `${pathname.slice(1)}.html`);
+      return;
+    }
+
     if (pathname === "/how-it-works") {
       await servePublicPage(req, res, "how-it-works.html");
       return;
@@ -12701,12 +12849,10 @@ const server = createServer(async (req, res) => {
       const rawCycle = String(reqUrl.searchParams.get("cycle") || "").trim();
       const selectedCycle = billingCycleConfig[rawCycle] ? rawCycle : "monthly";
       const cookies = parseCookies(req.headers.cookie);
-      // Reached the signup form = real purchase intent for a self-serve trial
-      // (SaaS equivalent of InitiateCheckout) — worth a Meta "Lead" so unfinished
-      // signups can be retargeted. tg_vid is a stable per-visitor seed reused by
-      // the sign_up forward on actual completion, so GA4/Meta tie Lead ->
-      // CompleteRegistration to the same visitor. tg_lead_sent just dedupes
-      // reloads/repeat visits within a day so Lead volume stays a real-intent signal.
+      // Viewing the form is not a lead: bots, link previews and reloads hit this
+      // route too. Lead now fires on a valid form submission (POST /signup).
+      // tg_vid is a stable per-visitor seed reused as Meta external_id and the
+      // GA4 client seed, so Lead -> CompleteRegistration tie to the same visitor.
       const setCookies = [];
       // tg_vid is client-supplied, and it now reaches an inline <script> on this page as
       // well as Meta's hashed external_id and the GA4 client seed. Only accept the shape
@@ -12717,28 +12863,8 @@ const server = createServer(async (req, res) => {
         visitorId = randomBytes(16).toString("hex");
         setCookies.push(`tg_vid=${visitorId}; Path=/; Max-Age=7776000; SameSite=Lax`);
       }
-      // Declared out here so the rendered page can carry the same id to the browser
-      // pixel. Stays "" on reloads that don't send a Lead, so the browser copy fires
-      // on exactly the requests the server copy does — no unmatched browser Leads.
-      let leadEventId = "";
-      if (!cookies.tg_lead_sent) {
-        // Snapshot this visitor's IP/UA/_fbp/_fbc before responding — both sends
-        // below run server-to-server and would otherwise carry the VPS's own
-        // identity. On a first visit tg_vid isn't in the cookie header yet, so
-        // seed the snapshot with the id we just minted.
-        const leadVisitor = { ...(tagiooVisitorContext(req) || {}), vid: visitorId };
-        leadEventId = `lead_${visitorId}_${Math.floor(Date.now() / 1000)}`;
-        forwardTagiooOwnEvent("generate_lead", {
-          seed: visitorId,
-          visitor: leadVisitor,
-          eventParams: { "ep.event_id": leadEventId }
-        }).catch(() => {});
-        // Same event_id so Meta dedupes to one Lead and merges the richer copy.
-        sendTagiooLeadToMetaCapi(leadVisitor, leadEventId).catch(() => {});
-        setCookies.push(`tg_lead_sent=1; Path=/; Max-Age=86400; SameSite=Lax`);
-      }
       const headers = setCookies.length ? { "set-cookie": setCookies } : {};
-      htmlResponse(res, 200, signupPage("", { email: prefillEmail, plan: selectedPlan, billingCycle: selectedCycle }, { leadEventId }), headers);
+      htmlResponse(res, 200, signupPage("", { email: prefillEmail, plan: selectedPlan, billingCycle: selectedCycle }), headers);
       return;
     }
 
@@ -12761,8 +12887,23 @@ const server = createServer(async (req, res) => {
       // fields match, so the plaintext has no further use — and this record is
       // persisted to disk, where a plaintext credential must never land.
       const { password, confirmPassword, confirm_password: confirmPasswordAlt, ...safeValues } = values;
+      // A valid, submitted signup form is the Lead. One per email per day, so a
+      // double submit or a "wrong email, try again" doesn't inflate the count.
+      const signupCookies = parseCookies(req.headers.cookie);
+      const leadKey = sha256Hex(check.email).slice(0, 16);
+      let leadEventId = "";
+      if (signupCookies.tg_lead_sent !== leadKey) {
+        const vid = /^[0-9a-f]{32}$/.test(String(signupCookies.tg_vid || "")) ? signupCookies.tg_vid : "";
+        const leadVisitor = { ...(tagiooVisitorContext(req) || {}), vid };
+        leadEventId = `lead_${token.slice(0, 24)}`;
+        // Browser GTM owns GA4 generate_lead delivery (pushed once on /verify,
+        // like sign_up); this direct CAPI copy shares its event_id for dedup.
+        sendTagiooLeadToMetaCapi(leadVisitor, leadEventId, { ...safeValues, email: check.email }).catch(() => {});
+      }
+      // The store persists only `values`, so the Lead id rides along under a
+      // private key and is stripped before the account is created.
       pendingSignupStore.put(token, {
-        values: { ...safeValues, passwordHash: hashPassword(password) },
+        values: { ...safeValues, passwordHash: hashPassword(password), ...(leadEventId ? { __leadEventId: leadEventId } : {}) },
         email: check.email,
         code,
         expires: Date.now() + SIGNUP_VERIFY_TTL_MS,
@@ -12770,9 +12911,11 @@ const server = createServer(async (req, res) => {
         resendAt: Date.now() + 30 * 1000
       });
       emailVerificationCode(check.email, values.fullName, code).catch(() => {});
+      const redirectCookies = [`tg_signup=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SIGNUP_VERIFY_TTL_MS / 1000}`];
+      if (leadEventId) redirectCookies.push(`tg_lead_sent=${leadKey}; Path=/; Max-Age=86400; SameSite=Lax`);
       res.writeHead(302, {
         location: "/verify",
-        "set-cookie": `tg_signup=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SIGNUP_VERIFY_TTL_MS / 1000}`,
+        "set-cookie": redirectCookies,
         "cache-control": "no-store"
       });
       res.end();
@@ -12787,7 +12930,14 @@ const server = createServer(async (req, res) => {
         redirect(res, "/signup");
         return;
       }
-      htmlResponse(res, 200, verifyPage({ email: pending.email }));
+      // Hand the browser pixel the server Lead's event_id exactly once, so
+      // reloading /verify can't create unmatched browser Leads.
+      const leadEventId = String(pending.values?.__leadEventId || "");
+      if (leadEventId) {
+        delete pending.values.__leadEventId;
+        pendingSignupStore.put(token, pending);
+      }
+      htmlResponse(res, 200, verifyPage({ email: pending.email, leadEventId }));
       return;
     }
 
@@ -12840,7 +12990,7 @@ const server = createServer(async (req, res) => {
       }
 
       // Code confirmed — now create the account.
-      const values = pending.values;
+      const { __leadEventId, ...values } = pending.values;
       const signupVisitor = tagiooVisitorContext(req);
       const result = await addCustomerSignup(values, signupVisitor);
       if (!result.ok) {
@@ -12853,7 +13003,7 @@ const server = createServer(async (req, res) => {
       // Account creation precedes checkout; signup is not a paid conversion.
       const signupEventId = `signup_${result.account.id}`;
       // Browser GTM owns GA4 signup delivery. Meta CAPI shares its event ID for deduplication.
-      sendTagiooSignupToMetaCapi(values, signupEventId, signupVisitor).catch(() => {});
+      sendTagiooSignupToMetaCapi(values, signupEventId, signupVisitor, result.account.tenantId).catch(() => {});
       // Keep the snapshot: a paid upgrade is confirmed later in an owner session,
       // where the buyer's own request context is no longer available.
 
@@ -13456,12 +13606,15 @@ const server = createServer(async (req, res) => {
     // Cloudflare-derived guess — handles VPNs and lets a visitor self-correct.
     if (pathname === "/api/geo" && req.method === "GET") {
       const forced = parseCookies(req.headers.cookie).tg_currency;
+      // Office IPs (TAGIOO_INTERNAL_IPS) are flagged so geo.js can set the
+      // tg_internal cookie and keep tagioo's own GA4/Meta free of test traffic.
+      const internal = TAGIOO_OWN_TRACKING.internalIps.includes(getClientIp(req)) ? { internal: true } : {};
       if (forced === "BDT" || forced === "USD") {
-        jsonResponse(res, 200, { country: forced === "BDT" ? "BD" : "", currency: forced, forced: true });
+        jsonResponse(res, 200, { country: forced === "BDT" ? "BD" : "", currency: forced, forced: true, ...internal });
         return;
       }
       const country = detectCountryCode(req);
-      jsonResponse(res, 200, { country, currency: currencyForCountry(country) });
+      jsonResponse(res, 200, { country, currency: currencyForCountry(country), ...internal });
       return;
     }
 

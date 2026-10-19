@@ -8,17 +8,23 @@
     <meta property="og:title" content="Server-Side GTM Hosting Pricing: Free &amp; Paid Plans | Tagioo" />
     <meta property="og:description" content="Compare Tagioo server-side GTM hosting plans by event volume, containers and features. Start free, then choose the capacity your tracking needs." />
     <title>Server-Side GTM Hosting Pricing: Free &amp; Paid Plans | Tagioo</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'" /><noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" /></noscript>
+<link rel="preload" href="/assets/fonts/inter-latin-var.woff2?v=1" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/assets/site-base.css?v=1" />
     <link rel="stylesheet" href="/landing.css?v=5" />
     <link rel="stylesheet" href="/assets/legacy-pages.css?v=2" />
-      <!-- Google Tag Manager -->
-    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-MCR3FD4W');</script>
+    <link rel="stylesheet" href="/assets/landing-pages.css?v=1" />
+      <!-- Tagioo boot + Google Tag Manager -->
+    <script>(function(w,d,L,i){var q=new URLSearchParams(L.search),dm=/(^|\.)tagioo\.com$/.test(L.hostname)?';domain=.tagioo.com':'',sc=L.protocol=='https:'?';Secure':'';
+    function ck(n){var m=d.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?m[1]:'';}
+    function set(n,v,s,h){d.cookie=n+'='+v+';path=/;max-age='+s+';SameSite=Lax'+(h?'':dm)+sc;}
+    if(q.get('internal')=='1')set('tg_internal','1',31536000,1);if(q.get('internal')=='0')set('tg_internal','',0,1);
+    if(ck('tg_internal')=='1'){w.tagiooInternal=true;return;}
+    var t=Date.now(),id=q.get('fbclid');if(id&&ck('_fbc').split('.').slice(3).join('.')!=id)set('_fbc','fb.1.'+t+'.'+id,7776000);
+    if(!ck('_fbp'))set('_fbp','fb.1.'+t+'.'+(1e9+Math.floor(Math.random()*9e9)),7776000);
+    if(!/^[0-9a-f]{32}$/.test(ck('tg_vid'))&&w.crypto&&crypto.getRandomValues){var a=crypto.getRandomValues(new Uint8Array(16)),v='';for(var k=0;k<16;k++)v+=(a[k]<16?'0':'')+a[k].toString(16);set('tg_vid',v,7776000,1);}
+    w.dataLayer=w.dataLayer||[];w.dataLayer.push({'gtm.start':t,event:'gtm.js'});var j=d.createElement('script');j.async=true;
+    j.src='https://www.googletagmanager.com/gtm.js?id='+i;d.head.appendChild(j);
+    })(window,document,location,'GTM-MCR3FD4W');</script>
     <!-- End Google Tag Manager -->
 
     <link rel="canonical" href="https://tagioo.com/pricing" />
@@ -36,7 +42,7 @@
     <!-- ── HEADER ─────────────────────────────────────────────── -->
     <header class="site-header" id="siteHeader">
       <a class="brand" href="/" aria-label="Tagioo home">
-        <picture><source srcset="/assets/tagioo-logo-284.avif?v=1" type="image/avif"><img src="/assets/tagioo-logo-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box"></picture>
+        <picture><source srcset="/assets/tagioo-logo-284.avif?v=1" type="image/avif"><source srcset="/assets/tagioo-logo-284.webp?v=1" type="image/webp"><img src="/assets/tagioo-logo-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box"></picture>
       </a>
       <nav aria-label="Primary navigation">
         <a href="/features">Platform</a>
@@ -95,6 +101,7 @@
           <h2>Plans that grow with your event volume.</h2>
           <p class="section-sub">Start with managed hosting, a first-party domain and guided GTM templates. Choose a paid plan for more event volume and additional tracking tools.</p>
         </div>
+        <div class="works-with" style="margin:0 auto 12px"><span>Works with <strong>Shopify</strong> and <strong>WooCommerce</strong></span><a href="/shopify">Shopify →</a><a href="/woocommerce">WooCommerce →</a></div>
         <div id="pricingCurrencySwitch" style="text-align:center;margin:0 0 8px;font-size:13px">In Bangladesh? <a href="/bd?next=/pricing">See local BDT pricing →</a></div>
 
         <div class="billing-toggle" id="billingToggle" style="display:none" role="tablist" aria-label="Billing cycle">
@@ -138,7 +145,7 @@
               <li><span class="pf-check">✓</span> Full-funnel Meta CAPI + dedup</li>
               <li><span class="pf-check">✓</span> Server-side purchase recovery</li>
               <li><span class="pf-check">✓</span> Cookie life extension</li>
-              <li><span class="pf-check">✓</span> Email &amp; WhatsApp support</li>
+              <li><span class="pf-check">✓</span> Email<span data-bd-only> &amp; WhatsApp</span> support</li>
             </ul>
             <a class="button button-outline full-width" data-plan-cta href="/signup?plan=Starter&cycle=monthly">Start 3-day free trial</a>
           </article>
@@ -186,7 +193,7 @@
         <div class="pricing-footer">
           <p id="pricingFooterNote">New card subscriptions include a 3-day free trial. Payment details required. After 3 days, your plan is charged automatically at the monthly price shown, plus applicable taxes. Cancel before the trial ends to avoid charges. Subscriptions renew monthly through Paddle until canceled. Bangladesh customers can also choose local BDT payment.</p>
           <p id="pricingCycleNote" hidden>Local BDT plans also offer longer billing cycles. <a href="/pricing">See local plan details →</a></p>
-          <p><a href="/#faq">Billing questions →</a> &nbsp;·&nbsp; Need a custom plan? <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Contact us on WhatsApp →</a></p>
+          <p><a href="/#faq">Billing questions →</a> &nbsp;·&nbsp; Need a custom plan? <a href="mailto:hello@tagioo.com" data-intl-only>Email hello@tagioo.com →</a><a href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>Contact us on WhatsApp →</a></p>
         </div>
       </section>
 
@@ -199,7 +206,8 @@
             <p class="eyebrow">Need more?</p>
             <h2>Custom volume or<br>multi-brand agency plan.</h2>
             <p class="monitoring-sub">Running multiple stores or brands, or need volume above 5M events/month? We'll build a plan around your setup — same isolated-container architecture, no shared infrastructure.</p>
-            <a class="button button-primary" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Talk to us on WhatsApp →</a>
+            <a class="button button-primary" href="mailto:hello@tagioo.com" data-intl-only>Email hello@tagioo.com →</a>
+            <a class="button button-primary" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>Talk to us on WhatsApp →</a>
           </div>
         </div>
       </section>
@@ -213,9 +221,9 @@
         <div class="faq-grid">
           <details class="faq-item">
             <summary>How do I pay — is there a card option?</summary>
-            <p>Yes. In Bangladesh, send the amount via <strong>bKash</strong> or <strong>Nagad</strong> "Send Money" to the number shown in your dashboard and enter the transaction ID — we verify it and activate your plan, after owner review. Everywhere else, pay by card (Visa, Mastercard, and more) via Paddle — activation follows successful payment processing.</p>
+            <p>Pay by card (Visa, Mastercard, and more) via Paddle — activation follows successful payment processing.<span data-bd-only> In Bangladesh, you can also send the amount via <strong>bKash</strong> or <strong>Nagad</strong> "Send Money" to the number shown in your dashboard and enter the transaction ID — we verify it and activate your plan, after owner review.</span></p>
           </details>
-          <details class="faq-item">
+          <details class="faq-item" data-bd-only>
             <summary>What happens right after I submit a transaction ID?</summary>
             <p>Your account stays on your current limits while we verify. Once confirmed, your plan goes <strong>active</strong> immediately, your container is (re)started if it was stopped, and your 30-day billing window starts from the confirmation date — not from when you submitted.</p>
           </details>
@@ -225,9 +233,9 @@
           </details>
           <details class="faq-item">
             <summary>How does renewal work?</summary>
-            <p>bKash/Nagad plans run for whichever cycle you pick — 30, 90, or 180 days — from the date we confirm your payment. We send reminders before your renewal date; if it lapses, you get a short grace period with tracking still running, then your account falls back to Free; a container can pause if it exceeds the Free allowance. Card subscriptions via Paddle are monthly and renew automatically — no action needed unless you cancel.</p>
+            <p>Card subscriptions via Paddle are monthly and renew automatically — no action needed unless you cancel.<span data-bd-only> bKash/Nagad plans run for whichever cycle you pick — 30, 90, or 180 days — from the date we confirm your payment. We send reminders before your renewal date; if it lapses, you get a short grace period with tracking still running, then your account falls back to Free; a container can pause if it exceeds the Free allowance.</span></p>
           </details>
-          <details class="faq-item">
+          <details class="faq-item" data-bd-only>
             <summary>How do the 3-month and 6-month discounts work?</summary>
             <p>Pick a 3-month cycle and pay 10% less than three separate monthly payments, plus we set your GTM containers up for you free (usually a self-serve step). Pick 6 months and save 20%. Same bKash/Nagad flow, one payment covers the whole cycle. These multi-month cycles apply to bKash/Nagad billing only — card subscriptions via Paddle are monthly.</p>
           </details>
@@ -237,7 +245,7 @@
           </details>
           <details class="faq-item">
             <summary>Do you offer refunds?</summary>
-            <p>Message us on WhatsApp if something's wrong with your billing — see our <a href="/refunds">Refund Policy</a> for requests and payment-provider procedures.</p>
+            <p>Email <a href="mailto:hello@tagioo.com">hello@tagioo.com</a><span data-bd-only> or message us on WhatsApp</span> if something's wrong with your billing — see our <a href="/refunds">Refund Policy</a> for requests and payment-provider procedures.</p>
           </details>
         </div>
       </section>
@@ -250,7 +258,8 @@
           <p class="cta-sub">15,000 events a month, forever, no card required.</p>
           <div class="cta-actions">
             <a class="button button-cta-primary button-lg" href="/signup">Create free account →</a>
-            <a class="button button-cta-ghost button-lg" href="https://wa.me/+8801990208987" target="_blank" rel="noopener">Chat on WhatsApp</a>
+            <a class="button button-cta-ghost button-lg" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>Chat on WhatsApp</a>
+            <a class="button button-cta-ghost button-lg" href="mailto:hello@tagioo.com" data-intl-only>Email support</a>
           </div>
         </div>
       </section>
@@ -262,7 +271,7 @@
       <div class="footer-inner">
         <div class="footer-brand">
           <a class="brand brand-light" href="/">
-            <picture><source srcset="/assets/tagioo-logo-light-284.avif?v=1" type="image/avif"><img src="/assets/tagioo-logo-light-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box" loading="lazy" decoding="async"></picture>
+            <picture><source srcset="/assets/tagioo-logo-light-284.avif?v=1" type="image/avif"><source srcset="/assets/tagioo-logo-light-284.webp?v=1" type="image/webp"><img src="/assets/tagioo-logo-light-284.png?v=1" alt="Tagioo" width="142" height="42" style="display:block;width:142px;height:42px;object-fit:contain;box-sizing:border-box" loading="lazy" decoding="async"></picture>
           </a>
           <p>Managed server-side tracking for ecommerce teams, marketers and agencies.</p>
           <div class="footer-payments">
@@ -284,7 +293,7 @@
             <strong>Support</strong>
             <a href="/docs">Docs</a>
         <a href="/blog">Blog</a>
-            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a>
+            <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only>WhatsApp</a>
             <a href="mailto:hello@tagioo.com">hello@tagioo.com</a>
             <a href="/#faq">FAQ</a>
           </div>
@@ -305,10 +314,14 @@
     </footer>
 
     <!-- ── WHATSAPP FLOAT ──────────────────────────────────────── -->
-    <a class="whatsapp-float" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">
+    <a class="whatsapp-float" href="https://wa.me/+8801990208987" target="_blank" rel="noopener" data-bd-only aria-label="Chat on WhatsApp">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
       </svg>
+    </a>
+    <a class="support-float" href="mailto:hello@tagioo.com" data-intl-only aria-label="Email Tagioo support">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+      <span>hello@tagioo.com</span>
     </a>
 
     <script>
@@ -420,5 +433,6 @@
       }).catch(() => {});
     </script>
     <script src="/assets/marketing.js?v=1" defer></script>
-  </body>
+    <script src="/assets/geo.js?v=1" defer></script>
+</body>
 </html>

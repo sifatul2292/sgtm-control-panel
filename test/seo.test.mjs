@@ -48,6 +48,6 @@ test('six articles have unique canonicals, one h1, parseable schema and resolvab
     for (const link of html.matchAll(/href="\/blog\/([^"]+)"/g)) assert.ok(articles.includes(link[1] + '.html'), link[1]);
   }
   const sitemap = await readFile(new URL('sitemap.xml', publicDir), 'utf8');
-  assert.equal((sitemap.match(/<loc>/g) || []).length, 16);
+  assert.equal((sitemap.match(/<loc>/g) || []).length, 19);
   for (const name of articles) assert.ok(sitemap.includes('https://tagioo.com/blog/' + name.slice(0, -5)));
 });
