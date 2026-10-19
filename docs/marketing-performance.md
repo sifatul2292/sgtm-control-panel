@@ -32,6 +32,13 @@ Cloudflare does not cache HTML by default. One Cache Rule, "Cache marketing page
 ```
 
 - Eligible for cache; Edge TTL follows the origin's `s-maxage`.
+- `/` is special: it is the homepage when logged out and the dashboard when logged
+  in. The origin sends browsers `Cache-Control: no-cache` for it and gives
+  Cloudflare `Cloudflare-CDN-Cache-Control: max-age=3600, stale-while-revalidate=86400`.
+  Before this, Cloudflare's Browser Cache TTL (default 4 hours) added
+  `max-age=14400`, so browsers kept showing the cached homepage after signup/login.
+- Caching → Configuration → **Browser Cache TTL: Respect Existing Headers**, so
+  Cloudflare never adds a browser max-age the origin didn't ask for.
 - Cache key: **ignore query string**, so ad-click URLs (`?fbclid=`, `?utm_*`) are
   served from the same cached copy. Pages are identical server-side whatever the
   query string, and GTM still reads the full URL in the browser.

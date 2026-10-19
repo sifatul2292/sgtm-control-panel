@@ -11,6 +11,7 @@ function helper(name) {
 }
 function context() {
   const ctx = vm.createContext({
+    tagiooCapiDirect: () => true,
     requiresShopifyBilling,
     config: { paddleClientToken: "test_token", paddleApiKey: "sandbox_key", paddleWebhookSecret: "secret", paddlePriceIds: { Starter: "pri_starter", Pro: "pri_pro", Enterprise: "pri_enterprise" }, paddleEnv: "sandbox" },
     paddleUsdMonthly: { Starter: 30, Pro: 50, Enterprise: 100 },
@@ -67,6 +68,7 @@ test("Paddle upgrade navigates before a billing refresh can stall or hit the che
   let destination, refreshed = false;
   const button = { dataset: { planSelect: 'Pro' }, textContent: 'Upgrade', hasAttribute: () => false };
   const ctx = vm.createContext({
+    tagiooCapiDirect: () => true,
     document: { querySelectorAll: () => [button] }, selectedCycle: { id: 'monthly' },
     fetch: async () => ({ ok: true, json: async () => ({ payment: {}, checkoutProvider: 'paddle' }) }),
     window: { location: { assign: value => { destination = value; } }, alert: assert.fail },

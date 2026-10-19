@@ -7,7 +7,7 @@ test("completed checkout disables repeat payment and waits for server activation
   const source = readFileSync(new URL("../server.js", import.meta.url), "utf8");
   const start = source.indexOf("function checkoutPage(");
   const page = source.slice(start, source.indexOf("\n}\n", start) + 3);
-  const ctx = vm.createContext({ escapeHtml: String, gtmHead: () => "", gtmNoscript: () => "", billingCycleConfig: { monthly: { months: 1 } } });
+  const ctx = vm.createContext({ tagiooCapiDirect: () => true, escapeHtml: String, gtmHead: () => "", gtmNoscript: () => "", billingCycleConfig: { monthly: { months: 1 } } });
   vm.runInContext(page, ctx);
   const html = ctx.checkoutPage({ instructions: { billingCycle: "monthly", plan: "Starter" }, paddle: { enabled: true, env: "sandbox", invoiceNo: "test" } });
   const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
@@ -42,7 +42,7 @@ test("completed checkout disables repeat payment and waits for server activation
 test("trial checkout discloses automatic monthly billing and cancellation", () => {
   const source = readFileSync(new URL("../server.js", import.meta.url), "utf8");
   const start = source.indexOf("function checkoutPage(");
-  const ctx = vm.createContext({ escapeHtml: String, gtmHead: () => "", gtmNoscript: () => "", billingCycleConfig: { monthly: { months: 1 } } });
+  const ctx = vm.createContext({ tagiooCapiDirect: () => true, escapeHtml: String, gtmHead: () => "", gtmNoscript: () => "", billingCycleConfig: { monthly: { months: 1 } } });
   vm.runInContext(source.slice(start, source.indexOf("\n}\n", start) + 3), ctx);
   const html = ctx.checkoutPage({ instructions: { billingCycle: "monthly", plan: "Pro" }, paddle: { enabled: true, trialDays: 3, usdAmount: 50 } });
   assert.match(html, /Start 3-day free trial/);
@@ -54,7 +54,7 @@ test("trial checkout discloses automatic monthly billing and cancellation", () =
 function paddleCheckoutBrowser({ statusBody }) {
   const source = readFileSync(new URL("../server.js", import.meta.url), "utf8");
   const start = source.indexOf("function checkoutPage(");
-  const ctx = vm.createContext({ escapeHtml: String, gtmHead: () => "", gtmNoscript: () => "", billingCycleConfig: { monthly: { months: 1 } } });
+  const ctx = vm.createContext({ tagiooCapiDirect: () => true, escapeHtml: String, gtmHead: () => "", gtmNoscript: () => "", billingCycleConfig: { monthly: { months: 1 } } });
   vm.runInContext(source.slice(start, source.indexOf("\n}\n", start) + 3), ctx);
   const html = ctx.checkoutPage({ instructions: { billingCycle: "monthly", plan: "Pro" }, paddle: { enabled: true, trialDays: 3, usdAmount: 50, planName: "Pro", invoiceNo: "INV-7", tenantId: "t1" } });
   const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];

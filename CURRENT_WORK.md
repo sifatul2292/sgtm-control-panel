@@ -2,6 +2,46 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
 
+## 2026-10-19 — Tagioo own registration not visible (partly fixed, uncommitted)
+
+- Test signup: web GTM fired GA4 generate_lead + sign_up and Meta Lead +
+  CompleteRegistration pixel tags. Event log showed no registration because it
+  reads only Nginx request URLs; events pushed before GTM loads (verify page Lead,
+  signup-complete sign_up) go out in GA4's batched POST body, so the URL names no
+  event ("Tracking Request"). Fix needs body-aware logging (Nginx/worker = live
+  tracking layer) - not done.
+- Meta: Test Events can't show Tagioo's direct CAPI copies (no test code). Meta
+  stats API for pixel 1039411801891124: no CompleteRegistration in the last 12h.
+  Suspect TAGIOO_META_CAPI_TOKEN missing on VPS (baseline CR had no email). Risk
+  from today's skip flag: with no token the direct copy drops AND the container
+  skipped its copy. Fixed: tagiooCapiDirect() - flag only set when pixel + token
+  are configured. Owner to check the token on the VPS.
+
+## 2026-10-19 — Homepage served from browser cache after login (fix uncommitted)
+
+- Symptom: after signup the browser showed the marketing homepage at /, and /login
+  bounced back to it; hard refresh showed the dashboard. Cause: Cloudflare Browser
+  Cache TTL (4h) appended max-age=14400 to the marketing headers, so browsers cached
+  the logged-out / and reused it once logged in (/ = dashboard when authenticated).
+- Fix: / sends browsers Cache-Control: no-cache; Cloudflare edge caching moves to
+  Cloudflare-CDN-Cache-Control: max-age=3600, stale-while-revalidate=86400. Other
+  marketing pages unchanged. Cloudflare: set Browser Cache TTL = Respect Existing
+  Headers; purge /. Browsers that already cached / keep it up to 4h (hard refresh).
+
+## 2026-10-19 — TikTok template parity (uncommitted)
+
+- Woo: TikTok server tag now blocks the browser-origin purchase (trigger 7), like
+  Meta, so the plugin's backend hit is the only server CompletePayment.
+- TikTok server template: shared tagioo_ud identity cookie (read + write the same
+  fields/hashes as Meta), external_id fallback to FPID then hashed phone/email,
+  dotted user_data.* param fallback, consent-aware. Meta template also reads dotted
+  user_data.* params now. Browser TikTok events call ttq.identify from the push's
+  user_data. test/tiktok-capi-template.test.js (6) runs the sandbox code.
+- Google Ads enhanced conversions: NOT changed. The Ads server tag reads a
+  structured user_data object; ours arrives as dotted params, so EC is likely not
+  receiving data. Check Google Ads → conversion → Diagnostics before changing the
+  web template (proper fix = Google tag user-provided data, also fixes PII in GA4).
+
 ## 2026-10-19 — WooCommerce plugin 2.5.0 (not yet committed)
 
 - AlurKohv test purchase (live on feat/us-launch deploy): browser/server dedup OK for

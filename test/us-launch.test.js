@@ -64,7 +64,7 @@ test("internal visitors never reach own GA4 or Meta CAPI", async () => {
     URL, URLSearchParams, Date, Symbol, console,
     TAGIOO_OWN_TRACKING: { measurementId: "G-TEST", domain: "https://s.example", metaPixelId: "1", metaCapiToken: "t", internalIps: ["203.0.113.9"] },
     parseCookies: (raw) => Object.fromEntries(String(raw || "").split("; ").filter(Boolean).map((c) => c.split("="))),
-    getClientIp: (req) => req.ip, mpClientId: (s) => s, sha256Hex: (v) => (v ? "h" + v : ""),
+    getClientIp: (req) => req.ip, mpClientId: (s) => s, sha256Hex: (v) => (v ? "h" + v : ""), tagiooCapiDirect: () => true,
     fetch: async () => { sent += 1; return { ok: true }; },
     sendMetaOfflineConversions: async () => { sent += 1; return { ok: true }; }
   });
@@ -112,7 +112,7 @@ test("own CompleteRegistration carries hashed email and external_id", async () =
 test("sGTM Meta template skips hits the backend already sent to CAPI", () => {
   const template = source.slice(source.indexOf("const eventMap = {"), source.indexOf("const mappedEventName = eventMap[eventData.event_name];"));
   assert.match(template, /makeString\(eventData\.tagioo_capi_direct\) === '1'/);
-  assert.match(extract("forwardTagiooOwnEvent"), /"ep\.tagioo_capi_direct": "1"/);
+  assert.match(extract("forwardTagiooOwnEvent"), /tagiooCapiDirect\(\) \? \{ "ep\.tagioo_capi_direct": "1" \}/);
 });
 
 test("WhatsApp, bKash and +880 are Bangladesh-only on marketing pages", () => {
@@ -142,4 +142,31 @@ test("case-study and video markers render placeholders clearly and respect flags
   assert.match(video, /data-video-id="9PGfxptCQtk"/);
   assert.doesNotMatch(video, /<iframe/);
   assert.equal(applyMarketingContent('<!-- tagioo:case-studies -->', { caseStudies: [{ placeholder: false, storeName: "<b>x</b>", metrics: [] }] }).includes("<b>x</b>"), false);
+});
+
+test("homepage revalidates in browsers (it is the dashboard once logged in) but stays edge-cacheable", () => {
+  const block = source.slice(source.indexOf("const HOMEPAGE_CACHE_HEADERS"), source.indexOf("};", source.indexOf("const HOMEPAGE_CACHE_HEADERS")));
+  assert.match(block, /"cache-control": "no-cache"/);
+  assert.match(block, /"cloudflare-cdn-cache-control": "max-age=3600, stale-while-revalidate=86400"/);
+  const serve = extract("servePublicPage");
+  assert.match(serve, /filename === "landing\.html" \? HOMEPAGE_CACHE_HEADERS/);
+});
+
+test("skip flag is only set when Tagioo's direct Meta send is configured", async () => {
+  // Without a CAPI token the direct copy is dropped; flagging would also make
+  // the server container skip its copy and Meta would get no server event.
+  for (const configured of [true, false]) {
+    const ctx = vm.createContext({ TAGIOO_OWN_TRACKING: { metaPixelId: "1", metaCapiToken: configured ? "t" : "" } });
+    vm.runInContext(extract("tagiooCapiDirect"), ctx);
+    assert.equal(ctx.tagiooCapiDirect(), configured);
+    let sent;
+    const fctx = vm.createContext({ URL, URLSearchParams, TAGIOO_OWN_TRACKING: { measurementId: "G-T", domain: "https://s.example" },
+      mpClientId: (x) => x, tagiooCapiDirect: () => configured, console, fetch: async (url) => { sent = new URL(url); return { ok: true }; } });
+    vm.runInContext(extract("forwardTagiooOwnEvent"), fctx);
+    await fctx.forwardTagiooOwnEvent("purchase", { seed: "s" });
+    assert.equal(sent.searchParams.get("ep.tagioo_capi_direct"), configured ? "1" : null);
+    const page = vm.createContext({ gtmHead: () => "", tagiooCapiDirect: () => configured });
+    vm.runInContext(extract("signupCompletePage"), page);
+    assert.equal(page.signupCompletePage("signup_1", "/").includes('"tagioo_capi_direct":"1"'), configured);
+  }
 });

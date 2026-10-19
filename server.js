@@ -324,6 +324,17 @@ const mimeTypes = {
 // client-side via /api/geo) and never sets cookies, so a CDN may cache it.
 // Everything user-specific must stay out of shared caches.
 const MARKETING_CACHE_CONTROL = "public, s-maxage=3600, stale-while-revalidate=86400";
+// `/` is the homepage for visitors but the dashboard once logged in, and a
+// browser cache can't tell the two apart. Cloudflare's Browser Cache TTL also
+// adds max-age=14400 when the origin sends none, so a browser that had seen the
+// homepage kept showing it after signup/login (and /login redirects to /).
+// Browsers must therefore revalidate `/` every time; Cloudflare's edge keeps
+// caching the logged-out homepage through its own header (its cache rule
+// already bypasses requests that carry the session cookie).
+const HOMEPAGE_CACHE_HEADERS = {
+  "cache-control": "no-cache",
+  "cloudflare-cdn-cache-control": "max-age=3600, stale-while-revalidate=86400"
+};
 const PRIVATE_CACHE_CONTROL = "private, no-store";
 
 function jsonResponse(res, status, body) {
@@ -1219,6 +1230,9 @@ if (!mappedEventName) {
 }
 
 const userData = eventData.user_data || {};
+// Browser GA4 tags send customer fields as dotted parameter names
+// (user_data.email_address); accept those as well as a nested user_data object.
+function ud(key) { return firstValue(userData[key], eventData['user_data.' + key]); }
 
 // Meta rejects events whose event_time is older than 7 days. Honor the
 // upstream event_time (so COD orders attribute to the real purchase moment),
@@ -1258,24 +1272,24 @@ if (storedRaw) {
   });
 }
 
-addHashed(event.user_data, 'em', firstValue(userData.email_address, userData.email, eventData.email_address, eventData.email, stored.em));
-addHashed(event.user_data, 'ph', firstValue(userData.phone_number, eventData.phone_number, stored.ph));
-addHashed(event.user_data, 'fn', firstValue(userData.first_name, eventData.first_name, stored.fn));
-addHashed(event.user_data, 'ln', firstValue(userData.last_name, eventData.last_name, stored.ln));
+addHashed(event.user_data, 'em', firstValue(ud('email_address'), userData.email, eventData.email_address, eventData.email, stored.em));
+addHashed(event.user_data, 'ph', firstValue(ud('phone_number'), eventData.phone_number, stored.ph));
+addHashed(event.user_data, 'fn', firstValue(ud('first_name'), eventData.first_name, stored.fn));
+addHashed(event.user_data, 'ln', firstValue(ud('last_name'), eventData.last_name, stored.ln));
 // external_id: storefront id, then the id remembered for this visitor, then the
 // stable first-party FPID cookie the GA4 client sets on every visitor. Backend
 // hits (e.g. WooCommerce purchase recovery) carry no cookies, so a guest order
 // falls back to its hashed phone or email rather than going without one.
-addHashed(event.user_data, 'external_id', firstValue(userData.external_id, eventData.external_id, stored.external_id, getCookieValues('FPID', true)[0], event.user_data.ph, event.user_data.em));
-addHashed(event.user_data, 'ct', firstValue(userData.city, eventData.city, stored.ct));
-addHashed(event.user_data, 'st', firstValue(userData.region, eventData.region, stored.st));
-addHashed(event.user_data, 'zp', firstValue(userData.postal_code, eventData.postal_code, stored.zp));
+addHashed(event.user_data, 'external_id', firstValue(ud('external_id'), eventData.external_id, stored.external_id, getCookieValues('FPID', true)[0], event.user_data.ph, event.user_data.em));
+addHashed(event.user_data, 'ct', firstValue(ud('city'), eventData.city, stored.ct));
+addHashed(event.user_data, 'st', firstValue(ud('region'), eventData.region, stored.st));
+addHashed(event.user_data, 'zp', firstValue(ud('postal_code'), eventData.postal_code, stored.zp));
 // Country must reflect the actual visitor: the pushed value, then the one
 // remembered for them, then Cloudflare's country header (forwarded by Tagioo's
 // Nginx), then the store's configured default. Unknown/Tor codes are ignored.
 let headerCountry = makeString(firstValue(getRequestHeader('x-tagioo-country'), getRequestHeader('cf-ipcountry')) || '');
 if (headerCountry.match('^[A-Za-z]{2}$') === null || headerCountry === 'XX' || headerCountry === 'T1') headerCountry = '';
-addHashed(event.user_data, 'country', firstValue(userData.country, eventData.country, stored.country, headerCountry, data.defaultCountry));
+addHashed(event.user_data, 'country', firstValue(ud('country'), eventData.country, stored.country, headerCountry, data.defaultCountry));
 
 if (!adStorageDenied && (event.user_data.em || event.user_data.ph)) {
   const remembered = [];
@@ -1494,6 +1508,7 @@ const makeNumber = require('makeNumber');
 const makeString = require('makeString');
 const Math = require('Math');
 const sendHttpRequest = require('sendHttpRequest');
+const setCookie = require('setCookie');
 const sha256Sync = require('sha256Sync');
 
 const eventData = getAllEventData();
@@ -1545,10 +1560,49 @@ if (!mappedEventName) {
 }
 
 const userData = eventData.user_data || {};
+// Browser GA4 tags send customer fields as dotted parameter names
+// (user_data.email_address); accept those as well as a nested user_data object.
+function ud(key) { return firstValue(userData[key], eventData['user_data.' + key]); }
+
+// Shared with the Tagioo Meta CAPI tag: hashed identity remembered in a
+// first-party HttpOnly cookie and reused on later events. Skipped when the hit
+// says ad_storage was denied.
+const gcs = makeString(eventData['x-ga-gcs'] || '');
+const adStorageDenied = gcs.length >= 3 && gcs.charAt(2) === '0';
+const stored = {};
+const storedRaw = adStorageDenied ? '' : getCookieValues('tagioo_ud', true)[0];
+if (storedRaw) {
+  makeString(storedRaw).split('~').forEach((pair) => {
+    const parts = pair.split(':');
+    if (parts.length === 2 && ['em', 'ph', 'external_id'].indexOf(parts[0]) !== -1 && parts[1].match('^[a-f0-9]{64}$') !== null) stored[parts[0]] = parts[1];
+  });
+}
+
 const user = {};
-addHashed(user, 'email', firstValue(userData.email_address, userData.email, eventData.email_address, eventData.email), true);
-addHashed(user, 'phone', firstValue(userData.phone_number, eventData.phone_number), true);
-addHashed(user, 'external_id', firstValue(userData.external_id, eventData.external_id, eventData.user_id), false);
+addHashed(user, 'email', firstValue(ud('email_address'), userData.email, eventData.email_address, eventData.email, stored.em), true);
+addHashed(user, 'phone', firstValue(ud('phone_number'), eventData.phone_number, stored.ph), true);
+// external_id: storefront id, remembered id, first-party FPID, then the hashed
+// phone/email so cookie-less backend purchase hits still carry one.
+addHashed(user, 'external_id', firstValue(ud('external_id'), eventData.external_id, eventData.user_id, stored.external_id, getCookieValues('FPID', true)[0], user.phone, user.email), false);
+if (!adStorageDenied && (user.email || user.phone)) {
+  const remembered = [];
+  if (user.email) remembered.push('em:' + user.email);
+  if (user.phone) remembered.push('ph:' + user.phone);
+  if (user.external_id) remembered.push('external_id:' + user.external_id);
+  // Write the same fields the Meta tag stores (same lower-case + SHA-256
+  // normalisation), so whichever tag writes last leaves a complete cookie.
+  const extra = { fn: ud('first_name'), ln: ud('last_name'), ct: ud('city'), st: ud('region'), zp: ud('postal_code'), country: ud('country') };
+  const kept = {};
+  makeString(storedRaw || '').split('~').forEach((pair) => {
+    const parts = pair.split(':');
+    if (parts.length === 2 && parts[1].match('^[a-f0-9]{64}$') !== null) kept[parts[0]] = parts[1];
+  });
+  ['fn', 'ln', 'ct', 'st', 'zp', 'country'].forEach((key) => {
+    const value = hash(extra[key], true) || kept[key];
+    if (value) remembered.push(key + ':' + value);
+  });
+  setCookie('tagioo_ud', remembered.join('~'), { domain: 'auto', path: '/', 'max-age': 7776000, secure: true, httpOnly: true, sameSite: 'lax' });
+}
 addRaw(user, 'ttclid', firstValue(eventData.ttclid, getRequestHeader('x-tt-click-id'), getCookieValues('tagioo_ttclid', true)[0]));
 addRaw(user, 'ttp', firstValue(eventData.ttp, getCookieValues('_ttp', true)[0]));
 addRaw(user, 'ip', firstValue(eventData.ip_override, eventData.ip, getRequestHeader('x-forwarded-for'), getRequestHeader('x-real-ip')));
@@ -1627,7 +1681,28 @@ ___SERVER_PERMISSIONS___
       "key": { "publicId": "get_cookies", "versionId": "1" },
       "param": [
         { "key": "cookieAccess", "value": { "type": 1, "string": "specific" } },
-        { "key": "cookieNames", "value": { "type": 2, "listItem": [{ "type": 1, "string": "tagioo_ttclid" }, { "type": 1, "string": "_ttp" }] } }
+        { "key": "cookieNames", "value": { "type": 2, "listItem": [{ "type": 1, "string": "tagioo_ttclid" }, { "type": 1, "string": "_ttp" }, { "type": 1, "string": "FPID" }, { "type": 1, "string": "tagioo_ud" }] } }
+      ]
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": { "publicId": "set_cookies", "versionId": "1" },
+      "param": [
+        {
+          "key": "allowedCookies",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 3,
+                "mapKey": [{ "type": 1, "string": "name" }, { "type": 1, "string": "domain" }, { "type": 1, "string": "path" }, { "type": 1, "string": "secure" }, { "type": 1, "string": "session" }],
+                "mapValue": [{ "type": 1, "string": "tagioo_ud" }, { "type": 1, "string": "*" }, { "type": 1, "string": "*" }, { "type": 1, "string": "any" }, { "type": 1, "string": "any" }]
+              }
+            ]
+          }
+        }
       ]
     },
     "isRequired": true
@@ -1854,8 +1929,19 @@ function metaPixelEventScript(metaEventName, saas = false) {
 }
 
 // Browser-side TikTok Pixel event tag. Same message-anchored id + fallback.
+// TikTok's pixel matches better when told who the shopper is. user_data from the
+// same dataLayer push (logged-in customer, checkout, purchase) goes to
+// ttq.identify; the pixel SHA-256 hashes these values before sending them.
+const TIKTOK_IDENTIFY_SCRIPT =
+  "var ud=null;for(var j=dl.length-1;j>=0;j--){var x=dl[j];if(x&&x.user_data&&typeof x.user_data==='object'&&(!eid||s(x.event_id||'')===eid)){ud=x.user_data;break;}}" +
+  "if(ud&&window.ttq&&ttq.identify){var idp={};" +
+  "if(ud.email_address)idp.email=String(ud.email_address).trim().toLowerCase();" +
+  "if(ud.phone_number)idp.phone_number=String(ud.phone_number).replace(/[^0-9+]/g,'');" +
+  "if(ud.external_id)idp.external_id=String(ud.external_id);" +
+  "for(var q in idp){ttq.identify(idp);break;}}";
+
 function tiktokPixelEventScript(tiktokEventName) {
-  return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + "var items=ec.items||[];var contents=items.map(function(it){return {content_id:String(it.item_id||it.id||''),content_name:it.item_name,quantity:it.quantity||1,price:it.price};});var p={contents:contents,content_type:'product'};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;if(window.ttq)ttq.track('" + tiktokEventName + "',p,eid?{event_id:String(eid)}:{});})();</script>";
+  return "<script>(function(){" + PIXEL_CONTEXT_SCRIPT + TIKTOK_IDENTIFY_SCRIPT + "var items=ec.items||[];var contents=items.map(function(it){return {content_id:String(it.item_id||it.id||''),content_name:it.item_name,quantity:it.quantity||1,price:it.price};});var p={contents:contents,content_type:'product'};if(ec.currency)p.currency=ec.currency;if(ec.value!=null&&ec.value!=='')p.value=ec.value;if(window.ttq)ttq.track('" + tiktokEventName + "',p,eid?{event_id:String(eid)}:{});})();</script>";
 }
 
 function cleanLaravelTrackerConfig(input) {
@@ -2296,11 +2382,15 @@ function buildServerGtmTemplate(input) {
     tags.push(metaTag);
   }
   if (destinations.includes("tiktok")) {
-    tags.push(gtmTag(tags.length + 1, "Tagioo TikTok Events API - All Events", "cvt_0_102", [
+    const tiktokTag = gtmTag(tags.length + 1, "Tagioo TikTok Events API - All Events", "cvt_0_102", [
       gtmTemplateParam("pixelId", "{{Tagioo - tiktok_pixel_id}}"),
       gtmTemplateParam("accessToken", "{{Tagioo - tiktok_access_token}}"),
       gtmBooleanParam("enableDebugLog", true)
-    ], ["1"], "6"));
+    ], ["1"], "6");
+    // Same as Meta: on WooCommerce the plugin's backend purchase hit is the
+    // server copy, so the browser-origin purchase must not send a second one.
+    if (payload.platform === "woocommerce") tiktokTag.blockingTriggerId = ["7"];
+    tags.push(tiktokTag);
   }
   if (destinations.includes("googleAds")) {
     tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Conversion Linker", "sgtmadscl", [
@@ -2865,7 +2955,7 @@ function gtmNoscript() {
 function signupCompletePage(eventId, landing) {
   // tagioo_capi_direct: the server already sent the rich CompleteRegistration
   // to Meta CAPI under this event_id (see sendTagiooSignupToMetaCapi).
-  const payload = JSON.stringify({ event: "sign_up", event_id: eventId, plan: "Free", tagioo_capi_direct: "1" }).replace(/</g, "\\u003c");
+  const payload = JSON.stringify({ event: "sign_up", event_id: eventId, plan: "Free", ...(tagiooCapiDirect() ? { tagioo_capi_direct: "1" } : {}) }).replace(/</g, "\\u003c");
   const destination = JSON.stringify(landing).replace(/</g, "\\u003c");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -2907,7 +2997,7 @@ function verifyPage({ email = "", error = "", info = "", leadEventId = "" } = {}
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/login.css" />
-    ${gtmHead(leadEventId ? `{event:'generate_lead',event_id:${JSON.stringify(leadEventId)},tagioo_capi_direct:'1'},{event_id:undefined,tagioo_capi_direct:undefined}` : "")}
+    ${gtmHead(leadEventId ? `{event:'generate_lead',event_id:${JSON.stringify(leadEventId)}${tagiooCapiDirect() ? ",tagioo_capi_direct:'1'" : ""}},{event_id:undefined,tagioo_capi_direct:undefined}` : "")}
   </head>
   <body class="login-body">
     ${gtmNoscript()}
@@ -3129,7 +3219,7 @@ function checkoutPage({ instructions, error = "", values = {}, paddle = {} } = {
           }
           // Backend Meta CAPI already sent StartTrial/InitiateCheckout under this
           // event_id; the flag lets the sGTM Meta tag skip its thinner copy.
-          if (name !== "add_payment_info") payload.tagioo_capi_direct = "1";
+          if (name !== "add_payment_info" && ${tagiooCapiDirect() ? "true" : "false"}) payload.tagioo_capi_direct = "1";
           window.dataLayer.push({ ecommerce: null });
           window.dataLayer.push(payload);
           window.dataLayer.push({ tagioo_capi_direct: undefined });
@@ -5513,6 +5603,14 @@ const TAGIOO_OWN_TRACKING = {
   internalIps: String(process.env.TAGIOO_INTERNAL_IPS || "").split(",").map((ip) => ip.trim()).filter(Boolean)
 };
 
+// The "already sent to Meta CAPI" flag that tells the server container's Meta
+// tag to skip its copy. Only set when the direct send can actually happen:
+// without a CAPI token the direct copy is dropped, and skipping the container's
+// copy as well would leave Meta with no server event at all.
+function tagiooCapiDirect() {
+  return Boolean(TAGIOO_OWN_TRACKING.metaPixelId && TAGIOO_OWN_TRACKING.metaCapiToken);
+}
+
 // Marks an own-funnel Meta event built from internal/test traffic. A Symbol so
 // it can never be serialized into the payload sent to Meta.
 const TAGIOO_INTERNAL_EVENT = Symbol("tagiooInternal");
@@ -5626,7 +5724,7 @@ async function forwardTagiooOwnEvent(eventName, { seed, eventParams = {}, pageLo
     // Every server forward has a richer direct CAPI twin (hashed email etc.).
     // The Tagioo Meta CAPI template skips flagged hits so Meta gets one server
     // copy per event_id instead of a second, email-less one.
-    "ep.tagioo_capi_direct": "1",
+    ...(tagiooCapiDirect() ? { "ep.tagioo_capi_direct": "1" } : {}),
     ...eventParams
   });
   if (visitor?.gaSessionId) params.set("sid", visitor.gaSessionId);
@@ -12515,7 +12613,8 @@ async function loadMarketingPage(filename) {
 async function servePublicPage(req, res, filename) {
   try {
     const page = await loadMarketingPage(filename);
-    const headers = { "cache-control": MARKETING_CACHE_CONTROL, "etag": page.etag, "vary": "Accept-Encoding" };
+    const cacheHeaders = filename === "landing.html" ? HOMEPAGE_CACHE_HEADERS : { "cache-control": MARKETING_CACHE_CONTROL };
+    const headers = { ...cacheHeaders, "etag": page.etag, "vary": "Accept-Encoding" };
     if (req.headers["if-none-match"] === page.etag) {
       res.writeHead(304, headers);
       res.end();

@@ -13,7 +13,7 @@ test("own GA events retain browser identity and fresh session without leaking si
     URL, URLSearchParams, Date,
     TAGIOO_OWN_TRACKING: { measurementId: "G-TEST", domain: "https://server.example.com" },
     parseCookies: () => ({ _ga: "GA1.1.123.456", _ga_TEST: "GS2.1.s789$o1", tg_vid: "visitor" }),
-    getClientIp: () => "192.0.2.1", mpClientId: seed => "fallback-" + seed,
+    getClientIp: () => "192.0.2.1", mpClientId: seed => "fallback-" + seed, tagiooCapiDirect: () => true,
     fetch: async (url) => { sent = new URL(url); return { ok: true }; }
   });
   vm.runInContext(["tagiooVisitorContext", "forwardTagiooOwnEvent", "storedTagiooVisitor"].map(extract).join("\n"), ctx);
@@ -47,7 +47,7 @@ test("own Meta purchases preserve USD Paddle currency and BDT manual fallback", 
 });
 
 test("verified completion queues one signup before GTM and continues once even when blocked", () => {
-  const ctx = vm.createContext({ gtmHead: () => '<script>/* GTM loader */</script>' });
+  const ctx = vm.createContext({ gtmHead: () => '<script>/* GTM loader */</script>', tagiooCapiDirect: () => true });
   vm.runInContext(extract("signupCompletePage"), ctx);
   const html = ctx.signupCompletePage('signup_test</script>', '/checkout');
   assert.ok(html.indexOf('window.dataLayer.push(signup)') < html.indexOf('GTM loader'));

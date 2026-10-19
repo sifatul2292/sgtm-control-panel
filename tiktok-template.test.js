@@ -36,6 +36,7 @@ test("TikTok server template imports fully configured", async () => {
   const dependencies = {
     getAllEventData: () => eventData,
     getCookieValues: () => [],
+    setCookie: () => {},
     getRequestHeader: () => undefined,
     getTimestampMillis: () => 1000000,
     getType: (value) => Array.isArray(value) ? "array" : typeof value,
