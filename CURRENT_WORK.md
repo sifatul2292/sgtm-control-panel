@@ -13,6 +13,14 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
   bridge (mini cart, cart page, Cart Block). Place order click → add_shipping_info +
   add_payment_info. test/woocommerce-plugin-events.test.js guards web.json ↔ plugin.
   PHP linted with php-parser (no local php). Needs a real WordPress smoke test.
+- 2.5.0 verified live on AlurKohv: all new tags fire except remove_from_cart.
+  2.5.1 (uncommitted): quantity −/+ changes queue remove_from_cart/add_to_cart
+  (woocommerce_after_cart_item_quantity_update); bridge also drains on
+  wc_fragments_refreshed/updated_checkout, gated by a tagioo_q cookie flag.
+- Open: Meta Test Events shows AddPaymentInfo and most PageViews (after 15:20) as
+  separate browser+server events (not deduplicated); earlier 14:57 pairs were.
+  Need both Event IDs from one pair to diagnose. SubscribedButtonClick = Meta
+  pixel automatic events (not Tagioo); off in Events Manager → Settings.
 
 ## 2026-10-19 — US launch readiness (branch feat/us-launch, not committed/deployed)
 

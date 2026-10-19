@@ -3,7 +3,7 @@
  * Plugin Name: Tagioo for WooCommerce
  * Plugin URI:  https://tagioo.com
  * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.5.0
+ * Version:     2.5.1
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author:      Tagioo
@@ -14,7 +14,7 @@
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.5.0');
+define('TAGIOO_VERSION', '2.5.1');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
@@ -531,7 +531,7 @@ add_action('woocommerce_add_to_cart', function (string $key, int $product_id, in
     ]];
     $ud = tagioo_current_user_data();
     if ($ud) $push['user_data'] = $ud;
-    WC()->session?->set('tagioo_atc', $push);
+    tagioo_queue_event('tagioo_atc', $push);
 }, 10, 4);
 
 // Return and atomically clear only the current shopper's queued cart event.
@@ -546,6 +546,7 @@ function tagioo_ajax_take_add_to_cart(): void {
         $session->set($slot, null);
         if (tagioo_opt($option) === '1') $events[] = $pending;
     }
+    tagioo_clear_queue_flag();
     // `event` kept for pages still running the 2.4 bridge script from cache.
     wp_send_json_success(['event' => $events[0] ?? null, 'events' => $events]);
 }
@@ -580,7 +581,9 @@ add_action('wp_footer', function () {
             layer.push(payload);
         }
 
-        function takeQueuedEvent() {
+        function takeQueuedEvent(e) {
+            var passive = e && /^(wc_fragments_refreshed|updated_checkout|updated_wc_div|updated_cart_totals)$/.test(e.type);
+            if (passive && document.cookie.indexOf('tagioo_q=1') === -1) return;
             if (busy) return;
             busy = true;
             fetch(endpoint, {
@@ -601,8 +604,10 @@ add_action('wp_footer', function () {
 
         function bind() {
             if (window.jQuery) {
-                // removed_from_cart: mini cart; updated_wc_div / updated_cart_totals: cart page.
-                window.jQuery(document.body).on('added_to_cart.tagioo removed_from_cart.tagioo updated_wc_div.tagioo updated_cart_totals.tagioo', takeQueuedEvent);
+                // added/removed_from_cart: mini cart; updated_wc_div / updated_cart_totals: cart
+                // page; wc_fragments_refreshed / updated_checkout: side carts and checkout
+                // quantity controls (e.g. FunnelKit) that refresh cart fragments.
+                window.jQuery(document.body).on('added_to_cart.tagioo removed_from_cart.tagioo updated_wc_div.tagioo updated_cart_totals.tagioo wc_fragments_refreshed.tagioo updated_checkout.tagioo', takeQueuedEvent);
             }
             document.body.addEventListener('wc-blocks_added_to_cart', takeQueuedEvent);
             document.body.addEventListener('wc-blocks_removed_from_cart', takeQueuedEvent);
@@ -625,6 +630,17 @@ add_action('wp_footer', function () {
     WC()->session->set('tagioo_atc', null);
     tagioo_push_script($pending);
 }, 25);
+
+// Queue a cart event for the browser. The tagioo_q cookie tells the bridge
+// script there is something to collect, so passive cart refreshes don't cost an
+// admin-ajax request on every page load.
+function tagioo_queue_event(string $slot, array $push): void {
+    WC()->session?->set($slot, $push);
+    if (!headers_sent()) setcookie('tagioo_q', '1', ['expires' => time() + 600, 'path' => COOKIEPATH ?: '/', 'domain' => COOKIE_DOMAIN, 'samesite' => 'Lax', 'secure' => is_ssl()]);
+}
+function tagioo_clear_queue_flag(): void {
+    if (!empty($_COOKIE['tagioo_q']) && !headers_sent()) setcookie('tagioo_q', '', ['expires' => time() - 3600, 'path' => COOKIEPATH ?: '/', 'domain' => COOKIE_DOMAIN, 'samesite' => 'Lax', 'secure' => is_ssl()]);
+}
 
 // Current cart as GA4 ecommerce {currency, value, items}; null when empty.
 function tagioo_cart_ecommerce(): ?array {
@@ -727,8 +743,37 @@ add_action('woocommerce_remove_cart_item', function (string $key, $cart) {
         'value'    => tagioo_price((string) ((float) $product->get_price() * $qty)),
         'items'    => [tagioo_item_from_product($product, $qty)],
     ]];
-    WC()->session?->set('tagioo_rfc', $push);
+    tagioo_queue_event('tagioo_rfc', $push);
 }, 10, 2);
+
+// Quantity changes (cart page, mini/side carts, FunnelKit checkout −/+ buttons)
+// never call woocommerce_remove_cart_item unless the quantity reaches zero.
+// GA4 treats a lower quantity as remove_from_cart and a higher one as
+// add_to_cart for the difference. Woo's own add_to_cart() also calls
+// set_quantity() for an item already in the cart; its woocommerce_add_to_cart
+// hook runs afterwards and overwrites this slot, so that path isn't doubled.
+add_action('woocommerce_after_cart_item_quantity_update', function (string $key, $quantity, $old_quantity, $cart) {
+    $quantity = (int) $quantity;
+    $old_quantity = (int) $old_quantity;
+    if ($quantity <= 0 || $quantity === $old_quantity || !$cart) return;
+    $increase = $quantity > $old_quantity;
+    if (tagioo_opt($increase ? 'track_add_cart' : 'track_remove_cart') !== '1') return;
+    $ci = $cart->get_cart_item($key);
+    $product = $ci['data'] ?? null;
+    if (!$product instanceof \WC_Product) return;
+    $diff = abs($quantity - $old_quantity);
+    $name = $increase ? 'add_to_cart' : 'remove_from_cart';
+    $push = ['event' => $name, 'event_id' => tagioo_event_id($increase ? 'atc' : 'rfc'), 'ecommerce' => [
+        'currency' => tagioo_currency(),
+        'value'    => tagioo_price((string) ((float) $product->get_price() * $diff)),
+        'items'    => [tagioo_item_from_product($product, $diff)],
+    ]];
+    if ($increase) {
+        $ud = tagioo_current_user_data();
+        if ($ud) $push['user_data'] = $ud;
+    }
+    tagioo_queue_event($increase ? 'tagioo_atc' : 'tagioo_rfc', $push);
+}, 10, 4);
 
 add_action('wp_footer', function () {
     if (tagioo_opt('track_remove_cart') !== '1') return;

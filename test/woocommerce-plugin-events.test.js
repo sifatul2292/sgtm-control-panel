@@ -24,6 +24,13 @@ test("new event toggles default on and survive saving settings", () => {
     assert.match(plugin, new RegExp(`'${key}'\\s*=> '1'`), key + " default");
     assert.match(plugin, new RegExp(`'${key}'\\s*=> isset\\(\\$in\\['${key}'\\]\\)`), key + " sanitizer");
   }
-  assert.match(plugin, /Version:\s+2\.5\.0/);
-  assert.match(plugin, /define\('TAGIOO_VERSION', '2\.5\.0'\)/);
+  assert.match(plugin, /Version:\s+2\.5\.1/);
+  assert.match(plugin, /define\('TAGIOO_VERSION', '2\.5\.1'\)/);
+});
+
+test("quantity changes queue add/remove events and passive refreshes only fetch when flagged", () => {
+  assert.match(plugin, /add_action\('woocommerce_after_cart_item_quantity_update'/);
+  assert.match(plugin, /\$name = \$increase \? 'add_to_cart' : 'remove_from_cart'/);
+  assert.match(plugin, /if \(passive && document\.cookie\.indexOf\('tagioo_q=1'\) === -1\) return;/);
+  assert.doesNotMatch(plugin, /WC\(\)->session\?->set\('tagioo_(atc|rfc)', \$push\)/, "all queued events go through tagioo_queue_event");
 });
