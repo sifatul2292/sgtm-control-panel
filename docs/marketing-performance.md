@@ -14,8 +14,12 @@ Goal: LCP < 2.5s for US mobile visitors while the origin stays in Singapore.
   - Marketing HTML: `Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`, plus an ETag
   - Versioned assets (`?v=`): `public, max-age=31536000, immutable`
   - Login, app shell, API, redirects and form responses: `private, no-store`
-- Marketing HTML never sets cookies. Currency/geo changes happen client-side via
-  `/api/geo` (which is `private, no-store`), so one cached copy is correct for everyone.
+- Marketing HTML never sets cookies. Region markup is rendered server-side
+  (`marketing-region.js`): the international page has no `data-bd-only` content
+  (WhatsApp, bKash/Nagad) at all; Bangladesh visitors (`tg_currency=BDT` cookie,
+  else `CF-IPCountry: BD`) get a `private, no-cache` render that Cloudflare never
+  stores. Only the international copy is cached. BDT prices still switch via
+  `/api/geo` (`private, no-store`).
 
 ## Cloudflare setup (live since 2026-10-19)
 
@@ -28,8 +32,13 @@ Cloudflare does not cache HTML by default. One Cache Rule, "Cache marketing page
  "/website-tracking-checker" "/blog" "/blog/" "/shopify" "/woocommerce" "/case-studies"}
  (`/case-studies` is currently removed from the site; the path in the rule is harmless.)
  or http.request.uri.path wildcard "/blog/*")
- and not http.cookie contains "sgtm_session=")
+ and not http.cookie contains "sgtm_session="
+ and not ip.src.country eq "BD"
+ and not http.cookie contains "tg_currency=")
 ```
+
+- The last two lines keep Bangladesh visitors and anyone who used `/bd` or `/global`
+  off the cache, so they always reach the origin's region-specific render.
 
 - Eligible for cache; Edge TTL follows the origin's `s-maxage`.
 - `/` is special: it is the homepage when logged out and the dashboard when logged
