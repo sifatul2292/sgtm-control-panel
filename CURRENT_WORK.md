@@ -15,7 +15,11 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
 - Bangladesh renders are "private, no-cache" so Cloudflare only caches the
   international copy. REQUIRED Cloudflare cache rule (else a BD visitor on a cache
   HIT gets the international page): bypass cache when ip.src.country eq "BD" or
-  the cookie contains tg_currency. Then purge /, /docs, /pricing, /shopify etc.
+  the cookie contains tg_currency. DONE 2026-10-20 via Chrome (rule "Cache
+  marketing pages (skip logged-in)" amended; BD /docs now cf-cache-status DYNAMIC).
+  Deployed as VPS merge ed5a7e6 (includes 40cadad + bc64eed); purged 14
+  marketing URLs. Live curl: BD → private render with WhatsApp; tg_currency=USD
+  → public render, 0 +880/bKash, /docs Shopify section present.
 - Tests: test/marketing-region.test.js (4 pass). seo.test.mjs /blog 500 fails on
   HEAD too (pre-existing, unrelated).
 
