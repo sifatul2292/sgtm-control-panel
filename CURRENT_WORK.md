@@ -2,6 +2,18 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
 
+## 2026-10-19 — WooCommerce plugin 2.5.0 (not yet committed)
+
+- AlurKohv test purchase (live on feat/us-launch deploy): browser/server dedup OK for
+  PageView, ViewContent, AddToCart, InitiateCheckout, Purchase (event_id = order id).
+- GTM tags view_cart, remove_from_cart, view_item_list, search, add_shipping_info,
+  add_payment_info never fired: plugin 2.4.4 only pushed view_item, add_to_cart,
+  begin_checkout, purchase. 2.5.0 adds all six (toggles default on), begin_checkout
+  footer fallback for Checkout Block/page builders, remove_from_cart via the AJAX
+  bridge (mini cart, cart page, Cart Block). Place order click → add_shipping_info +
+  add_payment_info. test/woocommerce-plugin-events.test.js guards web.json ↔ plugin.
+  PHP linted with php-parser (no local php). Needs a real WordPress smoke test.
+
 ## 2026-10-19 — US launch readiness (branch feat/us-launch, not committed/deployed)
 
 - Geo: marketing HTML stays one cached copy; `assets/geo.js` adds html.geo-bd from

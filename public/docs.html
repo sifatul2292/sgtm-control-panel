@@ -114,9 +114,13 @@
             <p>Once active, it automatically pushes these events to the dataLayer on every relevant page:</p>
             <ul>
               <li><code>page_view</code> — every page load, with page_location and page_title set explicitly</li>
+              <li><code>view_item_list</code> — shop, category, tag and product search pages</li>
+              <li><code>search</code> — product searches, with the search term</li>
               <li><code>view_item</code> — product page views</li>
-              <li><code>add_to_cart</code> — cart additions, with product ID, price, quantity</li>
-              <li><code>begin_checkout</code> — checkout page reached</li>
+              <li><code>add_to_cart</code> / <code>remove_from_cart</code> — cart changes (cart page, mini cart and Cart Block), with product ID, price, quantity</li>
+              <li><code>view_cart</code> — cart page reached</li>
+              <li><code>begin_checkout</code> — checkout page reached (classic checkout and Checkout Block)</li>
+              <li><code>add_shipping_info</code> and <code>add_payment_info</code> — when the shopper clicks Place order, with the chosen shipping and payment method</li>
               <li><code>purchase</code> — completed order, with transaction ID, value, and items</li>
               <li>Hashed <code>user_data</code> (email, phone) on purchase for Meta CAPI match quality, where available</li>
             </ul>

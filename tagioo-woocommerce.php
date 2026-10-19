@@ -3,7 +3,7 @@
  * Plugin Name: Tagioo for WooCommerce
  * Plugin URI:  https://tagioo.com
  * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.4.4
+ * Version:     2.5.0
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author:      Tagioo
@@ -14,7 +14,7 @@
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.4.4');
+define('TAGIOO_VERSION', '2.5.0');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
@@ -48,6 +48,11 @@ function tagioo_settings(): array {
             'track_add_cart'  => '1',
             'track_checkout'  => '1',
             'track_purchase'  => '1',
+            'track_view_cart'     => '1',
+            'track_remove_cart'   => '1',
+            'track_view_list'     => '1',
+            'track_search'        => '1',
+            'track_checkout_steps' => '1',
             'server_hit'      => '1',
         ]);
     }
@@ -81,6 +86,11 @@ function tagioo_sanitize_settings(array $in): array {
         'track_add_cart'  => isset($in['track_add_cart'])  ? '1' : '0',
         'track_checkout'  => isset($in['track_checkout'])  ? '1' : '0',
         'track_purchase'  => isset($in['track_purchase'])  ? '1' : '0',
+        'track_view_cart'      => isset($in['track_view_cart'])      ? '1' : '0',
+        'track_remove_cart'    => isset($in['track_remove_cart'])    ? '1' : '0',
+        'track_view_list'      => isset($in['track_view_list'])      ? '1' : '0',
+        'track_search'         => isset($in['track_search'])         ? '1' : '0',
+        'track_checkout_steps' => isset($in['track_checkout_steps']) ? '1' : '0',
         'server_hit'      => isset($in['server_hit'])      ? '1' : '0',
     ];
 }
@@ -170,8 +180,13 @@ function tagioo_settings_page(): void {
                 $events = [
                     'track_view_item' => ['view_item', 'Single product page'],
                     'track_add_cart'  => ['add_to_cart', 'Add to cart button'],
+                    'track_view_list'      => ['view_item_list', 'Shop, category, tag and product search pages'],
+                    'track_search'         => ['search', 'Product search results page'],
+                    'track_view_cart'      => ['view_cart', 'Cart page load'],
+                    'track_remove_cart'    => ['remove_from_cart', 'Item removed from the cart (cart page, mini cart, Cart Block)'],
                     'track_checkout'  => ['begin_checkout', 'Checkout page load'],
-                    'track_purchase'  => ['purchase', 'Thank-you page — includes full user_data for 10/10 Meta EMQ'],
+                    'track_checkout_steps' => ['add_shipping_info + add_payment_info', 'When the shopper clicks Place order (chosen shipping and payment method)'],
+                    'track_purchase'  => ['purchase', 'Thank-you page — includes customer data for Meta matching'],
                 ];
                 foreach ($events as $key => [$event, $desc]) : ?>
                     <tr>
@@ -523,13 +538,16 @@ add_action('woocommerce_add_to_cart', function (string $key, int $product_id, in
 // A nonce prevents another site from draining the session with a forged POST.
 function tagioo_ajax_take_add_to_cart(): void {
     check_ajax_referer('tagioo_take_add_to_cart', 'nonce');
-    if (tagioo_opt('track_add_cart') !== '1') {
-        wp_send_json_success(['event' => null]);
-    }
     $session = WC()->session ?? null;
-    $pending = $session?->get('tagioo_atc');
-    if ($pending) $session->set('tagioo_atc', null);
-    wp_send_json_success(['event' => $pending ?: null]);
+    $events  = [];
+    foreach (['tagioo_atc' => 'track_add_cart', 'tagioo_rfc' => 'track_remove_cart'] as $slot => $option) {
+        $pending = $session?->get($slot);
+        if (!$pending) continue;
+        $session->set($slot, null);
+        if (tagioo_opt($option) === '1') $events[] = $pending;
+    }
+    // `event` kept for pages still running the 2.4 bridge script from cache.
+    wp_send_json_success(['event' => $events[0] ?? null, 'events' => $events]);
 }
 add_action('wp_ajax_tagioo_take_add_to_cart', 'tagioo_ajax_take_add_to_cart');
 add_action('wp_ajax_nopriv_tagioo_take_add_to_cart', 'tagioo_ajax_take_add_to_cart');
@@ -538,7 +556,7 @@ add_action('wp_ajax_nopriv_tagioo_take_add_to_cart', 'tagioo_ajax_take_add_to_ca
 // Checkout Blocks dispatch the native `wc-blocks_added_to_cart` event. Listen
 // for both, fetch the server-built ecommerce payload, and push it immediately.
 add_action('wp_footer', function () {
-    if (tagioo_opt('track_add_cart') !== '1') return;
+    if (tagioo_opt('track_add_cart') !== '1' && tagioo_opt('track_remove_cart') !== '1') return;
     $endpoint = esc_url(admin_url('admin-ajax.php'));
     $nonce    = esc_js(wp_create_nonce('tagioo_take_add_to_cart'));
     ?>
@@ -551,10 +569,10 @@ add_action('wp_footer', function () {
         var busy = false;
 
         function pushEvent(payload) {
-            if (!payload || payload.event !== 'add_to_cart') return;
+            if (!payload || (payload.event !== 'add_to_cart' && payload.event !== 'remove_from_cart')) return;
             var id = String(payload.event_id || '');
             var sent = window.__tagiooDataLayerSent = window.__tagiooDataLayerSent || {};
-            var key = 'add_to_cart|' + id;
+            var key = payload.event + '|' + id;
             if (id && sent[key]) return;
             if (id) sent[key] = true;
             var layer = window.dataLayer = window.dataLayer || [];
@@ -573,7 +591,9 @@ add_action('wp_footer', function () {
             })
                 .then(function (response) { return response.ok ? response.json() : null; })
                 .then(function (result) {
-                    if (result && result.success && result.data) pushEvent(result.data.event);
+                    if (!result || !result.success || !result.data) return;
+                    var list = result.data.events || (result.data.event ? [result.data.event] : []);
+                    list.forEach(pushEvent);
                 })
                 .catch(function () {})
                 .then(function () { busy = false; });
@@ -581,9 +601,11 @@ add_action('wp_footer', function () {
 
         function bind() {
             if (window.jQuery) {
-                window.jQuery(document.body).on('added_to_cart.tagioo', takeQueuedEvent);
+                // removed_from_cart: mini cart; updated_wc_div / updated_cart_totals: cart page.
+                window.jQuery(document.body).on('added_to_cart.tagioo removed_from_cart.tagioo updated_wc_div.tagioo updated_cart_totals.tagioo', takeQueuedEvent);
             }
             document.body.addEventListener('wc-blocks_added_to_cart', takeQueuedEvent);
+            document.body.addEventListener('wc-blocks_removed_from_cart', takeQueuedEvent);
         }
 
         if (document.readyState === 'loading') {
@@ -604,33 +626,169 @@ add_action('wp_footer', function () {
     tagioo_push_script($pending);
 }, 25);
 
-// ---------------------------------------------------------------------------
-// begin_checkout
-// ---------------------------------------------------------------------------
-add_action('woocommerce_before_checkout_form', function () {
-    if (tagioo_opt('track_checkout') !== '1') return;
-    $cart = WC()->cart;
-    if (!$cart || $cart->is_empty()) return;
+// Current cart as GA4 ecommerce {currency, value, items}; null when empty.
+function tagioo_cart_ecommerce(): ?array {
+    $cart = function_exists('WC') ? WC()->cart : null;
+    if (!$cart || $cart->is_empty()) return null;
     $items = [];
     $value = 0.0;
     foreach ($cart->get_cart() as $ci) {
-        $product = $ci['data'];
+        $product = $ci['data'] ?? null;
         if (!$product instanceof \WC_Product) continue;
         $qty     = (int) $ci['quantity'];
-        $item    = tagioo_item_from_product($product, $qty);
-        $items[] = $item;
-        $value  += ($product->get_price() * $qty);
+        $items[] = tagioo_item_from_product($product, $qty);
+        $value  += ((float) $product->get_price() * $qty);
     }
-    $push = ['event' => 'begin_checkout', 'event_id' => tagioo_event_id('bc'), 'ecommerce' => [
-        'currency' => tagioo_currency(),
-        'value'    => round($value, 2),
-        'items'    => $items,
-    ]];
+    if (!$items) return null;
+    return ['currency' => tagioo_currency(), 'value' => round($value, 2), 'items' => $items];
+}
+
+// ---------------------------------------------------------------------------
+// begin_checkout
+// Classic checkout fires woocommerce_before_checkout_form; the Checkout Block
+// and some page builders never do, so wp_footer is the fallback. A static flag
+// keeps it to one push per page.
+// ---------------------------------------------------------------------------
+function tagioo_emit_begin_checkout(): void {
+    static $done = false;
+    if ($done || tagioo_opt('track_checkout') !== '1') return;
+    if (!function_exists('is_checkout') || !is_checkout() || (function_exists('is_order_received_page') && is_order_received_page())) return;
+    $ecommerce = tagioo_cart_ecommerce();
+    if (!$ecommerce) return;
+    $done = true;
+    $push = ['event' => 'begin_checkout', 'event_id' => tagioo_event_id('bc'), 'ecommerce' => $ecommerce];
     // Logged-in: billing address known already → include for Meta audience matching.
     $ud = tagioo_current_user_data();
     if ($ud) $push['user_data'] = $ud;
     tagioo_push_script($push);
-}, 5);
+}
+add_action('woocommerce_before_checkout_form', 'tagioo_emit_begin_checkout', 5);
+add_action('wp_footer', 'tagioo_emit_begin_checkout', 22);
+
+// ---------------------------------------------------------------------------
+// view_cart — cart page (classic shortcode and Cart Block)
+// ---------------------------------------------------------------------------
+add_action('wp_footer', function () {
+    if (tagioo_opt('track_view_cart') !== '1' || !function_exists('is_cart') || !is_cart()) return;
+    $ecommerce = tagioo_cart_ecommerce();
+    if (!$ecommerce) return;
+    $push = ['event' => 'view_cart', 'event_id' => tagioo_event_id('vc'), 'ecommerce' => $ecommerce];
+    $ud = tagioo_current_user_data();
+    if ($ud) $push['user_data'] = $ud;
+    tagioo_push_script($push);
+}, 21);
+
+// ---------------------------------------------------------------------------
+// view_item_list + search — shop, category, tag and product search pages
+// ---------------------------------------------------------------------------
+add_action('wp_footer', function () {
+    if (!function_exists('is_shop')) return;
+    $is_search = is_search() && (get_query_var('post_type') === 'product' || (function_exists('is_product_taxonomy') && is_product_taxonomy()) || is_post_type_archive('product'));
+    $is_list   = is_shop() || is_product_category() || is_product_tag() || $is_search;
+    if (!$is_list) return;
+
+    if ($is_search && tagioo_opt('track_search') === '1') {
+        $term = trim((string) get_search_query());
+        if ($term !== '') tagioo_push_script(['event' => 'search', 'event_id' => tagioo_event_id('se'), 'search_term' => $term]);
+    }
+    if (tagioo_opt('track_view_list') !== '1') return;
+
+    global $wp_query;
+    $list_name = $is_search ? 'Search results' : (is_shop() ? 'Shop' : single_term_title('', false));
+    $items = [];
+    foreach (array_slice((array) ($wp_query->posts ?? []), 0, 30) as $index => $post) {
+        $product = wc_get_product($post);
+        if (!$product) continue;
+        $item = tagioo_item_from_product($product);
+        $item['index'] = $index;
+        $item['item_list_name'] = (string) $list_name;
+        unset($item['quantity']);
+        $items[] = $item;
+    }
+    if (!$items) return;
+    tagioo_push_script(['event' => 'view_item_list', 'event_id' => tagioo_event_id('vil'), 'ecommerce' => [
+        'currency'       => tagioo_currency(),
+        'item_list_name' => (string) $list_name,
+        'items'          => $items,
+    ]]);
+}, 21);
+
+// ---------------------------------------------------------------------------
+// remove_from_cart — queued like add_to_cart and drained by the same bridge
+// ---------------------------------------------------------------------------
+add_action('woocommerce_remove_cart_item', function (string $key, $cart) {
+    if (tagioo_opt('track_remove_cart') !== '1' || !$cart) return;
+    $ci = $cart->get_cart_item($key);
+    $product = $ci['data'] ?? null;
+    if (!$product instanceof \WC_Product) return;
+    $qty  = max(1, (int) ($ci['quantity'] ?? 1));
+    $push = ['event' => 'remove_from_cart', 'event_id' => tagioo_event_id('rfc'), 'ecommerce' => [
+        'currency' => tagioo_currency(),
+        'value'    => tagioo_price((string) ((float) $product->get_price() * $qty)),
+        'items'    => [tagioo_item_from_product($product, $qty)],
+    ]];
+    WC()->session?->set('tagioo_rfc', $push);
+}, 10, 2);
+
+add_action('wp_footer', function () {
+    if (tagioo_opt('track_remove_cart') !== '1') return;
+    $pending = WC()->session?->get('tagioo_rfc');
+    if (!$pending) return;
+    WC()->session->set('tagioo_rfc', null);
+    tagioo_push_script($pending);
+}, 25);
+
+// ---------------------------------------------------------------------------
+// add_shipping_info + add_payment_info — when the shopper clicks Place order.
+// The cart snapshot is rendered with the page; the chosen shipping and payment
+// method are read from the form at click time (classic checkout and Block).
+// ---------------------------------------------------------------------------
+add_action('wp_footer', function () {
+    if (tagioo_opt('track_checkout_steps') !== '1' || !function_exists('is_checkout') || !is_checkout()) return;
+    if (function_exists('is_order_received_page') && is_order_received_page()) return;
+    $ecommerce = tagioo_cart_ecommerce();
+    if (!$ecommerce) return;
+    $needs_shipping = WC()->cart && WC()->cart->needs_shipping();
+    ?>
+    <script>
+    (function () {
+        if (window.__tagiooCheckoutSteps) return;
+        window.__tagiooCheckoutSteps = true;
+        var base = <?= wp_json_encode($ecommerce, JSON_UNESCAPED_UNICODE) ?>;
+        var needsShipping = <?= $needs_shipping ? 'true' : 'false' ?>;
+        var sent = {};
+        function id(prefix) { return 'tagioo-' + prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+        function checked(selector) {
+            var el = document.querySelector(selector);
+            if (!el) return '';
+            var label = el.id ? document.querySelector('label[for="' + el.id + '"]') : null;
+            return String((label && label.textContent) || el.value || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+        }
+        function push(name, extra) {
+            if (sent[name]) return;
+            sent[name] = true;
+            var ecommerce = {currency: base.currency, value: base.value, items: base.items};
+            for (var k in extra) if (extra[k]) ecommerce[k] = extra[k];
+            var layer = window.dataLayer = window.dataLayer || [];
+            layer.push({ecommerce: null});
+            layer.push({event: name, event_id: id(name === 'add_payment_info' ? 'api' : 'asi'), ecommerce: ecommerce});
+        }
+        function onPlaceOrder() {
+            if (needsShipping) push('add_shipping_info', {shipping_tier: checked('input[name^="shipping_method"]:checked, .wc-block-components-shipping-rates-control input:checked')});
+            push('add_payment_info', {payment_type: checked('input[name="payment_method"]:checked, input[name="radio-control-wc-payment-method-options"]:checked')});
+        }
+        function bind() {
+            if (window.jQuery) window.jQuery('form.checkout').on('checkout_place_order.tagioo', function () { onPlaceOrder(); return true; });
+            document.addEventListener('click', function (e) {
+                var t = e.target && e.target.closest && e.target.closest('#place_order, .wc-block-components-checkout-place-order-button');
+                if (t) onPlaceOrder();
+            }, true);
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, {once: true}); else bind();
+    })();
+    </script>
+    <?php
+}, 23);
 
 // ---------------------------------------------------------------------------
 // purchase — thank-you / order-received page (browser hit)
