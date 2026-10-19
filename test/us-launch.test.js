@@ -170,3 +170,46 @@ test("skip flag is only set when Tagioo's direct Meta send is configured", async
     assert.equal(page.signupCompletePage("signup_1", "/").includes('"tagioo_capi_direct":"1"'), configured);
   }
 });
+
+test("TAGIOO_META_TEST_EVENT_CODE routes own direct CAPI events to Test Events only while set", async () => {
+  for (const code of ["TEST123", ""]) {
+    let seen;
+    const ctx = vm.createContext({ TAGIOO_INTERNAL_EVENT: Symbol("i"), console,
+      TAGIOO_OWN_TRACKING: { metaPixelId: "1", metaCapiToken: "t", metaTestEventCode: code },
+      sendMetaOfflineConversions: async (tenant, events, opts) => { seen = { tenant, opts }; return { ok: true }; } });
+    vm.runInContext("let warnedMissingTagiooCapiToken = false;\n" + extract("sendTagiooOwnMetaEvent"), ctx);
+    for (const eventName of ["Lead", "CompleteRegistration"]) {
+      await ctx.sendTagiooOwnMetaEvent({ event_name: eventName, user_data: {} }, eventName);
+      assert.equal(seen.opts.useTestCode, Boolean(code));
+      assert.equal(seen.tenant.tracking.meta.testEventCode, code);
+    }
+  }
+  assert.match(source, /TAGIOO_META_TEST_EVENT_CODE is set: Tagioo's own Meta CAPI events go to Test Events/);
+});
+
+test("GTM mode forwards all own Meta conversions without direct Meta requests or a backend test code", async () => {
+  const sent = [];
+  const ctx = vm.createContext({ TAGIOO_INTERNAL_EVENT: Symbol("i"), console,
+    TAGIOO_OWN_TRACKING: { metaViaGtm: true },
+    forwardTagiooOwnEvent: async (name, options) => sent.push({ name, options }),
+    sendMetaOfflineConversions: () => { throw new Error("direct Meta delivery forbidden"); } });
+  vm.runInContext(extract("sendTagiooOwnMetaEvent"), ctx);
+  for (const name of ["Lead", "CompleteRegistration", "InitiateCheckout", "AddPaymentInfo", "StartTrial", "Subscribe", "Purchase"]) {
+    await ctx.sendTagiooOwnMetaEvent({ event_name: name, event_id: "shared-id", event_time: 123,
+      user_data: { em: ["hashed-email"], fbp: "fb-cookie", client_ip_address: "192.0.2.1" },
+      custom_data: { currency: "USD", value: 30 } }, name);
+  }
+  assert.equal(sent.length, 7);
+  for (const { name, options } of sent) {
+    assert.ok(name.startsWith("tagioo_meta_"));
+    assert.equal(options.eventParams["ep.tagioo_capi_direct"], "0");
+    assert.equal(options.eventParams["ep.event_id"], "shared-id");
+    assert.equal(options.eventParams["ep.user_data.email_address"], "hashed-email");
+    assert.equal(options.eventParams.cu, "USD");
+    assert.equal(options.visitor.fbp, "fb-cookie");
+    assert.equal(options.visitor.ip, "192.0.2.1");
+    assert.ok(!JSON.stringify(options).includes("test_event_code"));
+  }
+  assert.match(source, /ga4Tag\.blockingTriggerId = \["15"\]/);
+  assert.match(source, /name: "Tagioo - Meta-only backend delivery"/);
+});

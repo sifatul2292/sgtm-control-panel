@@ -1220,7 +1220,7 @@ if (makeString(eventData.tagioo_capi_direct) === '1') {
   return;
 }
 
-const mappedEventName = eventMap[eventData.event_name];
+const mappedEventName = eventMap[makeString(eventData.event_name).replace('tagioo_meta_', '')];
 if (!mappedEventName) {
   if (data.enableDebugLog) {
     logToConsole('Tagioo Meta CAPI: skipping unmapped event ' + eventData.event_name);
@@ -2341,6 +2341,12 @@ function buildServerGtmTemplate(input) {
   }
   const tags = [];
   const clients = [];
+  const metaOnlyTrigger = {
+    accountId: "0", containerId: "0", triggerId: "15", name: "Tagioo - Meta-only backend delivery", type: "ALWAYS",
+    filter: [{ type: "STARTS_WITH", parameter: [gtmTemplateParam("arg0", "{{Event Name}}"), gtmTemplateParam("arg1", "tagioo_meta_")] }],
+    fingerprint: String(Date.now())
+  };
+  triggers.push(metaOnlyTrigger);
   if (destinations.includes("ga4") || payload.businessType === "saas") {
     clients.push({
       accountId: "0",
@@ -2367,7 +2373,11 @@ function buildServerGtmTemplate(input) {
     if (ga4ApiSecret) {
       ga4Params.push(gtmTemplateParam("apiSecret", "{{Tagioo - ga4_api_secret}}"));
     }
-    if (destinations.includes("ga4")) tags.push(gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", ga4Params, ["1"], "3"));
+    if (destinations.includes("ga4")) {
+      const ga4Tag = gtmTag(1, "Tagioo GA4 - Forward Events", "sgtmgaaw", ga4Params, ["1"], "3");
+      ga4Tag.blockingTriggerId = ["15"];
+      tags.push(ga4Tag);
+    }
   }
   if (destinations.includes("meta")) {
     const metaTag = gtmTag(tags.length + 1, "Tagioo Meta CAPI - All Events", "cvt_0_101", [
@@ -5598,6 +5608,12 @@ const TAGIOO_OWN_TRACKING = {
   // a hardcoded fallback, since this file is committed to git.
   metaPixelId: process.env.TAGIOO_META_PIXEL_ID || "1039411801891124",
   metaCapiToken: process.env.TAGIOO_META_CAPI_TOKEN || "",
+  // Activate only after publishing the Meta-only mapping and GA4 exception in sGTM.
+  metaViaGtm: process.env.TAGIOO_META_VIA_GTM === "true",
+  // Optional, for testing only: while set, Tagioo's direct Meta CAPI events carry
+  // this test_event_code so they appear in Events Manager → Test Events. Events
+  // sent with a test code are not counted as real conversions: unset it after.
+  metaTestEventCode: String(process.env.TAGIOO_META_TEST_EVENT_CODE || "").trim(),
   // Office/VPN IPs whose visits must never reach tagioo's own GA4/Meta.
   // Comma-separated. Visitors can also opt out with ?internal=1 (tg_internal cookie).
   internalIps: String(process.env.TAGIOO_INTERNAL_IPS || "").split(",").map((ip) => ip.trim()).filter(Boolean)
@@ -5608,7 +5624,7 @@ const TAGIOO_OWN_TRACKING = {
 // without a CAPI token the direct copy is dropped, and skipping the container's
 // copy as well would leave Meta with no server event at all.
 function tagiooCapiDirect() {
-  return Boolean(TAGIOO_OWN_TRACKING.metaPixelId && TAGIOO_OWN_TRACKING.metaCapiToken);
+  return Boolean(TAGIOO_OWN_TRACKING.metaViaGtm || (TAGIOO_OWN_TRACKING.metaPixelId && TAGIOO_OWN_TRACKING.metaCapiToken));
 }
 
 // Marks an own-funnel Meta event built from internal/test traffic. A Symbol so
@@ -5691,6 +5707,27 @@ let warnedMissingTagiooCapiToken = false;
 
 async function sendTagiooOwnMetaEvent(event, label) {
   if (event[TAGIOO_INTERNAL_EVENT]) return;
+  if (TAGIOO_OWN_TRACKING.metaViaGtm) {
+    const names = { Lead: "generate_lead", CompleteRegistration: "sign_up", InitiateCheckout: "begin_checkout", AddPaymentInfo: "add_payment_info", StartTrial: "start_trial", Subscribe: "subscribe", Purchase: "purchase" };
+    const name = names[event.event_name];
+    if (!name) return;
+    const ud = event.user_data || {};
+    const custom = event.custom_data || {};
+    const eventParams = { "ep.tagioo_capi_direct": "0", "ep.event_id": event.event_id, "epn.event_time": String(event.event_time) };
+    const fields = { em: "email_address", ph: "phone_number", fn: "first_name", ln: "last_name", country: "country", external_id: "external_id" };
+    for (const [key, field] of Object.entries(fields)) {
+      const value = Array.isArray(ud[key]) ? ud[key][0] : ud[key];
+      if (value) eventParams[`ep.user_data.${field}`] = value;
+    }
+    if (custom.currency) eventParams.cu = custom.currency;
+    if (custom.value !== undefined) eventParams["epn.value"] = String(custom.value);
+    if (custom.order_id) eventParams["ep.transaction_id"] = custom.order_id;
+    await forwardTagiooOwnEvent(`tagioo_meta_${name}`, {
+      seed: event.event_id, eventParams, pageLocation: event.event_source_url,
+      visitor: { ip: ud.client_ip_address, ua: ud.client_user_agent, fbp: ud.fbp, fbc: ud.fbc }
+    });
+    return;
+  }
   if (!TAGIOO_OWN_TRACKING.metaPixelId || !TAGIOO_OWN_TRACKING.metaCapiToken) {
     if (!warnedMissingTagiooCapiToken) {
       warnedMissingTagiooCapiToken = true;
@@ -5702,9 +5739,10 @@ async function sendTagiooOwnMetaEvent(event, label) {
     }
     return;
   }
-  const tagiooOwnTenant = { tracking: { meta: { pixelId: TAGIOO_OWN_TRACKING.metaPixelId, capiToken: TAGIOO_OWN_TRACKING.metaCapiToken } } };
+  const testEventCode = TAGIOO_OWN_TRACKING.metaTestEventCode || "";
+  const tagiooOwnTenant = { tracking: { meta: { pixelId: TAGIOO_OWN_TRACKING.metaPixelId, capiToken: TAGIOO_OWN_TRACKING.metaCapiToken, testEventCode } } };
   try {
-    const result = await sendMetaOfflineConversions(tagiooOwnTenant, [event], { useTestCode: false });
+    const result = await sendMetaOfflineConversions(tagiooOwnTenant, [event], { useTestCode: Boolean(testEventCode) });
     if (!result.ok) {
       console.warn(`[tagioo-self-track] Meta CAPI ${label} send: ${(result.fbErrors || [result.reason]).join("; ")}`);
     }
@@ -15045,6 +15083,9 @@ persistenceTimer.unref?.();
 
 server.listen(config.port, config.host, () => {
   console.log(`SGTM control panel running at http://${config.host}:${config.port}`);
+  if (TAGIOO_OWN_TRACKING.metaTestEventCode) {
+    console.warn("[tagioo-self-track] TAGIOO_META_TEST_EVENT_CODE is set: Tagioo's own Meta CAPI events go to Test Events and are NOT counted as real conversions. Remove it from .env and restart when testing is done.");
+  }
   // Prioritize the first owner paint after a restart. The persistence sweep scans
   // every tenant log and can take many seconds; run it only after the dashboard
   // cache is ready instead of making cache warming wait behind it.

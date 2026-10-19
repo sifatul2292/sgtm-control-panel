@@ -2,6 +2,39 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
 
+## 2026-10-19 — Route Tagioo Meta conversions through sGTM (local, not activated)
+
+- Owner requested all events through GTM. Added TAGIOO_META_VIA_GTM=true mode:
+  backend Lead/registration/checkout/payment-info/trial/subscription/purchase send
+  Meta-only /g/collect hits to the existing own sGTM domain instead of Graph API.
+  Preserves event ID/time, hashed identity, buyer IP/UA/fbp/fbc and value/currency.
+- Existing ordinary GA4 hits remain single-sender; their Meta copies stay skipped.
+  Meta-only hits override the skip flag. Updated generated Meta template maps
+  tagioo_meta_* names and generated GA4 tag blocks these hits (trigger 15), so
+  hashes and duplicate conversion events are not forwarded to GA4. Meta credentials
+  and test code are managed in GTM in this mode. Legacy direct mode remains rollback.
+- Syntax and 27 focused self-tracking/template checks pass. No production changes.
+- Rollout: update only Tagioo's own server Meta template with the prefix mapping;
+  add an Event Name starts-with tagioo_meta_ exception to its GA4 forwarding tag.
+  Preview on a throwaway tenant before publishing (live tracking rule). Preserve
+  existing pixel/token/test code and other container configuration. Only then deploy
+  server code and enable TAGIOO_META_VIA_GTM=true; reload panel. No VPS test code
+  required. Verify fresh signup plus billing conversions and unchanged GA4 counts.
+  Existing deployed template otherwise ignores prefixed events: do not enable early.
+- Production SSH authentication still rejected; GTM publish/rollout/Meta destination
+  receipt remain pending. Roll back by removing TAGIOO_META_VIA_GTM and reloading;
+  existing direct credentials must remain available until rollout is verified.
+
+## 2026-10-19 — Enable Meta registration Test Events (deployment blocked)
+
+- Existing optional TAGIOO_META_TEST_EVENT_CODE patch retained; expanded regression
+  coverage to both Lead and CompleteRegistration with the code set and unset.
+- Syntax and all 12 us-launch checks pass. Production SSH to the documented VPS
+  rejected authentication (publickey,password); no production changes made.
+- Next: deploy the focused server patch, set TAGIOO_META_TEST_EVENT_CODE=TEST89864
+  in production .env (confirm the currently displayed Meta code), reload the panel,
+  and verify a fresh registration in Meta Test Events. Remove the code after testing.
+
 ## 2026-10-19 — Tagioo own registration not visible (partly fixed, uncommitted)
 
 - Test signup: web GTM fired GA4 generate_lead + sign_up and Meta Lead +
@@ -27,6 +60,16 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-19.
   Cloudflare-CDN-Cache-Control: max-age=3600, stale-while-revalidate=86400. Other
   marketing pages unchanged. Cloudflare: set Browser Cache TTL = Respect Existing
   Headers; purge /. Browsers that already cached / keep it up to 4h (hard refresh).
+- Done 2026-10-19 18:45 Dhaka: Cloudflare Browser Cache TTL = Respect Existing
+  Headers (it overrode no-cache on edge HITs with max-age=14400), / purged; live
+  edge now returns cache-control: no-cache. Tagioo server container
+  GTM-K89C9H47 still had test code TEST89864: its server PageViews went to Test
+  Events only. Tagioo's direct Lead/CompleteRegistration carry no test code, so
+  they never show in Test Events; verify them in Overview.
+- Confirmed via Meta stats API (Tagioo pixel, 18:00 Dhaka hour): 2 Lead + 2
+  CompleteRegistration received SERVER-side in production, so the direct CAPI path
+  works. Added optional TAGIOO_META_TEST_EVENT_CODE (uncommitted) so those direct
+  copies can be watched in Test Events; startup warns while it is set.
 
 ## 2026-10-19 — TikTok template parity (uncommitted)
 
