@@ -6,7 +6,13 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-20.
 
 - Commits 4a881b5 (SEO/blog/homepage), b4cda81 (lead-gen + consent-aware server tags +
   SEO routes), 661ec76 (WooCommerce plugin 2.6.0) on feat/us-launch, pushed to origin.
-  Local SSH to the VPS still rejected; deploy runs on the VPS (fetch + merge --no-ff).
+  DEPLOYED 2026-10-21 via Hostinger web terminal (Chrome): VPS merge c7e0deb on
+  feat/saas-phase1-payments; npm run check + 18 targeted tests pass on VPS; plugin linted
+  with `docker run --rm -v ...:ro php:8.3-cli php -l` (no syntax errors); build-blog ran
+  (8 posts as of 10-21); pm2 restart sgtm-control-panel; local route checks 200/301/404 as
+  expected; Cloudflare Purge Everything; live tagioo.com verified (homepage videos/guides,
+  blog, 2 new posts, sitemap 21 URLs, llms.txt, www 301). VPS sitemap.xml differs from git
+  only in lastmod dates (harmless). NO daily blog cron yet (needs owner OK).
 - Blog drip publishing: posts go live when `node scripts/build-blog.mjs` runs on/after
   their `published` date (America/New_York). Needs a daily VPS cron. Generated files
   (public/blog, public/sitemap.xml, public/llms.txt, public/landing.html) are tracked, so
