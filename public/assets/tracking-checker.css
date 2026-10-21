@@ -188,6 +188,13 @@ html, body { overflow-x: clip; }
 .tc-impact-big { display: grid; gap: 4px; padding: 20px; border-radius: 14px; background: var(--tc-navy); color: #fff; text-align: center; }
 .tc-impact-big strong { font-size: 46px; letter-spacing: -.03em; line-height: 1; color: #c5eb8c; }
 .tc-impact-big span { font-size: 14px; color: #b9c1d4; }
+.tc-impact-periods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.tc-impact-periods div { display: grid; gap: 2px; padding: 12px; border-radius: 12px; background: #fff; border: 1px solid var(--tc-line); text-align: center; }
+.tc-impact-periods strong { font-size: 24px; letter-spacing: -.02em; color: var(--tc-navy); }
+.tc-impact-periods span { font-size: 13px; color: var(--tc-body); }
+.tc-how { margin-top: 10px; }
+.tc-how summary { cursor: pointer; font-size: 13.5px; font-weight: 650; color: var(--tc-accent); }
+.tc-how p { margin: 8px 0 0; }
 .tc-impact-out p { margin: 10px 0 0; text-align: center; }
 .tc-sources { margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
 .tc-sources li { font-size: 13.5px; line-height: 1.55; color: var(--tc-body); }

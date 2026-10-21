@@ -110,7 +110,8 @@
     return `<section class="tc-block tc-emq"><h2>Meta Event Match Quality <span class="tc-muted">(estimate)</span></h2>
       <div class="tc-emq-card"><div class="tc-emq-score tc-tone-${tone}"><strong>${e.score}</strong><span>/ 10</span><em>${esc(e.label)}</em></div>
       <div><ul class="tc-keys">${e.keys.map((k) => `<li class="${k.sent ? "is-on" : "is-off"}">${k.sent ? "✓" : "✕"} ${esc(k.label)}</li>`).join("")}</ul>
-      <p class="tc-muted tc-small">${esc(e.note)}${e.automaticAdvancedMatching ? " Automatic Advanced Matching is on for your pixel." : ""}</p></div></div></section>`;
+      <p class="tc-muted tc-small">${esc(e.note)}${e.automaticAdvancedMatching ? " Automatic Advanced Matching is on for your pixel." : ""}</p>
+      <details class="tc-how"><summary>How we estimate this</summary><p class="tc-small">Meta scores each event from 0 to 10 based on the customer information it receives, and doesn't publish the formula. We give points for each piece of information your setup can send, weighted the way Meta ranks them: email and click ID count most, then phone, external ID and browser ID, then name and address. We can't see how often each one arrives or what your server sends, so treat this as what your setup can reach on purchase events. Page views usually score lower because visitors haven't entered an email yet.</p></details></div></div></section>`;
   }
 
   function googleBlock(r) {
@@ -122,15 +123,21 @@
   function impactBlock(r) {
     const imp = r.adImpact;
     if (!imp || !imp.factors.length) return "";
-    const calc = imp.factors.some((f) => f.platform === "meta" && f.uplift > 0);
+    const meta = imp.factors.find((f) => f.platform === "meta");
+    const calc = meta && meta.uplift > 0;
+    const intro = !meta ? "A prediction based on averages Google has published, applied only to the gaps found on this site."
+      : meta.mode === "covered" ? "Your Meta Conversions API is live, so the main gain Meta has measured is already in your results. Keep match quality high to hold on to it."
+      : meta.mode === "unconfirmed" ? "We found a server-side setup but couldn't confirm Meta Conversions API events. If they aren't actually reaching Meta, this is what adding them could be worth, based on Meta's published average."
+      : "A prediction based on averages Meta and Google have published, applied only to the gaps found on this site. Your results will differ.";
     return `<section class="tc-block tc-impact" id="impact"><h2>What fixing this could be worth</h2>
-      <p class="tc-small">A prediction based on averages Meta and Google have published, applied only to the gaps found on this site. Your results will differ.</p>
+      <p class="tc-small">${esc(intro)}</p>
       ${calc ? `<div class="tc-impact-grid">
         <div class="tc-impact-inputs">
           <label>Monthly Meta ads spend ($)<input type="number" min="0" step="100" value="1000" data-imp="meta"></label>
           <label>Your average cost per purchase on Meta ($)<input type="number" min="1" step="1" value="30" data-imp="cpa"></label>
         </div>
         <div class="tc-impact-out" aria-live="polite"><div class="tc-impact-big"><strong id="impPer100">–</strong><span>more purchases per $100 of Meta ad spend</span></div>
+          <div class="tc-impact-periods"><div><strong id="impDay">–</strong><span>more per day</span></div><div><strong id="impMonth">–</strong><span>more per month</span></div></div>
           <p id="impMonthly" class="tc-small"></p></div>
       </div>` : ""}
       <ul class="tc-sources">${imp.factors.map((f) => `<li><strong>${esc(f.label)}:</strong> ${esc(f.basis)} <a href="${esc(f.url)}" target="_blank" rel="noopener">Source: ${esc(f.source)}</a></li>`).join("")}</ul>
@@ -141,6 +148,7 @@
     const box = document.getElementById("impact");
     if (!box || !box.querySelector("#impPer100")) return;
     const val = (k) => Math.max(0, Number(box.querySelector(`[data-imp="${k}"]`)?.value || 0));
+    const fmt = (n) => (n < 10 ? n.toFixed(1) : Math.round(n).toLocaleString());
     const update = () => {
       const cpa = Math.max(1, val("cpa"));
       let extra = 0, spend = 0;
@@ -154,7 +162,9 @@
       }
       const per100 = spend ? (extra / spend) * 100 : 0;
       box.querySelector("#impPer100").textContent = `+${per100 < 1 ? per100.toFixed(2) : per100.toFixed(1)}`;
-      box.querySelector("#impMonthly").textContent = spend ? `About ${extra < 10 ? extra.toFixed(1) : Math.round(extra)} more purchases a month on $${spend.toLocaleString()} of spend, at $${cpa} per purchase.` : "Enter your monthly ad spend.";
+      box.querySelector("#impDay").textContent = spend ? `+${fmt(extra / 30)}` : "–";
+      box.querySelector("#impMonth").textContent = spend ? `+${fmt(extra)}` : "–";
+      box.querySelector("#impMonthly").textContent = spend ? `From ${fmt(Math.round(spend / cpa))} to about ${fmt(Math.round(spend / cpa) + extra)} purchases a month on $${spend.toLocaleString()} of spend (about $${Math.round(spend / 30).toLocaleString()} a day), at $${cpa} per purchase today.` : "Enter your monthly ad spend.";
     };
     box.addEventListener("input", update);
     update();

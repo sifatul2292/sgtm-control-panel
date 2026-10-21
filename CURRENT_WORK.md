@@ -38,6 +38,11 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-20.
   signals only (not purchases). Unverified figures (EC 5%, EMQ % uplift) deliberately not used.
   DEPLOYED 3e9ec32 as VPS merge 91c1cb2; live: woocommerce.com 38/F EMQ 3.5 Meta +21.7%;
   shobaz 97/A Meta CAPI confirmed via Gateway, EMQ 10.
+- Impact block v2 (2026-10-21, NOT deployed): adImpact now always present when Meta found; meta factor
+  mode gap|unconfirmed|covered (covered = uplift 0, no calculator). Calculator shows per $100, per day
+  (month/30), per month. EMQ card has "How we estimate this" (heuristic, not Meta's formula, ~purchase
+  event ceiling). Checker assets v=7. Local public/blog was built with BUILD_DATE=2026-11-01 for preview:
+  run `npm run build:blog` before committing anything under public/blog.
 - No headless browser on purpose: 1-core prod VPS; OOM would kill customer sGTM containers.
   Runtime checks (consent diff, network hits) would need a separate worker box.
 

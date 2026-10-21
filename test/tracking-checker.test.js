@@ -143,11 +143,13 @@ test('EMQ estimate and ad-impact prediction follow what the setup actually sends
   assert.ok(Math.abs(factor.uplift - (1 / (1 - 0.178) - 1)) < 1e-9);
   assert.match(factor.url, /^https:\/\/www\.facebook\.com\/business\/news\//);
   assert.match(browserOnly.adImpact.disclaimer, /not a promise/);
-  // Gateway on the pixel confirms CAPI: no impact factor, high EMQ, no low-EMQ issue.
+  // Gateway on the pixel confirms CAPI: "covered" impact factor, high EMQ, no low-EMQ issue.
   const gateway = buildReport({ url: 'https://shop.example.com', pageText: page, metaPixels: [{ id: '111222333444', automaticMatchingKeys: ['em', 'ph', 'external_id', 'fn', 'zp'], capiGateway: true, capiGatewayHost: 'x.on.aws' }] });
   assert.equal(gateway.destinations.find(d => d.key === 'meta').server.status, 'confirmed');
   assert.equal(gateway.emq.score, 10);
-  assert.equal(gateway.adImpact, null);
+  const covered = gateway.adImpact.factors.find(f => f.platform === 'meta');
+  assert.equal(covered.mode, 'covered');
+  assert.equal(covered.uplift, 0);
   assert.ok(!gateway.issues.some(i => /meta-low-emq|browser-only-meta|unconfirmed-server-meta/.test(i.id)));
   // A manual fbq init with only an options object of non-PII keys is not advanced matching.
   const autoConfig = buildReport({ url: 'https://shop.example.com', pageText: page.replace("fbq('init','111222333444');", "fbq('init','111222333444',{autoConfig:false});"), metaPixels: [] });

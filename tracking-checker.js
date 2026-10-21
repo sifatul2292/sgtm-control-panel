@@ -566,10 +566,16 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
   }
 
   // What fixing this could be worth: only vendor-published averages, applied to this site's gaps.
+  // mode: "gap" (no CAPI found), "unconfirmed" (server path we couldn't verify), "covered" (CAPI confirmed).
   const impactFactors = [];
-  if (dest.meta?.found && dest.meta.server.status === "not-detected") {
-    impactFactors.push({ platform: "meta", label: "Adding Meta Conversions API", uplift: 1 / (1 - 0.178) - 1,
-      basis: "Meta reports that advertisers using the Conversions API for web events saw an average 17.8% lower cost per result. The same budget then buys about 22% more results.",
+  if (dest.meta?.found) {
+    const metaStatus = dest.meta.server.status;
+    const mode = metaStatus === "not-detected" ? "gap" : metaStatus === "confirmed" ? "covered" : "unconfirmed";
+    impactFactors.push({ platform: "meta", mode, label: mode === "covered" ? "Meta Conversions API (already set up)" : "Adding Meta Conversions API",
+      uplift: mode === "covered" ? 0 : 1 / (1 - 0.178) - 1,
+      basis: mode === "covered"
+        ? "Meta reports an average 17.8% lower cost per result for advertisers using the Conversions API. Your site already sends server events, so that gain is already part of your results."
+        : "Meta reports that advertisers using the Conversions API for web events saw an average 17.8% lower cost per result. The same budget then buys about 22% more results.",
       source: "Meta, April 2026", url: "https://www.facebook.com/business/news/pixel-conversionsapi-updates" });
   }
   if ((dest.googleAds?.found || dest.ga4?.found) && !firstPartyLoader && !ga4Routed) {
