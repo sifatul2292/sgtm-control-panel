@@ -2,7 +2,12 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-20.
 
-## 2026-10-21 — Tracking checker rebuilt (deep inspection, not deployed)
+## 2026-10-21 — Tracking checker rebuilt (deep inspection) — DEPLOYED
+
+- Deployed 9cc17bc as VPS merge cd7ac52 (Hostinger web terminal): 16 checker/SEO tests pass
+  on VPS, blog rebuilt, pm2 restarted. Live: allbirds scan 84/B saved as share id, shared page
+  200 + noindex, stored report served; report email to hello@tagioo.com accepted by Resend.
+  Deploy gotcha: `git status | grep -v` exits 1 on a clean tree and breaks an && chain.
 
 - tracking-checker.js: keeps SSRF/redirect/size guards; now reads code only (codeOnly — visible
   text ignored), fetches the published GTM container (gtm.js `var data` JSON → tags, resolved
