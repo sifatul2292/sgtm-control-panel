@@ -149,11 +149,15 @@ export const DESTINATIONS = [
   { key: "googleAds", name: "Google Ads", kind: "ads", pattern: /\bAW-\d{6,}\b|googleadservices\.com\/pagead\/conversion|googleads\.g\.doubleclick\.net/i, ids: [/\bAW-\d{6,}\b/g, 0] },
   { key: "meta", name: "Meta (Facebook) Pixel", kind: "ads", pattern: /connect\.facebook\.net\/[^"']*fbevents\.js|fbq\s*\(\s*['"]init['"]|facebook\.com\/tr\?id=/i, ids: [/fbq\s*\(\s*['"]init['"]\s*,\s*['"](\d{8,20})['"]|facebook\.com\/tr\?id=(\d{8,20})|"pixel_id"\s*:\s*"(\d{8,20})"/g, -1] },
   { key: "tiktok", name: "TikTok Pixel", kind: "ads", pattern: /analytics\.tiktok\.com|ttq\.load\s*\(/i, ids: [/ttq\.load\s*\(\s*['"]([A-Z0-9]{12,30})['"]|"pixelCode"\s*:\s*"([A-Z0-9]{12,30})"/gi, -1] },
-  { key: "pinterest", name: "Pinterest Tag", kind: "ads", pattern: /s\.pinimg\.com\/ct\/core\.js|pintrk\s*\(/i, ids: [/pintrk\s*\(\s*['"]load['"]\s*,\s*['"](\d{8,20})['"]/g, 1] },
+  { key: "pinterest", name: "Pinterest Tag", kind: "ads", pattern: /s\.pinimg\.com\/ct\/core\.js|pintrk\s*\(/i, ids: [/pintrk\s*\(\s*['"]load['"]\s*,\s*['"](\d{8,20})['"]|"tagID"\s*:\s*"(\d{10,16})"/g, -1] },
   { key: "snapchat", name: "Snap Pixel", kind: "ads", pattern: /sc-static\.net\/scevent|snaptr\s*\(/i, ids: [/snaptr\s*\(\s*['"]init['"]\s*,\s*['"]([a-f0-9-]{20,})['"]/gi, 1] },
   { key: "microsoft", name: "Microsoft Ads (UET)", kind: "ads", pattern: /bat\.bing\.com\/bat\.js|uetq/i, ids: [/\bti\s*:\s*['"](\d{5,12})['"]/g, 1] },
   { key: "linkedin", name: "LinkedIn Insight Tag", kind: "ads", pattern: /snap\.licdn\.com|_linkedin_partner_id/i, ids: [/_linkedin_partner_id\s*=\s*['"](\d{3,12})['"]/g, 1] },
   { key: "reddit", name: "Reddit Pixel", kind: "ads", pattern: /redditstatic\.com\/ads\/pixel|rdt\s*\(\s*['"]init['"]|"redditPixelId"/i, ids: [/(?:rdt\s*\(\s*['"]init['"]\s*,\s*['"]|"redditPixelId"\s*:\s*")(t2_[a-z0-9]+|a2_[a-z0-9]+)/gi, 1] },
+  { key: "adroll", name: "AdRoll", kind: "ads", pattern: /adroll_adv_id|s\.adroll\.com|assets\d?\.adroll\.com/i, ids: [/adroll_adv_id\s*(?:=|:)\s*['"]?([A-Z0-9]{8,30})/g, 1] },
+  { key: "criteo", name: "Criteo", kind: "ads", pattern: /static\.criteo\.net|criteo_q/i, ids: [/criteo_q[\s\S]{0,120}?account\s*:\s*['"]?(\d{3,8})/g, 1] },
+  { key: "taboola", name: "Taboola Pixel", kind: "ads", pattern: /cdn\.taboola\.com\/libtrc|_tfa\s*=|window\._tfa/i, ids: [/id\s*:\s*(\d{6,9})\s*\}\s*\)?[\s\S]{0,40}tfa|_tfa\.push\(\{[^}]*id\s*:\s*(\d{6,9})/g, -1] },
+  { key: "outbrain", name: "Outbrain Pixel", kind: "ads", pattern: /amplify\.outbrain\.com|obApi\s*\(/i, ids: [/OB_ADV_ID\s*=\s*['"]([a-f0-9]{20,40})['"]/g, 1] },
   { key: "x", name: "X (Twitter) Pixel", kind: "ads", pattern: /static\.ads-twitter\.com\/uwt\.js|twq\s*\(/i, ids: [/twq\s*\(\s*['"]config['"]\s*,\s*['"]([a-z0-9]{4,10})['"]/gi, 1] }
 ];
 
@@ -389,7 +393,7 @@ export function issueArea(id) {
 const TECH_DOMAINS = {
   "Google Analytics 4": "analytics.google.com", "Google Ads": "ads.google.com", "Meta (Facebook) Pixel": "facebook.com", "TikTok Pixel": "tiktok.com",
   "Pinterest Tag": "pinterest.com", "Snap Pixel": "snapchat.com", "Microsoft Ads (UET)": "ads.microsoft.com", "LinkedIn Insight Tag": "linkedin.com",
-  "Reddit Pixel": "reddit.com", "X (Twitter) Pixel": "x.com", "Google Tag Manager": "tagmanager.google.com",
+  "Reddit Pixel": "reddit.com", "X (Twitter) Pixel": "x.com", AdRoll: "adroll.com", Criteo: "criteo.com", "Taboola Pixel": "taboola.com", "Outbrain Pixel": "outbrain.com", "Google Tag Manager": "tagmanager.google.com",
   Shopify: "shopify.com", WooCommerce: "woocommerce.com", WordPress: "wordpress.org", BigCommerce: "bigcommerce.com", Magento: "magento.com",
   Wix: "wix.com", Squarespace: "squarespace.com", Webflow: "webflow.com", "Next.js": "nextjs.org",
   "Microsoft Clarity": "clarity.microsoft.com", Hotjar: "hotjar.com", PostHog: "posthog.com", Klaviyo: "klaviyo.com", Segment: "segment.com", Mixpanel: "mixpanel.com",
@@ -440,7 +444,8 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
     else if (scriptSources.some((src) => d.pattern.test(src.text))) via.push("site-script");
     const gtmTypes = { ga4: ["ga4", "ga4-event"], googleAds: ["googleAds", "ads-conversion", "ads-remarketing"] }[d.key] || [];
     if (d.pattern.test(gtmText) || containers.some((c) => c.analysis?.tags.some((t) => gtmTypes.includes(t.type)))) via.push("gtm");
-    if (d.pattern.test(shopifyText) || (d.key === "meta" && /"pixel_id"/.test(shopifyText)) || (d.key === "googleAds" && /\bAW-\d+/.test(shopifyText)) || (d.key === "ga4" && /\bG-[A-Z0-9]{6,12}\b/.test(shopifyText))) via.push("shopify-app");
+    if (d.pattern.test(shopifyText) || (d.key === "meta" && /"pixel_id"/.test(shopifyText)) || (d.key === "googleAds" && /\bAW-\d+/.test(shopifyText)) || (d.key === "ga4" && /\bG-[A-Z0-9]{6,12}\b/.test(shopifyText))
+      || (d.key === "tiktok" && /"pixelCode"\s*:/.test(shopifyText)) || (d.key === "pinterest" && /"tagID"\s*:\s*"\d{10,16}"/.test(shopifyText))) via.push("shopify-app");
     const ids = idsFor(d, everything).filter((id) => !(d.key === "ga4" && id === "G-XXXXXXXXXX"));
     return { key: d.key, name: d.name, kind: d.kind, found: via.length > 0, via, ids, server: { status: "not-detected", detail: "" } };
   });
@@ -538,6 +543,10 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
       if (where) issue(`unconfirmed-server-${d.key}`, d.key === "meta" ? "medium" : "low", d.key === "meta" ? "Meta Conversions API (CAPI) can't be confirmed" : `${d.name} server-side events can't be confirmed`, `${d.server.detail} Server-to-server events can't be seen from outside, so we can't give full marks until you confirm them.`, [`Open ${where}.`, "If there are no server events, set up the server-side connection and send events with a shared event ID.", "Re-run this check after any change."], "Tagioo customers see server-side delivery for every event in the dashboard, so there's no guessing.");
     }
   }
+  const OTHER_CAPI = { pinterest: "Pinterest Conversions API", snapchat: "Snap Conversions API", microsoft: "Microsoft UET Conversions API", linkedin: "LinkedIn Conversions API", reddit: "Reddit Conversions API", x: "X Conversions API" };
+  for (const d of destinations.filter((x) => x.found && OTHER_CAPI[x.key] && x.server.status === "not-detected")) {
+    issue(`browser-only-${d.key}`, "low", `${d.name} is browser-only`, `${d.name} relies only on the browser, so blocked or interrupted events don't reach it.`, [`Add the ${OTHER_CAPI[d.key]} from a server container.`, "Send the same event ID from browser and server so each event is counted once."]);
+  }
   for (const e of endpoints) {
     if (!e.healthy) issue(`sgtm-down-${e.host}`, "critical", "Server container isn't responding", `Your tags send data to ${e.host}, but its health check failed${e.error ? ` (${e.error})` : ""}. Events sent there may be lost.`, ["Open your server-side hosting dashboard and check the container is running.", "Check the DNS record for this subdomain.", "Run GTM Server Preview and send a test event."]);
     else if (!e.firstParty) issue(`sgtm-third-party-${e.host}`, "medium", "Server container is on a third-party domain", `${e.host} isn't on ${siteDomain}. Cookies it sets are third-party, so Safari and other browsers limit them and some blockers block the domain.`, [`Map a subdomain like track.${siteDomain} to the server container.`, "Update server_container_url in your Google tag."], "Tagioo connects your own subdomain with automatic SSL.");
@@ -622,7 +631,7 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
   }
   if ((dest.googleAds?.found || dest.ga4?.found) && !firstPartyLoader && !ga4Routed) {
     impactFactors.push({ platform: "google", label: "Serving Google tags from your own domain", uplift: 0, signalsOnly: true,
-      basis: "Google reports an 11% uplift in Google tag signals for advertisers using Google tag gateway. That means more of your activity measured, not guaranteed extra sales, so it isn't included in the number above.",
+      basis: "Google reports an 11% uplift in Google tag signals for advertisers using Google tag gateway (first-party tag serving). The missed-visits estimate uses that average. It means more of your activity measured, not guaranteed extra sales, so it isn't added to the purchase prediction.",
       source: "Google Ads Help, May 2025", url: "https://support.google.com/google-ads/answer/16214371" });
   }
   const adImpact = impactFactors.length ? { factors: impactFactors,

@@ -173,3 +173,17 @@ test('report groups issues into scored areas and lists detected technologies', (
   // Non-https preview images are dropped.
   assert.equal(buildReport({ url: 'https://shop.example.com', pageText: '<meta property="og:image" content="http://x.test/a.jpg">' }).site.image, '');
 });
+
+test('Shopify app pixels reveal TikTok and Pinterest; other ad platforms get a low browser-only issue', () => {
+  const shopifyPixels = [
+    { type: 'APP', apiClientId: 4383523, configuration: '{"pixelCode":"CJ0K20RC77U0UINVOAU0"}' },
+    { type: 'APP', apiClientId: 3009811, configuration: '{"tagID":"2614374621480"}' }
+  ];
+  const r = buildReport({ url: 'https://shop.example.com', pageText: '<script src="https://cdn.shopify.com/s/x.js"></script><script src="https://assets1.adroll.com/shopify/latest/j/x.js?adroll_adv_id=X4HI56CNMJAD7FBFQ3RH35"></script>', shopifyPixels });
+  const byKey = Object.fromEntries(r.destinations.map(d => [d.key, d]));
+  assert.deepEqual(byKey.tiktok.ids, ['CJ0K20RC77U0UINVOAU0']);
+  assert.deepEqual(byKey.pinterest.ids, ['2614374621480']);
+  assert.deepEqual(byKey.adroll.ids, ['X4HI56CNMJAD7FBFQ3RH35']);
+  assert.equal(r.issues.find(i => i.id === 'browser-only-pinterest').severity, 'low');
+  assert.ok(!r.issues.some(i => i.id === 'browser-only-adroll'));
+});

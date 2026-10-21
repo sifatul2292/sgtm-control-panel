@@ -104,6 +104,49 @@
       <ul class="tc-chips">${list.map((t) => `<li>${iconFor(t.domain, t.name)}${esc(t.name)}</li>`).join("")}</ul></section>`;
   }
 
+  // Tracking architecture: each tracker's current path, what server-side adds, and why it matters.
+  const TRACKER_DOMAINS = { ga4: "analytics.google.com", googleAds: "ads.google.com", meta: "facebook.com", tiktok: "tiktok.com", pinterest: "pinterest.com", snapchat: "snapchat.com", microsoft: "ads.microsoft.com", linkedin: "linkedin.com", reddit: "reddit.com", x: "x.com", adroll: "adroll.com", criteo: "criteo.com", taboola: "taboola.com", outbrain: "outbrain.com" };
+  const SHORT_NAME = { meta: "Meta", tiktok: "TikTok", pinterest: "Pinterest", snapchat: "Snapchat", microsoft: "Microsoft Ads", linkedin: "LinkedIn", reddit: "Reddit", x: "X (Twitter)", taboola: "Taboola", outbrain: "Outbrain" };
+  const ICONS = {
+    domain: '<path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z"/>',
+    cookie: '<path d="M20.5 12.5A8.5 8.5 0 1 1 11.5 3.5a3 3 0 0 0 4 3.5 3 3 0 0 0 5 5.5Z"/><circle cx="9" cy="10" r=".9"/><circle cx="13" cy="15" r=".9"/><circle cx="8.5" cy="15.5" r=".9"/>',
+    server: '<rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/>',
+    match: '<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 11l2 2 3.5-3.5"/>',
+    offline: '<path d="M4 7h16M4 12h10M4 17h7M17 15l2 2 3-3"/>'
+  };
+  const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+
+  function architectureBlock(r) {
+    const trackers = r.destinations;
+    if (!trackers.length) return "";
+    const state = (d) => (d.server.status === "confirmed" ? "ok" : d.server.status === "not-detected" ? "bad" : "warn");
+    const chip = (d) => `<li class="tc-arch-chip tc-arch-${state(d)}" title="${esc(d.server.detail || "Browser-only")}">${iconFor(TRACKER_DOMAINS[d.key] || "", d.name)}${esc(SHORT_NAME[d.key] || d.name)}</li>`;
+    const good = trackers.filter((d) => state(d) === "ok");
+    const rest = trackers.filter((d) => state(d) !== "ok");
+    const tiles = [
+      ["domain", "Your own tracking domain", "Tags load and send from track.yourstore.com, so fewer requests are blocked."],
+      ["cookie", "First-party cookies", "Cookies are set by your own server, so they're less restricted by browsers."],
+      ["server", "Server-to-server events", "Purchases still arrive when the browser closes or a tag is blocked."],
+      ["match", "Better customer matching", "Hashed email, phone and click IDs travel with every server event."],
+      ["offline", "Offline conversions", "Send phone orders and CRM sales to the ad platforms too."]
+    ];
+    const impact = ["Fewer conversions lost to browsers and ad blockers", "Better optimization signals for your ad campaigns", "Higher event match quality and more reliable ROAS", "Bigger, more accurate remarketing audiences", "Visitors' consent choices still respected"];
+    return `<section class="tc-card tc-section tc-arch">
+      <div class="tc-section-head"><h2>Tracking architecture</h2><span class="tc-mono tc-tag">${good.length} of ${trackers.length} server-side</span></div>
+      ${good.length ? `<p class="tc-arch-label">Server-side confirmed</p><ul class="tc-arch-row">${good.map(chip).join("")}</ul>` : ""}
+      ${rest.length ? `<p class="tc-arch-label">${good.length ? "Still with issues" : "With issues"}</p>
+      <div class="tc-arch-flow">
+        <div class="tc-arch-col"><p class="tc-mono">Browser-side trackers</p><ul class="tc-arch-list">${rest.map(chip).join("")}</ul>
+          <p class="tc-arch-legend"><span class="tc-dot tc-dot-bad"></span>Browser-only <span class="tc-dot tc-dot-warn"></span>Not confirmed</p></div>
+        <span class="tc-arch-arrow" aria-hidden="true">→</span>
+        <div class="tc-arch-col"><p class="tc-mono"><img src="/assets/tagioo-icon.svg" alt="" width="14" height="14" onerror="this.remove()"> Move to server-side tracking</p>
+          <div class="tc-arch-tiles">${tiles.map(([k, t, d]) => `<div class="tc-arch-tile">${icon(k)}<strong>${t}</strong><span>${d}</span></div>`).join("")}</div></div>
+        <span class="tc-arch-arrow" aria-hidden="true">→</span>
+        <div class="tc-arch-col"><p class="tc-mono">Business impact</p><ul class="tc-arch-impact">${impact.map((x) => `<li>${x}</li>`).join("")}</ul></div>
+      </div>` : `<p class="tc-small">Every tracker we found has a confirmed server-side path. Keep testing one real conversion each month.</p>`}
+    </section>`;
+  }
+
   function actionsBlock(r) {
     if (!r.issues.length) return "";
     const rows = r.issues.map((i, n) => `<details class="tc-action tc-sev-${i.severity}"${n === 0 ? " open" : ""}>
@@ -188,27 +231,29 @@
     if (!imp || !imp.factors.length) return "";
     const meta = imp.factors.find((f) => f.platform === "meta");
     const calc = meta && meta.uplift > 0;
+    const google = imp.factors.find((f) => f.platform === "google" && f.signalsOnly);
     const intro = !meta ? "A prediction based on averages Google has published, applied only to the gaps found on this site."
       : meta.mode === "covered" ? "Your Meta Conversions API is live, so the main gain Meta has measured is already in your results. Keep match quality high to hold on to it."
       : meta.mode === "unconfirmed" ? "We found a server-side setup but couldn't confirm Meta Conversions API events. If they aren't actually reaching Meta, this is what adding them could be worth, based on Meta's published average."
       : "A prediction based on averages Meta has published, applied only to the gaps found on this site. Your results will differ.";
-    const field = (key, label, value, min, max, step) => `<div class="tc-field"><label for="imp-${key}">${label}</label>
-      <div class="tc-money"><span>$</span><input id="imp-${key}" type="number" inputmode="decimal" min="${min}" step="${step}" value="${value}" data-imp="${key}"></div>
+    const field = (key, label, value, min, max, step, unit = "$") => `<div class="tc-field"><label for="imp-${key}">${label}</label>
+      <div class="tc-money">${unit ? `<span>${unit}</span>` : ""}<input id="imp-${key}" type="number" inputmode="decimal" min="${min}" step="${step}" value="${value}" data-imp="${key}"></div>
       <input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-imp-range="${key}" aria-label="${label}">
-      <div class="tc-range-scale tc-mono"><span>$${min.toLocaleString()}</span><span>$${max.toLocaleString()}</span></div></div>`;
+      <div class="tc-range-scale tc-mono"><span>${unit}${min.toLocaleString()}</span><span>${unit}${max.toLocaleString()}</span></div></div>`;
     return `<section class="tc-card tc-impact" id="impact">
       <div class="tc-section-head"><h2>What fixing this could be worth</h2><span class="tc-mono tc-tag">Prediction</span></div>
       <p class="tc-small">${esc(intro)}</p>
-      ${calc ? `<div class="tc-impact-grid">
-        <div class="tc-impact-inputs">${field("meta", "Your monthly Meta ad spend", 1000, 0, 50000, 100)}${field("cpa", "Your average cost per purchase", 30, 1, 300, 1)}</div>
+      ${calc || google ? `<div class="tc-impact-grid">
+        <div class="tc-impact-inputs">${calc ? `${field("meta", "Your monthly Meta ad spend", 1000, 0, 50000, 100)}${field("cpa", "Your average cost per purchase", 30, 1, 300, 1)}` : ""}${google ? field("visitors", "Your monthly visitors", 50000, 1000, 2000000, 1000, "") : ""}</div>
         <div class="tc-impact-out" aria-live="polite">
-          <div class="tc-impact-big"><p class="tc-mono">Estimated extra purchases</p><strong id="impMonth">–</strong><span>per month</span></div>
+          ${calc ? `<div class="tc-impact-big"><p class="tc-mono">Estimated extra purchases</p><strong id="impMonth">–</strong><span>per month</span></div>
           <div class="tc-impact-periods">
             <div><p class="tc-mono">Per day</p><strong id="impDay">–</strong></div>
             <div><p class="tc-mono">Per $100 spend</p><strong id="impPer100">–</strong></div>
             <div><p class="tc-mono">Same results, less spend</p><strong id="impSaved">–</strong></div>
           </div>
-          <p id="impMonthly" class="tc-small"></p></div>
+          <p id="impMonthly" class="tc-small"></p>` : ""}
+          ${google ? `<div class="tc-impact-visits"><p class="tc-mono">Visits your Google tags may be missing</p><strong id="impVisits">–</strong><span>per month</span></div>` : ""}</div>
       </div>` : ""}
       <ul class="tc-sources">${imp.factors.map((f) => `<li><strong>${esc(f.label)}:</strong> ${esc(f.basis)} <a href="${esc(f.url)}" target="_blank" rel="noopener">Source: ${esc(f.source)}</a></li>`).join("")}</ul>
       <p class="tc-muted tc-small">${esc(imp.disclaimer)}</p></section>`;
@@ -216,11 +261,15 @@
 
   function wireImpact(r) {
     const box = document.getElementById("impact");
-    if (!box || !box.querySelector("#impMonth")) return;
+    if (!box || !box.querySelector("#impMonth, #impVisits")) return;
     const val = (k) => Math.max(0, Number(box.querySelector(`[data-imp="${k}"]`)?.value || 0));
     const fmt = (n) => (n < 10 ? n.toFixed(1) : Math.round(n).toLocaleString());
     const money = (n) => `$${Math.round(n).toLocaleString()}`;
     const update = () => {
+      // Google's tag gateway figure: 11% more signals measured, so about 1 - 1/1.11 of activity is missed today.
+      const visits = box.querySelector("#impVisits");
+      if (visits) visits.textContent = `~${Math.round(val("visitors") * (1 - 1 / 1.11)).toLocaleString()}`;
+      if (!box.querySelector("#impMonth")) return;
       const cpa = Math.max(1, val("cpa"));
       let extra = 0, spend = 0, saved = 0;
       for (const platform of ["meta"]) {
@@ -286,6 +335,7 @@
       ${headerCard(r, host)}
       ${scoresBlock(r)}
       ${techBlock(r)}
+      ${architectureBlock(r)}
       <section class="tc-card tc-section"><div class="tc-section-head"><h2>Tracking setup</h2></div>
         <dl class="tc-facts">${facts.map(([k, v, html]) => `<div><dt class="tc-mono">${k}</dt><dd>${html ? v : esc(v)}</dd></div>`).join("")}</dl>
         ${r.destinations.length ? `<div class="tc-table-wrap"><table class="tc-table"><thead><tr><th>Platform</th><th>Installed via</th><th>IDs</th><th>Server-side</th></tr></thead><tbody>${destRows}</tbody></table></div>` : ""}</section>

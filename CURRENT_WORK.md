@@ -47,6 +47,12 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-20.
   weights), areas[] (Analytics/Advertising/Server-side/Consent, score = 100 - 2x area penalty), technologies[]
   (favicons via google.com/s2/favicons), site{title,image,icon} from og tags (https only), no-analytics low
   issue. Impact calc has sliders + "same results, less spend" (spend x 17.8%). Assets v=8.
+- Checker v3 (2026-10-21): tracking architecture block (trackers by server status -> server-side tiles ->
+  business impact), visitors input with "visits Google tags may be missing" = visitors x (1-1/1.11) from
+  Google's 11% tag gateway figure. New destinations AdRoll/Criteo/Taboola/Outbrain; Shopify app pixels now
+  detect TikTok ("pixelCode") and Pinterest ("tagID"); low browser-only issue for Pinterest/Snap/Microsoft/
+  LinkedIn/Reddit/X (they have CAPIs). vanillabeankings 55 -> 45 (Stape 26: it runs JS and counts AdRoll's
+  partner syncs + page speed/SEO). Assets v=9.
 - No headless browser on purpose: 1-core prod VPS; OOM would kill customer sGTM containers.
   Runtime checks (consent diff, network hits) would need a separate worker box.
 
