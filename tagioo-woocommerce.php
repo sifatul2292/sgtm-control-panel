@@ -3,7 +3,7 @@
  * Plugin Name: Tagioo for WooCommerce
  * Plugin URI:  https://tagioo.com
  * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.5.1
+ * Version:     2.6.0
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author:      Tagioo
@@ -14,13 +14,15 @@
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.5.1');
+define('TAGIOO_VERSION', '2.6.0');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
 define('TAGIOO_META_UA',    '_tagioo_ua');
 define('TAGIOO_META_IP',    '_tagioo_ip');
 define('TAGIOO_META_SS_FIRED', '_tagioo_ss_purchase_fired');
+define('TAGIOO_META_CONSENT',     '_tagioo_consent');
+define('TAGIOO_META_CONSENT_SRC', '_tagioo_consent_src');
 
 // ---------------------------------------------------------------------------
 // HPOS compatibility
@@ -41,6 +43,9 @@ function tagioo_settings(): array {
             'gtm_id'          => '',
             'inject_gtm'      => '1',
             'custom_loader'   => '0',
+            'gtm_placement'   => 'code',
+            'consent_mode'    => 'off',
+            'consent_text'    => '',
             'sgtm_domain'     => '',
             'measurement_id'  => '',
             'api_secret'      => '',
@@ -63,6 +68,22 @@ function tagioo_opt(string $key, string $default = ''): string {
     return (string) (tagioo_settings()[$key] ?? $default);
 }
 
+// Cookie consent. Off by default: the plugin behaves exactly like 2.5.x (GTM always
+// loads, purchases go to every destination). 'banner' shows Tagioo's own consent banner
+// wired to Google Consent Mode v2; 'external' reads an existing banner plugin.
+function tagioo_consent_mode(): string {
+    $mode = tagioo_opt('consent_mode', 'off');
+    return in_array($mode, ['banner', 'external'], true) ? $mode : 'off';
+}
+
+function tagioo_consent_enabled(): bool {
+    return tagioo_consent_mode() !== 'off';
+}
+
+function tagioo_wait_for_consent(): bool {
+    return tagioo_consent_enabled() && tagioo_opt('gtm_placement') === 'consent';
+}
+
 // ---------------------------------------------------------------------------
 // Admin menu
 // ---------------------------------------------------------------------------
@@ -79,6 +100,9 @@ function tagioo_sanitize_settings(array $in): array {
         'gtm_id'          => sanitize_text_field($in['gtm_id'] ?? ''),
         'inject_gtm'      => isset($in['inject_gtm'])      ? '1' : '0',
         'custom_loader'   => isset($in['custom_loader'])   ? '1' : '0',
+        'gtm_placement'   => ($in['gtm_placement'] ?? '') === 'consent' ? 'consent' : 'code',
+        'consent_mode'    => in_array($in['consent_mode'] ?? '', ['banner', 'external'], true) ? $in['consent_mode'] : 'off',
+        'consent_text'    => sanitize_textarea_field($in['consent_text'] ?? ''),
         'sgtm_domain'     => esc_url_raw(rtrim($in['sgtm_domain'] ?? '', '/')),
         'measurement_id'  => sanitize_text_field($in['measurement_id'] ?? ''),
         'api_secret'      => sanitize_text_field($in['api_secret'] ?? ''),
@@ -134,6 +158,37 @@ function tagioo_settings_page(): void {
                         <p class="description">Serves gtm.js via <code>&lt;sGTM domain&gt;/tagioo-loader/gtm.js</code> instead of googletagmanager.com, to bypass domain-based blockers (Brave, uBlock). Requires the sGTM domain below and the Custom Loader power-up enabled on the server.</p>
                     </td>
                 </tr>
+                <tr>
+                    <th><label for="t_consent">Cookie consent</label></th>
+                    <td>
+                        <select name="<?= TAGIOO_OPTION ?>[consent_mode]" id="t_consent">
+                            <option value="off" <?= selected('off', $s['consent_mode'], false) ?>>Off — consent not required (default)</option>
+                            <option value="banner" <?= selected('banner', $s['consent_mode'], false) ?>>Show Tagioo consent banner</option>
+                            <option value="external" <?= selected('external', $s['consent_mode'], false) ?>>Use my own cookie banner plugin</option>
+                        </select>
+                        <p class="description"><strong>Off:</strong> no banner; tracking and server-side purchases work for every visitor.<br>
+                        <strong>Tagioo banner:</strong> shoppers see Accept / Reject. Uses Google Consent Mode v2 (denied until accepted), sets Meta cookies only after Accept, and Meta/TikTok skip purchases from shoppers who rejected.<br>
+                        <strong>Own banner plugin:</strong> reads CookieYes, Complianz, Cookiebot, OneTrust or the WP Consent API instead.<br>
+                        Check with your privacy notice and legal advice which option your store needs.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="t_consent_text">Banner text</label></th>
+                    <td>
+                        <textarea name="<?= TAGIOO_OPTION ?>[consent_text]" id="t_consent_text" rows="2" class="large-text" placeholder="<?= esc_attr(tagioo_default_consent_text()) ?>"><?= esc_textarea($s['consent_text']) ?></textarea>
+                        <p class="description">Optional. Used only with the Tagioo banner. Your privacy policy page (Settings → Privacy) is linked automatically. Shoppers can reopen the banner with a link to <code>#tagioo-cookie-settings</code> or the <code>[tagioo_cookie_settings]</code> shortcode.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="t_place">GTM loading</label></th>
+                    <td>
+                        <select name="<?= TAGIOO_OPTION ?>[gtm_placement]" id="t_place">
+                            <option value="code" <?= selected('code', $s['gtm_placement'], false) ?>>Always load GTM (default)</option>
+                            <option value="consent" <?= selected('consent', $s['gtm_placement'], false) ?>>Wait for consent (Google Consent Mode)</option>
+                        </select>
+                        <p class="description">Only applies when Cookie consent is on. “Wait for consent” keeps GTM paused until the banner grants <code>ad_storage</code> or <code>analytics_storage</code>. “Always” loads GTM straight away and lets Consent Mode control what Google tags send (recommended).</p>
+                    </td>
+                </tr>
             </table>
 
             <h2 class="title">Server-Side GTM (sGTM)</h2>
@@ -170,6 +225,7 @@ function tagioo_settings_page(): void {
                                <?= checked('1', $s['server_hit'], false) ?> />
                         POST to sGTM on payment complete (replaces WooCommerce webhook)</label>
                         <p class="description">Fires even if browser is closed / pixel blocked. Endpoint: <code><?= esc_html($collect_url) ?></code></p>
+                        <p class="description">When Cookie consent is on, the shopper's choice at checkout is sent with the hit as <code>consent_marketing</code>. Tagioo's Meta and TikTok server tags skip purchases marked denied; GA4 still records the order. Developers can change or skip the hit with the <code>tagioo_server_purchase_params</code> filter.</p>
                     </td>
                 </tr>
             </table>
@@ -222,14 +278,60 @@ add_action('wp_head', function () {
         $loader = 'https://www.googletagmanager.com/gtm.js?id=' . esc_js($id);
     }
     $id_e   = esc_js($id);
+    if (tagioo_wait_for_consent()) {
+        // Same idea as Stape's "Load GTM with consent": keep GTM paused until the
+        // cookie banner reports Consent Mode ad_storage or analytics_storage
+        // granted, checking pushes made before and after this script runs.
+        $src = $loader;
+        echo "\n<!-- Tagioo GTM (waits for consent) -->\n";
+        echo "<script>(function(w,d,l,src){w[l]=w[l]||[];var done=false;function load(){if(done)return;done=true;w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName('script')[0],j=d.createElement('script');j.async=true;j.src=src;f.parentNode.insertBefore(j,f);}function ok(e){if(!e||e[0]!=='consent'||(e[1]!=='default'&&e[1]!=='update'))return false;var c=e[2]||{};return c.ad_storage==='granted'||c.analytics_storage==='granted';}var q=w[l];for(var i=0;i<q.length;i++){if(ok(q[i])){load();break;}}if(!done){var p=q.push;q.push=function(){var r=p.apply(q,arguments);for(var k=0;k<arguments.length;k++){if(ok(arguments[k]))load();}return r;};}})(window,document,'dataLayer','{$src}');</script>\n";
+        echo "<!-- End Tagioo GTM -->\n";
+        return;
+    }
     echo "\n<!-- Tagioo GTM -->\n";
     echo "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='{$loader}'+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','{$id_e}');</script>\n";
     echo "<!-- End Tagioo GTM -->\n";
 }, 1);
 
+// Tagioo banner: Google Consent Mode v2 defaults must be set before GTM loads.
+add_action('wp_head', function () {
+    if (tagioo_consent_mode() !== 'banner' || is_admin()) return;
+    echo "\n<!-- Tagioo consent defaults -->\n";
+    echo "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}(function(){var all={ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted'};gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',wait_for_update:500});var m=document.cookie.match(/(?:^|; )tagioo_consent=([^;]*)/);if(m&&m[1]==='granted')gtag('consent','update',all);})();</script>\n";
+}, 0);
+
+function tagioo_default_consent_text(): string {
+    return 'We use cookies to measure our ads and improve your shopping experience. You can accept or reject them.';
+}
+
+add_action('wp_footer', function () {
+    if (tagioo_consent_mode() !== 'banner' || is_admin()) return;
+    $text    = tagioo_opt('consent_text') ?: tagioo_default_consent_text();
+    $privacy = function_exists('get_privacy_policy_url') ? get_privacy_policy_url() : '';
+    $link    = $privacy ? ' <a href="' . esc_url($privacy) . '">Privacy policy</a>' : '';
+    ?>
+<div id="tagioo-consent" class="tagioo-consent" role="dialog" aria-live="polite" aria-label="Cookie consent" hidden>
+  <div class="tagioo-consent-inner">
+    <p><?= esc_html($text) ?><?= $link ?></p>
+    <div class="tagioo-consent-actions">
+      <button type="button" data-tagioo-consent="denied">Reject</button>
+      <button type="button" data-tagioo-consent="granted">Accept</button>
+    </div>
+  </div>
+</div>
+<style>.tagioo-consent,.tagioo-consent *{box-sizing:border-box}.tagioo-consent{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:2147483647;margin:0;padding:16px 20px calc(16px + env(safe-area-inset-bottom));background:#fff;color:#1d2327;border-top:1px solid #dcdcde;box-shadow:0 -8px 30px rgba(0,0,0,.12);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;transform:none}.tagioo-consent[hidden]{display:none}.tagioo-consent-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:20px}.tagioo-consent p{margin:0;flex:1}.tagioo-consent a{color:inherit;text-decoration:underline}.tagioo-consent-actions{display:flex;gap:10px;flex:none}.tagioo-consent button{min-width:120px;min-height:44px;padding:0 18px;border-radius:8px;border:1px solid #1d2327;background:#fff;color:#1d2327;font-family:inherit;font-size:15px;font-weight:600;line-height:1;cursor:pointer}.tagioo-consent button[data-tagioo-consent=granted]{background:#1d2327;color:#fff}.tagioo-consent button:focus-visible{outline:3px solid #2271b1;outline-offset:2px}@media(max-width:640px){.tagioo-consent-inner{flex-direction:column;align-items:stretch;gap:12px}.tagioo-consent-actions button{flex:1;min-width:0}}</style>
+<script>(function(){var box=document.getElementById('tagioo-consent');if(!box)return;if(box.parentNode!==document.body)document.body.appendChild(box);var all={ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted'};var none={ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied'};function saved(){var m=document.cookie.match(/(?:^|; )tagioo_consent=([^;]*)/);return m?m[1]:'';}function choose(v){document.cookie='tagioo_consent='+v+';path=/;max-age=15552000;SameSite=Lax'+(location.protocol==='https:'?';Secure':'');window.dataLayer=window.dataLayer||[];if(typeof gtag==='function')gtag('consent','update',v==='granted'?all:none);window.dataLayer.push({event:'tagioo_consent_update',tagioo_consent:v});box.hidden=true;}box.addEventListener('click',function(e){var b=e.target.closest('[data-tagioo-consent]');if(b)choose(b.getAttribute('data-tagioo-consent'));});document.addEventListener('click',function(e){var a=e.target.closest('a[href$="#tagioo-cookie-settings"]');if(a){e.preventDefault();box.hidden=false;}});if(!saved())box.hidden=false;})();</script>
+    <?php
+}, 100);
+
+add_shortcode('tagioo_cookie_settings', function () {
+    return tagioo_consent_mode() === 'banner' ? '<a href="#tagioo-cookie-settings">Cookie settings</a>' : '';
+});
+
 add_action('wp_body_open', function () {
     $id = tagioo_opt('gtm_id');
     if (!$id || tagioo_opt('inject_gtm') !== '1') return;
+    if (tagioo_wait_for_consent()) return;   // no JS means no consent signal
     $id_e = esc_attr($id);
     $sgtm = tagioo_opt('sgtm_domain');
     $ns   = (tagioo_opt('custom_loader') === '1' && $sgtm)
@@ -436,6 +538,10 @@ add_action('init', function () {
     if (defined('REST_REQUEST') && REST_REQUEST) return;
     if (defined('DOING_AJAX') && DOING_AJAX) return;
     if (headers_sent()) return;
+    if (tagioo_consent_enabled()) {
+        [$consent] = tagioo_marketing_consent();
+        if (tagioo_consent_mode() === 'banner' ? $consent !== 'granted' : $consent === 'denied') return;
+    }
 
     $fbp = isset($_COOKIE['_fbp']) ? sanitize_text_field(wp_unslash($_COOKIE['_fbp'])) : '';
     $fbc = isset($_COOKIE['_fbc']) ? sanitize_text_field(wp_unslash($_COOKIE['_fbc'])) : '';
@@ -480,6 +586,44 @@ function tagioo_attach_meta_identifiers(\WC_Order $order): void {
     // from a server context (COD, webhook).
     $ip = tagioo_client_ip();
     if ($ip && !$order->get_meta(TAGIOO_META_IP)) $order->update_meta_data(TAGIOO_META_IP, $ip);
+    // Consent at the moment of purchase; the backend hit runs later from cron,
+    // where the shopper's cookies are no longer available.
+    if (tagioo_consent_enabled() && !$order->get_meta(TAGIOO_META_CONSENT)) {
+        [$consent, $source] = tagioo_marketing_consent();
+        $order->update_meta_data(TAGIOO_META_CONSENT, $consent);
+        $order->update_meta_data(TAGIOO_META_CONSENT_SRC, $source);
+    }
+}
+
+// Shopper's marketing consent for the current request: 'granted', 'denied' or
+// 'unknown', plus where it came from. Like Stape, the plugin never blocks on it;
+// it is passed to Server GTM, which decides per tag. Prefers the WP Consent API
+// (Complianz, CookieYes, Cookiebot and others implement it), then common banner cookies.
+function tagioo_marketing_consent(): array {
+    if (tagioo_consent_mode() === 'banner') {
+        $v = isset($_COOKIE['tagioo_consent']) ? sanitize_text_field(wp_unslash($_COOKIE['tagioo_consent'])) : '';
+        return [$v === 'granted' ? 'granted' : 'denied', 'tagioo_banner'];
+    }
+    if (function_exists('wp_has_consent') && function_exists('wp_get_consent_type') && wp_get_consent_type()) {
+        return [wp_has_consent('marketing') ? 'granted' : 'denied', 'wp_consent_api'];
+    }
+    $c = static fn(string $name): string => isset($_COOKIE[$name]) ? strtolower(rawurldecode(wp_unslash((string) $_COOKIE[$name]))) : '';
+    if (($v = $c('cookieyes-consent')) !== '') {
+        if (strpos($v, 'advertisement:yes') !== false) return ['granted', 'cookieyes'];
+        if (strpos($v, 'advertisement:no') !== false) return ['denied', 'cookieyes'];
+    }
+    if (($v = $c('cmplz_marketing')) !== '') return [$v === 'allow' ? 'granted' : 'denied', 'complianz'];
+    if (($v = $c('CookieConsent')) !== '') {
+        if (strpos($v, 'marketing:true') !== false) return ['granted', 'cookiebot'];
+        if (strpos($v, 'marketing:false') !== false) return ['denied', 'cookiebot'];
+    }
+    if (($v = $c('OptanonConsent')) !== '' && preg_match('/groups=([^&]*)/', $v, $m)) {
+        if (strpos($m[1], 'c0004:1') !== false) return ['granted', 'onetrust'];
+        if (strpos($m[1], 'c0004:0') !== false) return ['denied', 'onetrust'];
+    }
+    // IAB US Privacy string, e.g. "1YYN": third character Y = opted out of sale/sharing.
+    if (($v = $c('usprivacy')) !== '' && strlen($v) === 4 && $v[2] === 'y') return ['denied', 'usprivacy'];
+    return ['unknown', ''];
 }
 
 // Classic (shortcode) checkout.
@@ -924,6 +1068,23 @@ function tagioo_release_server_purchase(int $order_id): void {
     delete_option(tagioo_server_purchase_lock($order_id));
 }
 
+// Meta rejects server events whose event_time is more than 7 days old. Keep the
+// order-placed time while it is recent enough (best attribution). For orders paid
+// later — bank transfer or on-hold orders confirmed after a week — use the moment
+// payment was confirmed, which is when the sale actually completed; otherwise now.
+// One hour of margin covers the retry backoff.
+function tagioo_purchase_event_time(\WC_Order $order, ?int $now = null): int {
+    $now   = $now ?? time();
+    $limit = $now - (7 * DAY_IN_SECONDS - HOUR_IN_SECONDS);
+    $created    = $order->get_date_created();
+    $created_ts = $created ? $created->getTimestamp() : 0;
+    if ($created_ts >= $limit && $created_ts <= $now) return $created_ts;
+    $paid    = $order->get_date_paid();
+    $paid_ts = $paid ? $paid->getTimestamp() : 0;
+    if ($paid_ts >= $limit && $paid_ts <= $now) return $paid_ts;
+    return $now;
+}
+
 // Enqueue the send out-of-band. Idempotent: skips if already sent or queued.
 function tagioo_enqueue_server_purchase(int $order_id): void {
     if (tagioo_opt('server_hit') !== '1') return;
@@ -981,9 +1142,9 @@ add_action('tagioo_server_purchase', function (int $order_id, int $attempt = 1) 
     $ip  = $order->get_meta(TAGIOO_META_IP) ?: $order->get_customer_ip_address();
 
     // event_time = order placed time (not send time) so COD orders sent days
-    // later still attribute to the real conversion moment.
-    $created = $order->get_date_created();
-    $ts      = $created ? $created->getTimestamp() : time();
+    // later still attribute to the real conversion moment — unless that is
+    // older than Meta's 7-day limit (see tagioo_purchase_event_time()).
+    $ts = tagioo_purchase_event_time($order);
 
     // sGTM's GA4 client only claims the gtag wire format on /g/collect — an MP
     // JSON body returns HTTP 400. Build a gtag query string so the GA4 client
@@ -1029,6 +1190,23 @@ add_action('tagioo_server_purchase', function (int $order_id, int $attempt = 1) 
         if (!empty($it['item_category'])) $pr .= '~ca' . str_replace('~', '-', (string) $it['item_category']);
         $params['pr' . $i] = $pr;
         $i++;
+    }
+
+    // Consent captured at checkout travels with the hit and Server GTM decides
+    // per tag (Tagioo's Meta/TikTok tags skip 'denied'). No Consent Mode gcs:
+    // "marketing denied" says nothing about analytics, and this server-to-server
+    // hit sets no cookies and carries no ad click ID.
+    if (tagioo_consent_enabled()) {
+        $params['ep.consent_marketing'] = (string) ($order->get_meta(TAGIOO_META_CONSENT) ?: 'unknown');
+        if ($src = (string) $order->get_meta(TAGIOO_META_CONSENT_SRC)) $params['ep.consent_source'] = $src;
+    }
+
+    // Developers can adjust the hit, or return false to skip it (e.g. stricter consent rules).
+    $params = apply_filters('tagioo_server_purchase_params', $params, $order);
+    if ($params === false) {
+        error_log("[tagioo] server purchase #{$order_num} skipped by tagioo_server_purchase_params filter");
+        tagioo_release_server_purchase($order_id);
+        return;
     }
 
     $url = $sgtm . '/g/collect?' . http_build_query($params);
