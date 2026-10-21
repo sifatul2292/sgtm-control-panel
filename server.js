@@ -565,6 +565,51 @@ async function sendEmail({ to, subject, bodyHtml }) {
   }
 }
 
+// ── Website tracking checker: shareable reports and report emails ───────────
+function saveCheckerReport(report) {
+  if (!eventStore) return "";
+  try {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    const bytes = randomBytes(12);
+    const id = [...bytes].map((b) => alphabet[b % alphabet.length]).join("");
+    const { cached, ...clean } = report;
+    eventStore.saveTrackingReport(id, new URL(report.url).hostname, report.score, clean);
+    return id;
+  } catch (error) {
+    console.error("[checker] could not save report:", error.message);
+    return "";
+  }
+}
+
+async function emailCheckerReport(email, id, report, optIn) {
+  const host = new URL(report.url).hostname;
+  const link = `https://tagioo.com/website-tracking-checker/r/${id}`;
+  const sev = { critical: "#B42318", high: "#C4320A", medium: "#B54708", low: "#475467" };
+  const top = (report.issues || []).slice(0, 5).map((i) =>
+    `<li style="margin:0 0 10px"><strong style="color:${sev[i.severity] || "#111"};text-transform:uppercase;font-size:11px">${escapeHtml(i.severity)}</strong> ${escapeHtml(i.title)}<br><span style="color:#5C6372;font-size:13px">${escapeHtml(i.fix?.[0] || "")}</span></li>`).join("");
+  const score = report.score === null ? "Inconclusive" : `${report.score}/100 (grade ${escapeHtml(report.grade)})`;
+  const bodyHtml = [
+    `<h1 style="font-size:22px;margin:0 0 6px">Your tracking report for ${escapeHtml(host)}</h1>`,
+    `<p style="font-size:15px;color:#2B303B;margin:0 0 4px"><strong>Score:</strong> ${score}</p>`,
+    `<p style="font-size:15px;color:#2B303B;margin:0 0 18px">${escapeHtml(report.summary || "")}</p>`,
+    top ? `<h2 style="font-size:16px;margin:0 0 10px">Top issues to fix</h2><ol style="padding-left:18px;margin:0 0 18px;font-size:14px">${top}</ol>` : "",
+    `<p style="margin:0 0 20px"><a href="${link}" style="display:inline-block;background:#4F46E5;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">View the full report</a></p>`,
+    `<p style="font-size:14px;color:#2B303B;margin:0 0 6px">Want it fixed? Tagioo runs server-side tracking on your own domain and sets up GA4, Meta CAPI, Google Ads and TikTok for you. <a href="https://tagioo.com/signup?email=${encodeURIComponent(email)}">Start free</a> or reply to this email for free setup help.</p>`,
+    `<p style="font-size:12px;color:#8A91A0;margin:16px 0 0">You asked us to email this report from tagioo.com/website-tracking-checker. The link works for 90 days.</p>`
+  ].join("");
+  const result = await sendEmail({ to: email, subject: `Tracking report for ${host}: ${report.score === null ? "inconclusive" : `${report.score}/100`}`, bodyHtml });
+  if (!result.ok) return false;
+  try { eventStore?.addCheckerLead(email, id, host, optIn); } catch (error) { console.error("[checker] could not store lead:", error.message); }
+  if (config.customerSupportEmail) {
+    sendEmail({
+      to: config.customerSupportEmail,
+      subject: `New tracking-checker lead: ${host}`,
+      bodyHtml: `<p>${escapeHtml(email)} emailed themselves the report for <strong>${escapeHtml(host)}</strong> (${score}, ${(report.issues || []).length} issues). Marketing opt-in: ${optIn ? "yes" : "no"}.</p><p><a href="${link}">Open the report</a></p>`
+    }).catch(() => {});
+  }
+  return true;
+}
+
 async function notifyOwnerLaravelManagedSetup(tenant, setup) {
   const to = config.customerSupportEmail;
   if (!to || !tenant || !setup) return { ok: false };
@@ -12945,6 +12990,12 @@ const server = createServer(async (req, res) => {
       await servePublicPage(req, res, "tracking-checker.html");
       return;
     }
+    // Shared reports: the same page, which loads the stored report. Kept out of search.
+    if (/^\/website-tracking-checker\/r\/[A-Za-z0-9]{12}$/.test(pathname) && isReadRequest) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      await servePublicPage(req, res, "tracking-checker.html");
+      return;
+    }
     if (pathname === "/api/public/tracking-checker" && req.method === "POST") {
       res.setHeader("cache-control", "no-store");
       if (!checkRateLimit(req, "tracking-checker", 8, 10 * 60 * 1000)) {
@@ -12954,10 +13005,46 @@ const server = createServer(async (req, res) => {
       }
       try {
         const body = await readJson(req, 4096);
-        jsonResponse(res, 200, await scanWebsite(body.url));
+        const report = await scanWebsite(body.url);
+        jsonResponse(res, 200, { ...report, shareId: saveCheckerReport(report) });
       } catch (error) {
         jsonResponse(res, error.status || 400, { error: error.status ? error.message : "Enter a valid website URL." });
       }
+      return;
+    }
+    const checkerReportMatch = pathname.match(/^\/api\/public\/tracking-checker\/r\/([A-Za-z0-9]{12})(\/email)?$/);
+    if (checkerReportMatch) {
+      res.setHeader("cache-control", "no-store");
+      const stored = eventStore?.getTrackingReport(checkerReportMatch[1]);
+      if (!stored) {
+        jsonResponse(res, 404, { error: "This report has expired or doesn't exist. Run a new check." });
+        return;
+      }
+      if (!checkerReportMatch[2] && req.method === "GET") {
+        jsonResponse(res, 200, { ...stored.report, shareId: checkerReportMatch[1], shared: true, savedAt: new Date(stored.createdAt).toISOString() });
+        return;
+      }
+      if (checkerReportMatch[2] && req.method === "POST") {
+        if (!checkRateLimit(req, "tracking-checker-email", 3, 10 * 60 * 1000)) {
+          res.setHeader("retry-after", "600");
+          jsonResponse(res, 429, { error: "Too many emails sent. Please try again in ten minutes." });
+          return;
+        }
+        try {
+          const body = await readJson(req, 2048);
+          const email = String(body.email || "").trim().toLowerCase();
+          if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+            jsonResponse(res, 400, { error: "Enter a valid email address." });
+            return;
+          }
+          const sent = await emailCheckerReport(email, checkerReportMatch[1], stored.report, body.optIn === true);
+          jsonResponse(res, sent ? 200 : 502, sent ? { ok: true } : { error: "We couldn't send the email right now. Please try again." });
+        } catch {
+          jsonResponse(res, 400, { error: "Enter a valid email address." });
+        }
+        return;
+      }
+      jsonResponse(res, 405, { error: "Method not allowed." });
       return;
     }
 

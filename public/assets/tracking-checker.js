@@ -1,153 +1,227 @@
-const form = document.getElementById('scanForm');
-const button = document.getElementById('scanButton');
-const status = document.getElementById('scanStatus');
-const reportEl = document.getElementById('scanReport');
-let latestReport = null;
+// Tagioo tracking checker: run a scan and render the report.
+(() => {
+  const form = document.getElementById("scanForm");
+  const input = document.getElementById("scanUrl");
+  const button = document.getElementById("scanButton");
+  const progress = document.getElementById("scanProgress");
+  const errorBox = document.getElementById("scanStatus");
+  const report = document.getElementById("scanReport");
+  const scope = document.getElementById("scanScope");
+  if (!form) return;
 
-function element(tag, text, className = '') {
-  const node = document.createElement(tag);
-  if (text) node.textContent = text;
-  if (className) node.className = className;
-  return node;
-}
-function section(title, description = '') {
-  const node = element('section', '', 'report-section');
-  node.append(element('h3', title));
-  if (description) node.append(element('p', description));
-  reportEl.append(node);
-  return node;
-}
-function renderReport(report) {
-  reportEl.replaceChildren();
-  const top = element('div', '', 'report-top');
-  const heading = element('div');
-  heading.append(element('h2', 'Your website’s tracking clues'), element('p', report.url, 'report-url'));
-  const actions = element('div', '', 'report-actions');
-  const download = element('button', 'Download JSON');
-  download.type = 'button';
-  download.addEventListener('click', () => {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(latestReport, null, 2)], { type: 'application/json' }));
-    const link = element('a');
-    link.href = url;
-    link.download = 'tagioo-tracking-report.json';
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  });
-  const print = element('button', 'Print report');
-  print.type = 'button';
-  print.addEventListener('click', () => window.print());
-  actions.append(download, print);
-  top.append(heading, actions);
-  const summary = element('div', '', 'report-summary');
-  const summaryText = element('div');
-  summaryText.append(element('h3', 'Visible setup checks observed'), element('p', 'This is evidence coverage, not a tracking quality score. A tag reference does not prove that events are firing or accepted.'));
-  summary.append(element('strong', `${report.observedChecks} / ${report.totalChecks}`, 'report-count'), summaryText);
-  reportEl.append(top, summary, element('p', `Checked ${new Date(report.scannedAt).toLocaleString()} · ${report.inspectedSources.length} source ${report.inspectedSources.length === 1 ? 'file' : 'files'} · ${(report.bytes / 1024).toFixed(0)} KB inspected · ${(report.durationMs / 1000).toFixed(1)}s scan${report.cached ? ' · cached result' : ''}`, 'report-meta'));
-  const checks = section('What we observed', 'Not observed means the clue was not found in the inspected files. It may be loaded elsewhere or after consent.');
-  report.signals.forEach(signal => {
-    const row = element('div', '', 'evidence-row');
-    const detail = element('div');
-    detail.append(element('p', signal.detail), element('p', `Verify next: ${signal.next}`, 'next-step'));
-    row.append(element('strong', signal.name), detail, element('span', signal.status === 'observed' ? 'Observed' : 'Not observed', `scan-badge${signal.status === 'observed' ? '' : ' unknown'}`));
-    checks.append(row);
-  });
-  const trackers = section('Tracker references & IDs', 'References were found in source. Tags inside externally loaded containers may not appear here.');
-  if (!report.trackers.length) trackers.append(element('p', 'No recognizable tracker references found in the inspected source. Verify the live page in your browser before drawing conclusions.', 'report-empty'));
-  report.trackers.forEach(tracker => {
-    const row = element('div', '', 'evidence-row');
-    const detail = element('div');
-    detail.append(element('code', tracker.ids.length ? tracker.ids.join(' · ') : 'Reference found; no ID extracted'));
-    const evidence = element('details');
-    evidence.append(element('summary', 'View source locations'));
-    const list = element('ul', '', 'source-list');
-    tracker.sources.forEach(url => list.append(element('li', url)));
-    evidence.append(list);
-    detail.append(evidence);
-    row.append(element('strong', tracker.name), detail, element('span', 'Reference', 'scan-badge'));
-    trackers.append(row);
-  });
-  const architecture = section('Website & routing');
-  architecture.append(element('p', `Platform clues: ${report.platforms.length ? report.platforms.join(', ') : 'Not observed'}.`));
-  if (report.firstPartyEndpoints.length) {
-    architecture.append(element('p', 'First-party endpoint references (query parameters omitted):'));
-    const list = element('ul', '', 'source-list');
-    report.firstPartyEndpoints.forEach(url => list.append(element('li', url)));
-    architecture.append(list);
-  } else architecture.append(element('p', 'No explicit first-party endpoint URL extracted. Check the routing-clue finding above and inspect a live request.'));
-  if (report.multipleIds.length) {
-    const ids = section('Multiple IDs to review', 'Multiple IDs can be intentional. They do not establish duplicate events.');
-    report.multipleIds.forEach(item => ids.append(element('p', `${item.name}: ${item.ids.join(', ')}. Confirm that each property or container is expected.`)));
+  const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const SEVERITY = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
+  const SERVER = {
+    confirmed: ["Server-side ✓", "ok"],
+    configured: ["Configured", "warn"],
+    possible: ["Possible", "warn"],
+    "not-detected": ["Browser-only", "bad"]
+  };
+  const VIA = { page: "Page code", "site-script": "Site JavaScript", gtm: "GTM", "shopify-app": "Shopify app" };
+  const SERVER_STACK = {
+    confirmed: ["Live server container", "ok"],
+    configured: ["Configured, not confirmed", "warn"],
+    likely: ["Likely (app or vendor)", "warn"],
+    none: ["Not found — browser-only", "bad"]
+  };
+
+  // Step-by-step progress while the request runs (about 5–15 seconds).
+  let timer = 0;
+  function startProgress() {
+    const steps = [...progress.querySelectorAll("li")];
+    steps.forEach((li) => li.removeAttribute("data-state"));
+    progress.hidden = false;
+    let i = 0;
+    steps[0].dataset.state = "active";
+    timer = setInterval(() => {
+      if (i < steps.length - 1) {
+        steps[i].dataset.state = "done";
+        steps[++i].dataset.state = "active";
+      }
+    }, 2200);
   }
-  const cookies = section('Cookies in the HTTP response', 'These are response-header attributes, not cookies created by JavaScript. Browser restrictions can shorten lifetimes; values are never included.');
-  if (!report.cookies.length) cookies.append(element('p', 'No Set-Cookie headers returned for this request. JavaScript or consent may create cookies later.', 'report-empty'));
-  else {
-    const wrap = element('div', '', 'report-table-wrap');
-    const table = element('table', '', 'report-table');
-    const head = element('tr');
-    ['Name', 'Secure', 'HttpOnly', 'SameSite', 'Max-Age (seconds)'].forEach(text => head.append(element('th', text)));
-    const thead = element('thead'); thead.append(head); table.append(thead);
-    const tbody = element('tbody');
-    report.cookies.forEach(cookie => {
-      const row = element('tr');
-      [cookie.name, cookie.secure ? 'Yes' : 'No', cookie.httpOnly ? 'Yes' : 'No', cookie.sameSite, cookie.maxAge || 'Not specified'].forEach(text => row.append(element('td', text)));
-      tbody.append(row);
+  function stopProgress() {
+    clearInterval(timer);
+    progress.hidden = true;
+  }
+
+  function scoreRing(score, grade) {
+    if (score === null) return `<div class="tc-ring tc-ring-unknown"><span>?</span></div>`;
+    const r = 52, c = 2 * Math.PI * r, off = c * (1 - score / 100);
+    const tone = score >= 75 ? "ok" : score >= 50 ? "warn" : "bad";
+    return `<div class="tc-ring tc-tone-${tone}" role="img" aria-label="Score ${score} out of 100, grade ${esc(grade)}">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="${r}" class="tc-ring-bg"/><circle cx="60" cy="60" r="${r}" class="tc-ring-fg" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>
+      <span class="tc-ring-score">${score}</span><span class="tc-ring-grade">Grade ${esc(grade)}</span></div>`;
+  }
+
+  let leadEmail = "";
+  const signupHref = () => `/signup${leadEmail ? `?email=${encodeURIComponent(leadEmail)}` : ""}`;
+
+  function shareBlock(r) {
+    if (!r.shareId) return "";
+    const link = `${location.origin}/website-tracking-checker/r/${r.shareId}`;
+    return `<section class="tc-share" aria-label="Share or save this report">
+      <div class="tc-share-link"><h2>Share this report</h2><p>Send it to your developer or agency. The link works for 90 days.</p>
+        <div class="tc-copy"><input type="text" readonly value="${esc(link)}" aria-label="Report link" id="shareLink"><button type="button" id="copyLink">Copy link</button></div></div>
+      ${r.shared ? "" : `<form class="tc-email" id="emailForm" novalidate><h2>Email me this report</h2><p>Get the score, top fixes and the link in your inbox. Optional.</p>
+        <div class="tc-copy"><label class="sr-only" for="leadEmail">Email address</label><input type="email" id="leadEmail" autocomplete="email" placeholder="you@yourstore.com" required maxlength="254"><button type="submit">Send report</button></div>
+        <label class="tc-optin"><input type="checkbox" id="leadOptIn"> Also send me occasional tracking tips from Tagioo</label>
+        <p class="tc-email-status" id="emailStatus" role="status" aria-live="polite"></p></form>`}
+    </section>`;
+  }
+
+  function wireShare(r) {
+    const copy = document.getElementById("copyLink");
+    if (copy) copy.addEventListener("click", async () => {
+      const field = document.getElementById("shareLink");
+      try { await navigator.clipboard.writeText(field.value); } catch { field.select(); document.execCommand("copy"); }
+      copy.textContent = "Copied ✓";
+      setTimeout(() => { copy.textContent = "Copy link"; }, 2000);
     });
-    table.append(tbody); wrap.append(table); cookies.append(wrap);
-  }
-  const scope = section('Scan scope & limitations', report.limitations);
-  if (report.warnings.length) [...new Set(report.warnings)].forEach(warning => scope.append(element('p', warning)));
-  const sources = element('ul', '', 'source-list');
-  report.inspectedSources.forEach(url => sources.append(element('li', url)));
-  scope.append(sources);
-  reportEl.hidden = false;
-}
-form.addEventListener('submit', async event => {
-  event.preventDefault();
-  if (button.disabled) return;
-  button.disabled = true;
-  button.textContent = 'Checking website…';
-  status.className = 'scan-status is-loading';
-  status.textContent = 'Reading the public page and checking visible tracking clues…';
-  reportEl.hidden = true;
-  form.setAttribute('aria-busy', 'true');
-  try {
-    const response = await fetch('/api/public/tracking-checker', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ url: form.elements.url.value.trim() }), signal: AbortSignal.timeout(22000)
+    const emailForm = document.getElementById("emailForm");
+    if (!emailForm) return;
+    emailForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const field = document.getElementById("leadEmail");
+      const status = document.getElementById("emailStatus");
+      const email = field.value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { status.textContent = "Enter a valid email address."; status.dataset.tone = "bad"; field.focus(); return; }
+      const submit = emailForm.querySelector("button");
+      submit.disabled = true; submit.textContent = "Sending…";
+      try {
+        const res = await fetch(`/api/public/tracking-checker/r/${encodeURIComponent(r.shareId)}/email`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, optIn: document.getElementById("leadOptIn").checked }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "We couldn't send the email. Please try again.");
+        leadEmail = email;
+        status.textContent = `Sent to ${email}. Check your inbox (and spam folder).`;
+        status.dataset.tone = "ok";
+        document.querySelectorAll("[data-signup]").forEach((a) => { a.href = signupHref(); });
+        try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "generate_lead", lead_source: "tracking_checker" }); } catch {}
+      } catch (error) {
+        status.textContent = error.message; status.dataset.tone = "bad";
+      } finally { submit.disabled = false; submit.textContent = "Send report"; }
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'The scan could not be completed.');
-    latestReport = data;
-    renderReport(data);
-    status.textContent = 'Scan complete. Review the evidence and verification steps below.';
-    status.className = 'scan-status';
-    reportEl.focus({ preventScroll: true });
-    reportEl.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
-  } catch (error) {
-    status.className = 'scan-status is-error';
-    status.textContent = error.name === 'TimeoutError' ? 'The scan timed out. Please try again.' : error.message;
-  } finally {
-    button.disabled = false;
-    button.textContent = 'Check website →';
-    form.setAttribute('aria-busy', 'false');
   }
-});
-const menu = document.getElementById('mobileNav');
-const menuButton = document.getElementById('menuBtn');
-function closeMenu() {
-  menu.classList.remove('open');
-  menu.setAttribute('aria-hidden', 'true');
-  menu.inert = true;
-  menuButton.setAttribute('aria-expanded', 'false');
-  menuButton.setAttribute('aria-label', 'Open menu');
-}
-menuButton.addEventListener('click', () => {
-  const open = menuButton.getAttribute('aria-expanded') !== 'true';
-  menu.classList.toggle('open', open);
-  menu.inert = !open;
-  menu.setAttribute('aria-hidden', String(!open));
-  menuButton.setAttribute('aria-expanded', String(open));
-  menuButton.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
-});
-menu.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
-document.addEventListener('keydown', event => { if (event.key === 'Escape' && !menu.inert) { closeMenu(); menuButton.focus(); } });
+
+  function render(r) {
+    const host = (() => { try { return new URL(r.url).hostname; } catch { return r.url; } })();
+    const ss = SERVER_STACK[r.stack.serverSide.status] || SERVER_STACK.none;
+    const facts = [
+      ["Platform", r.platforms.length ? r.platforms.join(" · ") : "Not identified"],
+      ["Tag manager", r.stack.gtmIds.length ? r.stack.tagManagers.map((t) => `${t.id}${t.status === "ok" ? ` · ${t.tags} tags` : t.status === "not-found" ? " · not published" : ""}`).join(", ") : "None found"],
+      ["Server-side", `<span class="tc-pill tc-${ss[1]}">${ss[0]}</span>${r.stack.serverSide.vendor ? ` <span class="tc-muted">${esc(r.stack.serverSide.vendor)}</span>` : ""}`, true],
+      ["Consent", r.stack.cmps.length ? `${r.stack.cmps.join(", ")}${r.stack.consentMode ? " · Consent Mode" : ""}` : "No banner found"]
+    ];
+    const counts = ["critical", "high", "medium", "low"].filter((s) => r.counts[s]).map((s) => `<span class="tc-count tc-sev-${s}">${r.counts[s]} ${SEVERITY[s]}</span>`).join("");
+
+    const destRows = r.destinations.map((d) => {
+      const [label, tone] = SERVER[d.server.status] || SERVER["not-detected"];
+      return `<tr><th scope="row">${esc(d.name)}</th><td>${d.via.map((v) => esc(VIA[v] || v)).join(", ")}</td><td class="tc-ids">${d.ids.length ? d.ids.map(esc).join("<br>") : "<span class='tc-muted'>—</span>"}</td>
+        <td><span class="tc-pill tc-${tone}">${label}</span>${d.server.detail ? `<div class="tc-detail">${esc(d.server.detail)}</div>` : ""}</td></tr>`;
+    }).join("");
+
+    const issues = r.issues.map((i, n) => `<article class="tc-issue tc-sev-${i.severity}">
+      <div class="tc-issue-head"><span class="tc-badge tc-sev-${i.severity}">${SEVERITY[i.severity]}</span><h3>${esc(i.title)}</h3></div>
+      <p>${esc(i.detail)}</p>
+      <details${n < 3 ? " open" : ""}><summary>How to fix it</summary><ol>${i.fix.map((f) => `<li>${esc(f)}</li>`).join("")}</ol>
+      ${i.tagioo ? `<p class="tc-tagioo"><strong>With Tagioo:</strong> ${esc(i.tagioo)} <a data-signup href="${signupHref()}">Start free →</a></p>` : ""}</details>
+    </article>`).join("");
+
+    const passed = r.passed.map((p) => `<li><strong>${esc(p.title)}</strong><span>${esc(p.detail)}</span></li>`).join("");
+
+    const endpoints = r.stack.serverSide.endpoints.map((e) => `<li>${esc(e.host)} — ${e.healthy ? "live (health check passed)" : "not responding"}, ${e.firstParty ? "your domain" : "third-party domain"}</li>`).join("");
+    const tech = `
+      <dl class="tc-tech">
+        <dt>Pages inspected</dt><dd>${esc(r.inspected.page)}${r.inspected.productPage ? `<br>${esc(r.inspected.productPage)}` : ""}</dd>
+        <dt>GTM containers</dt><dd>${r.stack.tagManagers.length ? r.stack.tagManagers.map((t) => `${esc(t.id)} — ${t.status === "ok" ? `published, ${t.tags} tags${t.version ? `, version ${esc(t.version)}` : ""}` : t.status === "not-found" ? "no published version" : "couldn't be read"}`).join("<br>") : "None"}</dd>
+        <dt>GTM events</dt><dd>${r.stack.gtmEvents.length ? r.stack.gtmEvents.map(esc).join(", ") : "—"}</dd>
+        <dt>Server endpoints</dt><dd>${endpoints ? `<ul>${endpoints}</ul>` : "None found"}</dd>
+        <dt>Tag loading</dt><dd>${esc(r.stack.loader)}</dd>
+        <dt>Server-side vendors</dt><dd>${r.stack.vendors.length ? esc(r.stack.vendors.join(", ")) : "—"}</dd>
+        <dt>Other analytics</dt><dd>${r.stack.analyticsTools.length ? esc(r.stack.analyticsTools.join(", ")) : "—"}</dd>
+        <dt>Tracking plugins</dt><dd>${r.stack.wooPlugins.length ? esc(r.stack.wooPlugins.join(", ")) : "—"}</dd>
+        <dt>Shopify app pixels</dt><dd>${r.stack.shopifyAppPixels || "—"}</dd>
+        <dt>Scan time</dt><dd>${(r.durationMs / 1000).toFixed(1)}s${r.cached ? " (cached)" : ""}</dd>
+      </dl>
+      ${r.warnings.length ? `<p class="tc-muted">${r.warnings.map(esc).join(" ")}</p>` : ""}`;
+
+    const saved = r.shared ? `<p class="tc-saved">Saved report from ${esc(new Date(r.savedAt || r.scannedAt).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }))}. Tracking may have changed since. <a href="/website-tracking-checker?url=${encodeURIComponent(host)}">Run a fresh check →</a></p>` : "";
+    report.innerHTML = `${saved}
+      <div class="tc-summary">
+        ${scoreRing(r.score, r.grade)}
+        <div class="tc-summary-body">
+          <p class="tc-eyebrow">Tracking report</p>
+          <h2>${esc(host)}</h2>
+          <p class="tc-summary-text">${esc(r.summary)}</p>
+          <div class="tc-counts">${counts}</div>
+        </div>
+        <dl class="tc-facts">${facts.map(([k, v, html]) => `<div><dt>${k}</dt><dd>${html ? v : esc(v)}</dd></div>`).join("")}</dl>
+      </div>
+      ${r.destinations.length ? `<section class="tc-block"><h2>Where your tracking goes</h2>
+        <div class="tc-table-wrap"><table class="tc-table"><thead><tr><th>Platform</th><th>Installed via</th><th>IDs</th><th>Server-side</th></tr></thead><tbody>${destRows}</tbody></table></div></section>` : ""}
+      ${issues ? `<section class="tc-block"><h2>Issues to fix <span class="tc-muted">(${r.issues.length})</span></h2>${issues}</section>` : ""}
+      ${passed ? `<section class="tc-block"><h2>What's working</h2><ul class="tc-passed">${passed}</ul></section>` : ""}
+      ${shareBlock(r)}
+      <section class="tc-cta"><div><h2>Want these fixed for you?</h2><p>Tagioo runs your server-side tracking on your own domain and sets up GA4, Meta CAPI, Google Ads and TikTok. Free plan, and free setup help if you get stuck.</p></div>
+        <div class="tc-cta-actions"><a class="tc-btn" data-signup href="${signupHref()}">Start free →</a><a class="tc-btn tc-btn-ghost" href="mailto:hello@tagioo.com?subject=Tracking%20report%20for%20${encodeURIComponent(host)}">Ask for a free review</a></div></section>
+      <details class="tc-block tc-technical"><summary>Technical details</summary>${tech}</details>
+      <p class="tc-limits">${esc(r.limitations)}</p>
+      <p><button type="button" class="tc-again" id="scanAgain">Check another website</button></p>`;
+    report.hidden = false;
+    scope.hidden = true;
+    wireShare(r);
+    report.focus({ preventScroll: true });
+    report.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    document.getElementById("scanAgain").addEventListener("click", () => {
+      if (r.shared) { location.href = "/website-tracking-checker"; return; }
+      report.hidden = true;
+      scope.hidden = false;
+      input.value = "";
+      input.focus();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const url = input.value.trim();
+    if (!url) return;
+    errorBox.hidden = true;
+    report.hidden = true;
+    button.disabled = true;
+    button.textContent = "Checking…";
+    startProgress();
+    try {
+      const res = await fetch("/api/public/tracking-checker", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) });
+      const data = await res.json().catch(() => ({}));
+      stopProgress();
+      if (!res.ok) throw new Error(data.error || "The scan didn't finish. Please try again.");
+      render(data);
+      if (data.shareId) history.replaceState(null, "", `/website-tracking-checker/r/${data.shareId}`);
+      try { window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: "tracking_check", check_score: data.score, check_issues: data.issues.length }); } catch {}
+    } catch (error) {
+      stopProgress();
+      errorBox.textContent = error.message || "The scan didn't finish. Please try again.";
+      errorBox.hidden = false;
+    } finally {
+      button.disabled = false;
+      button.textContent = "Check my tracking →";
+    }
+  });
+
+  // Shared report links: /website-tracking-checker/r/<id>
+  const sharedId = (location.pathname.match(/^\/website-tracking-checker\/r\/([A-Za-z0-9]{12})$/) || [])[1];
+  if (sharedId) {
+    progress.hidden = true;
+    fetch(`/api/public/tracking-checker/r/${sharedId}`).then(async (res) => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "This report couldn't be loaded.");
+      render(data);
+    }).catch((error) => { errorBox.textContent = error.message; errorBox.hidden = false; });
+    return;
+  }
+
+  // Allow ?url= links, e.g. from the blog: /website-tracking-checker?url=example.com
+  const preset = new URLSearchParams(location.search).get("url");
+  if (preset) { input.value = preset; form.requestSubmit(); }
+})();

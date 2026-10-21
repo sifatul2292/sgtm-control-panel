@@ -19,6 +19,9 @@
 //                      process Map so a deploy/restart mid-signup doesn't strand the
 //                      visitor on "your verification session expired". Holds the
 //                      already-hashed password only — never a plaintext credential.
+//   tracking_reports — public website-tracking-checker reports, stored so a share link
+//                      shows exactly what the server produced (never browser-submitted).
+//   checker_leads    — emails people chose to send a checker report to.
 
 import Database from "better-sqlite3";
 import { join } from "node:path";
@@ -79,6 +82,25 @@ CREATE TABLE IF NOT EXISTS error_logs (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_error_logs_created ON error_logs (created_at);
+
+CREATE TABLE IF NOT EXISTS tracking_reports (
+  id TEXT PRIMARY KEY,
+  host TEXT NOT NULL,
+  score INTEGER,
+  report TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tracking_reports_created ON tracking_reports (created_at);
+
+CREATE TABLE IF NOT EXISTS checker_leads (
+  id INTEGER PRIMARY KEY,
+  email TEXT NOT NULL,
+  report_id TEXT NOT NULL,
+  host TEXT NOT NULL,
+  marketing_opt_in INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_checker_leads_created ON checker_leads (created_at);
 `;
 
 export function openEventStore(dataDir) {
@@ -157,6 +179,9 @@ export function openEventStore(dataDir) {
   const getPendingSignupStmt = db.prepare("SELECT * FROM pending_signups WHERE token = ?");
   const deletePendingSignupStmt = db.prepare("DELETE FROM pending_signups WHERE token = ?");
   const expirePendingSignupsStmt = db.prepare("DELETE FROM pending_signups WHERE expires_at < ?");
+  const putReportStmt = db.prepare("INSERT OR REPLACE INTO tracking_reports (id, host, score, report, created_at) VALUES (?, ?, ?, ?, ?)");
+  const getReportStmt = db.prepare("SELECT report, created_at FROM tracking_reports WHERE id = ?");
+  const addLeadStmt = db.prepare("INSERT INTO checker_leads (email, report_id, host, marketing_opt_in) VALUES (?, ?, ?, ?)");
 
   const insertErrorLogStmt = db.prepare(
     "INSERT INTO error_logs (source, message, stack, context) VALUES (@source, @message, @stack, @context)"
@@ -305,6 +330,21 @@ export function openEventStore(dataDir) {
       };
     },
 
+    // Website tracking checker: shareable reports (kept 90 days) and opt-in report emails.
+    saveTrackingReport(id, host, score, report, now = Date.now()) {
+      putReportStmt.run(id, String(host || ""), Number.isFinite(score) ? score : null, JSON.stringify(report), now);
+    },
+
+    getTrackingReport(id) {
+      const row = getReportStmt.get(String(id || ""));
+      if (!row) return null;
+      try { return { report: JSON.parse(row.report), createdAt: row.created_at }; } catch { return null; }
+    },
+
+    addCheckerLead(email, reportId, host, marketingOptIn = false) {
+      addLeadStmt.run(String(email), String(reportId), String(host || ""), marketingOptIn ? 1 : 0);
+    },
+
     deletePendingSignup(token) {
       deletePendingSignupStmt.run(String(token || ""));
     },
@@ -358,7 +398,8 @@ export function openEventStore(dataDir) {
       const batchCutoff = new Date(Date.now() - batchRetentionDays * 86400000).toISOString();
       const batches = db.prepare("DELETE FROM ingested_batches WHERE received_at < ?").run(batchCutoff).changes;
       const signups = expirePendingSignupsStmt.run(Date.now()).changes;
-      return { cutoff, lines, summaries, batches, signups };
+      const reports = db.prepare("DELETE FROM tracking_reports WHERE created_at < ?").run(Date.now() - 90 * 86400000).changes;
+      return { cutoff, lines, summaries, batches, signups, reports };
     },
 
     stats() {

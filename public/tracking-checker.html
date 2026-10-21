@@ -1,15 +1,15 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Website Tracking Checker — Tagioo</title>
-<meta name="description" content="Check a public website for analytics tags, tracking IDs, consent configuration and first-party routing clues. Get evidence and practical next steps, without an email gate.">
+<title>Free Server-Side Tracking Checker &amp; Website Tracking Audit | Tagioo</title>
+<meta name="description" content="Free server-side tracking checker. See if your Meta Pixel, GA4, Google Ads and TikTok are browser-only or server-side, find duplicate tags and get step-by-step fixes.">
 <link rel="canonical" href="https://tagioo.com/website-tracking-checker">
-<meta property="og:title" content="Website Tracking Checker — Tagioo"><meta property="og:description" content="See the tracking clues your website exposes, with evidence and next steps."><meta property="og:url" content="https://tagioo.com/website-tracking-checker"><meta property="og:type" content="website">
+<meta property="og:title" content="Free Server-Side Tracking Checker | Tagioo"><meta property="og:description" content="Free server-side tracking checker. See if your Meta Pixel, GA4, Google Ads and TikTok are browser-only or server-side, find duplicate tags and get step-by-step fixes."><meta property="og:url" content="https://tagioo.com/website-tracking-checker"><meta property="og:type" content="website">
 <link rel="icon" type="image/png" sizes="64x64" href="/assets/tagioo-icon-64.png?v=1" />
 <link rel="preload" href="/assets/fonts/inter-latin-var.woff2?v=1" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/assets/site-base.css?v=1" />
 <link rel="stylesheet" href="/assets/home-production-style.css?v=mobile-menu-3">
-<link rel="stylesheet" href="/assets/tracking-checker.css?v=2">
+<link rel="stylesheet" href="/assets/tracking-checker.css?v=4">
 <meta property="og:image" content="https://tagioo.com/assets/og-tagioo.png" /><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:site_name" content="Tagioo" /><meta name="twitter:card" content="summary_large_image" /></head><body class="checker-page"><a class="skip-link" href="#main-content">Skip to content</a>
     <header class="site-header" id="siteHeader">
       <a class="brand" href="/" aria-label="Tagioo home">
@@ -47,29 +47,35 @@
 
 
 <main class="checker-main" id="main-content">
-<section class="checker-intro" aria-labelledby="checker-title">
-<p class="checker-eyebrow">Free tool · Website tracking checker</p>
-<h1 id="checker-title">See what your website<br>reveals about its tracking.</h1>
-<p class="checker-lead">Find analytics tags, advertising pixels and first-party tracking clues. Get the evidence, then know what to check next.</p>
-<form class="scan-form" id="scanForm">
-<div class="scan-field"><label for="scanUrl">Website URL</label><input id="scanUrl" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://yourwebsite.com" required maxlength="2048" aria-describedby="scanNote"></div>
-<button id="scanButton" type="submit">Check website →</button>
+<section class="tc-hero" aria-labelledby="checker-title"><div class="tc-hero-inner">
+<p class="tc-eyebrow">Free tool · No email needed</p>
+<h1 id="checker-title">Server-side tracking checker</h1>
+<p class="tc-lead">Find out if your Meta Pixel, GA4, Google Ads and TikTok tracking is browser-only or server-side, what's broken, and exactly how to fix it.</p>
+<form class="tc-form" id="scanForm">
+<label class="sr-only" for="scanUrl">Website URL</label>
+<input id="scanUrl" name="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" placeholder="yourstore.com" required maxlength="2048" aria-describedby="scanNote">
+<button id="scanButton" type="submit">Check my tracking →</button>
 </form>
-<p class="scan-note" id="scanNote">Public pages only. No login or email needed. One page per scan.</p>
+<p class="tc-note" id="scanNote">Takes about 10 seconds. Public pages only.</p>
+</div></section>
+<section class="tc-progress" id="scanProgress" hidden aria-live="polite"><ol>
+<li data-step="0">Loading your page</li><li data-step="1">Reading your Google Tag Manager container</li><li data-step="2">Checking Shopify &amp; plugin pixels</li><li data-step="3">Testing your server container</li><li data-step="4">Scoring and writing fixes</li></ol></section>
+<p class="tc-error" id="scanStatus" role="alert" hidden></p>
+<section class="tc-report" id="scanReport" aria-label="Tracking report" tabindex="-1" hidden></section>
+<section class="tc-checks" id="scanScope" aria-labelledby="checksTitle">
+<h2 id="checksTitle">What the checker looks for</h2>
+<div class="tc-check-grid">
+<article><h3>Server-side tracking</h3><p>Is your data sent through a server container on your own domain, and is that server actually live?</p></article>
+<article><h3>Browser-only pixels</h3><p>Meta, TikTok, GA4 and Google Ads tags that rely only on the browser, where ad blockers and Safari drop events.</p></article>
+<article><h3>Duplicate tracking</h3><p>Pixels installed twice (theme code, apps, plugins and GTM) that double-count purchases.</p></article>
+<article><h3>Google Ads setup</h3><p>Conversion tags, the conversion linker and enhanced conversions.</p></article>
+<article><h3>Ecommerce events</h3><p>Purchase and product events for Shopify, WooCommerce and other stores.</p></article>
+<article><h3>Consent &amp; loading</h3><p>Cookie banners, Google Consent Mode and whether GTM loads from your own domain.</p></article>
+</div>
+<p class="tc-diff">Unlike most free checkers, we open your <strong>published GTM container</strong> and <strong>test your server container</strong>, instead of only searching the page's HTML.</p>
 </section>
-<p class="scan-status" id="scanStatus" role="status" aria-live="polite"></p>
-<section class="report" id="scanReport" aria-label="Tracking scan report" tabindex="-1" hidden></section>
-<section class="checker-scope" id="scanScope">
-<div><h2>Evidence you can inspect.</h2><p>Recognizable tracker references and IDs, website technology, consent clues, data-layer references, first-party endpoints and HTTP cookie attributes.</p></div>
-<div><h2>A starting point for verification.</h2><p>Tags can load after consent or through a published GTM container. A source scan cannot confirm live purchases or delivery to your ad platforms. Each finding includes a next step.</p></div>
-</section>
-<section class="checker-faq" id="faq"><h2>Before you read your report</h2>
-<details><summary>Does “Not observed” mean tracking is broken?</summary><p>No. This checker reads public HTML and up to three same-origin JavaScript files. It does not run JavaScript, accept cookies, log in, or inspect tags loaded by external containers. Use GTM Preview and your destination’s test-event tools to confirm actual behavior.</p></details>
-<details><summary>Can you verify server-side tracking?</summary><p>We look for first-party loader URLs and server transport configuration. These are implementation clues. Only a real event in Server GTM Preview and acceptance in GA4, Meta or another destination can confirm delivery.</p></details>
-<details><summary>Why isn’t there a tracking quality score?</summary><p>Counting tags is not a measure of tracking quality. The report shows how many visible checks were observed, the evidence behind them, and what to verify. It does not estimate lost conversions, ad-spend impact or browser cookie lifetime.</p></details>
-<details><summary>What happens to my scan?</summary><p>Reports are temporarily cached in server memory for up to five minutes and are not saved to customer accounts. Website URLs are sent to Tagioo’s server to retrieve the public page. Cookie values and raw page source are not included in the report. Download a JSON copy or print your report if you want to keep it.</p></details>
-<details><summary>What if the site blocks the scan?</summary><p>Some websites reject automated requests or serve a challenge page. Try a different public page, or inspect the site in your browser’s developer tools. Private networks, custom ports and oversized responses are blocked.</p></details>
-</section>
+<section class="tc-faq" id="faq" aria-labelledby="faqTitle"><h2 id="faqTitle">Questions about the checker</h2><details><summary>How does the checker work?</summary><p>It loads your page, reads the scripts on it, opens your published Google Tag Manager container to see every tag inside, reads Shopify app pixels, and pings your server container's health check. Most free checkers only look at the HTML, so they miss everything that loads through GTM.</p></details><details><summary>Can it tell if I have server-side tracking?</summary><p>Yes, when your Google tag sends data to a server container we can see the URL and test that the container is live. Server containers are private, so we can confirm one is running but not every tag inside it — for Meta, check Events Manager for events marked “Server”.</p></details><details><summary>Can it see Meta Conversions API (CAPI)?</summary><p>Not directly. CAPI runs server to server, so no browser-based checker can see it. We report it as “possible” when a live server container, a server-side app (like Elevar) or Shopify's Meta channel is present, and tell you where to confirm it.</p></details><details><summary>How is the score calculated?</summary><p>Every site starts at 100. Each issue removes points by severity: critical 25, high 14, medium 7, low 3. If we can't see a site's tracking (for example a JavaScript app or a site that waits for cookie consent), we say so instead of guessing a score.</p></details><details><summary>Why didn't it find my tracking?</summary><p>Some sites load tags only after cookie consent, inside a JavaScript app, or on checkout pages we can't open. Try scanning a product or landing page, or email hello@tagioo.com for a free manual review.</p></details><details><summary>What happens to my scan?</summary><p>Reports are kept in server memory for up to five minutes and aren't saved to an account. We don't store page source or cookie values, and we never send test events to your platforms.</p></details></section>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebApplication", "name": "Tagioo Tracking Checker", "url": "https://tagioo.com/website-tracking-checker", "applicationCategory": "BusinessApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "description": "Free website tracking checker: finds browser-only pixels, duplicate tags, missing server-side tracking, Google Ads and Meta setup problems, and shows how to fix them.", "publisher": {"@id": "https://tagioo.com/#organization"}}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How does the checker work?", "acceptedAnswer": {"@type": "Answer", "text": "It loads your page, reads the scripts on it, opens your published Google Tag Manager container to see every tag inside, reads Shopify app pixels, and pings your server container's health check. Most free checkers only look at the HTML, so they miss everything that loads through GTM."}}, {"@type": "Question", "name": "Can it tell if I have server-side tracking?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, when your Google tag sends data to a server container we can see the URL and test that the container is live. Server containers are private, so we can confirm one is running but not every tag inside it \u2014 for Meta, check Events Manager for events marked \u201cServer\u201d."}}, {"@type": "Question", "name": "Can it see Meta Conversions API (CAPI)?", "acceptedAnswer": {"@type": "Answer", "text": "Not directly. CAPI runs server to server, so no browser-based checker can see it. We report it as \u201cpossible\u201d when a live server container, a server-side app (like Elevar) or Shopify's Meta channel is present, and tell you where to confirm it."}}, {"@type": "Question", "name": "How is the score calculated?", "acceptedAnswer": {"@type": "Answer", "text": "Every site starts at 100. Each issue removes points by severity: critical 25, high 14, medium 7, low 3. If we can't see a site's tracking (for example a JavaScript app or a site that waits for cookie consent), we say so instead of guessing a score."}}, {"@type": "Question", "name": "Why didn't it find my tracking?", "acceptedAnswer": {"@type": "Answer", "text": "Some sites load tags only after cookie consent, inside a JavaScript app, or on checkout pages we can't open. Try scanning a product or landing page, or email hello@tagioo.com for a free manual review."}}, {"@type": "Question", "name": "What happens to my scan?", "acceptedAnswer": {"@type": "Answer", "text": "Reports are kept in server memory for up to five minutes and aren't saved to an account. We don't store page source or cookie values, and we never send test events to your platforms."}}]}]}</script>
 </main>
     <footer class="site-footer">
       <div class="footer-inner">
@@ -117,6 +123,6 @@
         <p class="footer-disclaimer">Dashboard previews use example data. Tracking results depend on your implementation, traffic, consent settings and destination configuration.</p>
       </div>
     </footer>
-<script src="/assets/tracking-checker.js?v=2" defer></script>
+<script src="/assets/tracking-checker.js?v=4" defer></script>
   <script src="/assets/geo.js?v=1" defer></script>
 </body></html>

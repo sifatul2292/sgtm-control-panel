@@ -2,6 +2,30 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-20.
 
+## 2026-10-21 — Tracking checker rebuilt (deep inspection, not deployed)
+
+- tracking-checker.js: keeps SSRF/redirect/size guards; now reads code only (codeOnly — visible
+  text ignored), fetches the published GTM container (gtm.js `var data` JSON → tags, resolved
+  constants, server_container_url, custom events, template vendors via permissions), Shopify
+  webPixelsConfigList, one product page, and pings server container /healthy (first-party vs
+  third-party). Report: score/grade (100 − critical 25/high 14/medium 7/low 3; null +
+  "inconclusive" for JS apps / consent-gated pages), destinations matrix (browser via
+  page/site-script/GTM/Shopify app; server confirmed/configured/possible/not-detected), issues
+  with fix steps + Tagioo tip, passed checks, technical evidence.
+- Fixed isPublicAddress over-blocking 192.0.0.0/16 (only 192.0.0.0/24 + 192.0.2.0/24 reserved).
+- Page rewritten for "server side tracking checker" (WebApplication + FAQ schema), new
+  tracking-checker.css/js v3, ?url= deep link. Tests: test/tracking-checker.test.js (11).
+- Share/email/calibration: every scan saved to SQLite tracking_reports (12-char id, 90-day
+  prune) → share link /website-tracking-checker/r/<id> (X-Robots-Tag noindex; page loads
+  GET /api/public/tracking-checker/r/<id>; address bar switches to the share URL). Optional
+  "Email me this report" → POST .../r/<id>/email (3 per 10 min per IP), sends via sendEmail,
+  stores checker_leads (marketing_opt_in unchecked by default) and emails CUSTOMER_SUPPORT_EMAIL
+  a lead note; signup links then prefill ?email=. Score calibration: "possible" server-side =
+  issue (Meta medium, TikTok/Ads low), GA4 "configured" not live = medium (Allbirds 97 → 84).
+  Tests: test/tracking-checker-share.test.js + calibration test. Full suite 159 pass.
+- No headless browser on purpose: 1-core prod VPS; OOM would kill customer sGTM containers.
+  Runtime checks (consent diff, network hits) would need a separate worker box.
+
 ## 2026-10-21 — SEO/blog, lead-gen, plugin 2.6.0 pushed for deploy
 
 - Commits 4a881b5 (SEO/blog/homepage), b4cda81 (lead-gen + consent-aware server tags +
