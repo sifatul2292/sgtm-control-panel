@@ -371,6 +371,48 @@ function idsFor(destination, text) {
 
 const SEVERITY_WEIGHT = { critical: 25, high: 14, medium: 7, low: 3 };
 
+// Report areas: every issue belongs to one, and each area gets its own score.
+const AREAS = [
+  { key: "analytics", label: "Analytics" },
+  { key: "ads", label: "Advertising" },
+  { key: "server", label: "Server-side" },
+  { key: "privacy", label: "Consent & cookies" }
+];
+export function issueArea(id) {
+  if (/^(?:browser-only-|unconfirmed-server-|sgtm-|third-party-loader)/.test(id)) return "server";
+  if (/^(?:consent-|no-cmp|no-https)/.test(id)) return "privacy";
+  if (/^(?:duplicate-(?!ga4)|multiple-ids-(?!ga4)|ads-|meta-|no-purchase|no-product|woo-plugin)/.test(id)) return "ads";
+  return "analytics";
+}
+
+// Domains used only to show each detected technology's icon in the report.
+const TECH_DOMAINS = {
+  "Google Analytics 4": "analytics.google.com", "Google Ads": "ads.google.com", "Meta (Facebook) Pixel": "facebook.com", "TikTok Pixel": "tiktok.com",
+  "Pinterest Tag": "pinterest.com", "Snap Pixel": "snapchat.com", "Microsoft Ads (UET)": "ads.microsoft.com", "LinkedIn Insight Tag": "linkedin.com",
+  "Reddit Pixel": "reddit.com", "X (Twitter) Pixel": "x.com", "Google Tag Manager": "tagmanager.google.com",
+  Shopify: "shopify.com", WooCommerce: "woocommerce.com", WordPress: "wordpress.org", BigCommerce: "bigcommerce.com", Magento: "magento.com",
+  Wix: "wix.com", Squarespace: "squarespace.com", Webflow: "webflow.com", "Next.js": "nextjs.org",
+  "Microsoft Clarity": "clarity.microsoft.com", Hotjar: "hotjar.com", PostHog: "posthog.com", Klaviyo: "klaviyo.com", Segment: "segment.com", Mixpanel: "mixpanel.com",
+  OneTrust: "onetrust.com", Cookiebot: "cookiebot.com", CookieYes: "cookieyes.com", Complianz: "complianz.io", Usercentrics: "usercentrics.com", iubenda: "iubenda.com",
+  Termly: "termly.io", Osano: "osano.com", Didomi: "didomi.io", Axeptio: "axeptio.eu", "Borlabs Cookie": "borlabs.io", CookieFirst: "cookiefirst.com",
+  Tagioo: "tagioo.com", "Tagioo consent banner": "tagioo.com", "Tagioo for WooCommerce": "tagioo.com", Stape: "stape.io", Elevar: "getelevar.com", Littledata: "littledata.io",
+  TAGGRS: "taggrs.io", Addingwell: "addingwell.com", Analyzify: "analyzify.com", JENTIS: "jentis.com", "Cloudflare Zaraz": "cloudflare.com",
+  GTM4WP: "gtm4wp.com", PixelYourSite: "pixelyoursite.com", "Meta for WooCommerce": "facebook.com", "Site Kit by Google": "sitekit.withgoogle.com", MonsterInsights: "monsterinsights.com",
+  "Shopify privacy banner": "shopify.com"
+};
+
+// The site's own preview image, title and icon, read from its HTML head (https only).
+function sitePreview(html, base) {
+  const meta = (name) => {
+    const tag = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]*>`, "i"))?.[0] || "";
+    return tag.match(/content=["']([^"']*)["']/i)?.[1] || "";
+  };
+  const abs = (value) => { try { const u = new URL(value.replace(/&amp;/g, "&"), base); return u.protocol === "https:" ? u.href.slice(0, 500) : ""; } catch { return ""; } };
+  const icon = html.match(/<link[^>]+rel=["'](?:shortcut icon|icon|apple-touch-icon)["'][^>]*>/i)?.[0].match(/href=["']([^"']+)["']/i)?.[1] || "/favicon.ico";
+  const title = (meta("og:site_name") || meta("og:title") || html.match(/<title[^>]*>([^<]{1,200})<\/title>/i)?.[1] || "").replace(/&amp;/g, "&").replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').trim().slice(0, 120);
+  return { title, image: abs(meta("og:image") || meta("twitter:image")), icon: abs(icon) };
+}
+
 // ── Report ──────────────────────────────────────────────────────────────────
 
 export function buildReport({ url, pageText, scriptSources = [], containers = [], shopifyPixels = [], endpoints = [], productPage = null, metaPixels = [], headers = {}, durationMs = 0, warnings = [] }) {
@@ -604,6 +646,9 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
     issue("woo-plugin-overlap", "medium", `${wooPlugins.length} tracking plugins installed`, `Found ${wooPlugins.join(", ")}. Several plugins sending the same events is a common cause of duplicate purchases.`, ["Choose one plugin to own each platform.", "Turn off overlapping features in the others."]);
   }
 
+  // Analytics alongside ads.
+  if (adDestinations.length && !dest.ga4.found && !analyticsTools.length) issue("no-analytics", "low", "No Google Analytics 4 found", "Ad pixels are installed, but there's no GA4 or other analytics tool. You can see what the ad platforms report, but not your full traffic, sources and funnel.", ["Create a GA4 property.", "Add the GA4 tag through GTM on all pages.", "Send the same ecommerce events you send to ad platforms."], "Tagioo's Setup Assistant includes GA4 with full ecommerce events.");
+
   // Consent.
   if (cmps.length && !consentMode) issue("consent-no-mode", "medium", "Cookie banner found, but no Google Consent Mode", `We found ${cmps.join(", ")}, but no Consent Mode signals. Google tags then can't adjust to the visitor's choice, and Google may limit ads features for EEA visitors.`, ["Enable Google Consent Mode v2 in your cookie banner's settings.", "Check in GTM Preview that consent defaults run before tags fire."]);
   else if (cmps.length && consentMode) pass("Consent management", `${cmps.join(", ")} with Google Consent Mode.`);
@@ -614,7 +659,25 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
   const score = inconclusive ? null : anyTracking ? Math.max(5, Math.min(100, 100 - penalty)) : 0;
   const grade = score === null ? "?" : score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 40 ? "D" : "F";
   const order = { critical: 0, high: 1, medium: 2, low: 3 };
-  issues.sort((a, b) => order[a.severity] - order[b.severity]);
+  for (const i of issues) { i.area = issueArea(i.id); i.points = SEVERITY_WEIGHT[i.severity]; }
+  issues.sort((a, b) => order[a.severity] - order[b.severity] || b.points - a.points);
+  // Area scores use twice the overall penalty so one high-impact issue shows clearly in its area.
+  const areaApplies = { analytics: anyTracking, ads: adDestinations.length > 0, server: anyTracking, privacy: true };
+  const areas = inconclusive ? [] : AREAS.filter((a) => areaApplies[a.key]).map((a) => {
+    const list = issues.filter((i) => i.area === a.key);
+    const areaScore = Math.max(0, 100 - 2 * list.reduce((sum, i) => sum + i.points, 0));
+    return { key: a.key, label: a.label, score: areaScore, rating: areaScore >= 80 ? "Strong" : areaScore >= 50 ? "Medium" : "Weak", issues: list.length };
+  });
+  const tech = (group, names) => names.map((name) => ({ name, group, domain: TECH_DOMAINS[name] || "" }));
+  const technologies = [
+    ...tech("platform", platforms),
+    ...tech("tag-manager", gtmIds.length ? ["Google Tag Manager"] : []),
+    ...tech("destination", destinations.filter((d) => d.found).map((d) => d.name)),
+    ...tech("analytics", analyticsTools),
+    ...tech("server", vendors),
+    ...tech("consent", cmps),
+    ...tech("plugin", wooPlugins)
+  ].filter((t, n, all) => all.findIndex((x) => x.name === t.name) === n);
   const counts = Object.fromEntries(["critical", "high", "medium", "low"].map((s) => [s, issues.filter((i) => i.severity === s).length]));
   const serverStatus = liveEndpoints.length ? "confirmed" : ga4Routed ? "configured" : serverVendor || shopifyMeta ? "likely" : "none";
   const summary = inconclusive ? `We couldn't see this site's tracking. ${jsApp ? "It's a JavaScript app that loads its tags after the page starts" : "Its tags appear to wait for cookie consent"}, which this scan can't run. Try a specific product or landing page, or ask us for a manual review.`
@@ -640,7 +703,7 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
       gtmEvents: [...gtmEvents].slice(0, 30)
     },
     destinations: destinations.filter((d) => d.found).map(({ key, name, kind, via, ids, server }) => ({ key, name, kind, via, ids, server })),
-    issues, passed, cookies, warnings, emq, googleSignals, adImpact,
+    issues, passed, cookies, warnings, emq, googleSignals, adImpact, areas, technologies, site: sitePreview(pageText, url),
     inspected: { page: url, productPage: productPage?.url || "", scripts: scriptSources.map((s) => s.url), containers: containers.map((c) => c.id) },
     limitations: "We read the page, its scripts, the published GTM container, Shopify app pixels and your server container's health check. We don't click, accept cookies or place orders, so tags that only run after consent or on checkout pages may not appear. Server containers are private: we can confirm one is live, not which tags it runs."
   };

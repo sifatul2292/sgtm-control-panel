@@ -155,3 +155,21 @@ test('EMQ estimate and ad-impact prediction follow what the setup actually sends
   const autoConfig = buildReport({ url: 'https://shop.example.com', pageText: page.replace("fbq('init','111222333444');", "fbq('init','111222333444',{autoConfig:false});"), metaPixels: [] });
   assert.equal(autoConfig.emq.keys.find(k => k.key === 'em').sent, false);
 });
+
+test('report groups issues into scored areas and lists detected technologies', () => {
+  const page = `<head><title>Shop &amp; Co</title><meta property="og:image" content="/img/og.jpg"><link rel="icon" href="/f.png"></head>
+    <script src="https://connect.facebook.net/en_US/fbevents.js"></script><script>fbq('init','111222333444');</script>`;
+  const r = buildReport({ url: 'https://shop.example.com', pageText: page });
+  for (const i of r.issues) assert.ok(['analytics', 'ads', 'server', 'privacy'].includes(i.area) && i.points > 0, i.id);
+  assert.equal(r.issues.find(i => i.id === 'browser-only-meta').area, 'server');
+  assert.equal(r.issues.find(i => i.id === 'browser-only-meta').points, 14);
+  assert.ok(r.issues.some(i => i.id === 'no-analytics' && i.area === 'analytics'));
+  const server = r.areas.find(a => a.key === 'server');
+  assert.equal(server.score, 72);
+  assert.equal(server.rating, 'Medium');
+  assert.deepEqual(r.technologies.map(t => t.name), ['Meta (Facebook) Pixel']);
+  assert.equal(r.technologies[0].domain, 'facebook.com');
+  assert.deepEqual(r.site, { title: 'Shop & Co', image: 'https://shop.example.com/img/og.jpg', icon: 'https://shop.example.com/f.png' });
+  // Non-https preview images are dropped.
+  assert.equal(buildReport({ url: 'https://shop.example.com', pageText: '<meta property="og:image" content="http://x.test/a.jpg">' }).site.image, '');
+});

@@ -45,13 +45,76 @@
     progress.hidden = true;
   }
 
-  function scoreRing(score, grade) {
-    if (score === null) return `<div class="tc-ring tc-ring-unknown"><span>?</span></div>`;
-    const r = 52, c = 2 * Math.PI * r, off = c * (1 - score / 100);
-    const tone = score >= 75 ? "ok" : score >= 50 ? "warn" : "bad";
-    return `<div class="tc-ring tc-tone-${tone}" role="img" aria-label="Score ${score} out of 100, grade ${esc(grade)}">
-      <svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="${r}" class="tc-ring-bg"/><circle cx="60" cy="60" r="${r}" class="tc-ring-fg" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"/></svg>
-      <span class="tc-ring-score">${score}</span><span class="tc-ring-grade">Grade ${esc(grade)}</span></div>`;
+  const tone = (score) => (score >= 75 ? "ok" : score >= 50 ? "warn" : "bad");
+  const AREA_TAG = { analytics: "Analytics", ads: "Advertising", server: "Server-side", privacy: "Consent" };
+
+  // Half-circle gauge for the overall score.
+  function gauge(score, grade) {
+    if (score === null) return `<div class="tc-gauge tc-gauge-unknown"><span>?</span></div>`;
+    const word = score >= 90 ? "Excellent" : score >= 75 ? "Good" : score >= 60 ? "Fair" : score >= 40 ? "Weak" : "Poor";
+    return `<div class="tc-gauge tc-tone-${tone(score)}" role="img" aria-label="Score ${score} out of 100, grade ${esc(grade)}">
+      <svg viewBox="0 0 120 66" aria-hidden="true"><path d="M10 60 A50 50 0 0 1 110 60" class="tc-gauge-bg" pathLength="100"/><path d="M10 60 A50 50 0 0 1 110 60" class="tc-gauge-fg" pathLength="100" stroke-dasharray="${score} 100"/></svg>
+      <span class="tc-gauge-word">${word}</span><span class="tc-gauge-grade">Grade ${esc(grade)}</span></div>`;
+  }
+
+  function iconFor(domain, name) {
+    const letter = esc((name || "?").trim().charAt(0).toUpperCase());
+    if (!domain) return `<span class="tc-chip-icon tc-chip-letter" aria-hidden="true">${letter}</span>`;
+    return `<span class="tc-chip-icon" aria-hidden="true"><img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&amp;sz=64" alt="" width="16" height="16" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent='${letter}';this.parentNode.classList.add('tc-chip-letter')"></span>`;
+  }
+
+  function headerCard(r, host) {
+    const site = r.site || {};
+    const when = new Date(r.savedAt || r.scannedAt);
+    const stamp = isNaN(when) ? "" : when.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    const thumb = site.image
+      ? `<img class="tc-thumb" src="${esc(site.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'tc-thumb tc-thumb-empty',textContent:'${esc(host.charAt(0).toUpperCase())}'}))">`
+      : `<span class="tc-thumb tc-thumb-empty">${site.icon ? `<img src="${esc(site.icon)}" alt="" width="28" height="28" referrerpolicy="no-referrer" onerror="this.remove()">` : esc(host.charAt(0).toUpperCase())}</span>`;
+    return `<header class="tc-card tc-head">
+      ${thumb}
+      <div class="tc-head-body"><p class="tc-mono">Website tracking report${stamp ? ` · Scanned ${esc(stamp)}` : ""}</p>
+        <h2><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>${esc(host)}</h2>
+        ${site.title ? `<p class="tc-head-title">${esc(site.title)}</p>` : ""}</div>
+      <button type="button" class="tc-mono-btn" id="scanAgainTop">Run new scan ↗</button>
+    </header>`;
+  }
+
+  function scoresBlock(r) {
+    const counts = ["critical", "high", "medium", "low"].filter((s) => r.counts[s]).map((s) => `<span class="tc-count tc-sev-${s}">${r.counts[s]} ${SEVERITY[s]}</span>`).join("");
+    const areas = (r.areas || []).map((a) => `<div class="tc-area">
+        <div class="tc-area-top"><h3>${esc(a.label)}</h3><span class="tc-mono tc-tag">${a.issues} issue${a.issues === 1 ? "" : "s"}</span></div>
+        <p class="tc-area-rating tc-text-${tone(a.score)}">${esc(a.rating)}</p>
+        <div class="tc-bar" role="img" aria-label="${esc(a.label)} ${a.score} out of 100"><span class="tc-fill-${tone(a.score)}" style="width:${Math.max(4, a.score)}%"></span></div>
+      </div>`).join("");
+    return `<div class="tc-scores">
+      <div class="tc-card tc-overall">
+        <div class="tc-area-top"><h3>Overall score</h3><span class="tc-mono tc-tag">${r.destinations.length} tracker${r.destinations.length === 1 ? "" : "s"} detected</span></div>
+        <div class="tc-overall-main"><p class="tc-big">${r.score === null ? "?" : r.score}<span>/100</span></p>${gauge(r.score, r.grade)}</div>
+        <p class="tc-summary-text">${esc(r.summary)}</p>
+        <div class="tc-counts">${counts}</div>
+      </div>
+      ${areas ? `<div class="tc-card tc-areas">${areas}</div>` : ""}
+    </div>`;
+  }
+
+  function techBlock(r) {
+    const list = r.technologies || [];
+    if (!list.length) return "";
+    return `<section class="tc-card tc-section"><div class="tc-section-head"><h2>Detected technologies</h2><span class="tc-mono tc-tag">${list.length} found</span></div>
+      <ul class="tc-chips">${list.map((t) => `<li>${iconFor(t.domain, t.name)}${esc(t.name)}</li>`).join("")}</ul></section>`;
+  }
+
+  function actionsBlock(r) {
+    if (!r.issues.length) return "";
+    const rows = r.issues.map((i, n) => `<details class="tc-action tc-sev-${i.severity}"${n === 0 ? " open" : ""}>
+      <summary><div class="tc-action-main"><h3>${esc(i.title)}</h3>
+        <div class="tc-action-tags"><span class="tc-mono tc-tag">${esc(AREA_TAG[i.area] || "Tracking")}</span><span class="tc-mono tc-sevtag tc-sev-${i.severity}">${SEVERITY[i.severity]}</span></div></div>
+        <div class="tc-points"><strong>+${i.points}</strong><span>to score</span></div></summary>
+      <div class="tc-action-body"><p>${esc(i.detail)}</p><h4>How to fix it</h4><ol>${i.fix.map((f) => `<li>${esc(f)}</li>`).join("")}</ol>
+        ${i.tagioo ? `<p class="tc-tagioo"><strong>With Tagioo:</strong> ${esc(i.tagioo)} <a data-signup href="${signupHref()}">Start free →</a></p>` : ""}</div>
+    </details>`).join("");
+    return `<section class="tc-card tc-actions"><div class="tc-actions-side"><h2>Recommended actions</h2><p class="tc-big">${r.issues.length}</p><p class="tc-small tc-muted">Sorted by impact. Each fix shows the points it adds to your score.</p></div>
+      <div class="tc-actions-list">${rows}</div></section>`;
   }
 
   let leadEmail = "";
@@ -107,7 +170,7 @@
     if (!r.emq) return "";
     const e = r.emq;
     const tone = e.score >= 8 ? "ok" : e.score >= 6 ? "ok" : e.score >= 4 ? "warn" : "bad";
-    return `<section class="tc-block tc-emq"><h2>Meta Event Match Quality <span class="tc-muted">(estimate)</span></h2>
+    return `<section class="tc-card tc-section tc-emq"><div class="tc-section-head"><h2>Meta Event Match Quality</h2><span class="tc-mono tc-tag">Estimate</span></div>
       <div class="tc-emq-card"><div class="tc-emq-score tc-tone-${tone}"><strong>${e.score}</strong><span>/ 10</span><em>${esc(e.label)}</em></div>
       <div><ul class="tc-keys">${e.keys.map((k) => `<li class="${k.sent ? "is-on" : "is-off"}">${k.sent ? "✓" : "✕"} ${esc(k.label)}</li>`).join("")}</ul>
       <p class="tc-muted tc-small">${esc(e.note)}${e.automaticAdvancedMatching ? " Automatic Advanced Matching is on for your pixel." : ""}</p>
@@ -116,7 +179,7 @@
 
   function googleBlock(r) {
     if (!r.googleSignals) return "";
-    return `<section class="tc-block"><h2>Google match signals</h2><ul class="tc-keys tc-keys-wide">${r.googleSignals.map((g) => `<li class="${g.ok ? "is-on" : "is-off"}">${g.ok ? "✓" : "✕"} ${esc(g.label)}</li>`).join("")}</ul></section>`;
+    return `<section class="tc-card tc-section"><div class="tc-section-head"><h2>Google match signals</h2></div><ul class="tc-keys tc-keys-wide">${r.googleSignals.map((g) => `<li class="${g.ok ? "is-on" : "is-off"}">${g.ok ? "✓" : "✕"} ${esc(g.label)}</li>`).join("")}</ul></section>`;
   }
 
   // "What better tracking could be worth": published platform averages applied to this site's gaps.
@@ -128,16 +191,23 @@
     const intro = !meta ? "A prediction based on averages Google has published, applied only to the gaps found on this site."
       : meta.mode === "covered" ? "Your Meta Conversions API is live, so the main gain Meta has measured is already in your results. Keep match quality high to hold on to it."
       : meta.mode === "unconfirmed" ? "We found a server-side setup but couldn't confirm Meta Conversions API events. If they aren't actually reaching Meta, this is what adding them could be worth, based on Meta's published average."
-      : "A prediction based on averages Meta and Google have published, applied only to the gaps found on this site. Your results will differ.";
-    return `<section class="tc-block tc-impact" id="impact"><h2>What fixing this could be worth</h2>
+      : "A prediction based on averages Meta has published, applied only to the gaps found on this site. Your results will differ.";
+    const field = (key, label, value, min, max, step) => `<div class="tc-field"><label for="imp-${key}">${label}</label>
+      <div class="tc-money"><span>$</span><input id="imp-${key}" type="number" inputmode="decimal" min="${min}" step="${step}" value="${value}" data-imp="${key}"></div>
+      <input type="range" min="${min}" max="${max}" step="${step}" value="${value}" data-imp-range="${key}" aria-label="${label}">
+      <div class="tc-range-scale tc-mono"><span>$${min.toLocaleString()}</span><span>$${max.toLocaleString()}</span></div></div>`;
+    return `<section class="tc-card tc-impact" id="impact">
+      <div class="tc-section-head"><h2>What fixing this could be worth</h2><span class="tc-mono tc-tag">Prediction</span></div>
       <p class="tc-small">${esc(intro)}</p>
       ${calc ? `<div class="tc-impact-grid">
-        <div class="tc-impact-inputs">
-          <label>Monthly Meta ads spend ($)<input type="number" min="0" step="100" value="1000" data-imp="meta"></label>
-          <label>Your average cost per purchase on Meta ($)<input type="number" min="1" step="1" value="30" data-imp="cpa"></label>
-        </div>
-        <div class="tc-impact-out" aria-live="polite"><div class="tc-impact-big"><strong id="impPer100">–</strong><span>more purchases per $100 of Meta ad spend</span></div>
-          <div class="tc-impact-periods"><div><strong id="impDay">–</strong><span>more per day</span></div><div><strong id="impMonth">–</strong><span>more per month</span></div></div>
+        <div class="tc-impact-inputs">${field("meta", "Your monthly Meta ad spend", 1000, 0, 50000, 100)}${field("cpa", "Your average cost per purchase", 30, 1, 300, 1)}</div>
+        <div class="tc-impact-out" aria-live="polite">
+          <div class="tc-impact-big"><p class="tc-mono">Estimated extra purchases</p><strong id="impMonth">–</strong><span>per month</span></div>
+          <div class="tc-impact-periods">
+            <div><p class="tc-mono">Per day</p><strong id="impDay">–</strong></div>
+            <div><p class="tc-mono">Per $100 spend</p><strong id="impPer100">–</strong></div>
+            <div><p class="tc-mono">Same results, less spend</p><strong id="impSaved">–</strong></div>
+          </div>
           <p id="impMonthly" class="tc-small"></p></div>
       </div>` : ""}
       <ul class="tc-sources">${imp.factors.map((f) => `<li><strong>${esc(f.label)}:</strong> ${esc(f.basis)} <a href="${esc(f.url)}" target="_blank" rel="noopener">Source: ${esc(f.source)}</a></li>`).join("")}</ul>
@@ -146,12 +216,13 @@
 
   function wireImpact(r) {
     const box = document.getElementById("impact");
-    if (!box || !box.querySelector("#impPer100")) return;
+    if (!box || !box.querySelector("#impMonth")) return;
     const val = (k) => Math.max(0, Number(box.querySelector(`[data-imp="${k}"]`)?.value || 0));
     const fmt = (n) => (n < 10 ? n.toFixed(1) : Math.round(n).toLocaleString());
+    const money = (n) => `$${Math.round(n).toLocaleString()}`;
     const update = () => {
       const cpa = Math.max(1, val("cpa"));
-      let extra = 0, spend = 0;
+      let extra = 0, spend = 0, saved = 0;
       for (const platform of ["meta"]) {
         const factors = r.adImpact.factors.filter((f) => f.platform === platform);
         if (!factors.length) continue;
@@ -159,14 +230,21 @@
         spend += s;
         const uplift = factors.reduce((m, f) => m * (1 + (f.uplift || 0)), 1) - 1;
         extra += (s / cpa) * uplift;
+        // Lower cost per result: the same results would cost s / (1 + uplift).
+        saved += s - s / (1 + uplift);
       }
       const per100 = spend ? (extra / spend) * 100 : 0;
-      box.querySelector("#impPer100").textContent = `+${per100 < 1 ? per100.toFixed(2) : per100.toFixed(1)}`;
-      box.querySelector("#impDay").textContent = spend ? `+${fmt(extra / 30)}` : "–";
       box.querySelector("#impMonth").textContent = spend ? `+${fmt(extra)}` : "–";
-      box.querySelector("#impMonthly").textContent = spend ? `From ${fmt(Math.round(spend / cpa))} to about ${fmt(Math.round(spend / cpa) + extra)} purchases a month on $${spend.toLocaleString()} of spend (about $${Math.round(spend / 30).toLocaleString()} a day), at $${cpa} per purchase today.` : "Enter your monthly ad spend.";
+      box.querySelector("#impDay").textContent = spend ? `+${fmt(extra / 30)}` : "–";
+      box.querySelector("#impPer100").textContent = spend ? `+${per100 < 1 ? per100.toFixed(2) : per100.toFixed(1)}` : "–";
+      box.querySelector("#impSaved").textContent = spend ? `${money(saved)}/mo` : "–";
+      box.querySelector("#impMonthly").textContent = spend ? `From ${fmt(Math.round(spend / cpa))} to about ${fmt(Math.round(spend / cpa) + extra)} purchases a month on ${money(spend)} of spend (about ${money(spend / 30)} a day), at $${cpa} per purchase today.` : "Enter your monthly ad spend.";
     };
-    box.addEventListener("input", update);
+    box.querySelectorAll("[data-imp-range]").forEach((range) => {
+      const num = box.querySelector(`[data-imp="${range.dataset.impRange}"]`);
+      range.addEventListener("input", () => { num.value = range.value; update(); });
+      num.addEventListener("input", () => { range.value = num.value; update(); });
+    });
     update();
   }
 
@@ -179,20 +257,11 @@
       ["Server-side", `<span class="tc-pill tc-${ss[1]}">${ss[0]}</span>${r.stack.serverSide.vendor ? ` <span class="tc-muted">${esc(r.stack.serverSide.vendor)}</span>` : ""}`, true],
       ["Consent", r.stack.cmps.length ? `${r.stack.cmps.join(", ")}${r.stack.consentMode ? " · Consent Mode" : ""}` : "No banner found"]
     ];
-    const counts = ["critical", "high", "medium", "low"].filter((s) => r.counts[s]).map((s) => `<span class="tc-count tc-sev-${s}">${r.counts[s]} ${SEVERITY[s]}</span>`).join("");
-
     const destRows = r.destinations.map((d) => {
       const [label, tone] = SERVER[d.server.status] || SERVER["not-detected"];
       return `<tr><th scope="row">${esc(d.name)}</th><td>${d.via.map((v) => esc(VIA[v] || v)).join(", ")}</td><td class="tc-ids">${d.ids.length ? d.ids.map(esc).join("<br>") : "<span class='tc-muted'>—</span>"}</td>
         <td><span class="tc-pill tc-${tone}">${label}</span>${d.server.detail ? `<div class="tc-detail">${esc(d.server.detail)}</div>` : ""}</td></tr>`;
     }).join("");
-
-    const issues = r.issues.map((i, n) => `<article class="tc-issue tc-sev-${i.severity}">
-      <div class="tc-issue-head"><span class="tc-badge tc-sev-${i.severity}">${SEVERITY[i.severity]}</span><h3>${esc(i.title)}</h3></div>
-      <p>${esc(i.detail)}</p>
-      <details${n < 3 ? " open" : ""}><summary>How to fix it</summary><ol>${i.fix.map((f) => `<li>${esc(f)}</li>`).join("")}</ol>
-      ${i.tagioo ? `<p class="tc-tagioo"><strong>With Tagioo:</strong> ${esc(i.tagioo)} <a data-signup href="${signupHref()}">Start free →</a></p>` : ""}</details>
-    </article>`).join("");
 
     const passed = r.passed.map((p) => `<li><strong>${esc(p.title)}</strong><span>${esc(p.detail)}</span></li>`).join("");
 
@@ -214,27 +283,20 @@
 
     const saved = r.shared ? `<p class="tc-saved">Saved report from ${esc(new Date(r.savedAt || r.scannedAt).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }))}. Tracking may have changed since. <a href="/website-tracking-checker?url=${encodeURIComponent(host)}">Run a fresh check →</a></p>` : "";
     report.innerHTML = `${saved}
-      <div class="tc-summary">
-        ${scoreRing(r.score, r.grade)}
-        <div class="tc-summary-body">
-          <p class="tc-eyebrow">Tracking report</p>
-          <h2>${esc(host)}</h2>
-          <p class="tc-summary-text">${esc(r.summary)}</p>
-          <div class="tc-counts">${counts}</div>
-        </div>
-        <dl class="tc-facts">${facts.map(([k, v, html]) => `<div><dt>${k}</dt><dd>${html ? v : esc(v)}</dd></div>`).join("")}</dl>
-      </div>
-      ${r.destinations.length ? `<section class="tc-block"><h2>Where your tracking goes</h2>
-        <div class="tc-table-wrap"><table class="tc-table"><thead><tr><th>Platform</th><th>Installed via</th><th>IDs</th><th>Server-side</th></tr></thead><tbody>${destRows}</tbody></table></div></section>` : ""}
-      ${issues ? `<section class="tc-block"><h2>Issues to fix <span class="tc-muted">(${r.issues.length})</span></h2>${issues}</section>` : ""}
+      ${headerCard(r, host)}
+      ${scoresBlock(r)}
+      ${techBlock(r)}
+      <section class="tc-card tc-section"><div class="tc-section-head"><h2>Tracking setup</h2></div>
+        <dl class="tc-facts">${facts.map(([k, v, html]) => `<div><dt class="tc-mono">${k}</dt><dd>${html ? v : esc(v)}</dd></div>`).join("")}</dl>
+        ${r.destinations.length ? `<div class="tc-table-wrap"><table class="tc-table"><thead><tr><th>Platform</th><th>Installed via</th><th>IDs</th><th>Server-side</th></tr></thead><tbody>${destRows}</tbody></table></div>` : ""}</section>
       ${impactBlock(r)}
-      ${emqBlock(r)}
-      ${googleBlock(r)}
-      ${passed ? `<section class="tc-block"><h2>What's working</h2><ul class="tc-passed">${passed}</ul></section>` : ""}
+      ${actionsBlock(r)}
+      <div class="tc-two">${emqBlock(r)}${googleBlock(r)}</div>
+      ${passed ? `<section class="tc-card tc-section"><div class="tc-section-head"><h2>What's working</h2><span class="tc-mono tc-tag">${r.passed.length} checks passed</span></div><ul class="tc-passed">${passed}</ul></section>` : ""}
       ${shareBlock(r)}
-      <section class="tc-cta"><div><h2>Want these fixed for you?</h2><p>Tagioo runs your server-side tracking on your own domain and sets up GA4, Meta CAPI, Google Ads and TikTok. Free plan, and free setup help if you get stuck.</p></div>
+      <section class="tc-cta"><div><h2>Give your tracking a quick fix</h2><p>Tagioo runs your server-side tracking on your own domain and sets up GA4, Meta CAPI, Google Ads and TikTok for you. Free plan, and free setup help if you get stuck.</p></div>
         <div class="tc-cta-actions"><a class="tc-btn" data-signup href="${signupHref()}">Start free →</a><a class="tc-btn tc-btn-ghost" href="mailto:hello@tagioo.com?subject=Tracking%20report%20for%20${encodeURIComponent(host)}">Ask for a free review</a></div></section>
-      <details class="tc-block tc-technical"><summary>Technical details</summary>${tech}</details>
+      <details class="tc-card tc-section tc-technical"><summary>Technical details</summary>${tech}</details>
       <p class="tc-limits">${esc(r.limitations)}</p>
       <p><button type="button" class="tc-again" id="scanAgain">Check another website</button></p>`;
     report.hidden = false;
@@ -243,14 +305,17 @@
     wireImpact(r);
     report.focus({ preventScroll: true });
     report.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-    document.getElementById("scanAgain").addEventListener("click", () => {
+    const again = () => {
       if (r.shared) { location.href = "/website-tracking-checker"; return; }
       report.hidden = true;
       scope.hidden = false;
       input.value = "";
-      input.focus();
+      history.replaceState(null, "", "/website-tracking-checker");
       window.scrollTo({ top: 0, behavior: "smooth" });
-    });
+      input.focus({ preventScroll: true });
+    };
+    document.getElementById("scanAgain").addEventListener("click", again);
+    document.getElementById("scanAgainTop").addEventListener("click", again);
   }
 
   form.addEventListener("submit", async (event) => {

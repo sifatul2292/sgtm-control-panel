@@ -43,6 +43,10 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-20.
   (month/30), per month. EMQ card has "How we estimate this" (heuristic, not Meta's formula, ~purchase
   event ceiling). Checker assets v=7. Local public/blog was built with BUILD_DATE=2026-11-01 for preview:
   run `npm run build:blog` before committing anything under public/blog.
+- Checker dashboard UI (2026-10-21): Stape-style card layout. Report adds issue.area/points (severity
+  weights), areas[] (Analytics/Advertising/Server-side/Consent, score = 100 - 2x area penalty), technologies[]
+  (favicons via google.com/s2/favicons), site{title,image,icon} from og tags (https only), no-analytics low
+  issue. Impact calc has sliders + "same results, less spend" (spend x 17.8%). Assets v=8.
 - No headless browser on purpose: 1-core prod VPS; OOM would kill customer sGTM containers.
   Runtime checks (consent diff, network hits) would need a separate worker box.
 
