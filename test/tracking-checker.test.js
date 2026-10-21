@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeScanUrl, isPublicAddress, resolveScanAddress, fetchScanPage, scriptUrls, extractGtmData, analyzeGtmContainer, parseShopifyPixels, codeOnly, buildReport } from '../tracking-checker.js';
+import { normalizeScanUrl, isPublicAddress, resolveScanAddress, fetchScanPage, scriptUrls, extractGtmData, analyzeGtmContainer, parseShopifyPixels, codeOnly, buildReport, parseMetaPixelConfig } from '../tracking-checker.js';
 
 test('URL boundary rejects credentials, unusual protocols/ports, local names and alternate loopback representations', () => {
   assert.equal(normalizeScanUrl('example.com/path#fragment').href, 'https://example.com/path');
@@ -124,4 +124,32 @@ test('unconfirmed server-side tracking costs points instead of scoring as fully 
   assert.match(unconfirmed.fix[0], /Events Manager/);
   assert.ok(!report.passed.some(p => p.title === 'Meta has a server-side path'));
   assert.ok(report.score < 100);
+});
+
+test('Meta pixel config reveals automatic advanced matching and the CAPI Gateway', () => {
+  const js = `config.set("111222333444", "automaticMatching", {"selectedMatchKeys":["em","ph","external_id"]});
+config.set("111222333444", "openbridge", {"endpoints":[{"targetDomain":null,"endpoint":"https:\/\/capig.example.on.aws\/","alwaysRetry":true}]});`;
+  assert.deepEqual(parseMetaPixelConfig(js, '111222333444'), { id: '111222333444', automaticMatchingKeys: ['em', 'ph', 'external_id'], capiGateway: true, capiGatewayHost: 'capig.example.on.aws' });
+  assert.deepEqual(parseMetaPixelConfig('config.set("999", "cookie", {});', '999'), { id: '999', automaticMatchingKeys: [], capiGateway: false, capiGatewayHost: '' });
+});
+
+test('EMQ estimate and ad-impact prediction follow what the setup actually sends', () => {
+  const page = `<script src="https://connect.facebook.net/en_US/fbevents.js"></script><script>fbq('init','111222333444');fbq('track','PageView');</script>`;
+  const browserOnly = buildReport({ url: 'https://shop.example.com', pageText: page, metaPixels: [{ id: '111222333444', automaticMatchingKeys: [], capiGateway: false }] });
+  assert.equal(browserOnly.emq.score, 3.5);
+  assert.equal(browserOnly.emq.label, 'Poor');
+  assert.ok(browserOnly.issues.some(i => i.id === 'meta-low-emq'));
+  const factor = browserOnly.adImpact.factors.find(f => f.platform === 'meta');
+  assert.ok(Math.abs(factor.uplift - (1 / (1 - 0.178) - 1)) < 1e-9);
+  assert.match(factor.url, /^https:\/\/www\.facebook\.com\/business\/news\//);
+  assert.match(browserOnly.adImpact.disclaimer, /not a promise/);
+  // Gateway on the pixel confirms CAPI: no impact factor, high EMQ, no low-EMQ issue.
+  const gateway = buildReport({ url: 'https://shop.example.com', pageText: page, metaPixels: [{ id: '111222333444', automaticMatchingKeys: ['em', 'ph', 'external_id', 'fn', 'zp'], capiGateway: true, capiGatewayHost: 'x.on.aws' }] });
+  assert.equal(gateway.destinations.find(d => d.key === 'meta').server.status, 'confirmed');
+  assert.equal(gateway.emq.score, 10);
+  assert.equal(gateway.adImpact, null);
+  assert.ok(!gateway.issues.some(i => /meta-low-emq|browser-only-meta|unconfirmed-server-meta/.test(i.id)));
+  // A manual fbq init with only an options object of non-PII keys is not advanced matching.
+  const autoConfig = buildReport({ url: 'https://shop.example.com', pageText: page.replace("fbq('init','111222333444');", "fbq('init','111222333444',{autoConfig:false});"), metaPixels: [] });
+  assert.equal(autoConfig.emq.keys.find(k => k.key === 'em').sent, false);
 });

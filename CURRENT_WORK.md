@@ -28,6 +28,14 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-20.
   a lead note; signup links then prefill ?email=. Score calibration: "possible" server-side =
   issue (Meta medium, TikTok/Ads low), GA4 "configured" not live = medium (Allbirds 97 → 84).
   Tests: test/tracking-checker-share.test.js + calibration test. Full suite 159 pass.
+- EMQ + ad impact (2026-10-21): fetches Meta pixel config (connect.facebook.net/signals/config/<id>)
+  → Automatic Advanced Matching keys + Conversions API Gateway ("openbridge" endpoint = Meta CAPI
+  confirmed). Estimated EMQ 0-10 weighted per Meta priority (email + click ID high; phone,
+  external ID, fbp medium; name/address low; + server events), floor-only note when server path
+  unconfirmed. Google match signals checklist. "What fixing this could be worth": ONLY Meta's
+  verified 17.8% lower cost per result (facebook.com/business/news/pixel-conversionsapi-updates,
+  Apr 2026) → +21.7% results, applied when Meta is browser-only; Google tag gateway 11% shown as
+  signals only (not purchases). Unverified figures (EC 5%, EMQ % uplift) deliberately not used.
 - No headless browser on purpose: 1-core prod VPS; OOM would kill customer sGTM containers.
   Runtime checks (consent diff, network hits) would need a separate worker box.
 

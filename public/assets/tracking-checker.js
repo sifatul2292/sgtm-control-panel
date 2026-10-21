@@ -103,6 +103,63 @@
     });
   }
 
+  function emqBlock(r) {
+    if (!r.emq) return "";
+    const e = r.emq;
+    const tone = e.score >= 8 ? "ok" : e.score >= 6 ? "ok" : e.score >= 4 ? "warn" : "bad";
+    return `<section class="tc-block tc-emq"><h2>Meta Event Match Quality <span class="tc-muted">(estimate)</span></h2>
+      <div class="tc-emq-card"><div class="tc-emq-score tc-tone-${tone}"><strong>${e.score}</strong><span>/ 10</span><em>${esc(e.label)}</em></div>
+      <div><ul class="tc-keys">${e.keys.map((k) => `<li class="${k.sent ? "is-on" : "is-off"}">${k.sent ? "✓" : "✕"} ${esc(k.label)}</li>`).join("")}</ul>
+      <p class="tc-muted tc-small">${esc(e.note)}${e.automaticAdvancedMatching ? " Automatic Advanced Matching is on for your pixel." : ""}</p></div></div></section>`;
+  }
+
+  function googleBlock(r) {
+    if (!r.googleSignals) return "";
+    return `<section class="tc-block"><h2>Google match signals</h2><ul class="tc-keys tc-keys-wide">${r.googleSignals.map((g) => `<li class="${g.ok ? "is-on" : "is-off"}">${g.ok ? "✓" : "✕"} ${esc(g.label)}</li>`).join("")}</ul></section>`;
+  }
+
+  // "What better tracking could be worth": published platform averages applied to this site's gaps.
+  function impactBlock(r) {
+    const imp = r.adImpact;
+    if (!imp || !imp.factors.length) return "";
+    const calc = imp.factors.some((f) => f.platform === "meta" && f.uplift > 0);
+    return `<section class="tc-block tc-impact" id="impact"><h2>What fixing this could be worth</h2>
+      <p class="tc-small">A prediction based on averages Meta and Google have published, applied only to the gaps found on this site. Your results will differ.</p>
+      ${calc ? `<div class="tc-impact-grid">
+        <div class="tc-impact-inputs">
+          <label>Monthly Meta ads spend ($)<input type="number" min="0" step="100" value="1000" data-imp="meta"></label>
+          <label>Your average cost per purchase on Meta ($)<input type="number" min="1" step="1" value="30" data-imp="cpa"></label>
+        </div>
+        <div class="tc-impact-out" aria-live="polite"><div class="tc-impact-big"><strong id="impPer100">–</strong><span>more purchases per $100 of Meta ad spend</span></div>
+          <p id="impMonthly" class="tc-small"></p></div>
+      </div>` : ""}
+      <ul class="tc-sources">${imp.factors.map((f) => `<li><strong>${esc(f.label)}:</strong> ${esc(f.basis)} <a href="${esc(f.url)}" target="_blank" rel="noopener">Source: ${esc(f.source)}</a></li>`).join("")}</ul>
+      <p class="tc-muted tc-small">${esc(imp.disclaimer)}</p></section>`;
+  }
+
+  function wireImpact(r) {
+    const box = document.getElementById("impact");
+    if (!box || !box.querySelector("#impPer100")) return;
+    const val = (k) => Math.max(0, Number(box.querySelector(`[data-imp="${k}"]`)?.value || 0));
+    const update = () => {
+      const cpa = Math.max(1, val("cpa"));
+      let extra = 0, spend = 0;
+      for (const platform of ["meta"]) {
+        const factors = r.adImpact.factors.filter((f) => f.platform === platform);
+        if (!factors.length) continue;
+        const s = val(platform);
+        spend += s;
+        const uplift = factors.reduce((m, f) => m * (1 + (f.uplift || 0)), 1) - 1;
+        extra += (s / cpa) * uplift;
+      }
+      const per100 = spend ? (extra / spend) * 100 : 0;
+      box.querySelector("#impPer100").textContent = `+${per100 < 1 ? per100.toFixed(2) : per100.toFixed(1)}`;
+      box.querySelector("#impMonthly").textContent = spend ? `About ${extra < 10 ? extra.toFixed(1) : Math.round(extra)} more purchases a month on $${spend.toLocaleString()} of spend, at $${cpa} per purchase.` : "Enter your monthly ad spend.";
+    };
+    box.addEventListener("input", update);
+    update();
+  }
+
   function render(r) {
     const host = (() => { try { return new URL(r.url).hostname; } catch { return r.url; } })();
     const ss = SERVER_STACK[r.stack.serverSide.status] || SERVER_STACK.none;
@@ -160,6 +217,9 @@
       ${r.destinations.length ? `<section class="tc-block"><h2>Where your tracking goes</h2>
         <div class="tc-table-wrap"><table class="tc-table"><thead><tr><th>Platform</th><th>Installed via</th><th>IDs</th><th>Server-side</th></tr></thead><tbody>${destRows}</tbody></table></div></section>` : ""}
       ${issues ? `<section class="tc-block"><h2>Issues to fix <span class="tc-muted">(${r.issues.length})</span></h2>${issues}</section>` : ""}
+      ${impactBlock(r)}
+      ${emqBlock(r)}
+      ${googleBlock(r)}
       ${passed ? `<section class="tc-block"><h2>What's working</h2><ul class="tc-passed">${passed}</ul></section>` : ""}
       ${shareBlock(r)}
       <section class="tc-cta"><div><h2>Want these fixed for you?</h2><p>Tagioo runs your server-side tracking on your own domain and sets up GA4, Meta CAPI, Google Ads and TikTok. Free plan, and free setup help if you get stuck.</p></div>
@@ -170,6 +230,7 @@
     report.hidden = false;
     scope.hidden = true;
     wireShare(r);
+    wireImpact(r);
     report.focus({ preventScroll: true });
     report.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
     document.getElementById("scanAgain").addEventListener("click", () => {

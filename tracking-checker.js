@@ -327,6 +327,21 @@ export function parseShopifyPixels(html) {
   return [];
 }
 
+// ── Meta pixel configuration (public: connect.facebook.net/signals/config/<pixel id>) ──
+
+// Reveals Automatic Advanced Matching keys and a Conversions API Gateway ("openbridge")
+// endpoint, both set by the advertiser in Events Manager.
+export function parseMetaPixelConfig(js, pixelId) {
+  const keys = js.match(new RegExp(`config\\.set\\("${pixelId}",\\s*"automaticMatching",\\s*\\{"selectedMatchKeys":\\[([^\\]]*)\\]`));
+  const bridge = js.match(new RegExp(`config\\.set\\("${pixelId}",\\s*"openbridge",\\s*\\{"endpoints":\\[\\{[^}]*"endpoint":"([^"]+)"`));
+  return {
+    id: pixelId,
+    automaticMatchingKeys: keys ? keys[1].split(",").map((k) => k.replace(/"/g, "").trim()).filter(Boolean) : [],
+    capiGateway: Boolean(bridge),
+    capiGatewayHost: bridge ? (() => { try { return new URL(bridge[1].replace(/\\\//g, "/")).hostname; } catch { return ""; } })() : ""
+  };
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 // Only markup that loads or configures code: scripts, links, root/body tags, tracking images and
@@ -358,7 +373,7 @@ const SEVERITY_WEIGHT = { critical: 25, high: 14, medium: 7, low: 3 };
 
 // ── Report ──────────────────────────────────────────────────────────────────
 
-export function buildReport({ url, pageText, scriptSources = [], containers = [], shopifyPixels = [], endpoints = [], productPage = null, headers = {}, durationMs = 0, warnings = [] }) {
+export function buildReport({ url, pageText, scriptSources = [], containers = [], shopifyPixels = [], endpoints = [], productPage = null, metaPixels = [], headers = {}, durationMs = 0, warnings = [] }) {
   const pageHost = new URL(url).hostname;
   const siteDomain = registrableDomain(pageHost);
   const pageCode = codeOnly(pageText);
@@ -406,10 +421,14 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
       d.server = { status: "possible", detail: liveEndpoints.length
         ? `A live server container was found (${liveEndpoints[0].host}). Server containers are private, so check ${d.key === "meta" ? "Meta Events Manager for “Server” events" : `${d.name} for server events`}.`
         : serverVendor ? `${serverVendor} is installed, which can send ${d.name} events from a server.` : "A server-side setup is configured; check the platform for server events." };
-    } else if (d.key === "meta" && shopifyMeta) {
+    } else if (d.key === "meta" && shopifyMeta && !metaPixels.some((p) => p.capiGateway)) {
       d.server = { status: "possible", detail: "Shopify's Facebook & Instagram app can send Conversions API events when data sharing is set to Maximum. Check it in the app." };
     }
   }
+
+  // Meta's own Conversions API Gateway is configured on the pixel: CAPI is confirmed.
+  const gateway = metaPixels.find((p) => p.capiGateway);
+  if (dest.meta?.found && gateway) dest.meta.server = { status: "confirmed", detail: `Meta's Conversions API Gateway is enabled for pixel ${gateway.id}${gateway.capiGatewayHost ? ` (${gateway.capiGatewayHost})` : ""}.` };
 
   // GTM container findings.
   const gtmIds = [...new Set((pageAll.match(/\bGTM-[A-Z0-9]{4,10}\b/g) || []))];
@@ -497,10 +516,69 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
   if (dest.meta.found && dest.meta.server.status === "confirmed") pass("Meta has a server-side path", dest.meta.server.detail);
 
   // Meta advanced matching: customer data passed to fbq('init', id, {...}) or user_data sent with events.
-  const metaAdvancedMatching = /fbq\s*\(\s*['"]init['"]\s*,\s*[^,)]+,\s*\{/.test(`${pageAll}\n${gtmText}`) || /autoConfig|"em"\s*:|['"]em['"]\s*:/.test(metaGtmTags.map((t) => t.html).join("\n"));
+  // Manual advanced matching: customer data passed as the third fbq('init') argument.
+  const metaAdvancedMatching = /fbq\s*\(\s*['"]init['"]\s*,\s*[^,)]+,\s*\{[^}]*\b(?:em|ph)\b\s*:/.test(`${pageAll}\n${gtmText}`);
   if (dest.meta.found && metaGtmTags.length && !metaAdvancedMatching && dest.meta.server.status === "not-detected") {
     issue("meta-no-advanced-matching", "medium", "Meta Pixel sends no customer data (advanced matching)", "Without hashed email or phone, Meta matches fewer conversions to the people who clicked your ads.", ["Turn on Automatic Advanced Matching in Events Manager → Settings.", "Or pass hashed email/phone to fbq('init') and with server events."]);
   }
+
+  // Estimated Meta Event Match Quality. Meta computes the real score from the events it receives;
+  // we estimate it from the customer information this setup visibly sends.
+  let emq = null;
+  if (dest.meta?.found) {
+    const aam = new Set(metaPixels.flatMap((p) => p.automaticMatchingKeys));
+    const gtmUserData = gtmTags.some((t) => t.type === "ga4-event" && JSON.stringify(t.params).includes("user_data.email"))
+      || /user_data\.(email_address|phone_number)/.test(gtmText);
+    const serverMeta = dest.meta.server.status === "confirmed" || (dest.meta.server.status === "possible" && liveEndpoints.length > 0);
+    const manualAM = metaAdvancedMatching;
+    const has = (key, alsoServer) => aam.has(key) || (manualAM && ["em", "ph"].includes(key)) || (alsoServer && serverMeta && gtmUserData);
+    const keys = [
+      { key: "fbp", label: "Browser ID (fbp)", sent: true, weight: 1.0 },
+      { key: "fbc", label: "Click ID (fbc)", sent: true, weight: 2.0 },
+      { key: "ip_ua", label: "IP address & user agent", sent: true, weight: 0.5 },
+      { key: "em", label: "Email (hashed)", sent: has("em", true), weight: 2.5 },
+      { key: "ph", label: "Phone (hashed)", sent: has("ph", true), weight: 1.0 },
+      { key: "external_id", label: "External ID", sent: aam.has("external_id") || (serverMeta && /user_data\.external_id/.test(gtmText)), weight: 1.0 },
+      { key: "name_address", label: "Name & address", sent: ["fn", "ln", "ct", "st", "zp", "country"].some((k) => aam.has(k)) || (serverMeta && /user_data\.(first_name|city|postal_code)/.test(gtmText)), weight: 0.5 },
+      { key: "server", label: "Server events (Conversions API)", sent: serverMeta, weight: 1.5 }
+    ];
+    const score = Math.min(10, Math.round(keys.reduce((sum, k) => sum + (k.sent ? k.weight : 0), 0) * 10) / 10);
+    const label = score >= 8 ? "Great" : score >= 6 ? "Good" : score >= 4 ? "OK" : "Poor";
+    // With an unconfirmed server path (an app like Elevar, or a private server container), customer
+    // data may be sent server-side where we can't see it, so the estimate is a floor.
+    const uncertain = dest.meta.server.status === "possible";
+    emq = { score, label, keys: keys.map(({ key, label: l, sent }) => ({ key, label: l, sent })), automaticAdvancedMatching: aam.size > 0, pixelsChecked: metaPixels.map((p) => p.id),
+      note: uncertain ? "A server-side setup may send more customer data than we can see, so your real score may be higher. Check it in Events Manager → your Pixel → Overview → Event Match Quality." : "Your exact score is in Events Manager → your Pixel → Overview → Event Match Quality." };
+    if (score < 6 && !uncertain) issue("meta-low-emq", "medium", `Estimated Meta Event Match Quality is ${label.toLowerCase()} (${score}/10)`, "Meta matches events to people using customer information. With little of it, fewer purchases are credited to your ads and the algorithm learns more slowly.", ["Turn on Automatic Advanced Matching: Events Manager → your Pixel → Settings.", "Send hashed email and phone with Conversions API events.", "Add an external ID (your customer ID) to browser and server events."], "Tagioo's setup sends hashed email, phone, external ID, fbp and fbc with every server event.");
+    else if (score >= 6) pass("Meta match quality", `Estimated Event Match Quality ${score}/10 (${label}).`);
+  }
+
+  // Google match signals.
+  let googleSignals = null;
+  if (dest.googleAds?.found || dest.ga4?.found) {
+    const enhanced = adsConversions.some((t) => t.enhanced) || gtmTags.some((t) => /user_provided_data|user_data/.test(JSON.stringify(t.params || {}))) || /user_data\.email_address/.test(gtmText);
+    googleSignals = [
+      { key: "linker", label: "Ad click IDs stored (conversion linker)", ok: hasLinker || !adsConversions.length },
+      { key: "enhanced", label: "Enhanced conversions / user-provided data", ok: enhanced },
+      { key: "first_party", label: "Tags served from your own domain", ok: firstPartyLoader },
+      { key: "server", label: "Events routed through a server container", ok: ga4Routed }
+    ];
+  }
+
+  // What fixing this could be worth: only vendor-published averages, applied to this site's gaps.
+  const impactFactors = [];
+  if (dest.meta?.found && dest.meta.server.status === "not-detected") {
+    impactFactors.push({ platform: "meta", label: "Adding Meta Conversions API", uplift: 1 / (1 - 0.178) - 1,
+      basis: "Meta reports that advertisers using the Conversions API for web events saw an average 17.8% lower cost per result. The same budget then buys about 22% more results.",
+      source: "Meta, April 2026", url: "https://www.facebook.com/business/news/pixel-conversionsapi-updates" });
+  }
+  if ((dest.googleAds?.found || dest.ga4?.found) && !firstPartyLoader && !ga4Routed) {
+    impactFactors.push({ platform: "google", label: "Serving Google tags from your own domain", uplift: 0, signalsOnly: true,
+      basis: "Google reports an 11% uplift in Google tag signals for advertisers using Google tag gateway. That means more of your activity measured, not guaranteed extra sales, so it isn't included in the number above.",
+      source: "Google Ads Help, May 2025", url: "https://support.google.com/google-ads/answer/16214371" });
+  }
+  const adImpact = impactFactors.length ? { factors: impactFactors,
+    disclaimer: "These are averages published by Meta and Google, not a promise. Your results depend on your offer, budget, audience and how complete your setup is. Better tracking mainly helps ad platforms find buyers; it doesn't create demand." } : null;
 
   // Product page: ecommerce events where they matter most.
   if (productPage) {
@@ -556,7 +634,7 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
       gtmEvents: [...gtmEvents].slice(0, 30)
     },
     destinations: destinations.filter((d) => d.found).map(({ key, name, kind, via, ids, server }) => ({ key, name, kind, via, ids, server })),
-    issues, passed, cookies, warnings,
+    issues, passed, cookies, warnings, emq, googleSignals, adImpact,
     inspected: { page: url, productPage: productPage?.url || "", scripts: scriptSources.map((s) => s.url), containers: containers.map((c) => c.id) },
     limitations: "We read the page, its scripts, the published GTM container, Shopify app pixels and your server container's health check. We don't click, accept cookies or place orders, so tags that only run after consent or on checkout pages may not appear. Server containers are private: we can confirm one is live, not which tags it runs."
   };
@@ -565,6 +643,7 @@ export function buildReport({ url, pageText, scriptSources = [], containers = []
 // ── Scan orchestration ─────────────────────────────────────────────────────
 
 const GTM_ORIGIN = "https://www.googletagmanager.com";
+const META_ORIGIN = "https://connect.facebook.net";
 
 async function fetchGtmContainer(id, signal) {
   try {
@@ -629,7 +708,16 @@ export async function scanWebsite(value) {
     for (const m of page.text.matchAll(/<script[^>]+src=["'](https?:\/\/[^"']+)\/(?:gtm\.js|gtag\/js)\?id=/gi)) if (!/googletagmanager\.com/i.test(m[1])) candidateUrls.add(m[1]);
     const origins = [...new Set([...candidateUrls].map((u) => { try { return new URL(u).origin; } catch { return ""; } }).filter(Boolean))].slice(0, 2);
     const endpoints = (await Promise.all(origins.map((origin) => checkEndpoint(origin, siteDomain, signal)))).filter(Boolean);
-    const report = buildReport({ url: page.url, pageText, scriptSources, containers, shopifyPixels, endpoints, productPage, headers: page.headers, durationMs: Date.now() - started, warnings: [...new Set(warnings)] });
+    // Meta pixel configs (up to two pixels).
+    const metaText = `${pageAll}\n${containers.map((c) => c.analysis?.text || "").join("\n")}\n${shopifyPixels.map((p) => p.configuration).join("\n")}`;
+    const pixelIds = idsFor(DESTINATIONS.find((d) => d.key === "meta"), metaText).slice(0, 2);
+    const metaPixels = (await Promise.all(pixelIds.map(async (id) => {
+      try {
+        const cfg = await fetchScanPage(`${META_ORIGIN}/signals/config/${id}?v=2.9.200&r=stable`, signal, requestPage, META_ORIGIN);
+        return parseMetaPixelConfig(cfg.text, id);
+      } catch { return null; }
+    }))).filter(Boolean);
+    const report = buildReport({ url: page.url, pageText, scriptSources, containers, shopifyPixels, endpoints, productPage, metaPixels, headers: page.headers, durationMs: Date.now() - started, warnings: [...new Set(warnings)] });
     if (cache.size >= 50) cache.delete(cache.keys().next().value);
     cache.set(normalized, { report, at: Date.now() });
     setTimeout(() => { if (cache.get(normalized)?.report === report) cache.delete(normalized); }, 5 * 60 * 1000).unref();
