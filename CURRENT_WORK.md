@@ -53,6 +53,13 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-20.
   detect TikTok ("pixelCode") and Pinterest ("tagID"); low browser-only issue for Pinterest/Snap/Microsoft/
   LinkedIn/Reddit/X (they have CAPIs). vanillabeankings 55 -> 45 (Stape 26: it runs JS and counts AdRoll's
   partner syncs + page speed/SEO). Assets v=9.
+- PageSpeed fixes (2026-10-21, local Lighthouse mobile: perf 70->96, a11y 96->100, agentic 3/4->4/4):
+  boot snippet now appends gtm.js after the first frame (rAF+setTimeout, 1.5s fallback for hidden tabs;
+  same text in server.js TAGIOO_BOOT_SCRIPT and every public/*.html, test/us-launch keeps them in sync).
+  GTM executing before first paint was the whole LCP problem (blocked GTM = 100). /.well-known/ai-catalog.json
+  (+ ard.json alias) lists public/skills/tagioo-tracking-check/SKILL.md (Lighthouse ARD validator: 0 errors).
+  Contrast: --muted #6B7280, --green #047857, footer alphas, plan CTA sr-only plan names. Blog HTML picks up
+  the new snippet from features.html on the next build-blog (run it on the VPS after deploy).
 - No headless browser on purpose: 1-core prod VPS; OOM would kill customer sGTM containers.
   Runtime checks (consent diff, network hits) would need a separate worker box.
 

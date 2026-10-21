@@ -28,7 +28,7 @@
     if(!ck('_fbp'))set('_fbp','fb.1.'+t+'.'+(1e9+Math.floor(Math.random()*9e9)),7776000);
     if(!/^[0-9a-f]{32}$/.test(ck('tg_vid'))&&w.crypto&&crypto.getRandomValues){var a=crypto.getRandomValues(new Uint8Array(16)),v='';for(var k=0;k<16;k++)v+=(a[k]<16?'0':'')+a[k].toString(16);set('tg_vid',v,7776000,1);}
     w.dataLayer=w.dataLayer||[];w.dataLayer.push({'gtm.start':t,event:'gtm.js'});var j=d.createElement('script');j.async=true;
-    j.src='https://www.googletagmanager.com/gtm.js?id='+i;d.head.appendChild(j);
+    j.src='https://www.googletagmanager.com/gtm.js?id='+i;var g=0,go=function(){if(!g){g=1;d.head.appendChild(j);}};if(w.requestAnimationFrame)w.requestAnimationFrame(function(){w.setTimeout(go,0);});w.setTimeout(go,1500);
     })(window,document,location,'GTM-MCR3FD4W');</script>
     <!-- End Google Tag Manager -->
   </head>

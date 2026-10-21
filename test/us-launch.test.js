@@ -32,7 +32,9 @@ function runBoot(search, cookie = "") {
     createElement: () => ({}),
     head: { appendChild: (el) => appended.push(el) }
   };
-  const window = { crypto: { getRandomValues: (a) => a.fill(171) } };
+  // Timers and animation frames run at once, so both the first-frame path and the
+  // hidden-tab fallback fire: gtm.js must still be appended exactly once.
+  const window = { crypto: { getRandomValues: (a) => a.fill(171) }, setTimeout: (fn) => fn(), requestAnimationFrame: (fn) => fn() };
   window.window = window;
   const script = BOOT.match(/<script>([\s\S]*?)<\/script>/)[1];
   vm.runInNewContext(script, { window, document, location: { search, hostname: "tagioo.com", protocol: "https:" }, URLSearchParams, crypto: window.crypto, Date, Math });

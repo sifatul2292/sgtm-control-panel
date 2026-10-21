@@ -314,6 +314,7 @@ const mimeTypes = {
   ".json": "application/json; charset=utf-8",
   ".xml": "application/xml; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
   ".avif": "image/avif",
@@ -3053,6 +3054,8 @@ const TAGIOO_GTM_ID = "GTM-MCR3FD4W";
 //   so server-side Lead/CompleteRegistration see them even if the pixel is
 //   blocked or slow. fbevents.js adopts existing _fbp/_fbc cookies.
 // - Mints tg_vid (hashed into Meta external_id) on the first page view.
+// - Appends gtm.js after the first frame (rAF + timeout; 1.5s fallback for hidden tabs), so
+//   GTM and the pixels it loads don't delay the first paint (Lighthouse LCP 8.8s -> 1.6s).
 const TAGIOO_BOOT_SCRIPT = `<!-- Tagioo boot + Google Tag Manager -->
     <script>(function(w,d,L,i){var q=new URLSearchParams(L.search),dm=/(^|\\.)tagioo\\.com$/.test(L.hostname)?';domain=.tagioo.com':'',sc=L.protocol=='https:'?';Secure':'';
     function ck(n){var m=d.cookie.match('(?:^|; )'+n+'=([^;]*)');return m?m[1]:'';}
@@ -3063,7 +3066,7 @@ const TAGIOO_BOOT_SCRIPT = `<!-- Tagioo boot + Google Tag Manager -->
     if(!ck('_fbp'))set('_fbp','fb.1.'+t+'.'+(1e9+Math.floor(Math.random()*9e9)),7776000);
     if(!/^[0-9a-f]{32}$/.test(ck('tg_vid'))&&w.crypto&&crypto.getRandomValues){var a=crypto.getRandomValues(new Uint8Array(16)),v='';for(var k=0;k<16;k++)v+=(a[k]<16?'0':'')+a[k].toString(16);set('tg_vid',v,7776000,1);}
     w.dataLayer=w.dataLayer||[];w.dataLayer.push({'gtm.start':t,event:'gtm.js'});var j=d.createElement('script');j.async=true;
-    j.src='https://www.googletagmanager.com/gtm.js?id='+i;d.head.appendChild(j);
+    j.src='https://www.googletagmanager.com/gtm.js?id='+i;var g=0,go=function(){if(!g){g=1;d.head.appendChild(j);}};if(w.requestAnimationFrame)w.requestAnimationFrame(function(){w.setTimeout(go,0);});w.setTimeout(go,1500);
     })(window,document,location,'${TAGIOO_GTM_ID}');</script>
     <!-- End Google Tag Manager -->`;
 
@@ -12935,6 +12938,16 @@ const server = createServer(async (req, res) => {
     if (isReadRequest && /^\/(?:blog|features|pricing|compare|how-it-works|docs|shopify|woocommerce|website-tracking-checker|terms|privacy|refunds|blog\/[a-z0-9-]+)\/$/.test(pathname)) {
       res.writeHead(301, { location: pathname.slice(0, -1) + reqUrl.search, "cache-control": "public, max-age=86400" });
       res.end();
+      return;
+    }
+    // AI agent discovery: the ARD catalog (old and new well-known paths) and the skill it lists.
+    if (isReadRequest && (pathname === "/.well-known/ai-catalog.json" || pathname === "/.well-known/ard.json")) {
+      req.url = "/.well-known/ai-catalog.json";
+      await serveStatic(req, res);
+      return;
+    }
+    if (isReadRequest && pathname === "/skills/tagioo-tracking-check/SKILL.md") {
+      await serveStatic(req, res);
       return;
     }
     if ((pathname === "/robots.txt" || pathname === "/sitemap.xml" || pathname === "/llms.txt") && isReadRequest) {

@@ -1,0 +1,28 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "Tagioo",
+    "documentationUrl": "https://tagioo.com/llms.txt",
+    "logoUrl": "https://tagioo.com/assets/tagioo-icon-64.png"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:tagioo.com:skills:tagioo-tracking-check",
+      "displayName": "Tagioo website tracking check",
+      "type": "text/markdown; profile=\"urn:air:agent-skills\"",
+      "url": "https://tagioo.com/skills/tagioo-tracking-check/SKILL.md",
+      "description": "Check a website's GA4, Google Ads, Meta Pixel and Conversions API, TikTok and other ad tracking with Tagioo's free checker, explain the issues and fixes, and set up server-side tracking with Tagioo.",
+      "tags": ["server-side tracking", "tracking audit", "Meta Conversions API", "GA4", "Google Tag Manager"],
+      "capabilities": ["TrackingAudit", "ServerSideTrackingSetup"],
+      "representativeQueries": [
+        "check if my website has server-side tracking",
+        "is my Meta Conversions API working on my store",
+        "audit the GA4 and Facebook pixel tracking on this site",
+        "why does Meta report fewer purchases than my Shopify store",
+        "set up server-side tracking for my WooCommerce store"
+      ],
+      "version": "1.0.0",
+      "updatedAt": "2026-10-21T00:00:00Z"
+    }
+  ]
+}
