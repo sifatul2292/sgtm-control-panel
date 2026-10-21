@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Which Meta match keys a WooCommerce store usually has at each step</title>
+<desc id="d">Illustrative matrix for a guest shopper. Browser keys fbp, client IP address and user agent are available on every event. fbc is available when the visitor arrived from a Meta ad click. Email, phone, name and address are usually only known at checkout and purchase, from the billing form. external_id is available when the shopper has an account or you assign your own ID. That is why Purchase usually has the highest match quality and ViewContent the lowest.</desc>
+<rect width="1200" height="660" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Why Purchase matches better than ViewContent</text>
+<text x="48" y="84" font-size="15" fill="#626975">Which customer keys a WooCommerce store usually has for a guest shopper, by event. Illustrative.</text>
+
+<rect x="48" y="108" width="1104" height="56" rx="12" fill="#fff" stroke="#dce0e3"/>
+<g font-size="15" font-weight="700" fill="#101721" text-anchor="middle">
+<text x="72" y="142" text-anchor="start">Match key</text><text x="360" y="142" text-anchor="start" font-weight="400" font-size="13" fill="#626975">hashed?</text>
+<text x="590" y="142">ViewContent</text><text x="760" y="142">AddToCart</text><text x="930" y="142">InitiateCheckout</text><text x="1080" y="142">Purchase</text>
+</g>
+
+<g font-size="15" fill="#101721">
+<text x="72" y="204">fbp (browser ID cookie)</text><text x="360" y="204" font-size="13" fill="#626975">no</text>
+<text x="72" y="256">fbc (Meta click ID)</text><text x="360" y="256" font-size="13" fill="#626975">no</text>
+<text x="72" y="308">IP address + user agent</text><text x="360" y="308" font-size="13" fill="#626975">no</text>
+<text x="72" y="360">Email (em)</text><text x="360" y="360" font-size="13" fill="#626975">SHA-256</text>
+<text x="72" y="412">Phone (ph)</text><text x="360" y="412" font-size="13" fill="#626975">SHA-256</text>
+<text x="72" y="464">Name, city, state, zip, country</text><text x="360" y="464" font-size="13" fill="#626975">SHA-256</text>
+<text x="72" y="516">external_id</text><text x="360" y="516" font-size="13" fill="#626975">recommended</text>
+</g>
+<g stroke="#dce0e3"><line x1="48" y1="226" x2="1152" y2="226"/><line x1="48" y1="278" x2="1152" y2="278"/><line x1="48" y1="330" x2="1152" y2="330"/><line x1="48" y1="382" x2="1152" y2="382"/><line x1="48" y1="434" x2="1152" y2="434"/><line x1="48" y1="486" x2="1152" y2="486"/><line x1="48" y1="538" x2="1152" y2="538"/></g>
+
+<!-- dots: full = green filled, partial = amber ring, none = grey dash -->
+<g>
+<!-- fbp -->
+<circle cx="590" cy="199" r="11" fill="#5fa83a"/><circle cx="760" cy="199" r="11" fill="#5fa83a"/><circle cx="930" cy="199" r="11" fill="#5fa83a"/><circle cx="1080" cy="199" r="11" fill="#5fa83a"/>
+<!-- fbc -->
+<circle cx="590" cy="251" r="10" fill="none" stroke="#e58a17" stroke-width="4"/><circle cx="760" cy="251" r="10" fill="none" stroke="#e58a17" stroke-width="4"/><circle cx="930" cy="251" r="10" fill="none" stroke="#e58a17" stroke-width="4"/><circle cx="1080" cy="251" r="10" fill="none" stroke="#e58a17" stroke-width="4"/>
+<!-- ip ua -->
+<circle cx="590" cy="303" r="11" fill="#5fa83a"/><circle cx="760" cy="303" r="11" fill="#5fa83a"/><circle cx="930" cy="303" r="11" fill="#5fa83a"/><circle cx="1080" cy="303" r="11" fill="#5fa83a"/>
+<!-- email -->
+<rect x="578" y="353" width="24" height="5" rx="2.5" fill="#c2c7ce"/><rect x="748" y="353" width="24" height="5" rx="2.5" fill="#c2c7ce"/><circle cx="930" cy="355" r="10" fill="none" stroke="#e58a17" stroke-width="4"/><circle cx="1080" cy="355" r="11" fill="#5fa83a"/>
+<!-- phone -->
+<rect x="578" y="405" width="24" height="5" rx="2.5" fill="#c2c7ce"/><rect x="748" y="405" width="24" height="5" rx="2.5" fill="#c2c7ce"/><circle cx="930" cy="407" r="10" fill="none" stroke="#e58a17" stroke-width="4"/><circle cx="1080" cy="407" r="11" fill="#5fa83a"/>
+<!-- name addr -->
+<rect x="578" y="457" width="24" height="5" rx="2.5" fill="#c2c7ce"/><rect x="748" y="457" width="24" height="5" rx="2.5" fill="#c2c7ce"/><circle cx="930" cy="459" r="10" fill="none" stroke="#e58a17" stroke-width="4"/><circle cx="1080" cy="459" r="11" fill="#5fa83a"/>
+<!-- external id -->
+<circle cx="590" cy="511" r="10" fill="none" stroke="#e58a17" stroke-width="4"/><circle cx="760" cy="511" r="10" fill="none" stroke="#e58a17" stroke-width="4"/><circle cx="930" cy="511" r="10" fill="none" stroke="#e58a17" stroke-width="4"/><circle cx="1080" cy="511" r="10" fill="none" stroke="#e58a17" stroke-width="4"/>
+</g>
+
+<g font-size="14" fill="#101721">
+<circle cx="60" cy="578" r="9" fill="#5fa83a"/><text x="78" y="583">Usually available</text>
+<circle cx="250" cy="578" r="8" fill="none" stroke="#e58a17" stroke-width="4"/><text x="268" y="583">Sometimes (ad click, logged-in customer, form already filled)</text>
+<rect x="736" y="575" width="24" height="5" rx="2.5" fill="#c2c7ce"/><text x="772" y="583">Usually unknown for a guest</text>
+</g>
+<text x="48" y="622" font-size="13" fill="#626975">Normalize before hashing: trim and lowercase email; phone with country code, digits only. Never hash fbp, fbc, IP or user agent.</text>
+<text x="48" y="644" font-size="13" fill="#9aa1ab">Illustrative, not measured. Hashing rules from Meta's Conversions API customer information parameters reference.</text>
+</svg>

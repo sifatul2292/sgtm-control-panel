@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Which lead number should your ads learn from?</title>
+<desc id="d">Illustrative bar chart of a lead funnel with made-up numbers: 100 form button clicks, 82 accepted submissions (GA4 generate_lead), 60 contacted (working_lead), 28 qualified (qualify_lead) and 7 won (close_convert_lead). Optimizing on clicks or raw submissions teaches ad platforms to find form-fillers; sending qualified or won stages teaches them to find buyers.</desc>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="24" font-weight="700" fill="#101721">Which lead number should your ads learn from?</text>
+<text x="48" y="84" font-size="15" fill="#626975">Illustrative numbers, not a benchmark. Each stage maps to a GA4 recommended event.</text>
+<g font-size="16" font-weight="600" fill="#101721">
+<text x="48" y="146">Form button clicks</text><text x="48" y="167" font-size="13" font-weight="400" fill="#626975">click trigger (don't count these)</text>
+<text x="48" y="226">Accepted submissions</text><text x="48" y="247" font-size="13" font-weight="400" fill="#626975" font-family="ui-monospace,Menlo,monospace">generate_lead</text>
+<text x="48" y="306">Contacted</text><text x="48" y="327" font-size="13" font-weight="400" fill="#626975" font-family="ui-monospace,Menlo,monospace">working_lead</text>
+<text x="48" y="386">Qualified</text><text x="48" y="407" font-size="13" font-weight="400" fill="#626975" font-family="ui-monospace,Menlo,monospace">qualify_lead</text>
+<text x="48" y="466">Won (became a customer)</text><text x="48" y="487" font-size="13" font-weight="400" fill="#626975" font-family="ui-monospace,Menlo,monospace">close_convert_lead</text>
+</g>
+<!-- scale 0..100 -> x 300..860 (5.6 px per unit) -->
+<g stroke="#dce0e3"><line x1="300" y1="118" x2="300" y2="500"/><line x1="580" y1="118" x2="580" y2="500"/><line x1="860" y1="118" x2="860" y2="500"/></g>
+<rect x="300" y="132" width="560" height="40" rx="6" fill="#d5d9e0"/><text x="848" y="158" text-anchor="end" font-size="15" font-weight="700" fill="#101721">100</text>
+<rect x="300" y="212" width="459" height="40" rx="6" fill="#aab4c5"/><text x="771" y="238" font-size="15" font-weight="700" fill="#101721">82</text>
+<rect x="300" y="292" width="336" height="40" rx="6" fill="#aab4c5"/><text x="648" y="318" font-size="15" font-weight="700" fill="#101721">60</text>
+<rect x="300" y="372" width="157" height="40" rx="6" fill="#5fa83a"/><text x="469" y="398" font-size="15" font-weight="700" fill="#101721">28</text>
+<rect x="300" y="452" width="39" height="40" rx="6" fill="#395e33"/><text x="351" y="478" font-size="15" font-weight="700" fill="#101721">7</text>
+<g font-size="13" fill="#626975"><text x="300" y="522" text-anchor="middle">0</text><text x="580" y="522" text-anchor="middle">50</text><text x="860" y="522" text-anchor="middle">100</text></g>
+<rect x="900" y="132" width="260" height="120" rx="14" fill="#fde8e8"/>
+<text x="920" y="162" font-size="15" font-weight="700" fill="#101721">Optimize on these</text>
+<text x="920" y="186" font-size="14" fill="#626975">and ad platforms learn to</text>
+<text x="920" y="206" font-size="14" fill="#626975">find people who fill in</text>
+<text x="920" y="226" font-size="14" fill="#626975">forms, including junk.</text>
+<rect x="900" y="372" width="260" height="120" rx="14" fill="#c5eb8c"/>
+<text x="920" y="402" font-size="15" font-weight="700" fill="#1a3123">Send these back too</text>
+<text x="920" y="426" font-size="14" fill="#395e33">and they can learn which</text>
+<text x="920" y="446" font-size="14" fill="#395e33">clicks turn into real</text>
+<text x="920" y="466" font-size="14" fill="#395e33">pipeline and revenue.</text>
+<text x="48" y="566" font-size="13" fill="#9aa1ab">Event names: Google Analytics Help, "[GA4] Recommended events", lead generation section.</text>
+</svg>

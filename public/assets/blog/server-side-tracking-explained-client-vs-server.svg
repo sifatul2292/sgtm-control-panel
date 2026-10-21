@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Client-side vs server-side tracking</title>
+<desc id="d">Top: in client-side tracking the browser loads four vendor scripts (GA4 tag, Meta Pixel, TikTok Pixel, Google Ads tag) and each sends data straight to its own vendor domain. Bottom: in server-side tracking the browser sends one stream to the store's own subdomain, track.yourstore.com, where a server container decides what to forward to GA4, the Meta Conversions API, the TikTok Events API and Google Ads.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+</defs>
+<rect width="1200" height="680" fill="#f7f8fa"/>
+<text x="48" y="54" font-size="15" font-weight="700" letter-spacing="2" fill="#5145cd">A · CLIENT-SIDE TRACKING</text>
+<rect x="48" y="76" width="300" height="214" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="112" font-size="20" font-weight="700" fill="#101721">Visitor's browser</text>
+<g font-size="15" font-weight="600" fill="#101721">
+<rect x="72" y="128" width="252" height="32" rx="8" fill="#eceef2"/><text x="88" y="150">GA4 tag</text>
+<rect x="72" y="166" width="252" height="32" rx="8" fill="#eceef2"/><text x="88" y="188">Meta Pixel</text>
+<rect x="72" y="204" width="252" height="32" rx="8" fill="#eceef2"/><text x="88" y="226">TikTok Pixel</text>
+<rect x="72" y="242" width="252" height="32" rx="8" fill="#eceef2"/><text x="88" y="264">Google Ads tag</text>
+</g>
+<g stroke="#626975" stroke-width="2.2" stroke-dasharray="7 6" fill="none">
+<line x1="328" y1="144" x2="872" y2="112" marker-end="url(#a)"/>
+<line x1="328" y1="182" x2="872" y2="162" marker-end="url(#a)"/>
+<line x1="328" y1="220" x2="872" y2="212" marker-end="url(#a)"/>
+<line x1="328" y1="258" x2="872" y2="262" marker-end="url(#a)"/>
+</g>
+<g font-size="15" fill="#101721">
+<rect x="880" y="92" width="272" height="40" rx="10" fill="#fff" stroke="#dce0e3"/><text x="900" y="118">google-analytics.com</text>
+<rect x="880" y="142" width="272" height="40" rx="10" fill="#fff" stroke="#dce0e3"/><text x="900" y="168">facebook.com (Meta)</text>
+<rect x="880" y="192" width="272" height="40" rx="10" fill="#fff" stroke="#dce0e3"/><text x="900" y="218">tiktok.com</text>
+<rect x="880" y="242" width="272" height="40" rx="10" fill="#fff" stroke="#dce0e3"/><text x="900" y="268">googleadservices.com</text>
+</g>
+<text x="48" y="320" font-size="14" fill="#626975">One script per tool, each sending to its own third-party domain. Each script decides what it reads from the page.</text>
+<line x1="48" y1="346" x2="1152" y2="346" stroke="#dce0e3"/>
+<text x="48" y="388" font-size="15" font-weight="700" letter-spacing="2" fill="#2f7d32">B · SERVER-SIDE TRACKING</text>
+<rect x="48" y="440" width="250" height="132" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="478" font-size="20" font-weight="700" fill="#101721">Visitor's browser</text>
+<text x="72" y="506" font-size="15" fill="#626975">One Google tag</text>
+<text x="72" y="528" font-size="15" fill="#626975">+ your consent tool</text>
+<text x="72" y="554" font-size="13" fill="#395e33">first-party request</text>
+<line x1="302" y1="506" x2="384" y2="506" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="390" y="408" width="420" height="226" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="414" y="440" font-size="13" font-weight="700" letter-spacing="1.5" fill="#395e33">track.yourstore.com · SERVER CONTAINER</text>
+<g font-size="16" font-weight="600" fill="#101721">
+<rect x="414" y="456" width="372" height="44" rx="9" fill="#fff"/><text x="432" y="484">1. A client receives the event</text>
+<rect x="414" y="510" width="372" height="44" rx="9" fill="#fff"/><text x="432" y="538">2. You choose what each vendor gets</text>
+<rect x="414" y="564" width="372" height="44" rx="9" fill="#fff"/><text x="432" y="592">3. Tags send it to each platform</text>
+</g>
+<g stroke="#2f7d32" stroke-width="2.5" fill="none">
+<line x1="814" y1="470" x2="872" y2="432" marker-end="url(#g)"/>
+<line x1="814" y1="504" x2="872" y2="486" marker-end="url(#g)"/>
+<line x1="814" y1="538" x2="872" y2="540" marker-end="url(#g)"/>
+<line x1="814" y1="572" x2="872" y2="594" marker-end="url(#g)"/>
+</g>
+<g font-size="15" fill="#101721">
+<rect x="880" y="412" width="272" height="40" rx="10" fill="#fff" stroke="#dce0e3"/><text x="900" y="438">GA4</text>
+<rect x="880" y="466" width="272" height="40" rx="10" fill="#fff" stroke="#dce0e3"/><text x="900" y="492">Meta Conversions API</text>
+<rect x="880" y="520" width="272" height="40" rx="10" fill="#fff" stroke="#dce0e3"/><text x="900" y="546">TikTok Events API</text>
+<rect x="880" y="574" width="272" height="40" rx="10" fill="#fff" stroke="#dce0e3"/><text x="900" y="600">Google Ads</text>
+</g>
+<text x="48" y="662" font-size="13" fill="#626975">Simplified. Most real setups are hybrid: the browser still notices the event, the server controls delivery. Consent rules apply to both.</text>
+</svg>

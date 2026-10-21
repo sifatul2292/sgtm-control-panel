@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">How the web container and server container work together</title>
+<desc id="d">The web GTM container in the visitor's browser sends a GA4 request to the tagging server on track.yourstore.com. Inside the server container, the GA4 client claims the request and builds event data, triggers decide which tags fire, and tags send the event to GA4, the Meta Conversions API, the TikTok Events API and Google Ads. A separate preview server powers the debugger. Both containers must be published.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+</defs>
+<rect width="1200" height="620" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Two containers, one pipeline</text>
+<text x="48" y="84" font-size="15" fill="#626975">The web container notices events. The server container receives them and forwards them to each platform.</text>
+<rect x="48" y="120" width="260" height="300" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="152" font-size="13" font-weight="700" letter-spacing="1.5" fill="#5145cd">WEB CONTAINER</text>
+<text x="72" y="180" font-size="18" font-weight="700" fill="#101721">Visitor's browser</text>
+<g font-size="15" fill="#101721">
+<rect x="72" y="198" width="212" height="36" rx="8" fill="#eceef2"/><text x="88" y="222">dataLayer events</text>
+<rect x="72" y="242" width="212" height="36" rx="8" fill="#eceef2"/><text x="88" y="266">Consent Mode defaults</text>
+<rect x="72" y="286" width="212" height="54" rx="8" fill="#eceef2"/><text x="88" y="309">Google tag (G-…)</text><text x="88" y="329" font-size="13" fill="#5145cd">server_container_url</text>
+</g>
+<text x="72" y="372" font-size="14" fill="#626975">Sends GA4 hits to your</text>
+<text x="72" y="392" font-size="14" fill="#626975">subdomain, not to Google</text>
+<line x1="312" y1="300" x2="372" y2="300" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="378" y="120" width="480" height="300" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="402" y="152" font-size="13" font-weight="700" letter-spacing="1.5" fill="#395e33">SERVER CONTAINER · track.yourstore.com</text>
+<rect x="402" y="172" width="136" height="168" rx="12" fill="#fff"/>
+<rect x="551" y="172" width="136" height="168" rx="12" fill="#fff"/>
+<rect x="700" y="172" width="136" height="168" rx="12" fill="#fff"/>
+<g font-size="17" font-weight="700" fill="#101721"><text x="418" y="202">Clients</text><text x="567" y="202">Triggers</text><text x="716" y="202">Tags</text></g>
+<g font-size="14" fill="#626975">
+<text x="418" y="232">GA4 client</text><text x="418" y="254">claims the</text><text x="418" y="276">request and</text><text x="418" y="298">builds event</text><text x="418" y="320">data</text>
+<text x="567" y="232">Client = GA4</text><text x="567" y="254">Event name =</text><text x="567" y="276">purchase</text><text x="567" y="298">+ consent</text><text x="567" y="320">conditions</text>
+<text x="716" y="232">GA4</text><text x="716" y="254">Meta CAPI</text><text x="716" y="276">TikTok</text><text x="716" y="298">Conv. Linker</text><text x="716" y="320">Google Ads</text>
+</g>
+<g stroke="#395e33" stroke-width="2.2" fill="none"><line x1="540" y1="256" x2="548" y2="256" marker-end="url(#g)"/><line x1="689" y1="256" x2="697" y2="256" marker-end="url(#g)"/></g>
+<text x="402" y="372" font-size="14" fill="#395e33">Runs on Cloud Run, your own Docker host,</text>
+<text x="402" y="394" font-size="14" fill="#395e33">or a managed provider</text>
+<g stroke="#2f7d32" stroke-width="2.5" fill="none">
+<line x1="862" y1="200" x2="932" y2="160" marker-end="url(#g)"/>
+<line x1="862" y1="240" x2="932" y2="226" marker-end="url(#g)"/>
+<line x1="862" y1="280" x2="932" y2="292" marker-end="url(#g)"/>
+<line x1="862" y1="320" x2="932" y2="358" marker-end="url(#g)"/>
+</g>
+<g font-size="15" fill="#101721">
+<rect x="940" y="138" width="212" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="960" y="166">Google Analytics 4</text>
+<rect x="940" y="204" width="212" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="960" y="232">Meta Conversions API</text>
+<rect x="940" y="270" width="212" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="960" y="298">TikTok Events API</text>
+<rect x="940" y="336" width="212" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="960" y="364">Google Ads</text>
+</g>
+<rect x="378" y="456" width="480" height="86" rx="14" fill="#fff" stroke="#dce0e3" stroke-dasharray="6 5"/>
+<text x="402" y="490" font-size="17" font-weight="700" fill="#101721">Preview server</text>
+<text x="402" y="516" font-size="14" fill="#626975">Exactly one instance. Powers the server-side debugger.</text>
+<line x1="618" y1="424" x2="618" y2="450" stroke="#626975" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#a)"/>
+<rect x="48" y="456" width="260" height="86" rx="14" fill="#fde8e8"/>
+<text x="72" y="490" font-size="16" font-weight="700" fill="#b4232c">Publish both containers</text>
+<text x="72" y="516" font-size="14" fill="#626975">One without the other = no data</text>
+<text x="48" y="592" font-size="13" fill="#626975">Simplified illustration based on Google's server-side tagging docs. Tag names are examples.</text>
+</svg>

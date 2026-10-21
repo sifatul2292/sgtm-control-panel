@@ -1,0 +1,26 @@
+# Tagioo
+
+> Tagioo is managed server-side Google Tag Manager (sGTM) hosting. Each customer gets a dedicated sGTM container on their own tracking subdomain, plus generated GTM setups for Meta Conversions API, GA4, TikTok Events API and Google Ads, with plugins for WooCommerce and a Custom Pixel flow for Shopify.
+
+## Product
+
+- [Homepage](https://tagioo.com/): Managed server-side GTM hosting with first-party tracking domains.
+- [Pricing](https://tagioo.com/pricing): Free plan with 15,000 events per 30 days; paid plans from $30/month.
+- [Features](https://tagioo.com/features): Meta Conversions API, GA4, TikTok Events API, Google Ads, Event Logs, Purchase Inspector.
+- [WooCommerce](https://tagioo.com/woocommerce): Tagioo for WooCommerce plugin with a server-side purchase backstop.
+- [Shopify](https://tagioo.com/shopify): Guided Shopify Custom Pixel setup for Meta and GA4.
+- [How it works](https://tagioo.com/how-it-works): Account, server container, DNS, template import, publish and verify.
+- [Compare](https://tagioo.com/compare): Managed Tagioo hosting vs self-hosted server-side GTM.
+- [Website Tracking Checker](https://tagioo.com/website-tracking-checker): Free scan of a public site's tags, IDs and first-party routing.
+- [Docs](https://tagioo.com/docs): Setup and troubleshooting documentation.
+
+## Guides
+
+- [What Is Server-Side Tracking? How It Works, Benefits & Setup (2026)](https://tagioo.com/blog/server-side-tracking-explained): What is server-side tracking? Learn how it works, server-side vs client-side tracking, cookies, benefits, limits, consent, cost and how to start.
+- [Google Ads Server-Side Tracking: The Complete 2026 Setup Guide](https://tagioo.com/blog/google-ads-server-side-tracking): Set up Google Ads server-side tracking with server GTM: Conversion Linker, conversion tag, enhanced conversions, Consent Mode v2, dedup and testing.
+- [Best Stape Alternatives for Server-Side GTM Hosting (2026)](https://tagioo.com/blog/stape-alternative): The best Stape alternatives for server-side GTM hosting in 2026: TAGGRS, Addingwell, Tracklution, Elevar, Cloud Run and Tagioo, with pricing units explained.
+- [Tagioo Setup Guide: Server-Side Tracking, Step by Step](https://tagioo.com/blog/tagioo-server-side-tracking-setup): The full Tagioo setup: GTM server container, tracking subdomain and SSL, Setup Assistant templates, WooCommerce or Shopify connection, testing and publishing.
+- [WooCommerce Orders Not Tracking? The 12-Point Purchase Tracking Checklist](https://tagioo.com/blog/woocommerce-purchase-tracking-checklist): WooCommerce purchase tracking broken? Follow one order through 12 checks: thank-you page, gateways, caching, consent, transaction_id, GA4 and Meta.
+- [Meta CAPI Deduplication: How to Fix Duplicate Pixel and Conversions API Events](https://tagioo.com/blog/meta-capi-deduplication-checklist): Meta CAPI deduplication explained: why the Facebook Pixel and Conversions API create duplicate events, how event_id matching works, and a 7-step fix.
+- [Conversion Tracking Discrepancies: Why GA4, Google Ads, Meta and Your Store Never Match](https://tagioo.com/blog/conversion-tracking-discrepancies): Conversion tracking discrepancies explained: why GA4 and Google Ads conversions differ, why Shopify orders don't match Facebook purchases, and how to fix it.
+- [Server-Side Tracking for Lead Generation: Track the Leads That Actually Close](https://tagioo.com/blog/server-side-tracking-lead-generation): Server-side tracking for lead generation: track form submissions in Google Ads and Meta, stop duplicate leads, and send CRM stages back as offline conversions.

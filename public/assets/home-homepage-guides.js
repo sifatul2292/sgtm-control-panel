@@ -23,3 +23,19 @@ if (guideTrack) {
   window.addEventListener('resize', updateControls);
   updateControls();
 }
+
+// Tagioo videos: load the YouTube player (privacy-enhanced domain) only after a click.
+document.addEventListener('click', (event) => {
+  const facade = event.target.closest('.home-videos [data-yt]');
+  if (!facade) return;
+  event.preventDefault();
+  const frame = document.createElement('iframe');
+  frame.src = `https://www.youtube-nocookie.com/embed/${facade.dataset.yt}?autoplay=1&rel=0`;
+  frame.title = facade.getAttribute('aria-label') || 'Tagioo video';
+  frame.allow = 'autoplay; encrypted-media; picture-in-picture';
+  frame.allowFullscreen = true;
+  const box = document.createElement('div');
+  box.className = facade.className.replace('hv-facade', '').trim();
+  box.appendChild(frame);
+  facade.replaceWith(box);
+});

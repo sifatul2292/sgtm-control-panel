@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Meta's 48-hour deduplication window and the order rule for fbp matching</title>
+<desc id="d">Timeline from 0 to 60 hours after the first event with a given event ID. A matching copy at 2 minutes or at 30 hours is discarded because it falls inside the 48-hour window. A copy arriving at 52 hours is outside the window and can be counted again. Below: with the fbp or external_id method, a browser event followed by a server event is deduplicated, but a server event followed by a browser event is not.</desc>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Timing matters: the 48-hour window</text>
+<text x="48" y="84" font-size="15" fill="#626975">Meta compares a copy with the first event that used the same event_id. Late copies can count again.</text>
+<!-- scale: 0..60h -> x 120..1110 (16.5 px per hour) -->
+<rect x="120" y="150" width="792" height="64" rx="10" fill="#eceafd" stroke="#cfcaf7"/>
+<text x="140" y="188" font-size="15" font-weight="700" fill="#4a40b8">Deduplication window: 48 hours from the first event</text>
+<line x1="120" y1="250" x2="1110" y2="250" stroke="#626975" stroke-width="2"/>
+<g font-size="13" fill="#626975" text-anchor="middle">
+<line x1="120" y1="244" x2="120" y2="256" stroke="#626975" stroke-width="2"/><text x="120" y="276">0 h</text>
+<line x1="318" y1="244" x2="318" y2="256" stroke="#626975" stroke-width="2"/><text x="318" y="276">12 h</text>
+<line x1="516" y1="244" x2="516" y2="256" stroke="#626975" stroke-width="2"/><text x="516" y="276">24 h</text>
+<line x1="714" y1="244" x2="714" y2="256" stroke="#626975" stroke-width="2"/><text x="714" y="276">36 h</text>
+<line x1="912" y1="240" x2="912" y2="260" stroke="#5145cd" stroke-width="3"/><text x="912" y="276" fill="#5145cd" font-weight="700">48 h</text>
+<line x1="1110" y1="244" x2="1110" y2="256" stroke="#626975" stroke-width="2"/><text x="1110" y="276">60 h</text>
+</g>
+<circle cx="120" cy="320" r="10" fill="#101721"/>
+<text x="138" y="316" font-size="15" font-weight="700" fill="#101721">First event</text>
+<text x="138" y="336" font-size="13" fill="#626975">kept</text>
+<circle cx="128" cy="380" r="10" fill="#2f7d32"/>
+<text x="146" y="376" font-size="15" font-weight="700" fill="#101721">Copy after minutes</text>
+<text x="146" y="396" font-size="13" fill="#2f7d32">discarded ✓</text>
+<circle cx="615" cy="320" r="10" fill="#2f7d32"/>
+<text x="633" y="316" font-size="15" font-weight="700" fill="#101721">Copy at 30 h</text>
+<text x="633" y="336" font-size="13" fill="#2f7d32">discarded ✓</text>
+<circle cx="978" cy="380" r="10" fill="#b4232c"/>
+<text x="960" y="376" font-size="15" font-weight="700" fill="#101721" text-anchor="end">Copy at 52 h</text>
+<text x="960" y="396" font-size="13" fill="#b4232c" text-anchor="end">can count again ✗</text>
+<line x1="48" y1="430" x2="1152" y2="430" stroke="#dce0e3"/>
+<text x="48" y="470" font-size="16" font-weight="700" fill="#101721">Fallback method (fbp or external_id): order matters</text>
+<rect x="48" y="490" width="540" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="524" font-size="15" font-weight="700" fill="#101721">Browser first → server second</text>
+<text x="72" y="550" font-size="14" fill="#2f7d32">deduplicated ✓</text>
+<rect x="612" y="490" width="540" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="636" y="524" font-size="15" font-weight="700" fill="#101721">Server first → browser second</text>
+<text x="636" y="550" font-size="14" fill="#b4232c">not deduplicated ✗ (use event_id instead)</text>
+<text x="48" y="612" font-size="13" fill="#9aa1ab">Source: Meta for Developers, "Handling Duplicate Pixel and Conversions API Events". Event timings are examples.</text>
+</svg>

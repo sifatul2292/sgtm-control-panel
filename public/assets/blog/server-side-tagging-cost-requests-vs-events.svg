@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Requests vs events: why provider limits aren't directly comparable</title>
+<desc id="d">Illustrative example. One incoming browser request to the tagging server carries three batched GA4 events: page_view, view_item and add_to_cart. The server container then makes outgoing requests to GA4, Meta and TikTok for each event. Depending on how a provider counts, the same activity could be 1 incoming request, 3 events, or 9 or more outgoing requests.</desc>
+<defs><marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker></defs>
+<rect width="1200" height="520" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Requests vs events: the same visit, counted three ways</text>
+<text x="48" y="84" font-size="15" fill="#626975">Illustrative example. Always check how a provider defines its billing unit.</text>
+<rect x="48" y="120" width="300" height="250" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="156" font-size="18" font-weight="700" fill="#101721">Browser</text>
+<text x="72" y="182" font-size="14" fill="#626975">1 HTTP request, batched:</text>
+<g font-size="15" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#101721">
+<rect x="72" y="200" width="252" height="38" rx="8" fill="#eceef2"/><text x="88" y="225">page_view</text>
+<rect x="72" y="246" width="252" height="38" rx="8" fill="#eceef2"/><text x="88" y="271">view_item</text>
+<rect x="72" y="292" width="252" height="38" rx="8" fill="#eceef2"/><text x="88" y="317">add_to_cart</text>
+</g>
+<line x1="352" y1="245" x2="440" y2="245" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="446" y="150" width="300" height="190" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="470" y="186" font-size="13" font-weight="700" letter-spacing="1.5" fill="#395e33">SERVER CONTAINER</text>
+<text x="470" y="222" font-size="18" font-weight="700" fill="#101721">Splits into 3 events</text>
+<text x="470" y="250" font-size="14" fill="#395e33">Each event can fire several</text>
+<text x="470" y="272" font-size="14" fill="#395e33">tags: GA4, Meta CAPI, TikTok</text>
+<g stroke="#2f7d32" stroke-width="2.5" fill="none">
+<line x1="750" y1="200" x2="848" y2="166" marker-end="url(#g)"/>
+<line x1="750" y1="245" x2="848" y2="245" marker-end="url(#g)"/>
+<line x1="750" y1="290" x2="848" y2="324" marker-end="url(#g)"/>
+</g>
+<g font-size="15" fill="#101721">
+<rect x="854" y="140" width="298" height="52" rx="10" fill="#fff" stroke="#dce0e3"/><text x="874" y="172">GA4 · 3 outgoing requests</text>
+<rect x="854" y="219" width="298" height="52" rx="10" fill="#fff" stroke="#dce0e3"/><text x="874" y="251">Meta CAPI · 3 outgoing</text>
+<rect x="854" y="298" width="298" height="52" rx="10" fill="#fff" stroke="#dce0e3"/><text x="874" y="330">TikTok · 3 outgoing</text>
+</g>
+<g font-size="15">
+<rect x="48" y="400" width="350" height="76" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="432" font-size="28" font-weight="700" fill="#5145cd">1</text><text x="104" y="432" font-weight="600" fill="#101721">incoming request</text>
+<text x="72" y="458" font-size="14" fill="#626975">what request-based plans usually count</text>
+<rect x="425" y="400" width="350" height="76" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="449" y="432" font-size="28" font-weight="700" fill="#395e33">3</text><text x="481" y="432" font-weight="600" fill="#101721">events</text>
+<text x="449" y="458" font-size="14" fill="#626975">what event-based plans count</text>
+<rect x="802" y="400" width="350" height="76" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="826" y="432" font-size="28" font-weight="700" fill="#101721">9</text><text x="858" y="432" font-weight="600" fill="#101721">outgoing requests</text>
+<text x="826" y="458" font-size="14" fill="#626975">the work your server actually does</text>
+</g>
+<text x="48" y="504" font-size="13" fill="#626975">Illustrative numbers. Real batching depends on the GA4 tag's transport; each provider documents what it counts.</text>
+</svg>

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Mapping GA4 ecommerce events to TikTok standard events</title>
+<desc id="d">A common mapping used in server-side tag templates. view_item maps to ViewContent. add_to_cart maps to AddToCart. add_to_wishlist maps to AddToWishlist. begin_checkout maps to InitiateCheckout. add_payment_info maps to AddPaymentInfo. purchase maps to Purchase, formerly CompletePayment. generate_lead maps to Lead, formerly SubmitForm. sign_up maps to CompleteRegistration. search maps to Search.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5145cd"/></marker></defs>
+<rect width="1200" height="660" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">From GA4 event names to TikTok event names</text>
+<text x="48" y="84" font-size="15" fill="#626975">A common mapping in server-side TikTok tags. Use the same TikTok name on the Pixel, or the copies won't pair.</text>
+<text x="72" y="128" font-size="13" font-weight="700" letter-spacing="1.5" fill="#626975">GA4 EVENT (DATA LAYER)</text>
+<text x="652" y="128" font-size="13" font-weight="700" letter-spacing="1.5" fill="#626975">TIKTOK STANDARD EVENT</text>
+<g font-size="16">
+<rect x="48" y="142" width="460" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="72" y="170" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#101721">view_item</text>
+<line x1="516" y1="164" x2="620" y2="164" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="628" y="142" width="524" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="652" y="170" font-weight="600" fill="#101721">ViewContent</text>
+<rect x="48" y="196" width="460" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="72" y="224" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#101721">add_to_cart</text>
+<line x1="516" y1="218" x2="620" y2="218" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="628" y="196" width="524" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="652" y="224" font-weight="600" fill="#101721">AddToCart</text>
+<rect x="48" y="250" width="460" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="72" y="278" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#101721">add_to_wishlist</text>
+<line x1="516" y1="272" x2="620" y2="272" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="628" y="250" width="524" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="652" y="278" font-weight="600" fill="#101721">AddToWishlist</text>
+<rect x="48" y="304" width="460" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="72" y="332" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#101721">begin_checkout</text>
+<line x1="516" y1="326" x2="620" y2="326" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="628" y="304" width="524" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="652" y="332" font-weight="600" fill="#101721">InitiateCheckout</text>
+<rect x="48" y="358" width="460" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="72" y="386" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#101721">add_payment_info</text>
+<line x1="516" y1="380" x2="620" y2="380" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="628" y="358" width="524" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="652" y="386" font-weight="600" fill="#101721">AddPaymentInfo</text>
+<rect x="48" y="412" width="460" height="44" rx="10" fill="#c5eb8c" stroke="#a9d36b"/><text x="72" y="440" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" font-weight="700" fill="#101721">purchase</text>
+<line x1="516" y1="434" x2="620" y2="434" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="628" y="412" width="524" height="44" rx="10" fill="#c5eb8c" stroke="#a9d36b"/><text x="652" y="440" font-weight="700" fill="#101721">Purchase</text><text x="760" y="440" font-size="14" fill="#395e33">formerly CompletePayment</text>
+<rect x="48" y="466" width="460" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="72" y="494" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#101721">generate_lead</text>
+<line x1="516" y1="488" x2="620" y2="488" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="628" y="466" width="524" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="652" y="494" font-weight="600" fill="#101721">Lead</text><text x="704" y="494" font-size="14" fill="#626975">formerly SubmitForm</text>
+<rect x="48" y="520" width="460" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="72" y="548" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#101721">sign_up</text>
+<line x1="516" y1="542" x2="620" y2="542" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="628" y="520" width="524" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="652" y="548" font-weight="600" fill="#101721">CompleteRegistration</text>
+<rect x="48" y="574" width="460" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="72" y="602" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#101721">search</text>
+<line x1="516" y1="596" x2="620" y2="596" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="628" y="574" width="524" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="652" y="602" font-weight="600" fill="#101721">Search</text>
+</g>
+<text x="48" y="646" font-size="13" fill="#9aa1ab">Renames per TikTok's "How to adopt TikTok's updated standard events" (May 2025); legacy names still work. Check your template's mapping.</text>
+</svg>

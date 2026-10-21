@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">What goes where in a Tagioo setup</title>
+<desc id="d">Setup Assistant generates two files. web.json is imported into your Web GTM container, which loads on your website through the Tagioo WooCommerce plugin, a Shopify Custom Pixel or your own snippet; it contains data layer listeners, the Custom Loader tag and Consent Mode v2 defaults. server.json is imported into your Server GTM container, which Tagioo runs as a dedicated container on your tracking subdomain; it contains the server tags and credentials for the destinations you chose. The server container forwards events to GA4, Meta CAPI, TikTok Events API and Google Ads.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+</defs>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">What goes where</text>
+<text x="48" y="84" font-size="15" fill="#626975">Two generated files, two GTM containers, one tracking subdomain.</text>
+<rect x="48" y="200" width="250" height="150" rx="16" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="72" y="236" font-size="13" font-weight="700" letter-spacing="1.5" fill="#5145cd">TAGIOO DASHBOARD</text>
+<text x="72" y="266" font-size="19" font-weight="700" fill="#101721">Setup Assistant</text>
+<text x="72" y="294" font-size="14" fill="#626975">Platform, destinations,</text>
+<text x="72" y="314" font-size="14" fill="#626975">IDs and credentials</text>
+<g font-size="15" font-weight="700" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+<rect x="350" y="148" width="150" height="44" rx="10" fill="#eceef2"/><text x="372" y="176" fill="#5145cd">web.json</text>
+<rect x="350" y="358" width="150" height="44" rx="10" fill="#e6f4ea"/><text x="366" y="386" fill="#395e33">server.json</text>
+</g>
+<g stroke="#626975" stroke-width="2.5" fill="none">
+<path d="M302 250 C320 250 320 170 344 170" marker-end="url(#a)"/>
+<path d="M302 300 C320 300 320 380 344 380" marker-end="url(#a)"/>
+<line x1="504" y1="170" x2="548" y2="170" marker-end="url(#a)"/>
+<line x1="504" y1="380" x2="548" y2="380" marker-end="url(#a)"/>
+</g>
+<rect x="554" y="108" width="330" height="172" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="578" y="142" font-size="13" font-weight="700" letter-spacing="1.5" fill="#5145cd">WEB GTM CONTAINER</text>
+<text x="578" y="170" font-size="16" font-weight="600" fill="#101721">Runs on your website</text>
+<g font-size="14" fill="#626975"><text x="578" y="198">• dataLayer listeners</text><text x="578" y="220">• Custom Loader tag</text><text x="578" y="242">• Consent Mode v2 defaults</text><text x="578" y="264">• Loaded by the plugin, pixel or snippet</text></g>
+<rect x="554" y="318" width="330" height="168" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="578" y="352" font-size="13" font-weight="700" letter-spacing="1.5" fill="#395e33">SERVER GTM CONTAINER</text>
+<text x="578" y="380" font-size="16" font-weight="600" fill="#101721">Runs in Tagioo on track.yourstore.com</text>
+<g font-size="14" fill="#395e33"><text x="578" y="408">• Server tags for your destinations</text><text x="578" y="430">• Credentials you entered</text><text x="578" y="452">• Dedicated, isolated container</text></g>
+<line x1="719" y1="280" x2="719" y2="312" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<text x="732" y="302" font-size="13" fill="#2f7d32">first-party requests</text>
+<g stroke="#2f7d32" stroke-width="2.5" fill="none">
+<line x1="888" y1="350" x2="934" y2="320" marker-end="url(#g)"/>
+<line x1="888" y1="384" x2="934" y2="378" marker-end="url(#g)"/>
+<line x1="888" y1="418" x2="934" y2="436" marker-end="url(#g)"/>
+<line x1="888" y1="452" x2="934" y2="494" marker-end="url(#g)"/>
+</g>
+<g font-size="15" fill="#101721">
+<rect x="940" y="298" width="212" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="960" y="326">GA4</text>
+<rect x="940" y="356" width="212" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="960" y="384">Meta CAPI</text>
+<rect x="940" y="414" width="212" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="960" y="442">TikTok Events API</text>
+<rect x="940" y="472" width="212" height="44" rx="10" fill="#fff" stroke="#dce0e3"/><text x="960" y="500">Google Ads</text>
+</g>
+<text x="48" y="574" font-size="13" fill="#626975">Only the destinations you select are included. Import each file into the matching container with Merge, then preview before publishing.</text>
+</svg>

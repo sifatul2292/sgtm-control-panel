@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Anatomy of a Conversions API purchase event</title>
+<desc id="d">A simplified Conversions API purchase event with labels. event_name, event_time, action_source and event_source_url describe what happened, when and where. event_id is the deduplication key shared with the Pixel. user_data holds match keys: email and phone are normalized and SHA-256 hashed, while IP address, user agent, fbp and fbc are sent unhashed. custom_data holds value and currency.</desc>
+<rect width="1200" height="700" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">What's inside a Conversions API purchase event?</text>
+<text x="48" y="84" font-size="15" fill="#626975">A simplified example. Values are made up; field names follow Meta's server event reference.</text>
+<rect x="48" y="112" width="600" height="540" rx="16" fill="#101721"/>
+<g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#e6e8eb">
+<text x="76" y="150">{</text>
+<text x="96" y="180"><tspan fill="#c5eb8c">"event_name"</tspan>: "Purchase",</text>
+<text x="96" y="208"><tspan fill="#c5eb8c">"event_time"</tspan>: 1792000000,</text>
+<text x="96" y="236"><tspan fill="#c5eb8c">"action_source"</tspan>: "website",</text>
+<text x="96" y="264"><tspan fill="#c5eb8c">"event_source_url"</tspan>: "https://shop.com/thanks",</text>
+<text x="96" y="300"><tspan fill="#b7b0ff">"event_id"</tspan>: "ORDER-1042",</text>
+<text x="96" y="336"><tspan fill="#ffd28a">"user_data"</tspan>: {</text>
+<text x="120" y="364">"em": ["7b17fb0b…"],</text>
+<text x="120" y="392">"ph": ["254aa248…"],</text>
+<text x="120" y="420">"client_ip_address": "203.0.113.7",</text>
+<text x="120" y="448">"client_user_agent": "Mozilla/5.0…",</text>
+<text x="120" y="476">"fbp": "fb.1.1791…",  "fbc": "fb.1.1791…"</text>
+<text x="96" y="504">},</text>
+<text x="96" y="540"><tspan fill="#9fd3ff">"custom_data"</tspan>: {</text>
+<text x="120" y="568">"value": 89.00, "currency": "USD"</text>
+<text x="96" y="596">}</text>
+<text x="76" y="626">}</text>
+</g>
+<rect x="680" y="146" width="472" height="128" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="704" y="178" font-size="16" font-weight="700" fill="#101721">What, when and where</text>
+<text x="704" y="204" font-size="14" fill="#626975">event_time: when it happened, max 7 days old</text>
+<text x="704" y="226" font-size="14" fill="#626975">action_source: required, e.g. website</text>
+<text x="704" y="248" font-size="14" fill="#626975">event_source_url: required for website events</text>
+<rect x="680" y="286" width="472" height="62" rx="14" fill="#eceafd" stroke="#cfcaf7"/>
+<text x="704" y="314" font-size="16" font-weight="700" fill="#101721">Dedup key</text>
+<text x="704" y="336" font-size="14" fill="#4a40b8">must equal the Pixel's eventID for the same event</text>
+<rect x="680" y="360" width="472" height="164" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="704" y="392" font-size="16" font-weight="700" fill="#101721">Match keys (user_data)</text>
+<text x="704" y="418" font-size="14" fill="#395e33">Hash with SHA-256 after normalizing:</text>
+<text x="704" y="440" font-size="14" fill="#626975">email, phone, names, city, zip, country</text>
+<text x="704" y="468" font-size="14" fill="#b4232c">Never hash:</text>
+<text x="704" y="490" font-size="14" fill="#626975">IP address, user agent, fbp, fbc</text>
+<text x="704" y="510" font-size="13" fill="#626975">user agent is required for website events</text>
+<rect x="680" y="536" width="472" height="78" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="704" y="566" font-size="16" font-weight="700" fill="#101721">Purchase details (custom_data)</text>
+<text x="704" y="590" font-size="14" fill="#626975">always send value and currency on Purchase</text>
+<text x="48" y="684" font-size="13" fill="#9aa1ab">Sources: Meta for Developers, server event parameters and customer information parameters. Hashes and IDs are truncated examples.</text>
+</svg>

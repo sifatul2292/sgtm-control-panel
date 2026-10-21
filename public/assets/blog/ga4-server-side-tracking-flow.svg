@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">How GA4 server-side tracking works</title>
+<desc id="d">The Google tag in the visitor's browser sends GA4 requests to the server container URL on the store's own subdomain. In the server container, the GA4 client claims the request and turns it into event data with fields such as event name, page location, page title and transaction ID. Server tags read that event data: the GA4 tag forwards it to Google Analytics, and the same event can feed Google Ads, Meta Conversions API and TikTok Events API tags. An optional backend purchase hit from the store can reach the same container.</desc>
+<defs>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+</defs>
+<rect width="1200" height="620" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">How GA4 server-side tracking works</text>
+<text x="48" y="84" font-size="15" fill="#626975">The tag still runs in the browser. Only where it sends data changes.</text>
+<!-- browser -->
+<rect x="48" y="130" width="250" height="150" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="170" font-size="19" font-weight="700" fill="#101721">Visitor's browser</text>
+<text x="72" y="198" font-size="14" fill="#626975">Google tag (web container)</text>
+<text x="72" y="222" font-size="14" fill="#626975">builds events from the page</text>
+<text x="72" y="246" font-size="14" fill="#626975">and the dataLayer</text>
+<line x1="302" y1="205" x2="384" y2="205" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<text x="306" y="190" font-size="13" fill="#395e33">/g/collect</text>
+<!-- backend -->
+<rect x="48" y="330" width="250" height="110" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="368" font-size="18" font-weight="700" fill="#101721">Store backend</text>
+<text x="72" y="394" font-size="14" fill="#626975">Optional server purchase hit</text>
+<text x="72" y="416" font-size="14" fill="#626975">same transaction_id</text>
+<line x1="302" y1="385" x2="384" y2="330" stroke="#2f7d32" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#g)"/>
+<!-- container -->
+<rect x="390" y="112" width="440" height="420" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="416" y="146" font-size="13" font-weight="700" letter-spacing="1.5" fill="#395e33">track.yourstore.com · SERVER CONTAINER</text>
+<rect x="416" y="164" width="388" height="64" rx="10" fill="#fff"/>
+<text x="436" y="192" font-size="16" font-weight="700" fill="#101721">1. GA4 client claims the request</text>
+<text x="436" y="214" font-size="13" fill="#626975">pre-installed in every server container</text>
+<rect x="416" y="244" width="388" height="150" rx="10" fill="#fff"/>
+<text x="436" y="272" font-size="16" font-weight="700" fill="#101721">2. Event data</text>
+<g font-family="SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#101721">
+<text x="436" y="300">event_name: "purchase"</text>
+<text x="436" y="322">page_location: "https://yourstore.com/…"</text>
+<text x="436" y="344">page_title: "Order received"</text>
+<text x="436" y="366">transaction_id: "10482" · value · currency</text>
+</g>
+<rect x="416" y="410" width="388" height="64" rx="10" fill="#fff"/>
+<text x="436" y="438" font-size="16" font-weight="700" fill="#101721">3. Server tags read the same event</text>
+<text x="436" y="460" font-size="13" fill="#626975">one browser request, many destinations</text>
+<text x="416" y="510" font-size="13" fill="#395e33">Consent state from the page travels with each hit</text>
+<!-- destinations -->
+<line x1="834" y1="442" x2="900" y2="170" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<line x1="834" y1="442" x2="900" y2="270" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+<line x1="834" y1="442" x2="900" y2="370" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+<line x1="834" y1="442" x2="900" y2="470" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+<rect x="906" y="130" width="246" height="80" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="928" y="164" font-size="17" font-weight="700" fill="#101721">Google Analytics 4</text>
+<text x="928" y="188" font-size="13" fill="#626975">via the server GA4 tag</text>
+<rect x="906" y="230" width="246" height="80" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="928" y="264" font-size="17" font-weight="700" fill="#101721">Google Ads</text>
+<text x="928" y="288" font-size="13" fill="#626975">conversion + Conversion Linker</text>
+<rect x="906" y="330" width="246" height="80" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="928" y="364" font-size="17" font-weight="700" fill="#101721">Meta</text>
+<text x="928" y="388" font-size="13" fill="#626975">Conversions API tag</text>
+<rect x="906" y="430" width="246" height="80" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="928" y="464" font-size="17" font-weight="700" fill="#101721">TikTok</text>
+<text x="928" y="488" font-size="13" fill="#626975">Events API tag</text>
+<text x="48" y="574" font-size="13" fill="#626975">Simplified. Values are examples. Every tag in the server container must be published, not just added.</text>
+<text x="48" y="596" font-size="13" fill="#9aa1ab">Sources: Google, "Send data to server-side Tag Manager" and "An introduction to server-side tagging".</text>
+</svg>

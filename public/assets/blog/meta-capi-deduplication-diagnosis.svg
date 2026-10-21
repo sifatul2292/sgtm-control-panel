@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Where duplicate Meta purchases come from</title>
+<desc id="d">Troubleshooting map. Start with one test order and count how many Purchase events reached Meta. If the browser and server IDs differ, share one event_id. If the names differ, use the same event name. If two integrations both send Purchase, pick one owner. If the Pixel fires again on a page reload, fire once per order. If the server retries with new IDs, keep the order ID on retries. If everything matches, compare over a longer period because attribution differences are normal.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker></defs>
+<rect width="1200" height="700" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Meta purchases higher than your orders? Check these in order</text>
+<text x="48" y="84" font-size="15" fill="#626975">Place one test order, then walk down the list. Stop at the first "yes".</text>
+<rect x="48" y="112" width="1104" height="56" rx="12" fill="#5145cd"/>
+<text x="72" y="147" font-size="17" font-weight="700" fill="#fff">Start: one test order (e.g. ORDER-1042). How many Purchase events reached Meta for it?</text>
+<g font-size="15">
+<rect x="48" y="186" width="1104" height="74" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="216" font-weight="700" fill="#101721">1. Do the browser eventID and server event_id differ?</text>
+<text x="72" y="242" font-size="14" fill="#626975">Usually random IDs generated separately on each side.</text>
+<text x="1128" y="230" text-anchor="end" font-weight="700" fill="#2f7d32">Fix: one shared ID (order ID)</text>
+<rect x="48" y="272" width="1104" height="74" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="302" font-weight="700" fill="#101721">2. Do the event names differ?</text>
+<text x="72" y="328" font-size="14" fill="#626975">"Purchase" vs "purchase" or a custom name.</text>
+<text x="1128" y="316" text-anchor="end" font-weight="700" fill="#2f7d32">Fix: identical event_name</text>
+<rect x="48" y="358" width="1104" height="74" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="388" font-weight="700" fill="#101721">3. Do two integrations send Purchase?</text>
+<text x="72" y="414" font-size="14" fill="#626975">A platform app plus a plugin, or an old CAPI tool still active.</text>
+<text x="1128" y="402" text-anchor="end" font-weight="700" fill="#2f7d32">Fix: one owner per event</text>
+<rect x="48" y="444" width="1104" height="74" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="474" font-weight="700" fill="#101721">4. Does the Pixel fire again when the thank-you page reloads?</text>
+<text x="72" y="500" font-size="14" fill="#626975">Browser-only repeats aren't something to rely on Meta to clean up.</text>
+<text x="1128" y="488" text-anchor="end" font-weight="700" fill="#2f7d32">Fix: fire once per order</text>
+<rect x="48" y="530" width="1104" height="74" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="560" font-weight="700" fill="#101721">5. Do server retries get a new ID?</text>
+<text x="72" y="586" font-size="14" fill="#626975">A queue or webhook retry that builds a fresh event_id.</text>
+<text x="1128" y="574" text-anchor="end" font-weight="700" fill="#2f7d32">Fix: reuse the order ID</text>
+</g>
+<rect x="48" y="618" width="1104" height="50" rx="12" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="72" y="649" font-size="15" font-weight="700" fill="#395e33">All clear? Then the gap is probably attribution (view-through, windows, dates), not duplicates. Compare 2–4 weeks.</text>
+<text x="48" y="690" font-size="13" fill="#9aa1ab">Based on Meta's deduplication rules. Order ID is an example.</text>
+</svg>

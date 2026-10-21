@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Meta's 7-day limit for server events and delayed WooCommerce payments</title>
+<desc id="d">Timeline from day 0 to day 10 after a WooCommerce order is placed. Meta's Conversions API accepts a website event whose event_time is up to 7 days in the past. A card order paid at once is sent on day 0. A bank transfer confirmed on day 3 can still be sent as a website Purchase with the original order time. A payment confirmed on day 9 is outside the window, and Meta rejects the request, so it needs another route such as an offline conversion upload.</desc>
+<rect width="1200" height="520" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Delayed payments and Meta's 7-day window</text>
+<text x="48" y="84" font-size="15" fill="#626975">A server event's event_time can be up to 7 days in the past. Older events are rejected.</text>
+
+<!-- scale day 0..10 -> x 120..1120 (100px/day) -->
+<rect x="120" y="170" width="700" height="44" rx="10" fill="#c5eb8c"/>
+<rect x="820" y="170" width="300" height="44" rx="10" fill="#fde8e8"/>
+<text x="140" y="198" font-size="15" font-weight="700" fill="#1a3123">Accepted as a website event</text>
+<text x="840" y="198" font-size="15" font-weight="700" fill="#b4232c">Rejected (older than 7 days)</text>
+<line x1="820" y1="150" x2="820" y2="236" stroke="#5145cd" stroke-width="3" stroke-dasharray="7 5"/>
+<text x="820" y="140" text-anchor="middle" font-size="14" font-weight="700" fill="#5145cd">Day 7</text>
+<g font-size="13" fill="#626975" text-anchor="middle">
+<text x="120" y="256">Day 0</text><text x="320" y="256">2</text><text x="520" y="256">4</text><text x="720" y="256">6</text><text x="920" y="256">8</text><text x="1120" y="256">10</text>
+</g>
+<g stroke="#dce0e3"><line x1="120" y1="236" x2="1120" y2="236"/></g>
+
+<g font-size="15" fill="#101721">
+<circle cx="120" cy="300" r="9" fill="#5fa83a"/>
+<rect x="60" y="322" width="250" height="88" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="80" y="352" font-weight="700">Card or PayPal</text>
+<text x="80" y="376" font-size="14" fill="#626975">Paid at checkout, sent</text>
+<text x="80" y="396" font-size="14" fill="#626975">within minutes. Fine.</text>
+
+<circle cx="420" cy="300" r="9" fill="#5fa83a"/>
+<line x1="420" y1="236" x2="420" y2="290" stroke="#dce0e3"/>
+<rect x="330" y="322" width="250" height="88" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="350" y="352" font-weight="700">Bank transfer, day 3</text>
+<text x="350" y="376" font-size="14" fill="#626975">Marked paid on day 3, sent</text>
+<text x="350" y="396" font-size="14" fill="#626975">with the order time. Fine.</text>
+
+<circle cx="1020" cy="300" r="9" fill="#b4232c"/>
+<line x1="1020" y1="236" x2="1020" y2="290" stroke="#dce0e3"/>
+<rect x="880" y="322" width="272" height="88" rx="14" fill="#fff" stroke="#b4232c" stroke-width="2"/>
+<text x="900" y="352" font-weight="700">Confirmed on day 9</text>
+<text x="900" y="376" font-size="14" fill="#626975">Too old for a website event.</text>
+<text x="900" y="396" font-size="14" fill="#626975">Use an offline upload instead.</text>
+</g>
+<text x="48" y="456" font-size="13" fill="#626975">Meta returns an error for the whole request if any event_time is more than 7 days old, so don't batch old orders with new ones.</text>
+<text x="48" y="480" font-size="13" fill="#9aa1ab">Source: Meta for Developers, Conversions API server event parameters (event_time). Payment examples are illustrative.</text>
+</svg>

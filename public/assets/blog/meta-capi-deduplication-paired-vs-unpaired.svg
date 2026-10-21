@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Why matching event IDs decide whether a purchase counts once or twice</title>
+<desc id="d">Row A: the Pixel sends Purchase with eventID ORDER-1042 and the server sends Purchase with event_id ORDER-1042. Meta pairs them and counts one purchase. Row B: the Pixel sends Purchase with a random ID and the server sends Purchase with a different random ID. Meta sees two different events and counts two purchases for one order.</desc>
+<defs>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+<marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#b4232c"/></marker>
+</defs>
+<rect width="1200" height="620" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">One order. One purchase in Meta, or two?</text>
+<text x="48" y="84" font-size="15" fill="#626975">Meta only knows two copies are the same sale when the event name and event ID both match.</text>
+<text x="48" y="132" font-size="15" font-weight="700" letter-spacing="2" fill="#2f7d32">A · PAIRED (DEDUPLICATED)</text>
+<rect x="48" y="150" width="330" height="70" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="70" y="180" font-size="16" font-weight="700" fill="#101721">Pixel: Purchase</text>
+<text x="70" y="204" font-size="14" fill="#626975">eventID: ORDER-1042</text>
+<rect x="48" y="232" width="330" height="70" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="70" y="262" font-size="16" font-weight="700" fill="#101721">Server (CAPI): Purchase</text>
+<text x="70" y="286" font-size="14" fill="#626975">event_id: ORDER-1042</text>
+<line x1="382" y1="185" x2="560" y2="220" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<line x1="382" y1="267" x2="560" y2="234" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="566" y="186" width="300" height="80" rx="14" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="590" y="218" font-size="16" font-weight="700" fill="#101721">Same name + same ID</text>
+<text x="590" y="244" font-size="14" fill="#395e33">later copy discarded</text>
+<line x1="870" y1="226" x2="944" y2="226" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="950" y="176" width="202" height="100" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="974" y="222" font-size="34" font-weight="700" fill="#2f7d32">1</text>
+<text x="1002" y="222" font-size="16" font-weight="700" fill="#101721">purchase</text>
+<text x="974" y="250" font-size="14" fill="#626975">matches the order</text>
+<line x1="48" y1="336" x2="1152" y2="336" stroke="#dce0e3"/>
+<text x="48" y="384" font-size="15" font-weight="700" letter-spacing="2" fill="#b4232c">B · UNPAIRED (DOUBLE COUNTED)</text>
+<rect x="48" y="402" width="330" height="70" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="70" y="432" font-size="16" font-weight="700" fill="#101721">Pixel: Purchase</text>
+<text x="70" y="456" font-size="14" fill="#626975">eventID: a81f3c (random)</text>
+<rect x="48" y="484" width="330" height="70" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="70" y="514" font-size="16" font-weight="700" fill="#101721">Server (CAPI): Purchase</text>
+<text x="70" y="538" font-size="14" fill="#626975">event_id: 7d02e9 (random)</text>
+<line x1="382" y1="437" x2="560" y2="470" stroke="#b4232c" stroke-width="2.5" marker-end="url(#r)"/>
+<line x1="382" y1="519" x2="560" y2="486" stroke="#b4232c" stroke-width="2.5" marker-end="url(#r)"/>
+<rect x="566" y="438" width="300" height="80" rx="14" fill="#fde8e8" stroke="#e8a3a3"/>
+<text x="590" y="470" font-size="16" font-weight="700" fill="#101721">IDs don't match</text>
+<text x="590" y="496" font-size="14" fill="#b4232c">treated as two events</text>
+<line x1="870" y1="478" x2="944" y2="478" stroke="#b4232c" stroke-width="2.5" marker-end="url(#r)"/>
+<rect x="950" y="428" width="202" height="100" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="974" y="474" font-size="34" font-weight="700" fill="#b4232c">2</text>
+<text x="1002" y="474" font-size="16" font-weight="700" fill="#101721">purchases</text>
+<text x="974" y="502" font-size="14" fill="#626975">for a single order</text>
+<text x="48" y="598" font-size="13" fill="#9aa1ab">Source: Meta for Developers, "Handling Duplicate Pixel and Conversions API Events". IDs are examples.</text>
+</svg>

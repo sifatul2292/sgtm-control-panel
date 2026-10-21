@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">How the Meta Pixel and the Conversions API work together</title>
+<desc id="d">The visitor's browser sends a Purchase event with the Meta Pixel. The same purchase, with the same event name and event ID, is sent from a server through the Conversions API. Meta matches the two copies on event name and event ID and counts the purchase once. If the browser copy is blocked, the server copy still arrives.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+<marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5145cd"/></marker>
+</defs>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">One purchase, two delivery paths, counted once</text>
+<text x="48" y="84" font-size="15" fill="#626975">The Pixel and the Conversions API send the same event. Matching keys let Meta keep a single copy.</text>
+<rect x="48" y="118" width="380" height="164" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="152" font-size="13" font-weight="700" letter-spacing="1.5" fill="#626975">BROWSER · META PIXEL</text>
+<text x="72" y="184" font-size="18" font-weight="700" fill="#101721">Thank-you page loads</text>
+<text x="72" y="212" font-size="14" fill="#626975">event: Purchase</text>
+<text x="72" y="234" font-size="14" fill="#626975">eventID: ORDER-1042</text>
+<text x="72" y="256" font-size="14" fill="#626975">reads _fbp and _fbc cookies</text>
+<line x1="238" y1="286" x2="238" y2="340" stroke="#5145cd" stroke-width="2.5" stroke-dasharray="6 5" marker-end="url(#p)"/>
+<text x="252" y="318" font-size="13" fill="#5145cd" font-weight="600">same ID + fbp/fbc passed on</text>
+<rect x="48" y="346" width="380" height="186" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="72" y="380" font-size="13" font-weight="700" letter-spacing="1.5" fill="#395e33">SERVER · CONVERSIONS API</text>
+<text x="72" y="412" font-size="18" font-weight="700" fill="#101721">Server container or backend</text>
+<text x="72" y="440" font-size="14" fill="#395e33">event_name: Purchase</text>
+<text x="72" y="462" font-size="14" fill="#395e33">event_id: ORDER-1042</text>
+<text x="72" y="484" font-size="14" fill="#395e33">hashed email/phone, IP, user agent</text>
+<text x="72" y="506" font-size="14" fill="#395e33">value + currency</text>
+<line x1="432" y1="232" x2="790" y2="282" stroke="#626975" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#a)"/>
+<text x="470" y="176" font-size="14" fill="#626975">Pixel request (can be blocked</text>
+<text x="470" y="196" font-size="14" fill="#626975">or lost if the page never loads)</text>
+<line x1="432" y1="440" x2="790" y2="370" stroke="#2f7d32" stroke-width="3" marker-end="url(#g)"/>
+<text x="500" y="452" font-size="14" fill="#2f7d32">HTTPS POST to Graph API</text>
+<text x="500" y="472" font-size="14" fill="#2f7d32">/{PIXEL_ID}/events</text>
+<rect x="796" y="196" width="356" height="250" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="822" y="236" font-size="22" font-weight="700" fill="#101721">Meta</text>
+<text x="822" y="266" font-size="15" fill="#626975">Compares the two copies:</text>
+<rect x="822" y="282" width="304" height="38" rx="8" fill="#eceafd"/>
+<text x="838" y="307" font-size="15" font-weight="600" fill="#101721">event_name matches ✓</text>
+<rect x="822" y="328" width="304" height="38" rx="8" fill="#eceafd"/>
+<text x="838" y="353" font-size="15" font-weight="600" fill="#101721">event_id matches ✓</text>
+<text x="822" y="398" font-size="17" font-weight="700" fill="#2f7d32">Counted as 1 purchase</text>
+<text x="822" y="422" font-size="13" fill="#626975">when copies arrive within 48 hours</text>
+<line x1="48" y1="566" x2="1152" y2="566" stroke="#dce0e3"/>
+<text x="48" y="596" font-size="13" fill="#626975">Simplified. Server delivery improves reliability; it doesn't override consent. If a visitor opts out, neither path should send their data.</text>
+<text x="48" y="618" font-size="13" fill="#9aa1ab">Source: Meta for Developers, "Handling Duplicate Pixel and Conversions API Events". Order ID is an example.</text>
+</svg>

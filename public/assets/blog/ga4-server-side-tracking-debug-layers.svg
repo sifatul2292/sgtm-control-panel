@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Debug GA4 server-side tracking in four layers</title>
+<desc id="d">Check each hop in order. 1, web preview with Tag Assistant: did the Google tag fire with the right parameters and send to your server container URL? 2, server preview: which client claimed the request, which tags fired, and what status code came back from Google? 3, GA4 DebugView: did Google Analytics receive the event? It needs debug mode and granted analytics consent. 4, backend orders: do GA4 purchases match orders by transaction ID over two or more weeks?</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+</defs>
+<rect width="1200" height="560" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Debug GA4 server-side tracking in four layers</text>
+<text x="48" y="84" font-size="15" fill="#626975">Check each hop in order. The first layer that looks wrong is where the problem is.</text>
+<g>
+<rect x="48" y="116" width="252" height="330" rx="16" fill="#fff" stroke="#dce0e3"/>
+<circle cx="84" cy="156" r="18" fill="#5145cd"/><text x="84" y="162" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">1</text>
+<text x="112" y="152" font-size="17" font-weight="700" fill="#101721">Web preview</text>
+<text x="112" y="172" font-size="13" fill="#626975">Tag Assistant</text>
+<text x="68" y="214" font-size="13" font-weight="700" letter-spacing="1" fill="#626975">CHECK</text>
+<g font-size="14" fill="#101721"><text x="68" y="240">Google tag fired</text><text x="68" y="264">Hits go to your server URL</text><text x="68" y="288">page_location, value,</text><text x="68" y="308">currency, transaction_id</text></g>
+<text x="68" y="350" font-size="13" font-weight="700" letter-spacing="1" fill="#b4232c">COMMON CULPRIT</text>
+<g font-size="14" fill="#626975"><text x="68" y="376">Consent not granted while</text><text x="68" y="396">testing, or the dataLayer</text><text x="68" y="416">push fires too late</text></g>
+</g>
+<line x1="302" y1="281" x2="330" y2="281" stroke="#626975" stroke-width="2.5" marker-end="url(#a)"/>
+<g>
+<rect x="332" y="116" width="252" height="330" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<circle cx="368" cy="156" r="18" fill="#5145cd"/><text x="368" y="162" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">2</text>
+<text x="396" y="152" font-size="17" font-weight="700" fill="#101721">Server preview</text>
+<text x="396" y="172" font-size="13" fill="#395e33">server container</text>
+<text x="352" y="214" font-size="13" font-weight="700" letter-spacing="1" fill="#395e33">CHECK</text>
+<g font-size="14" fill="#101721"><text x="352" y="240">GA4 client claimed it</text><text x="352" y="264">GA4 tag fired</text><text x="352" y="288">Outgoing request to Google</text><text x="352" y="308">returned a success status</text></g>
+<text x="352" y="350" font-size="13" font-weight="700" letter-spacing="1" fill="#b4232c">COMMON CULPRIT</text>
+<g font-size="14" fill="#395e33"><text x="352" y="376">Server container never</text><text x="352" y="396">published, or a trigger</text><text x="352" y="416">that doesn't match</text></g>
+</g>
+<line x1="586" y1="281" x2="614" y2="281" stroke="#626975" stroke-width="2.5" marker-end="url(#a)"/>
+<g>
+<rect x="616" y="116" width="252" height="330" rx="16" fill="#fff" stroke="#dce0e3"/>
+<circle cx="652" cy="156" r="18" fill="#5145cd"/><text x="652" y="162" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">3</text>
+<text x="680" y="152" font-size="17" font-weight="700" fill="#101721">GA4 DebugView</text>
+<text x="680" y="172" font-size="13" fill="#626975">Admin → DebugView</text>
+<text x="636" y="214" font-size="13" font-weight="700" letter-spacing="1" fill="#626975">CHECK</text>
+<g font-size="14" fill="#101721"><text x="636" y="240">Events arrive within</text><text x="636" y="264">seconds</text><text x="636" y="288">Parameters look right</text><text x="636" y="308">(items, value, currency)</text></g>
+<text x="636" y="350" font-size="13" font-weight="700" letter-spacing="1" fill="#b4232c">COMMON CULPRIT</text>
+<g font-size="14" fill="#626975"><text x="636" y="376">Debug mode not on, or</text><text x="636" y="396">analytics consent denied</text><text x="636" y="416">for your test session</text></g>
+</g>
+<line x1="870" y1="281" x2="898" y2="281" stroke="#626975" stroke-width="2.5" marker-end="url(#a)"/>
+<g>
+<rect x="900" y="116" width="252" height="330" rx="16" fill="#fff" stroke="#dce0e3"/>
+<circle cx="936" cy="156" r="18" fill="#5145cd"/><text x="936" y="162" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">4</text>
+<text x="964" y="152" font-size="17" font-weight="700" fill="#101721">Backend orders</text>
+<text x="964" y="172" font-size="13" fill="#626975">your store or CRM</text>
+<text x="920" y="214" font-size="13" font-weight="700" letter-spacing="1" fill="#626975">CHECK</text>
+<g font-size="14" fill="#101721"><text x="920" y="240">GA4 purchases match</text><text x="920" y="264">orders by transaction ID</text><text x="920" y="288">over 2+ weeks</text><text x="920" y="308">No duplicate IDs</text></g>
+<text x="920" y="350" font-size="13" font-weight="700" letter-spacing="1" fill="#b4232c">COMMON CULPRIT</text>
+<g font-size="14" fill="#626975"><text x="920" y="376">Thank-you page never</text><text x="920" y="396">loads, or a second plugin</text><text x="920" y="416">sends its own purchase</text></g>
+</g>
+<text x="48" y="490" font-size="13" fill="#626975">Tagioo's Event Logs and Purchase Inspector show what reached your server container, which is a quick check between layers 2 and 3.</text>
+<text x="48" y="514" font-size="13" fill="#9aa1ab">Sources: Google, "Preview and debug server containers"; Google Analytics Help, "Monitor events in DebugView".</text>
+</svg>

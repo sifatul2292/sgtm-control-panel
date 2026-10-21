@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">First-party vs third-party tracking</title>
+<desc id="d">Left: third-party tracking. A page on yourstore.com sends requests straight to vendor domains such as Google Analytics and connect.facebook.net. Those domains differ from the site in the address bar, their cross-site cookies are blocked in Safari and isolated in Firefox, and they are common filter-list targets. Right: first-party tracking. The page sends one request to track.yourstore.com, a subdomain of the same site. A server container there can set cookies for yourstore.com with a Set-Cookie header and forwards events to GA4, Google Ads, Meta and TikTok. Consent still decides what fires.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+</defs>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">First-party vs third-party tracking</text>
+<text x="48" y="84" font-size="15" fill="#626975">What matters is whether the request and cookie belong to the site in the address bar.</text>
+<!-- LEFT -->
+<rect x="48" y="112" width="528" height="440" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="148" font-size="14" font-weight="700" letter-spacing="2" fill="#b4232c">A · THIRD-PARTY</text>
+<rect x="72" y="166" width="200" height="88" rx="12" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="92" y="200" font-size="13" fill="#626975">Address bar</text>
+<text x="92" y="228" font-size="18" font-weight="700" fill="#101721">yourstore.com</text>
+<line x1="276" y1="194" x2="340" y2="194" stroke="#626975" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#a)"/>
+<line x1="276" y1="226" x2="340" y2="262" stroke="#626975" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#a)"/>
+<rect x="346" y="168" width="206" height="52" rx="10" fill="#fde8e8" stroke="#e8a3a3"/>
+<text x="362" y="200" font-size="14" font-weight="600" fill="#101721">google-analytics.com</text>
+<rect x="346" y="240" width="206" height="52" rx="10" fill="#fde8e8" stroke="#e8a3a3"/>
+<text x="362" y="272" font-size="14" font-weight="600" fill="#101721">connect.facebook.net</text>
+<g font-size="15" fill="#101721">
+<circle cx="84" cy="344" r="5" fill="#b4232c"/><text x="100" y="349">Vendor domain, not your site</text>
+<circle cx="84" cy="386" r="5" fill="#b4232c"/><text x="100" y="391">Cross-site cookies blocked in Safari,</text>
+<text x="100" y="413">isolated per site in Firefox</text>
+<circle cx="84" cy="450" r="5" fill="#b4232c"/><text x="100" y="455">Common targets of filter lists</text>
+<circle cx="84" cy="492" r="5" fill="#b4232c"/><text x="100" y="497">Vendor receives the full raw request</text>
+</g>
+<!-- RIGHT -->
+<rect x="624" y="112" width="528" height="440" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="648" y="148" font-size="14" font-weight="700" letter-spacing="2" fill="#2f7d32">B · FIRST-PARTY</text>
+<rect x="648" y="166" width="200" height="88" rx="12" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="668" y="200" font-size="13" fill="#626975">Address bar</text>
+<text x="668" y="228" font-size="18" font-weight="700" fill="#101721">yourstore.com</text>
+<line x1="852" y1="210" x2="904" y2="210" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="910" y="166" width="218" height="126" rx="12" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="928" y="196" font-size="15" font-weight="700" fill="#101721">track.yourstore.com</text>
+<text x="928" y="218" font-size="13" fill="#395e33">server container</text>
+<text x="928" y="248" font-size="13" fill="#395e33">→ GA4 · Google Ads</text>
+<text x="928" y="270" font-size="13" fill="#395e33">→ Meta · TikTok</text>
+<g font-size="15" fill="#101721">
+<circle cx="660" cy="344" r="5" fill="#2f7d32"/><text x="676" y="349">Same site as the address bar</text>
+<circle cx="660" cy="386" r="5" fill="#2f7d32"/><text x="676" y="391">Server can set cookies for yourstore.com</text>
+<text x="676" y="413">with a Set-Cookie header</text>
+<circle cx="660" cy="450" r="5" fill="#2f7d32"/><text x="676" y="455">You choose what each vendor receives</text>
+<circle cx="660" cy="492" r="5" fill="#2f7d32"/><text x="676" y="497">Consent still decides what fires</text>
+</g>
+<text x="48" y="590" font-size="13" fill="#626975">Simplified. Safari can still cap server-set cookies at 7 days if the subdomain resolves to third-party infrastructure (more below).</text>
+<text x="48" y="612" font-size="13" fill="#9aa1ab">Sources: WebKit full third-party cookie blocking; Mozilla Total Cookie Protection; Google custom domain guide for server-side tagging.</text>
+</svg>

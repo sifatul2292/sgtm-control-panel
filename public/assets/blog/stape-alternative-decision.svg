@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 770" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Which Stape alternative fits you?</title>
+<desc id="d">Decision flow. If you have an engineer who wants to run the servers, self-host on Google Cloud Run. If you would rather not build GTM containers at all, look at Tracklution. If you are a Shopify brand with steady order volume, look at Elevar. If you want an EU-based, request-billed host, look at TAGGRS or Addingwell. If you want ready-made containers and order-level checks, look at Tagioo. Otherwise, staying on Stape is a strong default.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker></defs>
+<rect width="1200" height="770" fill="#f7f8fa"/>
+<text x="600" y="52" text-anchor="middle" font-size="24" font-weight="700" fill="#101721">Which Stape alternative fits you?</text>
+<g font-size="17" font-weight="600" fill="#101721" text-anchor="middle">
+<rect x="390" y="80" width="420" height="80" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="114">Do you have an engineer who wants</text><text x="600" y="138">to run the servers?</text>
+<rect x="390" y="210" width="420" height="80" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="244">Would you rather not build</text><text x="600" y="268">GTM containers at all?</text>
+<rect x="390" y="340" width="420" height="80" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="374">Shopify brand with steady</text><text x="600" y="398">order volume?</text>
+<rect x="390" y="470" width="420" height="80" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="504">Do you want an EU-based,</text><text x="600" y="528">request-billed host?</text>
+<rect x="390" y="600" width="420" height="80" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="634">Do you want ready-made containers</text><text x="600" y="658">and order-level checks?</text>
+</g>
+<g stroke="#626975" stroke-width="2.5" fill="none">
+<line x1="600" y1="160" x2="600" y2="204" marker-end="url(#a)"/><line x1="600" y1="290" x2="600" y2="334" marker-end="url(#a)"/><line x1="600" y1="420" x2="600" y2="464" marker-end="url(#a)"/><line x1="600" y1="550" x2="600" y2="594" marker-end="url(#a)"/>
+<line x1="810" y1="120" x2="880" y2="120" marker-end="url(#a)"/>
+<line x1="390" y1="250" x2="320" y2="250" marker-end="url(#a)"/>
+<line x1="810" y1="380" x2="880" y2="380" marker-end="url(#a)"/>
+<line x1="390" y1="510" x2="320" y2="510" marker-end="url(#a)"/>
+<line x1="810" y1="640" x2="880" y2="640" marker-end="url(#a)"/>
+<line x1="390" y1="640" x2="320" y2="640" marker-end="url(#a)"/>
+</g>
+<g font-size="14" font-weight="700" fill="#626975">
+<text x="612" y="188">NO</text><text x="612" y="318">NO</text><text x="612" y="448">NO</text><text x="612" y="578">NO</text>
+<text x="826" y="108">YES</text><text x="334" y="238">YES</text><text x="826" y="368">YES</text><text x="334" y="498">YES</text><text x="826" y="628">YES</text><text x="340" y="628">NO</text>
+</g>
+<rect x="886" y="80" width="270" height="80" rx="14" fill="#eceef2"/><text x="906" y="114" font-size="16" font-weight="700" fill="#101721">Self-host on Cloud Run</text><text x="906" y="138" font-size="14" fill="#626975">full control, you run it</text>
+<rect x="44" y="210" width="270" height="80" rx="14" fill="#eceef2"/><text x="64" y="244" font-size="16" font-weight="700" fill="#101721">Tracklution</text><text x="64" y="268" font-size="14" fill="#626975">tracking tool, own connectors</text>
+<rect x="886" y="340" width="270" height="80" rx="14" fill="#eceef2"/><text x="906" y="374" font-size="16" font-weight="700" fill="#101721">Elevar</text><text x="906" y="398" font-size="14" fill="#626975">Shopify-native, priced by orders</text>
+<rect x="44" y="470" width="270" height="80" rx="14" fill="#eceef2"/><text x="64" y="504" font-size="16" font-weight="700" fill="#101721">TAGGRS or Addingwell</text><text x="64" y="528" font-size="14" fill="#626975">EU hosts, priced by requests</text>
+<rect x="886" y="600" width="270" height="80" rx="14" fill="#c5eb8c"/><text x="906" y="634" font-size="16" font-weight="700" fill="#1a3123">Tagioo</text><text x="906" y="658" font-size="14" fill="#395e33">generated containers + Event Logs</text>
+<rect x="44" y="600" width="270" height="80" rx="14" fill="#eceef2"/><text x="64" y="634" font-size="16" font-weight="700" fill="#101721">Stay on Stape</text><text x="64" y="658" font-size="14" fill="#626975">big add-on catalog, low entry price</text>
+<text x="600" y="730" text-anchor="middle" font-size="13" fill="#626975">A starting point, not a verdict. Estimate your volume in each provider's unit and test in parallel before you switch.</text>
+</svg>

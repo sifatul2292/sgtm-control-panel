@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">How long can the Google Ads click ID survive?</title>
+<desc id="d">Bar chart of maximum cookie lifetime for the Google Ads click ID. JavaScript cookie in Chrome or Firefox: 90 days. JavaScript cookie in Safari: 7 days. JavaScript cookie in Safari after a click from a domain classified as a tracker with a query string: 1 day. Server-set first-party FPGCLAW cookie: up to 90 days. A dashed line marks Google Ads' default 30-day click-through conversion window.</desc>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">How long can the Google Ads click ID survive?</text>
+<text x="48" y="84" font-size="15" fill="#626975">Maximum cookie lifetime in days. A purchase after the cookie expires can't be linked to the ad click.</text>
+<g font-size="15" fill="#101721">
+<text x="48" y="150" font-weight="600">Chrome / Firefox</text><text x="48" y="172" fill="#626975" font-size="13">JavaScript cookie _gcl_aw</text>
+<text x="48" y="250" font-weight="600">Safari</text><text x="48" y="272" fill="#626975" font-size="13">JavaScript cookie _gcl_aw</text>
+<text x="48" y="350" font-weight="600">Safari, some ad clicks</text><text x="48" y="372" fill="#626975" font-size="13">tracker-classified referrer + ?gclid</text>
+<text x="48" y="450" font-weight="600">Server-side (sGTM)</text><text x="48" y="472" fill="#626975" font-size="13">server-set cookie FPGCLAW</text>
+</g>
+<!-- scale: 0..90 days -> x 300..1110 (9 px/day) -->
+<g stroke="#dce0e3"><line x1="300" y1="120" x2="300" y2="500"/><line x1="570" y1="120" x2="570" y2="500"/><line x1="840" y1="120" x2="840" y2="500"/><line x1="1110" y1="120" x2="1110" y2="500"/></g>
+<rect x="300" y="138" width="810" height="40" rx="6" fill="#aab4c5"/><text x="1098" y="164" text-anchor="end" font-size="15" font-weight="700" fill="#101721">90 days</text>
+<rect x="300" y="238" width="63" height="40" rx="6" fill="#e58a17"/><text x="375" y="264" font-size="15" font-weight="700" fill="#101721">7 days</text>
+<rect x="300" y="338" width="9" height="40" rx="3" fill="#b4232c"/><text x="321" y="364" font-size="15" font-weight="700" fill="#101721">1 day</text>
+<rect x="300" y="438" width="810" height="40" rx="6" fill="#5fa83a"/><text x="1098" y="464" text-anchor="end" font-size="15" font-weight="700" fill="#fff">up to 90 days*</text>
+<line x1="570" y1="112" x2="570" y2="500" stroke="#5145cd" stroke-width="2.5" stroke-dasharray="8 6"/>
+<rect x="582" y="196" width="262" height="30" rx="6" fill="#5145cd"/><text x="594" y="216" font-size="13" font-weight="700" fill="#fff">Google Ads default window: 30 days</text>
+<g font-size="13" fill="#626975"><text x="300" y="522" text-anchor="middle">0</text><text x="570" y="522" text-anchor="middle">30</text><text x="840" y="522" text-anchor="middle">60</text><text x="1110" y="522" text-anchor="middle">90 days</text></g>
+<text x="48" y="560" font-size="13" fill="#626975">*Safari can also cap server-set cookies at 7 days if your tracking subdomain resolves to a different IP range than your site (WebKit CNAME-cloaking defense).</text>
+<text x="48" y="582" font-size="13" fill="#9aa1ab">Sources: WebKit ITP 2.1 &amp; 2.2 and CNAME defense posts; Google Ads cookie list; Google Ads conversion window help.</text>
+</svg>

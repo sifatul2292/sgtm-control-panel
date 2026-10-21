@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Do you need server-side tracking for Google Ads?</title>
+<desc id="d">Decision flow. If you don't bid on conversions, the standard Google tag is enough. If you do, first fix basic tag problems and enable enhanced conversions and Consent Mode. If backend orders still noticeably exceed Google Ads conversions, or you also send events to Meta and TikTok, server-side tracking is worth testing.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker></defs>
+<rect width="1200" height="700" fill="#f7f8fa"/>
+<text x="600" y="54" text-anchor="middle" font-size="24" font-weight="700" fill="#101721">Do you need server-side tracking for Google Ads?</text>
+<g font-size="17" font-weight="600" fill="#101721">
+<rect x="390" y="86" width="420" height="80" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="120" text-anchor="middle">Do your campaigns bid on conversions?</text>
+<text x="600" y="146" text-anchor="middle" font-size="14" font-weight="400" fill="#626975">Max Conversions, tCPA, tROAS, Max Conversion Value</text>
+<rect x="390" y="236" width="420" height="80" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="270" text-anchor="middle">Are the basics already right?</text>
+<text x="600" y="296" text-anchor="middle" font-size="14" font-weight="400" fill="#626975">Fires once · right value · linker · Consent Mode</text>
+<rect x="390" y="386" width="420" height="80" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="420" text-anchor="middle">Do backend orders still clearly exceed</text>
+<text x="600" y="444" text-anchor="middle">Google Ads conversions?</text>
+<rect x="390" y="536" width="420" height="80" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="570" text-anchor="middle">Do you also feed Meta, TikTok or GA4</text>
+<text x="600" y="594" text-anchor="middle">from the same site?</text>
+</g>
+<g stroke="#626975" stroke-width="2.5" fill="none">
+<line x1="600" y1="166" x2="600" y2="230" marker-end="url(#a)"/><line x1="600" y1="316" x2="600" y2="380" marker-end="url(#a)"/><line x1="600" y1="466" x2="600" y2="530" marker-end="url(#a)"/>
+<line x1="810" y1="126" x2="880" y2="126" marker-end="url(#a)"/><line x1="390" y1="276" x2="320" y2="276" marker-end="url(#a)"/><line x1="810" y1="426" x2="880" y2="426" marker-end="url(#a)"/>
+<line x1="390" y1="576" x2="320" y2="576" marker-end="url(#a)"/><line x1="810" y1="576" x2="880" y2="576" marker-end="url(#a)"/>
+</g>
+<g font-size="14" font-weight="700" fill="#626975">
+<text x="612" y="204">YES</text><text x="612" y="354">YES</text><text x="612" y="504">NO</text>
+<text x="826" y="114">NO</text><text x="334" y="264">NO</text><text x="826" y="414">YES</text><text x="334" y="564">YES</text><text x="826" y="564">NO</text>
+</g>
+<rect x="886" y="86" width="270" height="80" rx="14" fill="#eceef2"/><text x="906" y="120" font-size="16" font-weight="700" fill="#101721">Standard Google tag</text><text x="906" y="144" font-size="14" fill="#626975">is usually enough for now</text>
+<rect x="44" y="236" width="270" height="80" rx="14" fill="#fde8e8"/><text x="64" y="270" font-size="16" font-weight="700" fill="#101721">Fix the setup first</text><text x="64" y="294" font-size="14" fill="#626975">sGTM won't fix a broken tag</text>
+<rect x="886" y="386" width="270" height="80" rx="14" fill="#c5eb8c"/><text x="906" y="420" font-size="16" font-weight="700" fill="#1a3123">Test server-side tracking</text><text x="906" y="444" font-size="14" fill="#395e33">+ enhanced conversions</text>
+<rect x="44" y="536" width="270" height="80" rx="14" fill="#c5eb8c"/><text x="64" y="570" font-size="16" font-weight="700" fill="#1a3123">Server-side pays off</text><text x="64" y="594" font-size="14" fill="#395e33">one container, every platform</text>
+<rect x="886" y="536" width="270" height="80" rx="14" fill="#eceef2"/><text x="906" y="570" font-size="16" font-weight="700" fill="#101721">Enhanced conversions</text><text x="906" y="594" font-size="14" fill="#626975">may be all you need</text>
+<text x="600" y="672" text-anchor="middle" font-size="13" fill="#626975">Compare a few weeks of backend orders with Google Ads conversions (by conversion time) before deciding.</text>
+</svg>

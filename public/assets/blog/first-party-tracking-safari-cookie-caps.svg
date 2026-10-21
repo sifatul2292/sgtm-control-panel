@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">How long can a first-party cookie last in Safari?</title>
+<desc id="d">Bar chart of Safari's maximum lifetime for first-party cookies, in days. A cookie written by JavaScript: 7 days, deleted after 7 days without user interaction. A JavaScript cookie written on a landing page reached from a tracker-classified domain with a query string or fragment: 1 day. A server-set cookie from a subdomain that is CNAME- or IP-cloaked to a third party: 7 days. A server-set cookie from your own infrastructure: the expiry you set, which Chrome caps at 400 days for every cookie.</desc>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">How long can a first-party cookie last in Safari?</text>
+<text x="48" y="84" font-size="15" fill="#626975">Maximum lifetime in days. How the cookie is written, and by whose server, decides the cap.</text>
+<!-- scale 0..60 days -> x 440..1100 (11 px/day) -->
+<g stroke="#dce0e3"><line x1="440" y1="116" x2="440" y2="500"/><line x1="605" y1="116" x2="605" y2="500"/><line x1="770" y1="116" x2="770" y2="500"/><line x1="935" y1="116" x2="935" y2="500"/><line x1="1100" y1="116" x2="1100" y2="500"/></g>
+<g font-size="15" fill="#101721">
+<text x="48" y="150" font-weight="600">Written by JavaScript</text><text x="48" y="172" fill="#626975" font-size="13">document.cookie, e.g. standard _ga, _fbp</text>
+<text x="48" y="246" font-weight="600">JavaScript, after a tracker-domain click</text><text x="48" y="268" fill="#626975" font-size="13">landing URL with a query string or fragment</text>
+<text x="48" y="342" font-weight="600">Server-set, cloaked third party</text><text x="48" y="364" fill="#626975" font-size="13">subdomain CNAME- or IP-mapped to another party</text>
+<text x="48" y="438" font-weight="600">Server-set, your own infrastructure</text><text x="48" y="460" fill="#626975" font-size="13">same origin, or a same-party IP range</text>
+</g>
+<rect x="440" y="136" width="77" height="40" rx="6" fill="#e58a17"/><text x="529" y="162" font-size="15" font-weight="700" fill="#101721">7 days</text>
+<rect x="440" y="232" width="11" height="40" rx="3" fill="#b4232c"/><text x="463" y="258" font-size="15" font-weight="700" fill="#101721">1 day</text>
+<rect x="440" y="328" width="77" height="40" rx="6" fill="#e58a17"/><text x="529" y="354" font-size="15" font-weight="700" fill="#101721">7 days</text>
+<rect x="440" y="424" width="660" height="40" rx="6" fill="#5fa83a"/>
+<path d="M1100 424 l30 20 l-30 20z" fill="#5fa83a"/>
+<text x="1088" y="450" text-anchor="end" font-size="15" font-weight="700" fill="#fff">The expiry you set (beyond this chart)</text>
+<g font-size="13" fill="#626975"><text x="440" y="522" text-anchor="middle">0</text><text x="605" y="522" text-anchor="middle">15</text><text x="770" y="522" text-anchor="middle">30</text><text x="935" y="522" text-anchor="middle">45</text><text x="1100" y="522" text-anchor="middle">60 days</text></g>
+<text x="48" y="560" font-size="13" fill="#626975">Chrome caps every cookie at 400 days. GA4's default _ga expiry is 2 years. Detection of third-party IP addresses is heuristic and may change.</text>
+<text x="48" y="582" font-size="13" fill="#9aa1ab">Sources: WebKit tracking prevention policy, ITP 2.1 and 2.2, CNAME cloaking defense, Private Browsing 2.0; Chrome for Developers; GA4 cookie usage help.</text>
+</svg>

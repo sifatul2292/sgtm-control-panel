@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">One owner per event: avoiding double counting on Shopify</title>
+<desc id="d">Example ownership plan when a Shopify store moves event tracking to server GTM. Meta: keep the Facebook and Instagram channel for catalog and shops, but let server GTM own Pixel and Conversions API events, and lower the channel's data sharing for those events. GA4: one source sends purchase to the property, with the order ID as transaction_id. Google Ads: one purchase conversion action is primary; any second source is secondary. TikTok: one pixel and one Events API path that share an event ID. Two owners for the same event with different IDs means double counting.</desc>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">One owner per event, per platform</text>
+<text x="48" y="84" font-size="15" fill="#626975">Example plan for a store that keeps its sales channels but moves event tracking to server GTM.</text>
+
+<rect x="48" y="112" width="1104" height="56" rx="12" fill="#fff" stroke="#dce0e3"/>
+<g font-size="15" font-weight="700" fill="#101721">
+<text x="72" y="146">Platform</text><text x="272" y="146">Native app or channel keeps</text><text x="642" y="146">Server GTM owns</text><text x="952" y="146">Dedup key</text>
+</g>
+
+<g font-size="15" fill="#101721">
+<text x="72" y="214" font-weight="700">Meta</text>
+<text x="272" y="206">Catalog, Shops, product sync</text><text x="272" y="228" font-size="13" fill="#626975">lower its data sharing for events you move</text>
+<text x="642" y="206">Pixel + Conversions API</text><text x="642" y="228" font-size="13" fill="#626975">ViewContent → Purchase</text>
+<text x="952" y="214">event_id = order ID</text>
+
+<text x="72" y="304" font-weight="700">GA4</text>
+<text x="272" y="296">Nothing that sends purchase</text><text x="272" y="318" font-size="13" fill="#626975">to the same property</text>
+<text x="642" y="296">All ecommerce events</text><text x="642" y="318" font-size="13" fill="#626975">page_view → purchase</text>
+<text x="952" y="304">transaction_id</text>
+
+<text x="72" y="394" font-weight="700">Google Ads</text>
+<text x="272" y="386">Merchant Center, Shopping feed</text><text x="272" y="408" font-size="13" fill="#626975">its conversion set to secondary</text>
+<text x="642" y="386">Primary purchase action</text><text x="642" y="408" font-size="13" fill="#626975">Conversion Linker + Ads tag</text>
+<text x="952" y="394">transaction_id</text>
+
+<text x="72" y="484" font-weight="700">TikTok</text>
+<text x="272" y="476">Catalog and shop features</text><text x="272" y="498" font-size="13" fill="#626975">if you use them</text>
+<text x="642" y="476">Pixel + Events API</text><text x="642" y="498" font-size="13" fill="#626975">CompletePayment</text>
+<text x="952" y="484">event_id</text>
+</g>
+<g stroke="#dce0e3"><line x1="48" y1="256" x2="1152" y2="256"/><line x1="48" y1="346" x2="1152" y2="346"/><line x1="48" y1="436" x2="1152" y2="436"/><line x1="48" y1="526" x2="1152" y2="526"/></g>
+<g fill="#c5eb8c"><rect x="620" y="184" width="8" height="52" rx="4"/><rect x="620" y="274" width="8" height="52" rx="4"/><rect x="620" y="364" width="8" height="52" rx="4"/><rect x="620" y="454" width="8" height="52" rx="4"/></g>
+
+<rect x="48" y="544" width="1104" height="40" rx="10" fill="#fde8e8"/>
+<text x="68" y="570" font-size="14" font-weight="600" fill="#b4232c">Two owners sending the same event with different IDs can't be merged by the platform, so the sale is counted twice.</text>
+</svg>

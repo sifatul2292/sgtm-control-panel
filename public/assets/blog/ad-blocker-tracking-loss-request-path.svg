@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Where an ad blocker stops your tags</title>
+<desc id="d">Four requests from a store's thank-you page pass through a content blocker's filter list. The Google Tag Manager loader from googletagmanager.com, the GA4 hit to Google's collection domain and the Meta Pixel library from connect.facebook.net commonly match filter rules and are cancelled. A GA4 hit to the store's own tracking subdomain is less likely to match host-based rules, but it still only fires when the visitor's consent allows it.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+</defs>
+<rect width="1200" height="660" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Where an ad blocker stops your tags</text>
+<text x="48" y="84" font-size="15" fill="#626975">A content blocker checks every request against filter lists before it leaves the device.</text>
+<g font-size="13" font-weight="700" letter-spacing="1.5" fill="#626975">
+<text x="48" y="130">REQUEST FROM YOUR THANK-YOU PAGE</text>
+<text x="556" y="130">FILTER LIST</text>
+<text x="690" y="130">WHAT HAPPENS</text>
+</g>
+<!-- row 1 -->
+<rect x="48" y="146" width="470" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="182" font-size="17" font-weight="700" fill="#101721">Tag Manager loader (gtm.js)</text>
+<text x="72" y="208" font-size="14" fill="#626975">www.googletagmanager.com</text>
+<line x1="522" y1="188" x2="562" y2="188" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+<circle cx="600" cy="188" r="26" fill="#fde8e8" stroke="#e8a3a3"/>
+<path d="M589 177l22 22M611 177l-22 22" stroke="#b4232c" stroke-width="4" stroke-linecap="round"/>
+<text x="690" y="182" font-size="16" font-weight="700" fill="#b4232c">Usually matched and cancelled</text>
+<text x="690" y="208" font-size="14" fill="#626975">No container loads, so none of its tags run</text>
+<!-- row 2 -->
+<rect x="48" y="252" width="470" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="288" font-size="17" font-weight="700" fill="#101721">GA4 hit (/g/collect)</text>
+<text x="72" y="314" font-size="14" fill="#626975">Google's analytics collection domain</text>
+<line x1="522" y1="294" x2="562" y2="294" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+<circle cx="600" cy="294" r="26" fill="#fde8e8" stroke="#e8a3a3"/>
+<path d="M589 283l22 22M611 283l-22 22" stroke="#b4232c" stroke-width="4" stroke-linecap="round"/>
+<text x="690" y="288" font-size="16" font-weight="700" fill="#b4232c">Usually matched and cancelled</text>
+<text x="690" y="314" font-size="14" fill="#626975">Page view and purchase never reach GA4</text>
+<!-- row 3 -->
+<rect x="48" y="358" width="470" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="394" font-size="17" font-weight="700" fill="#101721">Meta Pixel library (fbevents.js)</text>
+<text x="72" y="420" font-size="14" fill="#626975">connect.facebook.net</text>
+<line x1="522" y1="400" x2="562" y2="400" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+<circle cx="600" cy="400" r="26" fill="#fde8e8" stroke="#e8a3a3"/>
+<path d="M589 389l22 22M611 389l-22 22" stroke="#b4232c" stroke-width="4" stroke-linecap="round"/>
+<text x="690" y="394" font-size="16" font-weight="700" fill="#b4232c">Usually matched and cancelled</text>
+<text x="690" y="420" font-size="14" fill="#626975">No browser events to Meta for this visitor</text>
+<!-- row 4 -->
+<rect x="48" y="464" width="470" height="84" rx="14" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="72" y="500" font-size="17" font-weight="700" fill="#101721">GA4 hit to your own subdomain</text>
+<text x="72" y="526" font-size="14" fill="#395e33">track.yourstore.com (server container)</text>
+<line x1="522" y1="506" x2="562" y2="506" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+<circle cx="600" cy="506" r="26" fill="#e7f6d2" stroke="#a9d36b"/>
+<path d="M588 507l8 8l16 -18" stroke="#395e33" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="690" y="500" font-size="16" font-weight="700" fill="#395e33">Less likely to match host rules</text>
+<text x="690" y="526" font-size="14" fill="#626975">Still fires only if the visitor's consent allows it</text>
+<line x1="48" y1="580" x2="1152" y2="580" stroke="#dce0e3"/>
+<text x="48" y="610" font-size="13" fill="#626975">Simplified. Results depend on the tool and its lists. Some tools also match paths, script names or behavior, and lists change often.</text>
+<text x="48" y="632" font-size="13" fill="#9aa1ab">Sources: EasyList / EasyPrivacy filter lists; Brave Shields; Google server-side tagging docs.</text>
+</svg>

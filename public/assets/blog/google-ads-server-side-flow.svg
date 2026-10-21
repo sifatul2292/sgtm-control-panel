@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Browser-only vs server-side Google Ads conversion tracking</title>
+<desc id="d">Top: the browser sends the conversion directly to Google, where ad blockers and browser limits can drop it. Bottom: the browser sends one request to the store's own tracking subdomain; the server container runs the Conversion Linker and Google Ads conversion tag and forwards the conversion to Google Ads.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+</defs>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="58" font-size="15" font-weight="700" letter-spacing="2" fill="#b4232c">A · BROWSER-ONLY TRACKING</text>
+<rect x="48" y="84" width="230" height="110" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="124" font-size="20" font-weight="700" fill="#101721">Visitor's browser</text>
+<text x="72" y="152" font-size="15" fill="#626975">Thank-you page loads</text>
+<text x="72" y="174" font-size="15" fill="#626975">Google Ads tag fires</text>
+<line x1="282" y1="139" x2="520" y2="139" stroke="#626975" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#a)"/>
+<text x="300" y="124" font-size="14" fill="#626975">googleadservices.com</text>
+<circle cx="560" cy="139" r="26" fill="#fde8e8" stroke="#e8a3a3"/>
+<path d="M549 128l22 22M571 128l-22 22" stroke="#b4232c" stroke-width="4" stroke-linecap="round"/>
+<text x="600" y="120" font-size="15" font-weight="600" fill="#101721">Can be dropped by:</text>
+<text x="600" y="144" font-size="14" fill="#626975">ad blockers · privacy browsers · ITP cookie caps</text>
+<text x="600" y="166" font-size="14" fill="#626975">visitor leaving before the tag loads</text>
+<rect x="950" y="84" width="200" height="110" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="974" y="132" font-size="20" font-weight="700" fill="#101721">Google Ads</text>
+<text x="974" y="158" font-size="15" fill="#b4232c">Conversion missing</text>
+<line x1="48" y1="250" x2="1152" y2="250" stroke="#dce0e3"/>
+<text x="48" y="304" font-size="15" font-weight="700" letter-spacing="2" fill="#2f7d32">B · SERVER-SIDE TRACKING (sGTM)</text>
+<rect x="48" y="330" width="230" height="120" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="370" font-size="20" font-weight="700" fill="#101721">Visitor's browser</text>
+<text x="72" y="398" font-size="15" fill="#626975">One Google tag request</text>
+<text x="72" y="420" font-size="15" fill="#626975">to your own domain</text>
+<line x1="282" y1="390" x2="404" y2="390" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="410" y="316" width="430" height="246" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="436" y="350" font-size="13" font-weight="700" letter-spacing="1.5" fill="#395e33">track.yourstore.com · SERVER CONTAINER</text>
+<rect x="436" y="366" width="378" height="44" rx="9" fill="#fff"/>
+<text x="456" y="394" font-size="16" font-weight="600" fill="#101721">1. GA4 client claims the request</text>
+<rect x="436" y="420" width="378" height="44" rx="9" fill="#fff"/>
+<text x="456" y="448" font-size="16" font-weight="600" fill="#101721">2. Conversion Linker keeps the click ID</text>
+<rect x="436" y="474" width="378" height="44" rx="9" fill="#fff"/>
+<text x="456" y="502" font-size="16" font-weight="600" fill="#101721">3. Google Ads conversion tag fires</text>
+<text x="436" y="546" font-size="13" fill="#395e33">Consent state from the page travels with the request</text>
+<rect x="48" y="490" width="230" height="92" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="526" font-size="18" font-weight="700" fill="#101721">Store backend</text>
+<text x="72" y="552" font-size="14" fill="#626975">Optional server purchase hit</text>
+<text x="72" y="571" font-size="14" fill="#626975">(e.g. Tagioo WooCommerce)</text>
+<line x1="282" y1="536" x2="404" y2="500" stroke="#2f7d32" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#g)"/>
+<line x1="844" y1="440" x2="944" y2="440" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="950" y="385" width="200" height="110" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="974" y="433" font-size="20" font-weight="700" fill="#101721">Google Ads</text>
+<text x="974" y="459" font-size="15" fill="#2f7d32">Conversion recorded</text>
+<text x="48" y="616" font-size="13" fill="#626975">Simplified. Server-side tracking makes delivery more reliable; it does not override a visitor's consent choices.</text>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">One enquiry, one lead in Meta</title>
+<desc id="d">Two examples of Meta deduplication. Top: the browser Pixel sends Lead with eventID lead_8F3K2 and the server Conversions API sends Lead with event_id lead_8F3K2; Meta matches event name and ID within 48 hours and counts one lead. Bottom: the browser sends lead_8F3K2 but the server sends a different random ID; Meta cannot match them and counts two leads.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker></defs>
+<rect width="1200" height="560" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="24" font-weight="700" fill="#101721">One enquiry, one lead in Meta</text>
+<text x="48" y="84" font-size="15" fill="#626975">Meta merges a Pixel event and a server event when the event name and event ID match, within 48 hours.</text>
+<rect x="40" y="110" width="1120" height="190" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="64" y="142" font-size="14" font-weight="700" fill="#395e33">SAME ID: DEDUPLICATED</text>
+<g font-size="15" font-weight="700" fill="#101721">
+<rect x="64" y="158" width="360" height="54" rx="12" fill="#f7f8fa" stroke="#dce0e3"/><text x="84" y="182">Browser Pixel · Lead</text><text x="84" y="201" font-size="13" font-weight="400" fill="#626975" font-family="ui-monospace,Menlo,monospace">eventID: "lead_8F3K2"</text>
+<rect x="64" y="226" width="360" height="54" rx="12" fill="#f7f8fa" stroke="#dce0e3"/><text x="84" y="250">Server CAPI · Lead</text><text x="84" y="269" font-size="13" font-weight="400" fill="#626975" font-family="ui-monospace,Menlo,monospace">event_id: "lead_8F3K2"</text>
+<rect x="560" y="186" width="220" height="66" rx="14" fill="#eceaff" stroke="#5145cd" stroke-width="2"/><text x="670" y="216" text-anchor="middle">Meta matches</text><text x="670" y="238" text-anchor="middle" font-size="13" font-weight="400" fill="#626975">name + ID</text>
+<rect x="900" y="186" width="230" height="66" rx="14" fill="#c5eb8c"/><text x="1015" y="226" text-anchor="middle" font-size="18" fill="#1a3123">Counted once</text>
+</g>
+<g stroke="#626975" stroke-width="2.5" fill="none"><path d="M424 185H500V210H554" marker-end="url(#a)"/><path d="M424 253H500V228H554" marker-end="url(#a)"/><line x1="780" y1="219" x2="894" y2="219" marker-end="url(#a)"/></g>
+<rect x="40" y="320" width="1120" height="190" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="64" y="352" font-size="14" font-weight="700" fill="#b4232c">DIFFERENT IDS: DOUBLE COUNTED</text>
+<g font-size="15" font-weight="700" fill="#101721">
+<rect x="64" y="368" width="360" height="54" rx="12" fill="#f7f8fa" stroke="#dce0e3"/><text x="84" y="392">Browser Pixel · Lead</text><text x="84" y="411" font-size="13" font-weight="400" fill="#626975" font-family="ui-monospace,Menlo,monospace">eventID: "lead_8F3K2"</text>
+<rect x="64" y="436" width="360" height="54" rx="12" fill="#f7f8fa" stroke="#dce0e3"/><text x="84" y="460">Server CAPI · Lead</text><text x="84" y="479" font-size="13" font-weight="400" fill="#626975" font-family="ui-monospace,Menlo,monospace">event_id: "a91c-random"</text>
+<rect x="560" y="396" width="220" height="66" rx="14" fill="#fff" stroke="#b4232c" stroke-width="2"/><text x="670" y="426" text-anchor="middle">No match</text><text x="670" y="448" text-anchor="middle" font-size="13" font-weight="400" fill="#626975">IDs differ</text>
+<rect x="900" y="396" width="230" height="66" rx="14" fill="#fde8e8"/><text x="1015" y="436" text-anchor="middle" font-size="18" fill="#101721">Counted twice</text>
+</g>
+<g stroke="#626975" stroke-width="2.5" fill="none"><path d="M424 395H500V420H554" marker-end="url(#a)"/><path d="M424 463H500V438H554" marker-end="url(#a)"/><line x1="780" y1="429" x2="894" y2="429" marker-end="url(#a)"/></g>
+<text x="48" y="540" font-size="13" fill="#9aa1ab">Fix: create the ID once (from the submission ID) and pass the same value to the Pixel and the server event. Source: Meta for Developers, server event parameters.</text>
+</svg>

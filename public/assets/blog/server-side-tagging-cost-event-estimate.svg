@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Worked example: estimating monthly event volume</title>
+<desc id="d">Hypothetical example in four steps. 40,000 monthly pageviews, times 3 events per pageview, equals 120,000 events per month. Adding 25 to 50 percent headroom for sales and holidays gives about 150,000 to 180,000 events per month, which is the volume to compare plans against. A 15,000-event free tier would be too small for this store's production traffic.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker></defs>
+<rect width="1200" height="500" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">How many events will you send? A worked example</text>
+<text x="48" y="84" font-size="15" fill="#626975">Hypothetical store. Replace each number with your own GA4 data.</text>
+<g fill="#fff" stroke="#dce0e3"><rect x="48" y="120" width="240" height="190" rx="16"/><rect x="332" y="120" width="240" height="190" rx="16"/><rect x="616" y="120" width="240" height="190" rx="16"/></g>
+<rect x="900" y="120" width="252" height="190" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<g font-size="13" font-weight="700" letter-spacing="1.5"><text x="72" y="152" fill="#5145cd">1 · PAGEVIEWS</text><text x="356" y="152" fill="#5145cd">2 · EVENTS PER VIEW</text><text x="640" y="152" fill="#5145cd">3 · MULTIPLY</text><text x="924" y="152" fill="#395e33">4 · ADD HEADROOM</text></g>
+<g font-size="36" font-weight="700" fill="#101721"><text x="72" y="206">40,000</text><text x="356" y="206">× 3</text><text x="640" y="206">120,000</text></g>
+<text x="924" y="200" font-size="30" font-weight="700" fill="#1a3123">150K–180K</text>
+<g font-size="14" fill="#626975">
+<text x="72" y="238">per month</text><text x="72" y="270">GA4 → Pages and screens,</text><text x="72" y="290">last 30 days</text>
+<text x="356" y="238">on average</text><text x="356" y="270">page_view plus view_item,</text><text x="356" y="290">add_to_cart, purchase…</text>
+<text x="640" y="238">events per month</text><text x="640" y="270">Check GA4's Events report</text><text x="640" y="290">for your real ratio</text>
+</g>
+<g font-size="14" fill="#395e33"><text x="924" y="238">events per month</text><text x="924" y="270">+25–50% for sales,</text><text x="924" y="290">holidays and spikes</text></g>
+<g stroke="#626975" stroke-width="2.5"><line x1="292" y1="215" x2="326" y2="215" marker-end="url(#a)"/><line x1="576" y1="215" x2="610" y2="215" marker-end="url(#a)"/><line x1="860" y1="215" x2="894" y2="215" marker-end="url(#a)"/></g>
+<rect x="48" y="340" width="1104" height="92" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="374" font-size="16" font-weight="700" fill="#101721">What it means for this store</text>
+<text x="72" y="402" font-size="15" fill="#626975">A 15,000-event free tier is fine for testing, but too small for production. Compare paid plans at roughly 150K–200K events a month,</text>
+<text x="72" y="422" font-size="15" fill="#626975">and convert to "requests" if a provider bills that way.</text>
+<text x="48" y="470" font-size="13" fill="#626975">All numbers are hypothetical and for illustration only. Events per pageview vary widely by site and tracking plan.</text>
+</svg>

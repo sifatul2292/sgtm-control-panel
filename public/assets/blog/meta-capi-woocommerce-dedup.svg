@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">How Meta deduplicates Pixel and Conversions API purchases</title>
+<desc id="d">Top: a WooCommerce order 4821 is reported twice, once by the browser Pixel with event Purchase and eventID 4821, and once by the Conversions API with event_name Purchase and event_id 4821. Meta sees the same event name and ID within 48 hours and counts one purchase. Bottom: the Pixel sends eventID 4821 while the server sends a different ID, so Meta cannot match them and counts two purchases.</desc>
+<defs>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+<marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#b4232c"/></marker>
+</defs>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">One order, two copies, one purchase</text>
+<text x="48" y="84" font-size="15" fill="#626975">Meta merges a browser and server event only when the event name and ID match, within 48 hours.</text>
+
+<text x="48" y="134" font-size="15" font-weight="700" letter-spacing="2" fill="#2f7d32">MATCHING IDS · COUNTED ONCE</text>
+<g font-size="15" fill="#101721">
+<rect x="48" y="152" width="380" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="184" font-weight="700">Browser · Meta Pixel</text>
+<text x="72" y="212" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="15">Purchase · eventID <tspan fill="#2f7d32" font-weight="700">4821</tspan></text>
+<rect x="48" y="252" width="380" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="284" font-weight="700">Server · Conversions API</text>
+<text x="72" y="312" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="15">Purchase · event_id <tspan fill="#2f7d32" font-weight="700">4821</tspan></text>
+</g>
+<line x1="432" y1="194" x2="560" y2="236" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<line x1="432" y1="294" x2="560" y2="254" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="566" y="196" width="300" height="96" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="716" y="232" text-anchor="middle" font-size="17" font-weight="700" fill="#101721">Meta: same name + ID</text>
+<text x="716" y="260" text-anchor="middle" font-size="14" fill="#626975">keeps one, discards the duplicate</text>
+<line x1="870" y1="244" x2="940" y2="244" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="946" y="196" width="206" height="96" rx="14" fill="#c5eb8c"/>
+<text x="1049" y="236" text-anchor="middle" font-size="30" font-weight="700" fill="#1a3123">1</text>
+<text x="1049" y="266" text-anchor="middle" font-size="15" font-weight="600" fill="#395e33">purchase counted</text>
+
+<line x1="48" y1="372" x2="1152" y2="372" stroke="#dce0e3"/>
+
+<text x="48" y="414" font-size="15" font-weight="700" letter-spacing="2" fill="#b4232c">MISMATCHED IDS · COUNTED TWICE</text>
+<g font-size="15" fill="#101721">
+<rect x="48" y="432" width="380" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="464" font-weight="700">Browser · Meta Pixel</text>
+<text x="72" y="492" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="15">Purchase · eventID <tspan fill="#b4232c" font-weight="700">4821</tspan></text>
+<rect x="48" y="532" width="380" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="564" font-weight="700">Server · second plugin</text>
+<text x="72" y="592" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="15">Purchase · event_id <tspan fill="#b4232c" font-weight="700">a9f3c…</tspan></text>
+</g>
+<line x1="432" y1="474" x2="560" y2="516" stroke="#b4232c" stroke-width="2.5" marker-end="url(#r)"/>
+<line x1="432" y1="574" x2="560" y2="534" stroke="#b4232c" stroke-width="2.5" marker-end="url(#r)"/>
+<rect x="566" y="476" width="300" height="96" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="716" y="512" text-anchor="middle" font-size="17" font-weight="700" fill="#101721">Meta: IDs differ</text>
+<text x="716" y="540" text-anchor="middle" font-size="14" fill="#626975">can't tell they're the same sale</text>
+<line x1="870" y1="524" x2="940" y2="524" stroke="#b4232c" stroke-width="2.5" marker-end="url(#r)"/>
+<rect x="946" y="476" width="206" height="96" rx="14" fill="#fde8e8"/>
+<text x="1049" y="516" text-anchor="middle" font-size="30" font-weight="700" fill="#b4232c">2</text>
+<text x="1049" y="546" text-anchor="middle" font-size="15" font-weight="600" fill="#b4232c">purchases counted</text>
+<text x="566" y="606" font-size="13" fill="#9aa1ab">Source: Meta for Developers, Deduplicate Pixel and Server Events.</text>
+</svg>

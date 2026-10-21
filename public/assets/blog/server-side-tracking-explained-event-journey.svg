@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">The journey of one purchase event through server-side tracking</title>
+<desc id="d">Six steps. 1: the visitor places an order and the data layer records a purchase with order ID, value and currency. 2: the web container's Google tag sends it to track.yourstore.com. 3: the GA4 client in the server container claims the request and turns it into event data. 4: triggers decide which tags fire, checking consent. 5: tags map the event for GA4, Meta, TikTok and Google Ads. 6: each platform receives a server-to-server request.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker></defs>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">The journey of one purchase event</text>
+<text x="48" y="84" font-size="15" fill="#626975">Steps 1–2 happen in the browser. Steps 3–6 happen on a server you control.</text>
+<g font-size="13" font-weight="700" letter-spacing="1.5"><text x="48" y="124" fill="#5145cd">IN THE BROWSER</text><text x="812" y="124" fill="#395e33">ON YOUR TRACKING SUBDOMAIN</text></g>
+<rect x="48" y="138" width="340" height="170" rx="14" fill="#fff" stroke="#dce0e3"/>
+<rect x="430" y="138" width="340" height="170" rx="14" fill="#fff" stroke="#dce0e3"/>
+<rect x="812" y="138" width="340" height="170" rx="14" fill="#c5eb8c" stroke="#a9d36b"/>
+<rect x="48" y="360" width="340" height="170" rx="14" fill="#c5eb8c" stroke="#a9d36b"/>
+<rect x="430" y="360" width="340" height="170" rx="14" fill="#c5eb8c" stroke="#a9d36b"/>
+<rect x="812" y="360" width="340" height="170" rx="14" fill="#fff" stroke="#dce0e3"/>
+<g font-size="16" font-weight="700" fill="#fff">
+<circle cx="88" cy="180" r="18" fill="#5145cd"/><text x="88" y="186" text-anchor="middle">1</text>
+<circle cx="470" cy="180" r="18" fill="#5145cd"/><text x="470" y="186" text-anchor="middle">2</text>
+<circle cx="852" cy="180" r="18" fill="#395e33"/><text x="852" y="186" text-anchor="middle">3</text>
+<circle cx="88" cy="402" r="18" fill="#395e33"/><text x="88" y="408" text-anchor="middle">4</text>
+<circle cx="470" cy="402" r="18" fill="#395e33"/><text x="470" y="408" text-anchor="middle">5</text>
+<circle cx="852" cy="402" r="18" fill="#101721"/><text x="852" y="408" text-anchor="middle">6</text>
+</g>
+<g font-size="18" font-weight="700" fill="#101721">
+<text x="118" y="186">Order placed</text>
+<text x="500" y="186">Google tag sends it</text>
+<text x="882" y="186">A client claims it</text>
+<text x="118" y="408">Triggers decide</text>
+<text x="500" y="408">Tags map the event</text>
+<text x="882" y="408">Platforms receive it</text>
+</g>
+<g font-size="15" fill="#626975">
+<text x="72" y="226">The data layer records a</text><text x="72" y="248"><tspan font-weight="600" fill="#101721">purchase</tspan> with order ID, value,</text><text x="72" y="270">currency and items.</text>
+<text x="454" y="226">The web container's Google tag</text><text x="454" y="248">sends the hit to your subdomain,</text><text x="454" y="270">not to Google directly.</text>
+</g>
+<g font-size="15" fill="#395e33">
+<text x="836" y="226">The GA4 client recognizes the</text><text x="836" y="248">request and turns it into event</text><text x="836" y="270">data tags can read.</text>
+<text x="72" y="448">"Fire on purchase", "fire only</text><text x="72" y="470">if marketing consent is granted",</text><text x="72" y="492">and so on.</text>
+<text x="454" y="448">GA4, Meta CAPI, TikTok and</text><text x="454" y="470">Google Ads tags shape the event,</text><text x="454" y="492">plus event_id for dedup.</text>
+</g>
+<g font-size="15" fill="#626975">
+<text x="836" y="448">Each platform gets a server-to-</text><text x="836" y="470">server request and applies its</text><text x="836" y="492">own matching and attribution.</text>
+</g>
+<g stroke="#626975" stroke-width="2.5" fill="none">
+<line x1="392" y1="223" x2="424" y2="223" marker-end="url(#a)"/>
+<line x1="774" y1="223" x2="806" y2="223" marker-end="url(#a)"/>
+<path d="M982 312 V334 H218 V354" marker-end="url(#a)"/>
+<line x1="392" y1="445" x2="424" y2="445" marker-end="url(#a)"/>
+<line x1="774" y1="445" x2="806" y2="445" marker-end="url(#a)"/>
+</g>
+<text x="48" y="572" font-size="13" fill="#626975">Illustration of a typical server-side Google Tag Manager setup. The server only forwards what the browser (or your backend) sends it.</text>
+</svg>

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Not every missing order is an ad blocker</title>
+<desc id="d">Illustrative waterfall chart, not benchmark data. A store has 100 website orders. 8 are missing in GA4 because the visitor declined analytics consent, which is expected. 5 are missing because the thank-you page never loaded. 4 are missing because a blocker stopped the tag. 1 is missing because of another tagging error. GA4 records 82 purchases. Each cause needs a different fix.</desc>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Not every missing order is an ad blocker</text>
+<text x="48" y="84" font-size="15" fill="#626975">Illustrative example: 100 website orders vs 82 GA4 purchases. Your own split will be different.</text>
+<!-- scale: 0..100 -> x 400..1000 (6 px per order) -->
+<g stroke="#dce0e3"><line x1="400" y1="116" x2="400" y2="540"/><line x1="700" y1="116" x2="700" y2="540"/><line x1="1000" y1="116" x2="1000" y2="540"/></g>
+<g font-size="15" fill="#101721">
+<text x="48" y="150" font-weight="600">Website orders (backend)</text><text x="48" y="171" font-size="13" fill="#626975">your source of truth</text>
+<text x="48" y="226" font-weight="600">Declined analytics consent</text><text x="48" y="247" font-size="13" fill="#626975">expected, don't try to recover</text>
+<text x="48" y="302" font-weight="600">Thank-you page never loaded</text><text x="48" y="323" font-size="13" fill="#626975">fix: backend purchase hit</text>
+<text x="48" y="378" font-weight="600">Tag blocked by extension or browser</text><text x="48" y="399" font-size="13" fill="#626975">helps: first-party serving</text>
+<text x="48" y="454" font-weight="600">Other tagging errors</text><text x="48" y="475" font-size="13" fill="#626975">fix: triggers, data layer</text>
+<text x="48" y="530" font-weight="600">GA4 purchases recorded</text><text x="48" y="551" font-size="13" fill="#626975">what your report shows</text>
+</g>
+<rect x="400" y="134" width="600" height="40" rx="6" fill="#aab4c5"/><text x="988" y="160" text-anchor="end" font-size="15" font-weight="700" fill="#101721">100</text>
+<rect x="952" y="210" width="48" height="40" rx="6" fill="#dcd9f7" stroke="#5145cd"/><text x="940" y="236" text-anchor="end" font-size="15" font-weight="700" fill="#5145cd">−8</text>
+<rect x="922" y="286" width="30" height="40" rx="6" fill="#e58a17"/><text x="910" y="312" text-anchor="end" font-size="15" font-weight="700" fill="#101721">−5</text>
+<rect x="898" y="362" width="24" height="40" rx="6" fill="#b4232c"/><text x="886" y="388" text-anchor="end" font-size="15" font-weight="700" fill="#101721">−4</text>
+<rect x="892" y="438" width="6" height="40" rx="3" fill="#626975"/><text x="880" y="464" text-anchor="end" font-size="15" font-weight="700" fill="#101721">−1</text>
+<rect x="400" y="514" width="492" height="40" rx="6" fill="#5fa83a"/><text x="880" y="540" text-anchor="end" font-size="15" font-weight="700" fill="#fff">82</text>
+<g stroke="#9aa1ab" stroke-dasharray="4 4"><line x1="1000" y1="174" x2="1000" y2="210"/><line x1="952" y1="250" x2="952" y2="286"/><line x1="922" y1="326" x2="922" y2="362"/><line x1="898" y1="402" x2="898" y2="438"/><line x1="892" y1="478" x2="892" y2="514"/></g>
+<rect x="1012" y="210" width="152" height="40" rx="8" fill="#fff" stroke="#dce0e3"/><text x="1088" y="235" text-anchor="middle" font-size="13" font-weight="600" fill="#5145cd">working as designed</text>
+<rect x="1012" y="362" width="152" height="40" rx="8" fill="#fff" stroke="#dce0e3"/><text x="1088" y="387" text-anchor="middle" font-size="13" font-weight="600" fill="#b4232c">the blocker share</text>
+<g font-size="13" fill="#626975"><text x="400" y="580" text-anchor="middle">0</text><text x="700" y="580" text-anchor="middle">50</text><text x="1000" y="580" text-anchor="middle">100 orders</text></g>
+<text x="48" y="616" font-size="13" fill="#9aa1ab">Illustrative numbers only, not a benchmark. Measure your own split by matching order IDs with GA4 transaction IDs.</text>
+</svg>

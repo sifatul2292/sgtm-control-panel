@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">One shopping visit, three ways to count it</title>
+<desc id="d">Illustrative example of one visit that loads gtm.js and gtag.js, then sends page_view, add_to_cart and purchase. Counted in requests, as Stape, TAGGRS and Addingwell bill, it is about 5. Counted in events, as Tagioo and Tracklution bill, it is 3. Counted in orders, as Elevar bills, it is 1. Whether script loads count as requests depends on the host.</desc>
+<defs><path id="ck" d="M-7 0L-2 5L8 -6" fill="none" stroke="#395e33" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></defs>
+<rect width="1200" height="650" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="24" font-weight="700" fill="#101721">One shopping visit, three ways to count it</text>
+<text x="48" y="86" font-size="15" fill="#626975">The same traffic lands on different plan tiers depending on the unit a host bills by.</text>
+<rect x="40" y="110" width="1120" height="430" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="76" y="150" font-size="14" font-weight="700" fill="#626975">WHAT HAPPENS IN THE BROWSER</text>
+<g text-anchor="middle">
+<text x="720" y="144" font-size="17" font-weight="700" fill="#101721">Requests</text><text x="720" y="164" font-size="13" fill="#626975">Stape · TAGGRS · Addingwell</text>
+<text x="900" y="144" font-size="17" font-weight="700" fill="#101721">Events</text><text x="900" y="164" font-size="13" fill="#626975">Tagioo · Tracklution</text>
+<text x="1070" y="144" font-size="17" font-weight="700" fill="#101721">Orders</text><text x="1070" y="164" font-size="13" fill="#626975">Elevar</text>
+</g>
+<line x1="60" y1="180" x2="1140" y2="180" stroke="#dce0e3"/>
+<g font-size="16" font-weight="600" fill="#101721">
+<circle cx="88" cy="214" r="15" fill="#5145cd"/><text x="88" y="219" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">1</text>
+<text x="120" y="210">Page loads gtm.js</text><text x="120" y="230" font-size="13" font-weight="400" fill="#626975">from your tracking subdomain (custom loader)</text>
+<circle cx="88" cy="274" r="15" fill="#5145cd"/><text x="88" y="279" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">2</text>
+<text x="120" y="270">Page loads gtag.js</text><text x="120" y="290" font-size="13" font-weight="400" fill="#626975">the Google tag library</text>
+<circle cx="88" cy="334" r="15" fill="#5145cd"/><text x="88" y="339" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">3</text>
+<text x="120" y="330">page_view</text><text x="120" y="350" font-size="13" font-weight="400" fill="#626975">visitor lands on a product page</text>
+<circle cx="88" cy="394" r="15" fill="#5145cd"/><text x="88" y="399" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">4</text>
+<text x="120" y="390">add_to_cart</text><text x="120" y="410" font-size="13" font-weight="400" fill="#626975">visitor adds the product</text>
+<circle cx="88" cy="454" r="15" fill="#5145cd"/><text x="88" y="459" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">5</text>
+<text x="120" y="450">purchase</text><text x="120" y="470" font-size="13" font-weight="400" fill="#626975">visitor completes the order</text>
+</g>
+<g stroke="#eef0f2"><line x1="60" y1="244" x2="1140" y2="244"/><line x1="60" y1="304" x2="1140" y2="304"/><line x1="60" y1="364" x2="1140" y2="364"/><line x1="60" y1="424" x2="1140" y2="424"/></g>
+<g fill="#c5eb8c">
+<circle cx="720" cy="214" r="16"/><circle cx="720" cy="274" r="16"/><circle cx="720" cy="334" r="16"/><circle cx="720" cy="394" r="16"/><circle cx="720" cy="454" r="16"/>
+<circle cx="900" cy="334" r="16"/><circle cx="900" cy="394" r="16"/><circle cx="900" cy="454" r="16"/>
+<circle cx="1070" cy="454" r="16"/>
+</g>
+<use href="#ck" x="720" y="214"/><use href="#ck" x="720" y="274"/><use href="#ck" x="720" y="334"/><use href="#ck" x="720" y="394"/><use href="#ck" x="720" y="454"/>
+<use href="#ck" x="900" y="334"/><use href="#ck" x="900" y="394"/><use href="#ck" x="900" y="454"/>
+<use href="#ck" x="1070" y="454"/>
+<g font-size="18" fill="#9aa1ab" text-anchor="middle"><text x="900" y="220">–</text><text x="900" y="280">–</text><text x="1070" y="220">–</text><text x="1070" y="280">–</text><text x="1070" y="340">–</text><text x="1070" y="400">–</text></g>
+<rect x="56" y="482" width="1088" height="46" rx="12" fill="#eceaff"/>
+<text x="76" y="512" font-size="16" font-weight="700" fill="#101721">Total for this visit</text>
+<g font-size="22" font-weight="800" fill="#5145cd" text-anchor="middle"><text x="720" y="513">5</text><text x="900" y="513">3</text><text x="1070" y="513">1</text></g>
+<text x="48" y="574" font-size="13" fill="#626975">Illustrative example, not a measurement. Bots, preview sessions and extra tags can add requests. Whether script loads count</text>
+<text x="48" y="594" font-size="13" fill="#626975">depends on the host: Addingwell's pricing page says gtm.js and gtag.js downloads count as requests.</text>
+<text x="48" y="624" font-size="13" fill="#9aa1ab">Pricing units from each provider's own pricing page, as of October 2026.</text>
+</svg>

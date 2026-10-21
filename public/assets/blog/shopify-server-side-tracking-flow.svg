@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">How Shopify server-side tracking works with a Custom Pixel</title>
+<desc id="d">Shopify publishes standard customer events such as product_viewed, product_added_to_cart, checkout_started and checkout_completed. A Custom Pixel subscribes to them inside Shopify's lax sandbox, an iframe that only runs under the customer privacy permissions you set. The pixel loads the web GTM container and sends events to the store's own tracking subdomain, where the server GTM container forwards them to Meta Conversions API, GA4, TikTok Events API and Google Ads. A dashed path shows that apps using Shopify order webhooks can also send paid orders from the backend.</desc>
+<defs>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+<marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5145cd"/></marker>
+</defs>
+<rect width="1200" height="660" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">How Shopify server-side tracking works</text>
+<text x="48" y="84" font-size="15" fill="#626975">Customer events feed a Custom Pixel; the pixel feeds your own server container.</text>
+
+<!-- shopify -->
+<rect x="48" y="116" width="260" height="290" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="152" font-size="18" font-weight="700" fill="#101721">Shopify Customer events</text>
+<g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="14" fill="#101721">
+<rect x="72" y="172" width="212" height="32" rx="7" fill="#eceef2"/><text x="84" y="193">page_viewed</text>
+<rect x="72" y="212" width="212" height="32" rx="7" fill="#eceef2"/><text x="84" y="233">product_viewed</text>
+<rect x="72" y="252" width="212" height="32" rx="7" fill="#eceef2"/><text x="84" y="273">product_added_to_cart</text>
+<rect x="72" y="292" width="212" height="32" rx="7" fill="#eceef2"/><text x="84" y="313">checkout_started</text>
+<rect x="72" y="332" width="212" height="32" rx="7" fill="#c5eb8c"/><text x="84" y="353">checkout_completed</text>
+</g>
+<text x="72" y="390" font-size="13" fill="#626975">Needs the Thank you page to load</text>
+
+<line x1="312" y1="262" x2="364" y2="262" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+
+<!-- custom pixel sandbox -->
+<rect x="370" y="116" width="260" height="290" rx="14" fill="#fff" stroke="#dce0e3" stroke-dasharray="6 5"/>
+<text x="394" y="152" font-size="18" font-weight="700" fill="#101721">Custom Pixel</text>
+<text x="394" y="176" font-size="13" fill="#626975">Lax sandbox (iframe)</text>
+<rect x="394" y="194" width="212" height="58" rx="9" fill="#eceef2"/>
+<text x="410" y="218" font-size="14" font-weight="600" fill="#101721">Consent-gated</text>
+<text x="410" y="238" font-size="13" fill="#626975">runs under your permissions</text>
+<rect x="394" y="264" width="212" height="58" rx="9" fill="#eceef2"/>
+<text x="410" y="288" font-size="14" font-weight="600" fill="#101721">Loads web GTM</text>
+<text x="410" y="308" font-size="13" fill="#626975">maps events to GA4 names</text>
+<text x="394" y="352" font-size="13" fill="#626975">Can't read the storefront page;</text>
+<text x="394" y="372" font-size="13" fill="#626975">window.href is the sandbox URL</text>
+
+<line x1="634" y1="262" x2="686" y2="262" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+
+<!-- server -->
+<rect x="692" y="116" width="230" height="290" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="714" y="150" font-size="13" font-weight="700" letter-spacing="1.2" fill="#395e33">track.yourstore.com</text>
+<text x="714" y="174" font-size="17" font-weight="700" fill="#1a3123">Server container</text>
+<rect x="714" y="194" width="186" height="52" rx="9" fill="#fff"/><text x="730" y="226" font-size="14" font-weight="600" fill="#101721">GA4 client claims it</text>
+<rect x="714" y="256" width="186" height="52" rx="9" fill="#fff"/><text x="730" y="288" font-size="14" font-weight="600" fill="#101721">One tag per platform</text>
+<rect x="714" y="318" width="186" height="52" rx="9" fill="#fff"/><text x="730" y="341" font-size="14" font-weight="600" fill="#101721">Order ID = event_id</text><text x="730" y="360" font-size="13" fill="#626975">+ transaction_id</text>
+
+<!-- destinations -->
+<g font-size="16" font-weight="700" fill="#101721">
+<rect x="976" y="116" width="176" height="62" rx="12" fill="#fff" stroke="#dce0e3"/><text x="994" y="153">Meta CAPI</text>
+<rect x="976" y="192" width="176" height="62" rx="12" fill="#fff" stroke="#dce0e3"/><text x="994" y="229">GA4</text>
+<rect x="976" y="268" width="176" height="62" rx="12" fill="#fff" stroke="#dce0e3"/><text x="994" y="305">TikTok Events API</text>
+<rect x="976" y="344" width="176" height="62" rx="12" fill="#fff" stroke="#dce0e3"/><text x="994" y="381">Google Ads</text>
+</g>
+<g stroke="#2f7d32" stroke-width="2.5"><line x1="926" y1="240" x2="970" y2="150" marker-end="url(#g)"/><line x1="926" y1="252" x2="970" y2="223" marker-end="url(#g)"/><line x1="926" y1="270" x2="970" y2="299" marker-end="url(#g)"/><line x1="926" y1="282" x2="970" y2="374" marker-end="url(#g)"/></g>
+
+<!-- webhook path -->
+<rect x="48" y="456" width="260" height="96" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="72" y="490" font-size="17" font-weight="700" fill="#101721">Shopify backend</text>
+<text x="72" y="514" font-size="14" fill="#626975">orders/paid webhook</text>
+<text x="72" y="534" font-size="14" fill="#626975">(app-based setups)</text>
+<path d="M312 504 H806 V412" fill="none" stroke="#5145cd" stroke-width="2.5" stroke-dasharray="8 6" marker-end="url(#p)"/>
+<text x="350" y="494" font-size="14" fill="#5145cd" font-weight="600">Optional backend path: sends paid orders even if the Thank you page fails</text>
+
+<line x1="48" y1="590" x2="1152" y2="590" stroke="#dce0e3"/>
+<text x="48" y="618" font-size="13" fill="#626975">Simplified. Event names are Shopify's standard customer events. The Custom Pixel runs under the customer privacy permissions you configure.</text>
+<text x="48" y="640" font-size="13" fill="#9aa1ab">Sources: Shopify web pixels docs (sandboxes), checkout_completed reference.</text>
+</svg>

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Where a WooCommerce purchase can get lost in the browser</title>
+<desc id="d">A browser purchase has to pass five steps: the payment is completed, the shopper returns to the thank-you page, the tag loads, the request leaves the browser, and the platform receives it. Each step can fail: closed tabs and gateway redirects, cached or custom thank-you pages, blocked or delayed scripts, and blockers or privacy browsers. A backend purchase hit starts when WooCommerce records the payment, so it skips the thank-you page, tag and browser steps.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5145cd"/></marker>
+</defs>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Where a WooCommerce purchase gets lost in the browser</text>
+<text x="48" y="84" font-size="15" fill="#626975">A browser-only purchase must survive every step. A backend hit skips the fragile middle.</text>
+
+<g font-size="16" font-weight="700" fill="#101721" text-anchor="middle">
+<rect x="48" y="128" width="184" height="84" rx="14" fill="#fff" stroke="#dce0e3"/><text x="140" y="164">1. Payment</text><text x="140" y="188" font-size="13" font-weight="400" fill="#626975">order created + paid</text>
+<rect x="276" y="128" width="184" height="84" rx="14" fill="#fff" stroke="#dce0e3"/><text x="368" y="164">2. Thank-you page</text><text x="368" y="188" font-size="13" font-weight="400" fill="#626975">shopper comes back</text>
+<rect x="504" y="128" width="184" height="84" rx="14" fill="#fff" stroke="#dce0e3"/><text x="596" y="164">3. Tag loads</text><text x="596" y="188" font-size="13" font-weight="400" fill="#626975">GTM + purchase push</text>
+<rect x="732" y="128" width="184" height="84" rx="14" fill="#fff" stroke="#dce0e3"/><text x="824" y="164">4. Request sent</text><text x="824" y="188" font-size="13" font-weight="400" fill="#626975">leaves the browser</text>
+<rect x="960" y="128" width="192" height="84" rx="14" fill="#fff" stroke="#dce0e3"/><text x="1056" y="164">5. Platform</text><text x="1056" y="188" font-size="13" font-weight="400" fill="#626975">GA4, Meta, TikTok</text>
+</g>
+<g stroke="#626975" stroke-width="2.5"><line x1="234" y1="170" x2="270" y2="170" marker-end="url(#a)"/><line x1="462" y1="170" x2="498" y2="170" marker-end="url(#a)"/><line x1="690" y1="170" x2="726" y2="170" marker-end="url(#a)"/><line x1="918" y1="170" x2="954" y2="170" marker-end="url(#a)"/></g>
+
+<!-- failure notes -->
+<g font-size="14" fill="#101721">
+<rect x="276" y="236" width="184" height="150" rx="12" fill="#fde8e8"/>
+<text x="292" y="262" font-weight="700" fill="#b4232c">Can fail when</text>
+<text x="292" y="288">Tab closed after</text><text x="292" y="307">"payment successful"</text>
+<text x="292" y="333">Gateway redirect</text><text x="292" y="352">fails or is slow</text>
+
+<rect x="504" y="236" width="184" height="150" rx="12" fill="#fde8e8"/>
+<text x="520" y="262" font-weight="700" fill="#b4232c">Can fail when</text>
+<text x="520" y="288">Page served from</text><text x="520" y="307">cache or a custom</text><text x="520" y="326">thank-you template</text>
+<text x="520" y="352">JS "delayed until</text><text x="520" y="371">interaction"</text>
+
+<rect x="732" y="236" width="184" height="150" rx="12" fill="#fde8e8"/>
+<text x="748" y="262" font-weight="700" fill="#b4232c">Can fail when</text>
+<text x="748" y="288">Blocker stops</text><text x="748" y="307">third-party domains</text>
+<text x="748" y="333">Privacy browser</text><text x="748" y="352">drops the request</text>
+</g>
+
+<!-- backend path -->
+<path d="M140 214 V470 H1056 V218" fill="none" stroke="#5145cd" stroke-width="3" stroke-dasharray="9 7" marker-end="url(#p)"/>
+<rect x="330" y="436" width="540" height="68" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="464" text-anchor="middle" font-size="16" font-weight="700" fill="#101721">Backend purchase hit</text>
+<text x="600" y="488" text-anchor="middle" font-size="14" fill="#626975">starts when WooCommerce records the payment, via your server container</text>
+
+<text x="48" y="548" font-size="13" fill="#626975">Step 5 can still differ from your order count: attribution windows, consent and platform matching decide what an ad report shows.</text>
+<text x="48" y="572" font-size="13" fill="#626975">Simplified illustration of common failure points, not measured loss rates.</text>
+</svg>

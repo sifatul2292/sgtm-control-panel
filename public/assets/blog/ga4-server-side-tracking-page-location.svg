@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Why server-side GA4 can show only the homepage</title>
+<desc id="d">Illustrative comparison. Top: an event reaches the server container without page_location or page_title, so the server-side data falls back to the homepage and the GA4 pages report collapses into one row. Bottom: the web container sets page_location to the Page URL variable and page_title to document.title, so every event carries its real page and the pages report shows many URLs.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+</defs>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Why server-side GA4 can show only the homepage</text>
+<text x="48" y="84" font-size="15" fill="#626975">Illustration of a problem we hit ourselves. The fix lives in the web container.</text>
+<!-- row 1 -->
+<text x="48" y="130" font-size="14" font-weight="700" letter-spacing="2" fill="#b4232c">BEFORE · NO EXPLICIT PAGE FIELDS</text>
+<rect x="48" y="146" width="470" height="150" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="178" font-size="15" font-weight="700" fill="#101721">Event data in server preview</text>
+<g font-family="SFMono-Regular,Menlo,Consolas,monospace" font-size="14">
+<text x="72" y="210" fill="#101721">event_name: "page_view"</text>
+<text x="72" y="236" fill="#b4232c">page_location: (missing)</text>
+<text x="72" y="262" fill="#b4232c">page_title: (missing)</text>
+</g>
+<line x1="522" y1="221" x2="602" y2="221" stroke="#626975" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="608" y="146" width="544" height="150" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="632" y="178" font-size="15" font-weight="700" fill="#101721">GA4 · Pages and screens</text>
+<rect x="632" y="196" width="496" height="36" rx="6" fill="#fde8e8"/>
+<text x="648" y="220" font-size="14" fill="#101721">/ (homepage)</text><text x="1112" y="220" text-anchor="end" font-size="14" font-weight="700" fill="#b4232c">almost every view</text>
+<text x="632" y="262" font-size="14" fill="#626975">Landing pages, page reports and Meta's event_source_url</text>
+<text x="632" y="282" font-size="14" fill="#626975">all point at the same URL.</text>
+<!-- row 2 -->
+<text x="48" y="350" font-size="14" font-weight="700" letter-spacing="2" fill="#2f7d32">AFTER · SET THEM ON THE GOOGLE TAG</text>
+<rect x="48" y="366" width="470" height="150" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="398" font-size="15" font-weight="700" fill="#101721">Event data in server preview</text>
+<g font-family="SFMono-Regular,Menlo,Consolas,monospace" font-size="14">
+<text x="72" y="430" fill="#101721">event_name: "page_view"</text>
+<text x="72" y="456" fill="#395e33">page_location: {{Page URL}}</text>
+<text x="72" y="482" fill="#395e33">page_title: document.title</text>
+</g>
+<line x1="522" y1="441" x2="602" y2="441" stroke="#626975" stroke-width="2.5" marker-end="url(#a)"/>
+<rect x="608" y="366" width="544" height="150" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="632" y="398" font-size="15" font-weight="700" fill="#101721">GA4 · Pages and screens</text>
+<g font-size="14" fill="#101721">
+<rect x="632" y="412" width="496" height="28" rx="6" fill="#e7f6d2"/><text x="648" y="431">/products/linen-shirt</text>
+<rect x="632" y="444" width="496" height="28" rx="6" fill="#e7f6d2"/><text x="648" y="463">/collections/summer</text>
+<rect x="632" y="476" width="496" height="28" rx="6" fill="#e7f6d2"/><text x="648" y="495">/checkout/order-received</text>
+</g>
+<text x="1112" y="431" text-anchor="end" font-size="13" fill="#395e33">real pages</text>
+<text x="48" y="556" font-size="13" fill="#626975">Illustrative. Confirm both fields on every incoming event in server preview before you trust page-level reports.</text>
+<text x="48" y="578" font-size="13" fill="#9aa1ab">Page paths are examples. GA4 field names from Google's GA4 configuration reference.</text>
+</svg>

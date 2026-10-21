@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Shopify tracking changes, 2025 to 2026</title>
+<desc id="d">Timeline of Shopify changes that affect tracking. August 28, 2025: checkout Additional scripts became view-only. January 13, 2026: app pixels default to Optimized data sharing, so Shopify can pause marketing app pixels that send no signals. June 3, 2026: the app pixel activity log starts recording data access changes. August 26, 2026: deadline for non-Plus stores to upgrade the Thank you and Order status pages.</desc>
+<rect width="1200" height="520" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">What changed in Shopify tracking</text>
+<text x="48" y="84" font-size="15" fill="#626975">Four dates that explain why old scripts and quiet pixels stopped reporting purchases.</text>
+
+<line x1="96" y1="230" x2="1104" y2="230" stroke="#dce0e3" stroke-width="4" stroke-linecap="round"/>
+<g fill="#5145cd"><circle cx="174" cy="230" r="11"/><circle cx="458" cy="230" r="11"/><circle cx="742" cy="230" r="11"/><circle cx="1026" cy="230" r="11"/></g>
+<g fill="#fff"><circle cx="174" cy="230" r="4"/><circle cx="458" cy="230" r="4"/><circle cx="742" cy="230" r="4"/><circle cx="1026" cy="230" r="4"/></g>
+<g font-size="17" font-weight="700" fill="#5145cd" text-anchor="middle">
+<text x="174" y="196">Aug 28, 2025</text><text x="458" y="196">Jan 13, 2026</text><text x="742" y="196">Jun 3, 2026</text><text x="1026" y="196">Aug 26, 2026</text>
+</g>
+
+<g font-size="14" fill="#626975">
+<rect x="48" y="262" width="252" height="186" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="68" y="294" font-size="16" font-weight="700" fill="#101721">Additional scripts</text>
+<text x="68" y="316" font-size="16" font-weight="700" fill="#101721">become view-only</text>
+<text x="68" y="344">Snippets pasted into</text><text x="68" y="364">checkout settings can no</text><text x="68" y="384">longer be edited.</text>
+<text x="68" y="420" fill="#5145cd" font-weight="600">Move to Customer events</text>
+
+<rect x="332" y="262" width="252" height="186" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="352" y="294" font-size="16" font-weight="700" fill="#101721">App pixels default to</text>
+<text x="352" y="316" font-size="16" font-weight="700" fill="#101721">"Optimized" sharing</text>
+<text x="352" y="344">Shopify can pause a</text><text x="352" y="364">marketing app pixel that</text><text x="352" y="384">sends no signals.</text>
+<text x="352" y="420" fill="#5145cd" font-weight="600">Check each app pixel</text>
+
+<rect x="616" y="262" width="252" height="186" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="636" y="294" font-size="16" font-weight="700" fill="#101721">App pixel activity</text>
+<text x="636" y="316" font-size="16" font-weight="700" fill="#101721">log starts recording</text>
+<text x="636" y="344">See when a pixel's data</text><text x="636" y="364">access changed. Nothing</text><text x="636" y="384">before this date.</text>
+<text x="636" y="420" fill="#5145cd" font-weight="600">Use it to explain dips</text>
+
+<rect x="900" y="262" width="252" height="186" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="920" y="294" font-size="16" font-weight="700" fill="#101721">Thank you page</text>
+<text x="920" y="316" font-size="16" font-weight="700" fill="#101721">upgrade deadline</text>
+<text x="920" y="344">Last date for non-Plus</text><text x="920" y="364">stores to upgrade Thank</text><text x="920" y="384">you and Order status.</text>
+<text x="920" y="420" fill="#5145cd" font-weight="600">Replace script tracking</text>
+</g>
+<text x="48" y="490" font-size="13" fill="#9aa1ab">Sources: Shopify Help Center (Thank you and Order status upgrade, app pixels) and Shopify Changelog, January 13 and June 29, 2026.</text>
+</svg>

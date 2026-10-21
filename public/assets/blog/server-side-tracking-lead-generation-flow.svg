@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">How a lead travels through a server-side setup</title>
+<desc id="d">Diagram. A visitor submits a form and the page saves click IDs in hidden fields. Your backend accepts the submission and creates a submission ID. The site pushes a generate_lead event with that ID as event_id to Server GTM on your own tracking subdomain, which forwards it to GA4, Google Ads and the Meta Conversions API. Separately, the lead and its click IDs are saved in the CRM. Days or weeks later the CRM marks it qualified or won, and an offline upload sends that stage to Google Ads and Meta.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5145cd"/></marker>
+</defs>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="54" font-size="24" font-weight="700" fill="#101721">How a lead travels through a server-side setup</text>
+<text x="48" y="82" font-size="15" fill="#626975">Top: the moment of the enquiry. Bottom: what happens to the lead later in your CRM.</text>
+<text x="48" y="128" font-size="13" font-weight="700" fill="#626975">ON YOUR WEBSITE (SECONDS)</text>
+<g font-size="16" font-weight="700" fill="#101721">
+<rect x="40" y="144" width="230" height="104" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="60" y="178">1  Visitor submits</text><text x="60" y="200" font-size="13" font-weight="400" fill="#626975">the form; click IDs (gclid,</text><text x="60" y="219" font-size="13" font-weight="400" fill="#626975">fbclid) sit in hidden fields</text>
+<rect x="310" y="144" width="230" height="104" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="330" y="178">2  Backend accepts it</text><text x="330" y="200" font-size="13" font-weight="400" fill="#626975">validation and spam checks</text><text x="330" y="219" font-size="13" font-weight="400" fill="#626975">pass; submission ID created</text>
+<rect x="580" y="144" width="250" height="104" rx="14" fill="#eceaff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="178">3  Server GTM</text><text x="600" y="200" font-size="13" font-weight="400" fill="#626975">on track.yoursite.com</text><text x="600" y="219" font-size="13" font-weight="400" fill="#626975">checks consent, forwards</text>
+</g>
+<g font-size="15" font-weight="700" fill="#101721">
+<rect x="900" y="118" width="260" height="56" rx="14" fill="#fff" stroke="#dce0e3"/><text x="920" y="144">GA4</text><text x="920" y="163" font-size="13" font-weight="400" fill="#626975">generate_lead</text>
+<rect x="900" y="186" width="260" height="56" rx="14" fill="#fff" stroke="#dce0e3"/><text x="920" y="212">Google Ads</text><text x="920" y="231" font-size="13" font-weight="400" fill="#626975">lead conversion action</text>
+<rect x="900" y="254" width="260" height="56" rx="14" fill="#fff" stroke="#dce0e3"/><text x="920" y="280">Meta Conversions API</text><text x="920" y="299" font-size="13" font-weight="400" fill="#626975">Lead, same event_id as Pixel</text>
+</g>
+<g stroke="#626975" stroke-width="2.5" fill="none">
+<line x1="270" y1="196" x2="304" y2="196" marker-end="url(#a)"/>
+<line x1="540" y1="196" x2="574" y2="196" marker-end="url(#a)"/>
+<path d="M830 196H862V146H894" marker-end="url(#a)"/><line x1="862" y1="214" x2="894" y2="214" marker-end="url(#a)"/><path d="M862 196V282H894" marker-end="url(#a)"/>
+<path d="M425 248V420" marker-end="url(#a)"/>
+</g>
+<rect x="436" y="300" width="250" height="50" rx="10" fill="#fff" stroke="#dce0e3"/>
+<text x="452" y="321" font-size="13" font-weight="700" fill="#101721">generate_lead + event_id</text><text x="452" y="340" font-size="13" fill="#626975">e.g. event_id: "lead_8F3K2"</text>
+<path d="M557 300V206" stroke="#9aa1ab" stroke-width="1.5" fill="none" stroke-dasharray="4 4"/>
+<text x="413" y="300" font-size="13" fill="#626975" text-anchor="end">lead + click IDs</text><text x="413" y="318" font-size="13" fill="#626975" text-anchor="end">+ email saved</text>
+<line x1="40" y1="392" x2="1160" y2="392" stroke="#dce0e3" stroke-dasharray="6 6"/>
+<text x="48" y="414" font-size="13" font-weight="700" fill="#626975">IN YOUR CRM (DAYS OR WEEKS LATER)</text>
+<g font-size="16" font-weight="700" fill="#101721">
+<rect x="310" y="426" width="270" height="104" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="330" y="460">4  CRM updates the lead</text><text x="330" y="482" font-size="13" font-weight="400" fill="#626975">contacted, qualified, won or lost</text><text x="330" y="501" font-size="13" font-weight="400" fill="#626975">by your sales team</text>
+<rect x="620" y="426" width="260" height="104" rx="14" fill="#c5eb8c"/>
+<text x="640" y="460" fill="#1a3123">5  Offline upload</text><text x="640" y="482" font-size="13" font-weight="400" fill="#395e33">Google Ads Data Manager,</text><text x="640" y="501" font-size="13" font-weight="400" fill="#395e33">Meta Conversions API</text>
+</g>
+<line x1="580" y1="478" x2="614" y2="478" stroke="#626975" stroke-width="2.5" marker-end="url(#a)"/>
+<path d="M880 478H1000V316" stroke="#5145cd" stroke-width="2.5" fill="none" stroke-dasharray="8 6" marker-end="url(#b)"/>
+<text x="1012" y="420" font-size="13" font-weight="700" fill="#5145cd">qualified / won</text><text x="1012" y="438" font-size="13" fill="#5145cd">sent back to</text><text x="1012" y="456" font-size="13" fill="#5145cd">Google Ads + Meta</text>
+<rect x="40" y="556" width="1120" height="48" rx="12" fill="#fde8e8"/>
+<text x="60" y="586" font-size="14" font-weight="600" fill="#101721">Consent still applies. Server-side only changes where data is processed, not whether you may collect it.</text>
+<text x="48" y="626" font-size="13" fill="#9aa1ab">Simplified diagram. Event names follow Google's GA4 recommended events and Meta's standard events.</text>
+</svg>

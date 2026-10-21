@@ -8,7 +8,9 @@
     "start": "node server.js",
     "check": "node --check server.js",
     "test:paddle": "node --test paddle-billing.test.js",
-    "test:data-protection": "node --test test/data-protection.test.js test/protected-data-audit.test.js test/staff-password-policy.test.js"
+    "test:data-protection": "node --test test/data-protection.test.js test/protected-data-audit.test.js test/staff-password-policy.test.js",
+    "build:blog": "node scripts/build-blog.mjs",
+    "build:covers": "node scripts/build-blog-covers.mjs"
   },
   "engines": {
     "node": ">=20"

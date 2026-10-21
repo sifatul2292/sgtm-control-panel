@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Tagioo setup in 8 steps</title>
+<desc id="d">The Tagioo launch flow in eight steps across three places. In Tagioo and GTM: 1 create a Tagioo account, 2 create a GTM server container and copy the Container Config, 3 create the Tagioo container with your tracking domain, 4 add one CNAME record and wait for SSL. In Setup Assistant and GTM: 5 generate web.json and server.json, 6 import both with Merge. On your website: 7 connect WooCommerce, Shopify or a custom site, 8 preview, test an order, then publish both containers.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker></defs>
+<rect width="1200" height="560" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">From new account to first verified event</text>
+<text x="48" y="84" font-size="15" fill="#626975">Eight steps. DNS propagation is usually the only part you wait on.</text>
+<g font-size="13" font-weight="700" letter-spacing="1.5">
+<text x="48" y="126" fill="#5145cd">HOSTING AND DOMAIN</text>
+<text x="48" y="336" fill="#395e33">CONTAINER FILES</text>
+<text x="612" y="336" fill="#101721">YOUR WEBSITE</text>
+</g>
+<g fill="#fff" stroke="#dce0e3">
+<rect x="48" y="140" width="258" height="150" rx="14"/><rect x="330" y="140" width="258" height="150" rx="14"/><rect x="612" y="140" width="258" height="150" rx="14"/><rect x="894" y="140" width="258" height="150" rx="14"/>
+</g>
+<g fill="#c5eb8c" stroke="#a9d36b"><rect x="48" y="350" width="258" height="150" rx="14"/><rect x="330" y="350" width="258" height="150" rx="14"/></g>
+<g fill="#fff" stroke="#dce0e3"><rect x="612" y="350" width="258" height="150" rx="14"/></g>
+<rect x="894" y="350" width="258" height="150" rx="14" fill="#101721"/>
+<g font-size="16" font-weight="700" fill="#fff">
+<circle cx="86" cy="178" r="18" fill="#5145cd"/><text x="86" y="184" text-anchor="middle">1</text>
+<circle cx="368" cy="178" r="18" fill="#5145cd"/><text x="368" y="184" text-anchor="middle">2</text>
+<circle cx="650" cy="178" r="18" fill="#5145cd"/><text x="650" y="184" text-anchor="middle">3</text>
+<circle cx="932" cy="178" r="18" fill="#5145cd"/><text x="932" y="184" text-anchor="middle">4</text>
+<circle cx="86" cy="388" r="18" fill="#395e33"/><text x="86" y="394" text-anchor="middle">5</text>
+<circle cx="368" cy="388" r="18" fill="#395e33"/><text x="368" y="394" text-anchor="middle">6</text>
+<circle cx="650" cy="388" r="18" fill="#101721"/><text x="650" y="394" text-anchor="middle">7</text>
+<circle cx="932" cy="388" r="18" fill="#c5eb8c"/><text x="932" y="394" text-anchor="middle" fill="#1a3123">8</text>
+</g>
+<g font-size="17" font-weight="700" fill="#101721">
+<text x="68" y="228">Create account</text><text x="350" y="228">GTM server container</text><text x="632" y="228">Tagioo container</text><text x="914" y="228">CNAME + SSL</text>
+<text x="68" y="438">Setup Assistant</text><text x="350" y="438">Import with Merge</text><text x="632" y="438">Connect your site</text>
+</g>
+<text x="914" y="438" font-size="17" font-weight="700" fill="#fff">Test, then publish</text>
+<g font-size="14" fill="#626975">
+<text x="68" y="254">Free plan, no card</text><text x="68" y="274">Verify your email</text>
+<text x="350" y="254">Manually provision</text><text x="350" y="274">Copy Container Config</text>
+<text x="632" y="254">Paste the config</text><text x="632" y="274">+ track.yourstore.com</text>
+<text x="914" y="254">One record at your DNS</text><text x="914" y="274">SSL issued automatically</text>
+<text x="632" y="464">WooCommerce plugin, Shopify</text><text x="632" y="484">Custom Pixel, or custom site</text>
+</g>
+<g font-size="14" fill="#395e33">
+<text x="68" y="464">Choose destinations</text><text x="68" y="484">Get web.json + server.json</text>
+<text x="350" y="464">web.json → Web GTM</text><text x="350" y="484">server.json → Server GTM</text>
+</g>
+<g font-size="14" fill="#c9cfd8"><text x="914" y="464">Preview, test order, Event Logs</text><text x="914" y="484">Publish both containers</text></g>
+<g stroke="#626975" stroke-width="2.5" fill="none">
+<line x1="308" y1="215" x2="326" y2="215" marker-end="url(#a)"/><line x1="590" y1="215" x2="608" y2="215" marker-end="url(#a)"/><line x1="872" y1="215" x2="890" y2="215" marker-end="url(#a)"/>
+<path d="M1023 294 V312 H270 V344" marker-end="url(#a)"/>
+<line x1="308" y1="425" x2="326" y2="425" marker-end="url(#a)"/><line x1="590" y1="425" x2="608" y2="425" marker-end="url(#a)"/><line x1="872" y1="425" x2="890" y2="425" marker-end="url(#a)"/>
+</g>
+<text x="48" y="536" font-size="13" fill="#626975">Based on Tagioo's How it works page and docs. Don't publish until the test in step 8 passes.</text>
+</svg>

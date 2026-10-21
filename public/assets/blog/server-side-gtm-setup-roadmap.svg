@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Server-side GTM setup in 8 steps</title>
+<desc id="d">Eight setup steps grouped into four phases. Build: 1 create the server container, 2 host it. Connect: 3 add a tracking subdomain with DNS and SSL, 4 point the web container's Google tag at it. Forward: 5 GA4 client and GA4 tag, 6 Meta CAPI, TikTok and Google Ads tags. Verify: 7 preview and debug, 8 publish both containers and verify with a real order. Badges show which steps a managed host usually handles (2 and 3) and which pre-built container files can cover (4 to 6).</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker></defs>
+<rect width="1200" height="520" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Server-side GTM setup at a glance</text>
+<text x="48" y="84" font-size="15" fill="#626975">Eight steps in four phases. Most failed setups break in Connect or Verify.</text>
+<g font-size="13" font-weight="700" letter-spacing="1.5" fill="#fff">
+<rect x="48" y="112" width="258" height="36" rx="10" fill="#5145cd"/><text x="68" y="136">1 · BUILD</text>
+<rect x="330" y="112" width="258" height="36" rx="10" fill="#5145cd"/><text x="350" y="136">2 · CONNECT</text>
+<rect x="612" y="112" width="258" height="36" rx="10" fill="#395e33"/><text x="632" y="136">3 · FORWARD</text>
+<rect x="894" y="112" width="258" height="36" rx="10" fill="#101721"/><text x="914" y="136">4 · VERIFY</text>
+</g>
+<g fill="#fff" stroke="#dce0e3">
+<rect x="48" y="164" width="258" height="112" rx="14"/><rect x="48" y="292" width="258" height="112" rx="14"/>
+<rect x="330" y="164" width="258" height="112" rx="14"/><rect x="330" y="292" width="258" height="112" rx="14"/>
+<rect x="612" y="164" width="258" height="112" rx="14"/><rect x="612" y="292" width="258" height="112" rx="14"/>
+<rect x="894" y="164" width="258" height="112" rx="14"/><rect x="894" y="292" width="258" height="112" rx="14"/>
+</g>
+<g font-size="15" font-weight="700" fill="#5145cd">
+<text x="68" y="194">STEP 1</text><text x="68" y="322">STEP 2</text><text x="350" y="194">STEP 3</text><text x="350" y="322">STEP 4</text>
+</g>
+<g font-size="15" font-weight="700" fill="#395e33"><text x="632" y="194">STEP 5</text><text x="632" y="322">STEP 6</text></g>
+<g font-size="15" font-weight="700" fill="#101721"><text x="914" y="194">STEP 7</text><text x="914" y="322">STEP 8</text></g>
+<g font-size="17" font-weight="700" fill="#101721">
+<text x="68" y="222">Create server container</text><text x="68" y="350">Host the container</text>
+<text x="350" y="222">Subdomain, DNS, SSL</text><text x="350" y="350">Point the web container</text>
+<text x="632" y="222">GA4 client + GA4 tag</text><text x="632" y="350">Meta, TikTok, Google Ads</text>
+<text x="914" y="222">Preview and debug</text><text x="914" y="350">Publish and verify</text>
+</g>
+<g font-size="14" fill="#626975">
+<text x="68" y="248">Copy the Container Config</text><text x="68" y="376">Cloud Run, Docker or managed</text>
+<text x="350" y="248">e.g. track.yourstore.com</text><text x="350" y="376">server_container_url</text>
+<text x="632" y="248">Trigger: Client Name = GA4</text><text x="632" y="376">event_id, consent checks</text>
+<text x="914" y="248">Both debuggers, a test order</text><text x="914" y="376">Both containers, real order</text>
+</g>
+<g font-size="13" font-weight="700">
+<rect x="210" y="300" width="84" height="24" rx="12" fill="#eceef2"/><text x="252" y="316" text-anchor="middle" fill="#5145cd">MANAGED</text>
+<rect x="492" y="172" width="84" height="24" rx="12" fill="#eceef2"/><text x="534" y="188" text-anchor="middle" fill="#5145cd">MANAGED</text>
+<rect x="492" y="300" width="84" height="24" rx="12" fill="#e6f4ea"/><text x="534" y="316" text-anchor="middle" fill="#395e33">FILES</text>
+<rect x="774" y="172" width="84" height="24" rx="12" fill="#e6f4ea"/><text x="816" y="188" text-anchor="middle" fill="#395e33">FILES</text>
+<rect x="774" y="300" width="84" height="24" rx="12" fill="#e6f4ea"/><text x="816" y="316" text-anchor="middle" fill="#395e33">FILES</text>
+</g>
+<g font-size="14">
+<rect x="48" y="436" width="84" height="24" rx="12" fill="#eceef2"/><text x="90" y="452" text-anchor="middle" font-size="13" font-weight="700" fill="#5145cd">MANAGED</text>
+<text x="146" y="453" fill="#626975">A managed sGTM host usually takes care of this step for you.</text>
+<rect x="48" y="470" width="84" height="24" rx="12" fill="#e6f4ea"/><text x="90" y="486" text-anchor="middle" font-size="13" font-weight="700" fill="#395e33">FILES</text>
+<text x="146" y="487" fill="#626975">Pre-built, importable container files (such as Tagioo's Setup Assistant) can cover this step. You still review, preview and publish.</text>
+</g>
+</svg>

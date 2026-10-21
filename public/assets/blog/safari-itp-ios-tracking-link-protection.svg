@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Where Safari removes click IDs from links</title>
+<desc id="d">Table of Safari's Link Tracking Protection as of iOS 26. Normal Safari browsing with default settings: click IDs usually kept, UTM parameters kept. Safari Private Browsing: click IDs removed, UTMs kept. Links shared in Mail or Messages: click IDs removed, UTMs kept. Advanced Tracking and Fingerprinting Protection set to All Browsing by the user: click IDs removed, UTMs kept. Apple does not publish the exact parameter list.</desc>
+<rect width="1200" height="560" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Where Safari removes click IDs from links</text>
+<text x="48" y="84" font-size="15" fill="#626975">Link Tracking Protection, iOS 17 onward. Campaign-level UTM parameters are left alone.</text>
+<rect x="48" y="112" width="1104" height="368" rx="16" fill="#fff" stroke="#dce0e3"/>
+<g font-size="13" font-weight="700" letter-spacing="1.5" fill="#626975">
+<text x="76" y="148">WHERE THE LINK IS OPENED</text>
+<text x="660" y="148">CLICK IDS (e.g. gclid, fbclid)</text>
+<text x="940" y="148">UTM PARAMETERS</text>
+</g>
+<line x1="48" y1="166" x2="1152" y2="166" stroke="#dce0e3"/>
+<g font-size="16" fill="#101721">
+<text x="76" y="204" font-weight="600">Normal Safari browsing</text><text x="76" y="226" font-size="13" fill="#626975">default settings</text>
+<text x="76" y="282" font-weight="600">Safari Private Browsing</text><text x="76" y="304" font-size="13" fill="#626975">protection on by default since Safari 17</text>
+<text x="76" y="360" font-weight="600">Links shared in Mail or Messages</text><text x="76" y="382" font-size="13" fill="#626975">Apple: links users share in these apps</text>
+<text x="76" y="438" font-weight="600">"All Browsing" protection turned on</text><text x="76" y="460" font-size="13" fill="#626975">Advanced Tracking and Fingerprinting Protection, user choice</text>
+</g>
+<g stroke="#dce0e3"><line x1="48" y1="244" x2="1152" y2="244"/><line x1="48" y1="322" x2="1152" y2="322"/><line x1="48" y1="400" x2="1152" y2="400"/></g>
+<!-- pills -->
+<g font-size="14" font-weight="700">
+<rect x="660" y="190" width="160" height="34" rx="17" fill="#c5eb8c"/><text x="740" y="212" text-anchor="middle" fill="#395e33">Usually kept</text>
+<rect x="660" y="268" width="160" height="34" rx="17" fill="#fde8e8"/><text x="740" y="290" text-anchor="middle" fill="#b4232c">Removed</text>
+<rect x="660" y="346" width="160" height="34" rx="17" fill="#fde8e8"/><text x="740" y="368" text-anchor="middle" fill="#b4232c">Removed</text>
+<rect x="660" y="424" width="160" height="34" rx="17" fill="#fde8e8"/><text x="740" y="446" text-anchor="middle" fill="#b4232c">Removed</text>
+<rect x="940" y="190" width="120" height="34" rx="17" fill="#c5eb8c"/><text x="1000" y="212" text-anchor="middle" fill="#395e33">Kept</text>
+<rect x="940" y="268" width="120" height="34" rx="17" fill="#c5eb8c"/><text x="1000" y="290" text-anchor="middle" fill="#395e33">Kept</text>
+<rect x="940" y="346" width="120" height="34" rx="17" fill="#c5eb8c"/><text x="1000" y="368" text-anchor="middle" fill="#395e33">Kept</text>
+<rect x="940" y="424" width="120" height="34" rx="17" fill="#c5eb8c"/><text x="1000" y="446" text-anchor="middle" fill="#395e33">Kept</text>
+</g>
+<text x="48" y="514" font-size="13" fill="#626975">Apple doesn't publish the parameter list. Independent tests report gclid and fbclid among those removed. Behavior can change between releases.</text>
+<text x="48" y="536" font-size="13" fill="#9aa1ab">Sources: Apple Newsroom (June 2023); WebKit Private Browsing 2.0; Apple iOS 26 announcement.</text>
+</svg>

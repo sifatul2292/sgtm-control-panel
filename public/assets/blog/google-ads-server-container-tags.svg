@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Illustration: tags in a server GTM container for Google Ads</title>
+<desc id="d">A simplified tag list in a server Google Tag Manager container: GA4 tag triggered on all GA4 client events, Conversion Linker on all pages, Google Ads Conversion Tracking on the purchase custom event, and optional Google Ads Remarketing on all pages. The GA4 client is listed under Clients.</desc>
+<rect width="1200" height="520" fill="#f7f8fa"/>
+<rect x="48" y="40" width="1104" height="440" rx="14" fill="#fff" stroke="#dce0e3"/>
+<rect x="48" y="40" width="1104" height="56" rx="14" fill="#1a73e8"/><rect x="48" y="80" width="1104" height="16" fill="#1a73e8"/>
+<text x="76" y="75" font-size="18" font-weight="600" fill="#fff">Tag Manager  ·  Server container  ·  track.yourstore.com</text>
+<text x="1124" y="75" text-anchor="end" font-size="13" fill="#d2e3fc">ILLUSTRATION</text>
+<rect x="48" y="96" width="200" height="384" fill="#f1f3f4"/>
+<g font-size="15" fill="#3c4043"><text x="72" y="140">Overview</text><text x="72" y="178" font-weight="700" fill="#1a73e8">Tags</text><text x="72" y="216">Triggers</text><text x="72" y="254">Variables</text><text x="72" y="292" font-weight="700" fill="#101721">Clients</text><text x="88" y="318" font-size="13" fill="#5f6368">GA4 (claims /g/collect)</text></g>
+<rect x="56" y="160" width="184" height="28" rx="6" fill="#d2e3fc" opacity=".55"/>
+<g font-size="13" font-weight="700" fill="#5f6368" letter-spacing=".5"><text x="276" y="138">NAME</text><text x="600" y="138">TYPE</text><text x="900" y="138">FIRING TRIGGER</text></g>
+<line x1="264" y1="152" x2="1136" y2="152" stroke="#dadce0"/>
+<g font-size="16" fill="#202124">
+<text x="276" y="192" font-weight="600">GA4 · forward events</text><text x="600" y="192" fill="#5f6368">Google Analytics: GA4</text><text x="900" y="192" fill="#5f6368">All GA4 client events</text>
+<line x1="264" y1="214" x2="1136" y2="214" stroke="#eceef2"/>
+<text x="276" y="252" font-weight="600">Conversion Linker</text><text x="600" y="252" fill="#5f6368">Conversion Linker</text><text x="900" y="252" fill="#5f6368">All Pages</text>
+<line x1="264" y1="274" x2="1136" y2="274" stroke="#eceef2"/>
+<text x="276" y="312" font-weight="600">Google Ads · Purchase</text><text x="600" y="312" fill="#5f6368">Google Ads Conversion Tracking</text><text x="900" y="312" fill="#5f6368">Event name = purchase</text>
+<line x1="264" y1="334" x2="1136" y2="334" stroke="#eceef2"/>
+<text x="276" y="372" font-weight="600">Google Ads · Remarketing</text><text x="600" y="372" fill="#5f6368">Google Ads Remarketing</text><text x="900" y="372" fill="#5f6368">All Pages (optional)</text>
+</g>
+<rect x="276" y="404" width="840" height="52" rx="8" fill="#e6f4ea"/>
+<text x="296" y="436" font-size="15" fill="#137333">Conversion ID + label go in the Purchase tag. Order ID, value and currency come from the GA4 event.</text>
+</svg>

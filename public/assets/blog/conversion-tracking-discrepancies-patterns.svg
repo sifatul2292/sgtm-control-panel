@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Four discrepancy patterns and what they usually mean</title>
+<desc id="d">Four illustrative bar charts comparing store orders, GA4 purchases and ad platform conversions for the same period. Pattern 1: GA4 and the ad platform are both far below store orders, which usually means a collection problem. Pattern 2: GA4 is close to store orders but the ad platform is lower, which is usually attribution or click ID loss and is partly normal. Pattern 3: the ad platform is above store orders, which usually means double counting or view-through conversions. Pattern 4: purchase counts match but revenue differs, which usually means a different value definition such as tax, shipping, refunds or currency. Numbers are made up for illustration.</desc>
+<rect width="1200" height="720" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Which gap are you looking at?</text>
+<text x="48" y="84" font-size="15" fill="#626975">Compare the same weeks in all three. The shape of the gap points to the cause. Numbers are illustrative.</text>
+<g font-size="13" fill="#626975">
+<!-- panel 1 -->
+<rect x="48" y="110" width="540" height="270" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="144" font-size="17" font-weight="700" fill="#101721">1. Everything is low</text>
+<text x="72" y="166">Store 100 · GA4 61 · Ad platform 54</text>
+<rect x="72" y="188" width="340" height="30" rx="5" fill="#aab4c5"/><text x="424" y="208" fill="#101721">Store orders</text>
+<rect x="72" y="226" width="207" height="30" rx="5" fill="#e58a17"/><text x="291" y="246" fill="#101721">GA4</text>
+<rect x="72" y="264" width="184" height="30" rx="5" fill="#5145cd"/><text x="268" y="284" fill="#101721">Ad platform</text>
+<text x="72" y="330" font-size="15" font-weight="700" fill="#b4232c">Likely: collection problem</text>
+<text x="72" y="354" font-size="14">Tag not firing, thank-you page skipped, broken setup</text>
+<!-- panel 2 -->
+<rect x="612" y="110" width="540" height="270" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="636" y="144" font-size="17" font-weight="700" fill="#101721">2. Only the ad platform is low</text>
+<text x="636" y="166">Store 100 · GA4 93 · Ad platform 64</text>
+<rect x="636" y="188" width="340" height="30" rx="5" fill="#aab4c5"/><text x="988" y="208" fill="#101721">Store orders</text>
+<rect x="636" y="226" width="316" height="30" rx="5" fill="#e58a17"/><text x="964" y="246" fill="#101721">GA4</text>
+<rect x="636" y="264" width="218" height="30" rx="5" fill="#5145cd"/><text x="866" y="284" fill="#101721">Ad platform</text>
+<text x="636" y="330" font-size="15" font-weight="700" fill="#e58a17">Likely: attribution or click-ID loss</text>
+<text x="636" y="354" font-size="14">Partly normal: not every order came from that ad</text>
+<!-- panel 3 -->
+<rect x="48" y="400" width="540" height="270" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="434" font-size="17" font-weight="700" fill="#101721">3. Ad platform is above the store</text>
+<text x="72" y="456">Store 100 · GA4 90 · Ad platform 131</text>
+<rect x="72" y="478" width="260" height="30" rx="5" fill="#aab4c5"/><text x="344" y="498" fill="#101721">Store orders</text>
+<rect x="72" y="516" width="234" height="30" rx="5" fill="#e58a17"/><text x="318" y="536" fill="#101721">GA4</text>
+<rect x="72" y="554" width="340" height="30" rx="5" fill="#b4232c"/><text x="424" y="574" fill="#101721">Ad platform</text>
+<text x="72" y="620" font-size="15" font-weight="700" fill="#b4232c">Likely: double counting or view-through</text>
+<text x="72" y="644" font-size="14">Check Pixel + server dedup, duplicate tags, view windows</text>
+<!-- panel 4 -->
+<rect x="612" y="400" width="540" height="270" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="636" y="434" font-size="17" font-weight="700" fill="#101721">4. Counts match, revenue doesn't</text>
+<text x="636" y="456">Revenue: Store $9,800 · GA4 $11,050</text>
+<rect x="636" y="478" width="302" height="30" rx="5" fill="#aab4c5"/><text x="950" y="498" fill="#101721">Store revenue</text>
+<rect x="636" y="516" width="340" height="30" rx="5" fill="#e58a17"/><text x="988" y="536" fill="#101721">GA4 revenue</text>
+<text x="636" y="580" font-size="14" fill="#626975">Orders: 100 vs 99 (close)</text>
+<text x="636" y="620" font-size="15" font-weight="700" fill="#5145cd">Likely: different value definition</text>
+<text x="636" y="644" font-size="14">Tax, shipping, discounts, refunds or currency</text>
+</g>
+<text x="48" y="700" font-size="13" fill="#9aa1ab">Illustrative numbers, not real data. "Ad platform" means Google Ads, Meta or TikTok purchases for the same dates.</text>
+</svg>

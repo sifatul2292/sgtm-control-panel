@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">TikTok Pixel plus Events API through a server container</title>
+<desc id="d">The visitor's browser fires the TikTok Pixel and sends one Google tag request to the store's own tracking subdomain. The server container maps the GA4 purchase event to TikTok's Purchase event and sends it to the TikTok Events API with an access token, the same event_id as the Pixel, and match keys such as the ttclid click ID, hashed email and phone, IP address and user agent. TikTok deduplicates the two copies and records the first one received.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+</defs>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">How the TikTok Events API fits next to the Pixel</text>
+<text x="48" y="84" font-size="15" fill="#626975">Two channels, one shared event_id. TikTok keeps the first copy it receives.</text>
+<rect x="48" y="128" width="300" height="300" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="162" font-size="13" font-weight="700" letter-spacing="1.5" fill="#626975">VISITOR'S BROWSER</text>
+<text x="72" y="194" font-size="18" font-weight="700" fill="#101721">Order confirmed</text>
+<rect x="72" y="214" width="252" height="80" rx="10" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="88" y="242" font-size="15" font-weight="600" fill="#101721">TikTok Pixel</text>
+<text x="88" y="266" font-size="13" fill="#626975">Purchase · event_id ORDER-1042</text>
+<text x="88" y="284" font-size="13" fill="#626975">sets the _ttp cookie</text>
+<rect x="72" y="306" width="252" height="98" rx="10" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="88" y="334" font-size="15" font-weight="600" fill="#101721">Google tag (GA4)</text>
+<text x="88" y="358" font-size="13" fill="#626975">purchase · same event_id</text>
+<text x="88" y="376" font-size="13" fill="#626975">value, currency, items,</text>
+<text x="88" y="394" font-size="13" fill="#626975">ttclid from the landing URL</text>
+<line x1="328" y1="254" x2="830" y2="190" stroke="#626975" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#a)"/>
+<text x="470" y="178" font-size="14" fill="#626975">Pixel request (browser channel)</text>
+<line x1="328" y1="356" x2="404" y2="356" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<rect x="410" y="250" width="380" height="252" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="434" y="284" font-size="13" font-weight="700" letter-spacing="1.5" fill="#395e33">track.yourstore.com · SERVER CONTAINER</text>
+<rect x="434" y="300" width="332" height="42" rx="9" fill="#fff"/>
+<text x="452" y="327" font-size="15" font-weight="600" fill="#101721">1. GA4 client receives purchase</text>
+<rect x="434" y="350" width="332" height="42" rx="9" fill="#fff"/>
+<text x="452" y="377" font-size="15" font-weight="600" fill="#101721">2. Map purchase → Purchase</text>
+<rect x="434" y="400" width="332" height="42" rx="9" fill="#fff"/>
+<text x="452" y="427" font-size="15" font-weight="600" fill="#101721">3. TikTok tag adds token + keys</text>
+<text x="434" y="472" font-size="13" fill="#395e33">Consent state travels with the request</text>
+<text x="434" y="490" font-size="13" fill="#395e33">Access token stays on the server</text>
+<line x1="794" y1="376" x2="830" y2="330" stroke="#2f7d32" stroke-width="3" marker-end="url(#g)"/>
+<rect x="836" y="140" width="316" height="290" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="860" y="180" font-size="22" font-weight="700" fill="#101721">TikTok</text>
+<text x="860" y="210" font-size="15" fill="#626975">Events API channel:</text>
+<text x="860" y="234" font-size="14" fill="#626975">Purchase · ORDER-1042</text>
+<text x="860" y="256" font-size="14" fill="#626975">ttclid, hashed email/phone,</text>
+<text x="860" y="278" font-size="14" fill="#626975">IP, user agent</text>
+<rect x="860" y="300" width="268" height="40" rx="8" fill="#eceafd"/>
+<text x="876" y="326" font-size="15" font-weight="600" fill="#101721">Same event + event_id ✓</text>
+<text x="860" y="372" font-size="17" font-weight="700" fill="#2f7d32">Counted once</text>
+<text x="860" y="396" font-size="13" fill="#626975">first copy received is kept;</text>
+<text x="860" y="414" font-size="13" fill="#626975">48-hour matching window</text>
+<line x1="48" y1="540" x2="1152" y2="540" stroke="#dce0e3"/>
+<text x="48" y="574" font-size="13" fill="#626975">Simplified. If a visitor declines advertising cookies, neither channel should send their data. The Events API doesn't change who you may track.</text>
+<text x="48" y="598" font-size="13" fill="#9aa1ab">Sources: TikTok Business Help Center, "About Events API", "About event deduplication". Order ID is an example.</text>
+</svg>

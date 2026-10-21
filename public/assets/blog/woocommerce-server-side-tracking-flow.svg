@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">How WooCommerce server-side tracking works</title>
+<desc id="d">Two paths feed one server container on the store's own tracking subdomain. The shopper's browser sends ecommerce events through the web GTM container. The WooCommerce backend sends a purchase hit when the order is paid. The server container claims each request with the GA4 client, maps it for each platform, and forwards it to GA4, Meta Conversions API, TikTok Events API and Google Ads. The order ID keeps the browser and backend copies of a purchase counted once.</desc>
+<defs>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+<marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5145cd"/></marker>
+</defs>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">How WooCommerce server-side tracking works</text>
+<text x="48" y="84" font-size="15" fill="#626975">Two ways in, one server container, every platform out.</text>
+
+<!-- inputs -->
+<text x="48" y="134" font-size="13" font-weight="700" letter-spacing="1.5" fill="#626975">1 · WHERE EVENTS START</text>
+<rect x="48" y="150" width="300" height="168" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="186" font-size="19" font-weight="700" fill="#101721">Shopper's browser</text>
+<text x="72" y="214" font-size="15" fill="#626975">view_item · add_to_cart</text>
+<text x="72" y="236" font-size="15" fill="#626975">begin_checkout · purchase</text>
+<text x="72" y="266" font-size="15" fill="#626975">Web GTM container sends</text>
+<text x="72" y="288" font-size="15" fill="#626975">them to your subdomain</text>
+
+<rect x="48" y="346" width="300" height="168" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="72" y="382" font-size="19" font-weight="700" fill="#101721">WooCommerce backend</text>
+<text x="72" y="410" font-size="15" fill="#626975">Order marked paid</text>
+<text x="72" y="432" font-size="15" fill="#626975">→ background purchase hit</text>
+<text x="72" y="462" font-size="15" fill="#626975">No thank-you page needed.</text>
+<text x="72" y="484" font-size="15" fill="#626975">Retries if the server is busy.</text>
+
+<line x1="352" y1="234" x2="442" y2="300" stroke="#2f7d32" stroke-width="2.5" marker-end="url(#g)"/>
+<line x1="352" y1="430" x2="442" y2="370" stroke="#5145cd" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#p)"/>
+
+<!-- server container -->
+<text x="450" y="134" font-size="13" font-weight="700" letter-spacing="1.5" fill="#626975">2 · YOUR SERVER</text>
+<rect x="450" y="150" width="380" height="364" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="474" y="184" font-size="13" font-weight="700" letter-spacing="1.5" fill="#395e33">track.yourstore.com</text>
+<text x="474" y="206" font-size="17" font-weight="700" fill="#1a3123">Server GTM container</text>
+<rect x="474" y="226" width="332" height="60" rx="9" fill="#fff"/>
+<text x="494" y="252" font-size="15" font-weight="600" fill="#101721">GA4 client claims each request</text>
+<text x="494" y="273" font-size="13" fill="#626975">Browser and backend hits look the same</text>
+<rect x="474" y="298" width="332" height="60" rx="9" fill="#fff"/>
+<text x="494" y="324" font-size="15" font-weight="600" fill="#101721">Tags map the event per platform</text>
+<text x="494" y="345" font-size="13" fill="#626975">Hashed match keys, fbp/fbc, value</text>
+<rect x="474" y="370" width="332" height="60" rx="9" fill="#fff"/>
+<text x="494" y="396" font-size="15" font-weight="600" fill="#101721">Order ID keeps it to one sale</text>
+<text x="494" y="417" font-size="13" fill="#626975">transaction_id + Meta event_id</text>
+<text x="474" y="462" font-size="13" fill="#395e33">Consent state from the page travels</text>
+<text x="474" y="482" font-size="13" fill="#395e33">with each browser request.</text>
+
+<!-- destinations -->
+<text x="900" y="134" font-size="13" font-weight="700" letter-spacing="1.5" fill="#626975">3 · PLATFORMS</text>
+<g font-size="17" font-weight="700" fill="#101721">
+<rect x="900" y="150" width="252" height="76" rx="14" fill="#fff" stroke="#dce0e3"/><text x="924" y="184">Google Analytics 4</text><text x="924" y="208" font-size="13" font-weight="400" fill="#626975">deduped by transaction_id</text>
+<rect x="900" y="246" width="252" height="76" rx="14" fill="#fff" stroke="#dce0e3"/><text x="924" y="280">Meta Conversions API</text><text x="924" y="304" font-size="13" font-weight="400" fill="#626975">deduped with Pixel by event_id</text>
+<rect x="900" y="342" width="252" height="76" rx="14" fill="#fff" stroke="#dce0e3"/><text x="924" y="376">TikTok Events API</text><text x="924" y="400" font-size="13" font-weight="400" fill="#626975">CompletePayment + event ID</text>
+<rect x="900" y="438" width="252" height="76" rx="14" fill="#fff" stroke="#dce0e3"/><text x="924" y="472">Google Ads</text><text x="924" y="496" font-size="13" font-weight="400" fill="#626975">conversion + remarketing</text>
+</g>
+<g stroke="#2f7d32" stroke-width="2.5" fill="none">
+<line x1="834" y1="300" x2="894" y2="190" marker-end="url(#g)"/>
+<line x1="834" y1="320" x2="894" y2="284" marker-end="url(#g)"/>
+<line x1="834" y1="344" x2="894" y2="380" marker-end="url(#g)"/>
+<line x1="834" y1="364" x2="894" y2="474" marker-end="url(#g)"/>
+</g>
+<line x1="48" y1="552" x2="1152" y2="552" stroke="#dce0e3"/>
+<line x1="48" y1="582" x2="96" y2="582" stroke="#2f7d32" stroke-width="2.5"/><text x="108" y="587" font-size="13" fill="#626975">Browser events (need the page and tag to load)</text>
+<line x1="470" y1="582" x2="518" y2="582" stroke="#5145cd" stroke-width="2.5" stroke-dasharray="7 6"/><text x="530" y="587" font-size="13" fill="#626975">Backend purchase hit (sent when WooCommerce records payment)</text>
+<text x="48" y="616" font-size="13" fill="#626975">Simplified. Server-side delivery makes tracking more reliable; it does not override a visitor's consent choices.</text>
+</svg>

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Three ways to address your tagging server</title>
+<desc id="d">Comparison of three server container URL options from Google's custom domain guide. Default cloud domain such as metrics.run.app: pre-configured, but can only set JavaScript cookies and requests go to a third-party domain. Subdomain such as track.yourstore.com: needs a DNS record and gets server-set first-party cookies. Same origin such as yourstore.com/metrics: Google's best practice, needs a CDN or load balancer to forward requests.</desc>
+<rect width="1200" height="560" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Where should your server container live?</text>
+<text x="48" y="84" font-size="15" fill="#626975">Three server container URL options, as described in Google's custom domain guide.</text>
+<rect x="48" y="112" width="344" height="370" rx="16" fill="#fff" stroke="#dce0e3"/>
+<rect x="428" y="112" width="344" height="370" rx="16" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<rect x="808" y="112" width="344" height="370" rx="16" fill="#fff" stroke="#dce0e3"/>
+<g font-size="13" font-weight="700" letter-spacing="1.5">
+<text x="72" y="146" fill="#b4232c">DEFAULT CLOUD URL</text>
+<text x="452" y="146" fill="#5145cd">SUBDOMAIN · MOST COMMON</text>
+<text x="832" y="146" fill="#395e33">SAME ORIGIN · BEST PRACTICE</text>
+</g>
+<g font-size="17" font-weight="700" fill="#101721" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+<rect x="72" y="162" width="296" height="44" rx="8" fill="#f1f3f4"/><text x="88" y="190">metrics.run.app</text>
+<rect x="452" y="162" width="296" height="44" rx="8" fill="#f1f3f4"/><text x="468" y="190">track.yourstore.com</text>
+<rect x="832" y="162" width="296" height="44" rx="8" fill="#f1f3f4"/><text x="848" y="190">yourstore.com/metrics</text>
+</g>
+<g font-size="15" fill="#101721">
+<text x="72" y="246" font-weight="600">Setup</text><text x="72" y="270" fill="#626975">Ready out of the box</text>
+<text x="72" y="310" font-weight="600">Cookies</text><text x="72" y="334" fill="#b4232c">JavaScript cookies only</text>
+<text x="72" y="374" font-weight="600">Domain seen by the browser</text><text x="72" y="398" fill="#b4232c">Third-party</text>
+<text x="72" y="438" font-weight="600">Use for</text><text x="72" y="462" fill="#626975">Quick tests only</text>
+<text x="452" y="246" font-weight="600">Setup</text><text x="452" y="270" fill="#626975">One DNS record + SSL</text>
+<text x="452" y="310" font-weight="600">Cookies</text><text x="452" y="334" fill="#2f7d32">Server-set first-party cookies</text>
+<text x="452" y="374" font-weight="600">Domain seen by the browser</text><text x="452" y="398" fill="#2f7d32">Your own (first-party)</text>
+<text x="452" y="438" font-weight="600">Use for</text><text x="452" y="462" fill="#626975">Most stores and managed hosts</text>
+<text x="832" y="246" font-weight="600">Setup</text><text x="832" y="270" fill="#626975">CDN or load balancer rule</text>
+<text x="832" y="310" font-weight="600">Cookies</text><text x="832" y="334" fill="#2f7d32">Server-set first-party cookies</text>
+<text x="832" y="374" font-weight="600">Domain seen by the browser</text><text x="832" y="398" fill="#2f7d32">Exactly your site</text>
+<text x="832" y="438" font-weight="600">Use for</text><text x="832" y="462" fill="#626975">Teams that control the CDN</text>
+</g>
+<text x="48" y="516" font-size="13" fill="#626975">Safari may still cap cookies at 7 days when a subdomain is a CNAME to another company's servers (WebKit CNAME-cloaking defense).</text>
+<text x="48" y="538" font-size="13" fill="#9aa1ab">Source: Google, "Custom domain for your tagging server"; WebKit, "CNAME Cloaking and Bounce Tracking Defense".</text>
+</svg>

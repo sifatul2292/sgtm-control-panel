@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Three ways to host a tagging server</title>
+<desc id="d">Three hosting options for a server-side tagging endpoint. Default provider URL, such as a cloud run.app address: third-party, cookies only via JavaScript, no DNS work. Subdomain such as track.yourstore.com: first-party, one DNS record, server-set cookies, and Safari may cap cookies at 7 days if the subdomain resolves to third-party infrastructure. Same origin path such as yourstore.com/metrics: first-party, needs a CDN or load balancer that forwards the path, server-set cookies, and the most durable option in Safari.</desc>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Three ways to host a tagging server</text>
+<text x="48" y="84" font-size="15" fill="#626975">The hostname decides whether your tracking is first-party, and how long Safari lets cookies live.</text>
+<!-- card 1 -->
+<rect x="48" y="116" width="344" height="400" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="152" font-size="13" font-weight="700" letter-spacing="1.5" fill="#b4232c">THIRD-PARTY</text>
+<text x="72" y="186" font-size="20" font-weight="700" fill="#101721">Default provider URL</text>
+<rect x="72" y="204" width="296" height="40" rx="8" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="88" y="230" font-size="14" fill="#101721">xyz-abc.a.run.app</text>
+<g font-size="15" fill="#101721">
+<text x="72" y="290">✕ Different site from your store</text>
+<text x="72" y="324">✕ JavaScript cookies only</text>
+<text x="72" y="358">✓ No DNS work</text>
+</g>
+<text x="72" y="410" font-size="13" font-weight="700" letter-spacing="1" fill="#626975">GOOD FOR</text>
+<text x="72" y="436" font-size="15" fill="#101721">Quick tests only</text>
+<!-- card 2 -->
+<rect x="428" y="116" width="344" height="400" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="452" y="152" font-size="13" font-weight="700" letter-spacing="1.5" fill="#395e33">FIRST-PARTY · MOST COMMON</text>
+<text x="452" y="186" font-size="20" font-weight="700" fill="#101721">Subdomain</text>
+<rect x="452" y="204" width="296" height="40" rx="8" fill="#fff"/>
+<text x="468" y="230" font-size="14" fill="#101721">track.yourstore.com</text>
+<g font-size="15" fill="#101721">
+<text x="452" y="290">✓ Same site as your store</text>
+<text x="452" y="324">✓ Server-set cookies</text>
+<text x="452" y="358">✓ One A or CNAME record</text>
+<text x="452" y="392">! Safari may cap at 7 days if</text>
+<text x="470" y="414">it resolves to another party</text>
+</g>
+<text x="452" y="456" font-size="13" font-weight="700" letter-spacing="1" fill="#395e33">GOOD FOR</text>
+<text x="452" y="482" font-size="15" fill="#101721">Most stores and agencies</text>
+<!-- card 3 -->
+<rect x="808" y="116" width="344" height="400" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="832" y="152" font-size="13" font-weight="700" letter-spacing="1.5" fill="#5145cd">FIRST-PARTY · SAME ORIGIN</text>
+<text x="832" y="186" font-size="20" font-weight="700" fill="#101721">Path on your site</text>
+<rect x="832" y="204" width="296" height="40" rx="8" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="848" y="230" font-size="14" fill="#101721">yourstore.com/metrics</text>
+<g font-size="15" fill="#101721">
+<text x="832" y="290">✓ Exactly your site's origin</text>
+<text x="832" y="324">✓ Server-set cookies</text>
+<text x="832" y="358">✓ Most durable in Safari</text>
+<text x="832" y="392">! Needs a CDN or load balancer</text>
+<text x="850" y="414">that forwards the path</text>
+</g>
+<text x="832" y="456" font-size="13" font-weight="700" letter-spacing="1" fill="#626975">GOOD FOR</text>
+<text x="832" y="482" font-size="15" fill="#101721">Teams that control the edge</text>
+<text x="48" y="556" font-size="13" fill="#626975">All three still need consent. Hostnames are examples.</text>
+<text x="48" y="578" font-size="13" fill="#9aa1ab">Sources: Google custom domain guide for server-side tagging; WebKit CNAME cloaking defense and Private Browsing 2.0.</text>
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 580" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">What server-side tracking can and can't do</title>
+<desc id="d">Two columns. It can: deliver events through your own domain, set longer-lived first-party cookies from the server, remove vendor scripts from the page, control what each vendor receives, send better match keys to ad platforms, and add a backend purchase source. It can't: bypass consent, fix broken or duplicate events, make every report agree, capture 100% of events, create sales on its own, or run for free.</desc>
+<rect width="1200" height="580" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">What server-side tracking can and can't do</text>
+<rect x="48" y="84" width="540" height="430" rx="16" fill="#fff" stroke="#dce0e3"/>
+<rect x="48" y="84" width="540" height="60" rx="16" fill="#c5eb8c"/><rect x="48" y="128" width="540" height="16" fill="#c5eb8c"/>
+<text x="76" y="122" font-size="18" font-weight="700" fill="#1a3123">It can help you…</text>
+<rect x="612" y="84" width="540" height="430" rx="16" fill="#fff" stroke="#dce0e3"/>
+<rect x="612" y="84" width="540" height="60" rx="16" fill="#fde8e8"/><rect x="612" y="128" width="540" height="16" fill="#fde8e8"/>
+<text x="640" y="122" font-size="18" font-weight="700" fill="#b4232c">It can't…</text>
+<g font-size="16" fill="#101721">
+<g fill="#395e33" font-weight="700"><text x="76" y="190">✓</text><text x="76" y="246">✓</text><text x="76" y="302">✓</text><text x="76" y="358">✓</text><text x="76" y="414">✓</text><text x="76" y="470">✓</text></g>
+<text x="104" y="190" font-weight="600">Deliver events through your own domain</text><text x="104" y="212" font-size="14" fill="#626975">fewer requests lost to domain blocklists</text>
+<text x="104" y="246" font-weight="600">Set first-party cookies from the server</text><text x="104" y="268" font-size="14" fill="#626975">often longer-lived than JavaScript cookies</text>
+<text x="104" y="302" font-weight="600">Remove vendor scripts from the page</text><text x="104" y="324" font-size="14" fill="#626975">less third-party code in the browser</text>
+<text x="104" y="358" font-weight="600">Control what each vendor receives</text><text x="104" y="380" font-size="14" fill="#626975">strip, hash or redact fields first</text>
+<text x="104" y="414" font-weight="600">Send better match keys to ad platforms</text><text x="104" y="436" font-size="14" fill="#626975">hashed email/phone, fbp/fbc, event_id</text>
+<text x="104" y="470" font-weight="600">Add a backend purchase source</text><text x="104" y="492" font-size="14" fill="#626975">orders recorded even if the thank-you page fails</text>
+<g fill="#b4232c" font-weight="700"><text x="640" y="190">✕</text><text x="640" y="246">✕</text><text x="640" y="302">✕</text><text x="640" y="358">✕</text><text x="640" y="414">✕</text><text x="640" y="470">✕</text></g>
+<text x="668" y="190" font-weight="600">Bypass consent</text><text x="668" y="212" font-size="14" fill="#626975">the same legal rules apply as for browser tags</text>
+<text x="668" y="246" font-weight="600">Fix broken or duplicate events</text><text x="668" y="268" font-size="14" fill="#626975">it forwards whatever it receives</text>
+<text x="668" y="302" font-weight="600">Make every report agree</text><text x="668" y="324" font-size="14" fill="#626975">platforms still attribute differently</text>
+<text x="668" y="358" font-weight="600">Capture 100% of events</text><text x="668" y="380" font-size="14" fill="#626975">bots, network errors and early exits remain</text>
+<text x="668" y="414" font-weight="600">Create sales on its own</text><text x="668" y="436" font-size="14" fill="#626975">better data, not better products or ads</text>
+<text x="668" y="470" font-weight="600">Run for free</text><text x="668" y="492" font-size="14" fill="#626975">hosting plus setup and maintenance time</text>
+</g>
+<text x="48" y="552" font-size="13" fill="#626975">How much each benefit helps depends on your audience, your current setup and how carefully the server container is configured.</text>
+</svg>

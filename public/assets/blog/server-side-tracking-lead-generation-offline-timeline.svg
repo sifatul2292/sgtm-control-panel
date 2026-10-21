@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">The clock starts at the ad click</title>
+<desc id="d">Timeline from day 0 to day 35 for an example lead. Day 0: ad click and form submission. Day 6: the lead is qualified. Day 24: the deal is won. Bands show Google Ads' default 30-day click-through conversion window, Meta's guidance that a Conversions API for CRM optimization stage should happen within 28 days of the lead, and Meta's rule that an event's event_time can be at most 7 days old when you send it, so stages should be uploaded at least daily.</desc>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="24" font-weight="700" fill="#101721">The clock starts at the ad click</text>
+<text x="48" y="84" font-size="15" fill="#626975">An example lead (illustrative days) against the windows Google and Meta publish.</text>
+<!-- scale day 0..35 -> x 140..1120 (28 px/day) -->
+<g stroke="#dce0e3"><line x1="140" y1="120" x2="140" y2="520"/><line x1="420" y1="120" x2="420" y2="520"/><line x1="700" y1="120" x2="700" y2="520"/><line x1="980" y1="120" x2="980" y2="520"/></g>
+<g font-size="13" fill="#626975" text-anchor="middle"><text x="140" y="542">Day 0</text><text x="420" y="542">10</text><text x="700" y="542">20</text><text x="980" y="542">30</text><text x="1120" y="542">35</text></g>
+<line x1="140" y1="200" x2="1120" y2="200" stroke="#626975" stroke-width="2.5"/>
+<g>
+<circle cx="140" cy="200" r="12" fill="#5145cd"/>
+<circle cx="308" cy="200" r="12" fill="#5145cd"/>
+<circle cx="812" cy="200" r="12" fill="#395e33"/>
+</g>
+<g font-size="15" font-weight="700" fill="#101721">
+<text x="160" y="144">Ad click + form</text><text x="160" y="164" font-size="13" font-weight="400" fill="#626975">gclid / fbc saved with the lead</text>
+<text x="328" y="244">Day 6: qualified</text><text x="328" y="264" font-size="13" font-weight="400" fill="#626975">qualify_lead uploaded</text>
+<text x="832" y="144">Day 24: won</text><text x="832" y="164" font-size="13" font-weight="400" fill="#626975">close_convert_lead uploaded</text>
+</g>
+<rect x="140" y="300" width="840" height="44" rx="10" fill="#eceaff" stroke="#5145cd"/>
+<text x="160" y="328" font-size="14" font-weight="700" fill="#101721">Google Ads default click-through conversion window: 30 days</text>
+<rect x="140" y="362" width="784" height="44" rx="10" fill="#fff" stroke="#dce0e3"/>
+<text x="160" y="390" font-size="14" font-weight="700" fill="#101721">Meta CRM integration: optimize on a stage within 28 days of the lead</text>
+<rect x="812" y="424" width="196" height="44" rx="10" fill="#fde8e8" stroke="#b4232c"/>
+<text x="826" y="452" font-size="14" font-weight="700" fill="#101721">Meta: send within 7 days</text>
+<text x="796" y="452" font-size="13" fill="#626975" text-anchor="end">event_time can't be older than this →</text>
+<text x="48" y="574" font-size="13" fill="#9aa1ab">Sources: Google Ads Help, conversion windows; Meta for Developers, Conversions API for CRM and server event parameters. Days are illustrative.</text>
+</svg>

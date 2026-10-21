@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Safari tracking prevention timeline, 2017 to 2025</title>
+<desc id="d">Timeline of WebKit tracking prevention changes. June 2017, ITP 1.0: a machine-learning classifier flags tracker domains. June 2018, ITP 2.0: tracker cookies partitioned immediately, 24-hour window removed. February 2019, ITP 2.1: cookies written by JavaScript capped at 7 days. April 2019, ITP 2.2: 1-day cap after a click from a tracker domain with a query string. September 2019, ITP 2.3: script storage deleted after 7 days and referrer trimmed. March 2020: full third-party cookie blocking. November 2020, Safari 14: cookies from CNAME-cloaked third-party subdomains capped at 7 days. September 2023, Safari 17 and iOS 17: Link Tracking Protection in Private Browsing, Mail and Messages. September 2025, Safari 26: advanced fingerprinting protection on by default in all browsing.</desc>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">How Safari tightened tracking, 2017–2025</text>
+<text x="48" y="84" font-size="15" fill="#626975">Each release shortened how long browser-side identifiers survive.</text>
+<line x1="60" y1="320" x2="1140" y2="320" stroke="#dce0e3" stroke-width="4" stroke-linecap="round"/>
+<g fill="#5145cd"><circle cx="150" cy="320" r="9"/><circle cx="262" cy="320" r="9"/><circle cx="375" cy="320" r="9"/><circle cx="487" cy="320" r="9"/><circle cx="600" cy="320" r="9"/><circle cx="712" cy="320" r="9"/><circle cx="825" cy="320" r="9"/><circle cx="937" cy="320" r="9"/><circle cx="1049" cy="320" r="9"/></g>
+<g stroke="#9aa1ab" stroke-width="1.5"><line x1="150" y1="200" x2="150" y2="311"/><line x1="375" y1="200" x2="375" y2="311"/><line x1="600" y1="200" x2="600" y2="311"/><line x1="825" y1="200" x2="825" y2="311"/><line x1="1049" y1="200" x2="1049" y2="311"/>
+<line x1="262" y1="329" x2="262" y2="390"/><line x1="487" y1="329" x2="487" y2="390"/><line x1="712" y1="329" x2="712" y2="390"/><line x1="937" y1="329" x2="937" y2="390"/></g>
+<!-- above -->
+<g font-size="14" fill="#101721">
+<rect x="47" y="112" width="206" height="88" rx="12" fill="#fff" stroke="#dce0e3"/>
+<text x="63" y="138" font-size="13" font-weight="700" fill="#5145cd">JUN 2017 · ITP 1.0</text>
+<text x="63" y="162">Classifier flags tracker</text><text x="63" y="182">domains</text>
+<rect x="272" y="112" width="206" height="88" rx="12" fill="#fff" stroke="#dce0e3"/>
+<text x="288" y="138" font-size="13" font-weight="700" fill="#5145cd">FEB 2019 · ITP 2.1</text>
+<text x="288" y="162">JavaScript cookies capped</text><text x="288" y="182">at 7 days</text>
+<rect x="497" y="112" width="206" height="88" rx="12" fill="#fff" stroke="#dce0e3"/>
+<text x="513" y="138" font-size="13" font-weight="700" fill="#5145cd">SEP 2019 · ITP 2.3</text>
+<text x="513" y="162">Script storage deleted after</text><text x="513" y="182">7 days; referrer trimmed</text>
+<rect x="722" y="112" width="206" height="88" rx="12" fill="#fff" stroke="#dce0e3"/>
+<text x="738" y="138" font-size="13" font-weight="700" fill="#5145cd">NOV 2020 · SAFARI 14</text>
+<text x="738" y="162">CNAME-cloaked server</text><text x="738" y="182">cookies capped at 7 days</text>
+<rect x="946" y="112" width="206" height="88" rx="12" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="962" y="138" font-size="13" font-weight="700" fill="#395e33">SEP 2025 · SAFARI 26</text>
+<text x="962" y="162">Fingerprinting protection</text><text x="962" y="182">on in all browsing</text>
+</g>
+<!-- below -->
+<g font-size="14" fill="#101721">
+<rect x="159" y="390" width="206" height="88" rx="12" fill="#fff" stroke="#dce0e3"/>
+<text x="175" y="416" font-size="13" font-weight="700" fill="#5145cd">JUN 2018 · ITP 2.0</text>
+<text x="175" y="440">Tracker cookies partitioned</text><text x="175" y="460">immediately</text>
+<rect x="384" y="390" width="206" height="88" rx="12" fill="#fff" stroke="#dce0e3"/>
+<text x="400" y="416" font-size="13" font-weight="700" fill="#5145cd">APR 2019 · ITP 2.2</text>
+<text x="400" y="440">1 day after a tracker-</text><text x="400" y="460">domain click with ?query</text>
+<rect x="609" y="390" width="206" height="88" rx="12" fill="#fff" stroke="#dce0e3"/>
+<text x="625" y="416" font-size="13" font-weight="700" fill="#5145cd">MAR 2020 · SAFARI 13.1</text>
+<text x="625" y="440">Full third-party cookie</text><text x="625" y="460">blocking</text>
+<rect x="834" y="390" width="206" height="88" rx="12" fill="#fff" stroke="#dce0e3"/>
+<text x="850" y="416" font-size="13" font-weight="700" fill="#5145cd">SEP 2023 · SAFARI 17</text>
+<text x="850" y="440">Link Tracking Protection:</text><text x="850" y="460">Private, Mail, Messages</text>
+</g>
+<text x="48" y="532" font-size="13" fill="#626975">Also documented by 2024: cookies from cloaked third-party IP addresses capped at 7 days, in regular and Private Browsing.</text>
+<text x="48" y="556" font-size="13" fill="#9aa1ab">Sources: WebKit blog posts on ITP 1.0–2.3, full third-party cookie blocking, CNAME cloaking, Private Browsing 2.0 and Safari 26.0; Apple Newsroom.</text>
+<text x="48" y="578" font-size="13" fill="#9aa1ab">Dates are WebKit or Apple announcement dates.</text>
+</svg>

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">What a healthy WooCommerce purchase event looks like</title>
+<desc id="d">An example GA4 purchase event in the data layer, with notes. transaction_id should be the WooCommerce order number and never empty, because GA4 deduplicates on it. value and currency should match the definition you report on, for example with or without tax and shipping. items lists each product with ID, name, price and quantity. event_id must be the same on the browser and server copies so Meta can deduplicate. The event should fire once per order, not on every reload of the thank-you page.</desc>
+<rect width="1200" height="620" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">What a healthy purchase event looks like</text>
+<text x="48" y="84" font-size="15" fill="#626975">Open GTM Preview on the thank-you page and compare your purchase push with this.</text>
+
+<rect x="48" y="112" width="560" height="460" rx="16" fill="#101721"/>
+<g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="16" fill="#e6e8ec">
+<text x="76" y="154"><tspan fill="#9aa1ab">dataLayer.push({</tspan></text>
+<text x="96" y="186">event: <tspan fill="#c5eb8c">"purchase"</tspan>,</text>
+<text x="96" y="218">event_id: <tspan fill="#c5eb8c">"4821"</tspan>,</text>
+<text x="96" y="250">ecommerce: {</text>
+<text x="120" y="282">transaction_id: <tspan fill="#c5eb8c">"4821"</tspan>,</text>
+<text x="120" y="314">value: <tspan fill="#b9b3ff">84.00</tspan>,</text>
+<text x="120" y="346">tax: <tspan fill="#b9b3ff">6.00</tspan>,</text>
+<text x="120" y="378">shipping: <tspan fill="#b9b3ff">5.00</tspan>,</text>
+<text x="120" y="410">currency: <tspan fill="#c5eb8c">"USD"</tspan>,</text>
+<text x="120" y="442">items: [{ item_id: <tspan fill="#c5eb8c">"SKU-12"</tspan>,</text>
+<text x="152" y="474">price: <tspan fill="#b9b3ff">36.50</tspan>, quantity: <tspan fill="#b9b3ff">2</tspan> }]</text>
+<text x="96" y="506">}</text>
+<text x="76" y="538"><tspan fill="#9aa1ab">});</tspan></text>
+</g>
+
+<g font-size="15" fill="#101721">
+<rect x="656" y="112" width="496" height="88" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="680" y="142" font-weight="700">event_id: same on browser and server</text>
+<text x="680" y="166" fill="#626975">Meta merges the Pixel and CAPI copies only</text>
+<text x="680" y="186" fill="#626975">when event name and ID match.</text>
+
+<rect x="656" y="214" width="496" height="88" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="680" y="244" font-weight="700">transaction_id: the order number, never empty</text>
+<text x="680" y="268" fill="#626975">GA4 deduplicates purchases on it. A random or</text>
+<text x="680" y="288" fill="#626975">blank ID breaks deduplication and refunds.</text>
+
+<rect x="656" y="316" width="496" height="88" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="680" y="346" font-weight="700">value + currency: one definition</text>
+<text x="680" y="370" fill="#626975">Decide if value includes tax and shipping, and</text>
+<text x="680" y="390" fill="#626975">use the same rule in every copy and report.</text>
+
+<rect x="656" y="418" width="496" height="88" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="680" y="448" font-weight="700">items: real products, real prices</text>
+<text x="680" y="472" fill="#626975">Needed for product reports and dynamic ads.</text>
+<text x="680" y="492" fill="#626975">Empty items often points to caching.</text>
+
+<rect x="656" y="520" width="496" height="52" rx="14" fill="#c5eb8c"/>
+<text x="680" y="552" font-weight="700" fill="#1a3123">Fires once. Reloading the page adds nothing.</text>
+</g>
+<text x="48" y="604" font-size="13" fill="#626975">Example values. Field names follow Google's GA4 ecommerce reference; your plugin may add more fields.</text>
+</svg>

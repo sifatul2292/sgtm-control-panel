@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">How a Google Ads click becomes a server-side conversion</title>
+<desc id="d">Four steps: a visitor clicks an ad and lands with a gclid in the URL; the server-side Conversion Linker stores it in the first-party FPGCLAW cookie on your domain for up to 90 days; days later the visitor buys and the purchase event reaches the server container; the Google Ads conversion tag sends the conversion with the click ID, order ID, value and currency. If ad_storage consent is denied, no cookie is written and a cookieless signal is sent instead.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5145cd"/></marker></defs>
+<rect width="1200" height="560" fill="#f7f8fa"/>
+<text x="48" y="58" font-size="22" font-weight="700" fill="#101721">From ad click to counted conversion, server-side</text>
+<g>
+<rect x="48" y="96" width="250" height="250" rx="16" fill="#fff" stroke="#dce0e3"/>
+<circle cx="84" cy="134" r="18" fill="#5145cd"/><text x="84" y="140" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">1</text>
+<text x="72" y="190" font-size="19" font-weight="700" fill="#101721">Ad click</text>
+<text x="72" y="220" font-size="15" fill="#626975">Visitor lands on</text>
+<rect x="72" y="236" width="204" height="56" rx="8" fill="#eceef2"/>
+<text x="84" y="259" font-size="13" font-family="ui-monospace,Menlo,monospace" fill="#101721">yourstore.com/</text>
+<text x="84" y="280" font-size="13" font-family="ui-monospace,Menlo,monospace" fill="#5145cd">?gclid=Cj0KCQ…</text>
+<text x="72" y="322" font-size="13" fill="#626975">iOS may use wbraid/gbraid</text>
+</g>
+<line x1="302" y1="221" x2="340" y2="221" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<g>
+<rect x="346" y="96" width="250" height="250" rx="16" fill="#c5eb8c" stroke="#a9d36b"/>
+<circle cx="382" cy="134" r="18" fill="#1a3123"/><text x="382" y="140" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">2</text>
+<text x="370" y="190" font-size="19" font-weight="700" fill="#1a3123">Click ID stored</text>
+<text x="370" y="220" font-size="15" fill="#395e33">Server Conversion Linker</text>
+<text x="370" y="242" font-size="15" fill="#395e33">sets a first-party cookie</text>
+<rect x="370" y="258" width="204" height="40" rx="8" fill="#fff"/>
+<text x="384" y="284" font-size="14" font-family="ui-monospace,Menlo,monospace" fill="#101721">FPGCLAW · 90 days</text>
+<text x="370" y="322" font-size="13" fill="#395e33">set on your own domain</text>
+</g>
+<line x1="600" y1="221" x2="638" y2="221" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<g>
+<rect x="644" y="96" width="250" height="250" rx="16" fill="#fff" stroke="#dce0e3"/>
+<circle cx="680" cy="134" r="18" fill="#5145cd"/><text x="680" y="140" text-anchor="middle" font-size="16" font-weight="700" fill="#fff">3</text>
+<text x="668" y="190" font-size="19" font-weight="700" fill="#101721">Purchase, days later</text>
+<text x="668" y="220" font-size="15" fill="#626975">GA4 purchase event →</text>
+<text x="668" y="242" font-size="15" fill="#626975">your server container</text>
+<rect x="668" y="258" width="204" height="56" rx="8" fill="#eceef2"/>
+<text x="680" y="281" font-size="13" font-family="ui-monospace,Menlo,monospace" fill="#101721">transaction_id: 1042</text>
+<text x="680" y="302" font-size="13" font-family="ui-monospace,Menlo,monospace" fill="#101721">value: 89 · USD</text>
+</g>
+<line x1="898" y1="221" x2="936" y2="221" stroke="#5145cd" stroke-width="2.5" marker-end="url(#a)"/>
+<g>
+<rect x="942" y="96" width="210" height="250" rx="16" fill="#101721"/>
+<circle cx="978" cy="134" r="18" fill="#c5eb8c"/><text x="978" y="140" text-anchor="middle" font-size="16" font-weight="700" fill="#101721">4</text>
+<text x="966" y="190" font-size="19" font-weight="700" fill="#fff">Google Ads</text>
+<text x="966" y="220" font-size="15" fill="#aab4c5">Conversion tag sends</text>
+<text x="966" y="242" font-size="15" fill="#aab4c5">click ID + order ID,</text>
+<text x="966" y="264" font-size="15" fill="#aab4c5">value, currency and</text>
+<text x="966" y="286" font-size="15" fill="#aab4c5">hashed user data (EC)</text>
+<text x="966" y="322" font-size="13" fill="#c5eb8c">One order ID, one count</text>
+</g>
+<rect x="48" y="380" width="1104" height="132" rx="16" fill="#fff" stroke="#dce0e3"/>
+<text x="76" y="420" font-size="16" font-weight="700" fill="#101721">If the visitor denies ad_storage consent (Consent Mode v2)</text>
+<text x="76" y="450" font-size="15" fill="#626975">The server tags neither write nor read conversion cookies. Google receives a cookieless signal instead,</text>
+<text x="76" y="474" font-size="15" fill="#626975">and Google Ads may model the missing conversion. Consent is set in the web container and travels with each hit.</text>
+<text x="76" y="498" font-size="13" fill="#9aa1ab">Sources: Google Tag Manager server-side docs, Google Ads cookie list (business.safety.google/adscookies).</text>
+</svg>

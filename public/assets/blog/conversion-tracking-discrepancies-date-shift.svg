@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Why the same conversion lands on different days in Google Ads and GA4</title>
+<desc id="d">Timeline from July 16 to July 22. A shopper clicks a Google ad on July 17 and buys on July 20. Google Ads' standard conversion columns record the conversion on July 17, the click date. GA4 and Google Ads' "by conv. time" columns record it on July 20, the purchase date. A daily or weekly comparison can show a gap even though nothing was lost.</desc>
+<rect width="1200" height="560" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">One sale, two different dates</text>
+<text x="48" y="84" font-size="15" fill="#626975">Google Ads' standard columns date a conversion by the ad click. GA4 dates it by when it happened.</text>
+<!-- days: Jul 16..22 -> x 140..1060 step 153.3 -->
+<line x1="120" y1="200" x2="1100" y2="200" stroke="#626975" stroke-width="2"/>
+<g font-size="14" fill="#626975" text-anchor="middle">
+<text x="140" y="230">Jul 16</text><text x="293" y="230" font-weight="700" fill="#101721">Jul 17</text><text x="447" y="230">Jul 18</text><text x="600" y="230">Jul 19</text><text x="753" y="230" font-weight="700" fill="#101721">Jul 20</text><text x="907" y="230">Jul 21</text><text x="1060" y="230">Jul 22</text>
+</g>
+<g stroke="#626975" stroke-width="2"><line x1="140" y1="194" x2="140" y2="206"/><line x1="447" y1="194" x2="447" y2="206"/><line x1="600" y1="194" x2="600" y2="206"/><line x1="907" y1="194" x2="907" y2="206"/><line x1="1060" y1="194" x2="1060" y2="206"/></g>
+<circle cx="293" cy="200" r="12" fill="#5145cd"/>
+<text x="293" y="150" font-size="16" font-weight="700" fill="#101721" text-anchor="middle">Ad click</text>
+<text x="293" y="172" font-size="13" fill="#626975" text-anchor="middle">gclid stored</text>
+<circle cx="753" cy="200" r="12" fill="#2f7d32"/>
+<text x="753" y="150" font-size="16" font-weight="700" fill="#101721" text-anchor="middle">Purchase</text>
+<text x="753" y="172" font-size="13" fill="#626975" text-anchor="middle">order placed</text>
+<line x1="305" y1="200" x2="741" y2="200" stroke="#5145cd" stroke-width="4" stroke-dasharray="2 8" stroke-linecap="round"/>
+<text x="523" y="186" font-size="13" fill="#5145cd" text-anchor="middle">3 days later</text>
+<rect x="120" y="270" width="470" height="120" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="144" y="304" font-size="16" font-weight="700" fill="#101721">Google Ads (standard columns)</text>
+<text x="144" y="332" font-size="15" fill="#626975">Conversion reported on</text>
+<text x="144" y="364" font-size="24" font-weight="700" fill="#5145cd">July 17 · click date</text>
+<line x1="293" y1="240" x2="293" y2="268" stroke="#5145cd" stroke-width="2" stroke-dasharray="5 5"/>
+<rect x="610" y="270" width="490" height="120" rx="14" fill="#c5eb8c" stroke="#a9d36b"/>
+<text x="634" y="304" font-size="16" font-weight="700" fill="#101721">GA4 and Google Ads "by conv. time"</text>
+<text x="634" y="332" font-size="15" fill="#395e33">Conversion reported on</text>
+<text x="634" y="364" font-size="24" font-weight="700" fill="#2f7d32">July 20 · purchase date</text>
+<line x1="753" y1="240" x2="753" y2="268" stroke="#2f7d32" stroke-width="2" stroke-dasharray="5 5"/>
+<rect x="120" y="414" width="980" height="76" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="144" y="446" font-size="15" font-weight="700" fill="#101721">What this means for you</text>
+<text x="144" y="472" font-size="15" fill="#626975">Compare Google Ads' "Conversions (by conv. time)" with GA4 and your store, over weeks rather than single days.</text>
+<text x="48" y="530" font-size="13" fill="#9aa1ab">Example dates from Google's help on Google Ads vs Analytics differences. Source: Google Ads Help, "Understand conversions by time with new columns".</text>
+</svg>

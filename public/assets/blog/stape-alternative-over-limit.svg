@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">What happens when you go over your request limit?</title>
+<desc id="d">Comparison of three request-based sGTM hosts as described on their own pages in October 2026. Stape: the Free plan container is disabled and its limit does not reset; Pro is paused at 110 percent of the limit until the next billing cycle; Business and above get a one-time 30-day grace period; optional auto-upgrade moves you up a tier instead. TAGGRS: once over the limit, data can no longer be sent to platforms, and automatic upgrades can prevent this. Addingwell: extra requests are billed per 100,000 at the end of the billing cycle, from 2.30 euros on the 1 million plan down to 1.30 euros on the 100 million plan.</desc>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="24" font-weight="700" fill="#101721">What happens when you go over your request limit?</text>
+<text x="48" y="86" font-size="15" fill="#626975">Three request-based hosts, as described on their own pricing and help pages (October 2026).</text>
+<g>
+<rect x="40" y="114" width="360" height="420" rx="16" fill="#fff" stroke="#dce0e3"/>
+<path d="M40 130a16 16 0 0 1 16-16h328a16 16 0 0 1 16 16v38H40z" fill="#5145cd"/>
+<text x="64" y="149" font-size="19" font-weight="700" fill="#fff">Stape</text>
+<rect x="420" y="114" width="360" height="420" rx="16" fill="#fff" stroke="#dce0e3"/>
+<path d="M420 130a16 16 0 0 1 16-16h328a16 16 0 0 1 16 16v38H420z" fill="#5145cd"/>
+<text x="444" y="149" font-size="19" font-weight="700" fill="#fff">TAGGRS</text>
+<rect x="800" y="114" width="360" height="420" rx="16" fill="#fff" stroke="#dce0e3"/>
+<path d="M800 130a16 16 0 0 1 16-16h328a16 16 0 0 1 16 16v38H800z" fill="#5145cd"/>
+<text x="824" y="149" font-size="19" font-weight="700" fill="#fff">Addingwell</text>
+</g>
+<g font-size="15" fill="#101721">
+<circle cx="72" cy="206" r="7" fill="#b4232c"/><text x="90" y="211" font-weight="700">Free plan</text>
+<text x="90" y="233" fill="#626975" font-size="14">Container is disabled and the limit</text>
+<text x="90" y="253" fill="#626975" font-size="14">doesn't reset. Upgrade to restart.</text>
+<circle cx="72" cy="290" r="7" fill="#e58a17"/><text x="90" y="295" font-weight="700">Pro</text>
+<text x="90" y="317" fill="#626975" font-size="14">Paused at 110% of the limit until</text>
+<text x="90" y="337" fill="#626975" font-size="14">the next billing cycle starts.</text>
+<circle cx="72" cy="374" r="7" fill="#e58a17"/><text x="90" y="379" font-weight="700">Business and above</text>
+<text x="90" y="401" fill="#626975" font-size="14">A one-time 30-day grace period the</text>
+<text x="90" y="421" fill="#626975" font-size="14">first time you go over, then pauses.</text>
+<circle cx="72" cy="458" r="7" fill="#5fa83a"/><text x="90" y="463" font-weight="700">Auto-upgrade (optional)</text>
+<text x="90" y="485" fill="#626975" font-size="14">Moves the container up a tier and</text>
+<text x="90" y="505" fill="#626975" font-size="14">charges the new plan instead.</text>
+
+<circle cx="452" cy="206" r="7" fill="#b4232c"/><text x="470" y="211" font-weight="700">Over the limit</text>
+<text x="470" y="233" fill="#626975" font-size="14">Data can no longer be sent to your</text>
+<text x="470" y="253" fill="#626975" font-size="14">platforms from that point on.</text>
+<circle cx="452" cy="290" r="7" fill="#5fa83a"/><text x="470" y="295" font-weight="700">Automatic upgrade</text>
+<text x="470" y="317" fill="#626975" font-size="14">Can be switched on to prevent the</text>
+<text x="470" y="337" fill="#626975" font-size="14">data stop.</text>
+<circle cx="452" cy="374" r="7" fill="#aab4c5"/><text x="470" y="379" font-weight="700">Free plan</text>
+<text x="470" y="401" fill="#626975" font-size="14">10,000 requests renew monthly while</text>
+<text x="470" y="421" fill="#626975" font-size="14">you stay under the limit.</text>
+
+<circle cx="832" cy="206" r="7" fill="#5fa83a"/><text x="850" y="211" font-weight="700">Overage is billed</text>
+<text x="850" y="233" fill="#626975" font-size="14">Extra requests are charged per 100k</text>
+<text x="850" y="253" fill="#626975" font-size="14">at the end of the billing cycle.</text>
+<circle cx="832" cy="290" r="7" fill="#aab4c5"/><text x="850" y="295" font-weight="700">Overage rate falls with tier</text>
+<text x="850" y="317" fill="#626975" font-size="14">€2.30 per 100k on the 1M plan,</text>
+<text x="850" y="337" fill="#626975" font-size="14">€1.30 per 100k on the 100M plan.</text>
+<circle cx="832" cy="374" r="7" fill="#aab4c5"/><text x="850" y="379" font-weight="700">No rollover</text>
+<text x="850" y="401" fill="#626975" font-size="14">Unused requests don't carry over</text>
+<text x="850" y="421" fill="#626975" font-size="14">to the next month.</text>
+</g>
+<g font-size="13" fill="#626975">
+<circle cx="56" cy="571" r="6" fill="#b4232c"/><text x="70" y="576">Tracking stops</text>
+<circle cx="196" cy="571" r="6" fill="#e58a17"/><text x="210" y="576">Paused for a while</text>
+<circle cx="360" cy="571" r="6" fill="#5fa83a"/><text x="374" y="576">Keeps running (you pay more)</text>
+<circle cx="584" cy="571" r="6" fill="#aab4c5"/><text x="598" y="576">Good to know</text>
+</g>
+<text x="48" y="612" font-size="13" fill="#9aa1ab">Sources: Stape help desk "Request limits and pause logic"; TAGGRS pricing FAQ; Addingwell pricing page. Check the live pages before you decide.</text>
+</svg>
