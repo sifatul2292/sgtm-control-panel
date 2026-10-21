@@ -1179,7 +1179,9 @@ const eventMap = {
   sign_up: 'CompleteRegistration',
   start_trial: 'StartTrial',
   subscribe: 'Subscribe',
-  generate_lead: 'Lead'
+  generate_lead: 'Lead',
+  contact: 'Contact',
+  schedule: 'Schedule'
 };
 
 function firstValue() {
@@ -1218,6 +1220,14 @@ if (makeString(eventData.tagioo_capi_direct) === '1') {
   if (data.enableDebugLog) {
     logToConsole('Tagioo Meta CAPI: skipping ' + eventData.event_name + ' already sent by backend');
   }
+  data.gtmOnSuccess();
+  return;
+}
+
+// Backend purchase hits (WooCommerce plugin) carry the shopper's consent from
+// checkout. Respect an explicit denial; unknown consent is sent as before.
+if (eventData.consent_marketing === 'denied') {
+  if (data.enableDebugLog) logToConsole('Tagioo Meta CAPI: skipping ' + eventData.event_name + ', marketing consent denied');
   data.gtmOnSuccess();
   return;
 }
@@ -1525,7 +1535,8 @@ const eventMap = {
   search: 'Search',
   sign_up: 'CompleteRegistration',
   subscribe: 'Subscribe',
-  generate_lead: 'SubmitForm'
+  generate_lead: 'SubmitForm',
+  contact: 'Contact'
 };
 
 function firstValue() {
@@ -1557,6 +1568,13 @@ function addRaw(target, key, value) {
 const mappedEventName = eventMap[eventData.event_name];
 if (!mappedEventName) {
   if (data.enableDebugLog) logToConsole('Tagioo TikTok Events API: skipping unmapped event ' + eventData.event_name);
+  data.gtmOnSuccess();
+  return;
+}
+
+// Backend purchase hits carry the shopper's consent from checkout.
+if (eventData.consent_marketing === 'denied') {
+  if (data.enableDebugLog) logToConsole('Tagioo TikTok Events API: skipping ' + eventData.event_name + ', marketing consent denied');
   data.gtmOnSuccess();
   return;
 }
@@ -1996,7 +2014,7 @@ function initialScan(){setTimeout(function(){scan(0);},150);}if(document.readySt
 }
 
 function buildWebGtmTemplate(input) {
-  if (input.businessType === "saas") input = { ...input, platform: "custom" };
+  if (["saas", "lead"].includes(input.businessType)) input = { ...input, platform: "custom" };
   const destinations = selectedDestinations(input);
   const payload = {
     businessType: cleanTemplateValue(input.businessType, "ecommerce"),
@@ -2077,6 +2095,11 @@ function buildWebGtmTemplate(input) {
       fingerprint: String(Date.now()), parentFolderId: "2"
     }
   ];
+  if (payload.businessType === "lead") {
+    variables.push(gtmDataLayerVariable(92, "dlv - lead_source", "lead_source"));
+    variables.push(gtmDataLayerVariable(93, "dlv - value", "value"));
+    variables.push(gtmDataLayerVariable(94, "dlv - currency", "currency"));
+  }
   if (payload.businessType === "saas") {
     variables.push(gtmDataLayerVariable(90, "dlv - plan", "plan"));
     // Set to "1" by an app whose backend already sends this event to Meta CAPI
@@ -2104,6 +2127,14 @@ function buildWebGtmTemplate(input) {
       ...[["generate_lead", 15], ["sign_up", 12], ["start_trial", 13], ["subscribe", 14], ["begin_checkout", 4], ["add_payment_info", 6], ["purchase", 5]]
         .map(([name, id]) => gtmTrigger(id, "Tagioo - " + name, name)));
   }
+  if (payload.businessType === "lead") {
+    triggers.splice(0, triggers.length,
+      { accountId: "0", containerId: "0", triggerId: "1", name: "Tagioo - DOM Ready PageView", type: "DOM_READY", fingerprint: String(Date.now()) },
+      ...[["generate_lead", 15], ["contact", 16], ["schedule", 17]].map(([name, id]) => gtmTrigger(id, "Tagioo - " + name, name)));
+  }
+  // Lead and SaaS events can repeat on one page (AJAX forms, single-page apps), so
+  // their tags fire per data layer event instead of once per page load.
+  const firesPerEvent = ["saas", "lead"].includes(payload.businessType) || ["laravel", "woocommerce", "shopify"].includes(payload.platform);
   const tags = [];
   if (payload.businessType === "ecommerce" && payload.platform === "laravel") {
     tags.push(gtmTag(900, "Tagioo - Laravel Auto Tracker", "html", [
@@ -2118,7 +2149,9 @@ function buildWebGtmTemplate(input) {
         { parameter: "send_page_view", parameterValue: "false" }
       ])
     ], ["2147479573"], "3"));
-    const eventMap = payload.businessType === "saas" ? [
+    const eventMap = payload.businessType === "lead" ? [
+      ["page_view", "1"], ["generate_lead", "15"], ["contact", "16"], ["schedule", "17"]
+    ] : payload.businessType === "saas" ? [
       ["page_view", "1"], ["generate_lead", "15"], ["sign_up", "12"], ["start_trial", "13"], ["subscribe", "14"], ["begin_checkout", "4"], ["add_payment_info", "6"], ["purchase", "5"]
     ] : [
       ["page_view", "1"], ["view_item", "2"], ["add_to_cart", "3"],
@@ -2153,6 +2186,14 @@ function buildWebGtmTemplate(input) {
             { parameter: "currency", parameterValue: "{{dlv - ecommerce.currency}}" },
             { parameter: "value", parameterValue: "{{dlv - ecommerce.value}}" });
         }
+      }
+      if (payload.businessType === "lead" && eventName !== "page_view") {
+        // user_data stays: Google treats it as user-provided data (enhanced conversions),
+        // and the server Meta/TikTok tags hash it for matching. It is not a GA4 event parameter.
+        eventSettingsRows.push(
+          { parameter: "lead_source", parameterValue: "{{dlv - lead_source}}" },
+          { parameter: "value", parameterValue: "{{dlv - value}}" },
+          { parameter: "currency", parameterValue: "{{dlv - currency}}" });
       }
       // WooCommerce has an authoritative backend Purchase recovery hit. Mark
       // browser events so the server container can keep forwarding them to GA4
@@ -2199,7 +2240,7 @@ function buildWebGtmTemplate(input) {
       // Livewire/Inertia and WooCommerce AJAX storefronts can legitimately push
       // the same event type several times without a page load. Keep other legacy
       // templates unchanged, but let those platforms fire per dataLayer event.
-      if (payload.businessType !== "saas" && !["laravel", "woocommerce", "shopify"].includes(payload.platform)) tagObj.tagFiringOption = "ONCE_PER_LOAD";
+      if (!firesPerEvent) tagObj.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tagObj);
     }
   }
@@ -2208,7 +2249,9 @@ function buildWebGtmTemplate(input) {
       gtmTemplateParam("html", metaPixelBaseScript())
     ], [payload.platform === "shopify" ? "1" : "2147479553"], "4"));
     // Browser pixel events, deduped with server CAPI via event_id.
-    const metaEventMap = payload.businessType === "saas" ? [
+    const metaEventMap = payload.businessType === "lead" ? [
+      ["generate_lead", "Lead", "15"], ["contact", "Contact", "16"], ["schedule", "Schedule", "17"]
+    ] : payload.businessType === "saas" ? [
       ["generate_lead", "Lead", "15"], ["sign_up", "CompleteRegistration", "12"], ["start_trial", "StartTrial", "13"], ["subscribe", "Subscribe", "14"],
       ["begin_checkout", "InitiateCheckout", "4"], ["add_payment_info", "AddPaymentInfo", "6"], ["purchase", "Purchase", "5"]
     ] : [
@@ -2220,9 +2263,9 @@ function buildWebGtmTemplate(input) {
     ];
     for (const [eventName, metaEventName, triggerId] of metaEventMap) {
       const metaTag = gtmTag(tags.length + 1, `Tagioo Meta - ${metaEventName}`, "html", [
-        gtmTemplateParam("html", metaPixelEventScript(metaEventName, payload.businessType === "saas"))
+        gtmTemplateParam("html", metaPixelEventScript(metaEventName, ["saas", "lead"].includes(payload.businessType)))
       ], [triggerId], "4");
-      if (payload.businessType !== "saas" && !["laravel", "woocommerce", "shopify"].includes(payload.platform)) metaTag.tagFiringOption = "ONCE_PER_LOAD";
+      if (!firesPerEvent) metaTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(metaTag);
     }
   }
@@ -2231,7 +2274,9 @@ function buildWebGtmTemplate(input) {
       gtmTemplateParam("html", "<script>!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=['page','track','identify','instances','debug','on','off','once','ready','alias','group','enableCookie','disableCookie'];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.load=function(e){var i='https://analytics.tiktok.com/i18n/pixel/events.js';ttq._i=ttq._i||{};ttq._i[e]=[];var n=d.createElement('script');n.type='text/javascript';n.async=!0;n.src=i;var a=d.getElementsByTagName('script')[0];a.parentNode.insertBefore(n,a)};ttq.load('{{Tagioo - tiktok_pixel_id}}');ttq.page();}(window,document,'ttq');</script>")
     ], [payload.platform === "shopify" ? "1" : "2147479553"], "6"));
     // Browser pixel events, deduped with server Events API via event_id.
-    const tiktokEventMap = payload.businessType === "saas" ? [
+    const tiktokEventMap = payload.businessType === "lead" ? [
+      ["generate_lead", "SubmitForm", "15"], ["contact", "Contact", "16"]
+    ] : payload.businessType === "saas" ? [
       ["generate_lead", "SubmitForm", "15"], ["sign_up", "CompleteRegistration", "12"], ["subscribe", "Subscribe", "14"],
       ["begin_checkout", "InitiateCheckout", "4"], ["add_payment_info", "AddPaymentInfo", "6"], ["purchase", "CompletePayment", "5"]
     ] : [
@@ -2245,7 +2290,7 @@ function buildWebGtmTemplate(input) {
       const tiktokTag = gtmTag(tags.length + 1, `Tagioo TikTok - ${tiktokEventName}`, "html", [
         gtmTemplateParam("html", tiktokPixelEventScript(tiktokEventName))
       ], [triggerId], "6");
-      if (payload.businessType !== "saas" && !["laravel", "woocommerce", "shopify"].includes(payload.platform)) tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
+      if (!firesPerEvent) tiktokTag.tagFiringOption = "ONCE_PER_LOAD";
       tags.push(tiktokTag);
     }
   }
@@ -2262,7 +2307,7 @@ function buildWebGtmTemplate(input) {
 }
 
 function buildServerGtmTemplate(input) {
-  if (input.businessType === "saas") input = { ...input, platform: "custom" };
+  if (["saas", "lead"].includes(input.businessType)) input = { ...input, platform: "custom" };
   const destinations = selectedDestinations(input);
   const ga4ApiSecret = String(input.ga4ApiSecret || "").trim();
   const metaTestEventCode = String(input.metaTestEventCode || "").trim();
@@ -2332,6 +2377,9 @@ function buildServerGtmTemplate(input) {
     triggers.splice(0, triggers.length, triggers[0],
       ...[["purchase", 2], ["begin_checkout", 4], ["add_payment_info", 5], ["sign_up", 12], ["start_trial", 13], ["subscribe", 14]]
         .map(([name, id]) => gtmTrigger(id, "Tagioo - GA4 " + name, name, "GA4")));
+  }
+  if (payload.businessType === "lead") {
+    triggers.splice(0, triggers.length, triggers[0], gtmTrigger(2, "Tagioo - GA4 generate_lead", "generate_lead", "GA4"));
   }
   if (payload.platform === "woocommerce") {
     const browserPurchase = gtmTrigger(7, "Tagioo - Woo browser Purchase", "purchase", "GA4");
@@ -2409,24 +2457,25 @@ function buildServerGtmTemplate(input) {
       gtmBooleanParam("enableLinkerParams", false),
       gtmBooleanParam("enableCookieOverrides", false)
     ], ["1"], "5"));
-    tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Purchase", "sgtmadsct", [
+    const isLead = payload.businessType === "lead";
+    tags.push(gtmTag(tags.length + 1, isLead ? "Tagioo Google Ads - Lead" : "Tagioo Google Ads - Purchase", "sgtmadsct", [
       gtmTemplateParam("productReportingDataSource", "EVENT"),
       gtmBooleanParam("enableConversionLinker", true),
-      gtmBooleanParam("enableProductReporting", true),
+      gtmBooleanParam("enableProductReporting", !isLead),
       gtmTemplateParam("conversionId", "{{Tagioo - google_ads_conversion_id}}"),
       gtmTemplateParam("conversionLabel", "{{Tagioo - google_ads_purchase_label}}"),
       gtmBooleanParam("rdp", false)
     ], ["2"], "5"));
     tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Remarketing", "sgtmadsremarket", [
       gtmBooleanParam("enableConversionLinker", true),
-      gtmBooleanParam("enableDynamicRemarketing", true),
+      gtmBooleanParam("enableDynamicRemarketing", !isLead),
       gtmTemplateParam("remarketingEventDataSource", "EVENT_DATA"),
       gtmTemplateParam("conversionId", "{{Tagioo - google_ads_conversion_id}}"),
       gtmBooleanParam("rdp", false)
     ], ["1"], "5"));
     // Optional micro-conversions — only emitted when a label is supplied (wires the
     // previously-unused add_to_cart / begin_checkout server triggers).
-    if (payload.businessType !== "saas" && String(input.googleAdsAddToCartLabel || "").trim()) {
+    if (!["saas", "lead"].includes(payload.businessType) && String(input.googleAdsAddToCartLabel || "").trim()) {
       tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Add to Cart", "sgtmadsct", [
         gtmTemplateParam("productReportingDataSource", "EVENT"),
         gtmBooleanParam("enableConversionLinker", true),
@@ -2436,7 +2485,7 @@ function buildServerGtmTemplate(input) {
         gtmBooleanParam("rdp", false)
       ], ["3"], "5"));
     }
-    if (String(input.googleAdsBeginCheckoutLabel || "").trim()) {
+    if (!isLead && String(input.googleAdsBeginCheckoutLabel || "").trim()) {
       tags.push(gtmTag(tags.length + 1, "Tagioo Google Ads - Begin Checkout", "sgtmadsct", [
         gtmTemplateParam("productReportingDataSource", "EVENT"),
         gtmBooleanParam("enableConversionLinker", true),
@@ -2650,8 +2699,26 @@ For Tagioo's own site, first import and publish the regenerated server file, inc
 TikTok trial-start mapping and Google Ads signup/trial conversion labels are not included; configure those destination rules separately if needed.`;
 }
 
+function leadSetupGuide(input = {}) {
+  const currency = /^[A-Za-z]{3}$/.test(String(input.currency || "").trim()) ? String(input.currency).trim().toUpperCase() : "USD";
+  return `Lead generation setup
+In Setup Assistant choose Lead generation, select your destinations, and enter your tracking domain, GA4 measurement ID, Meta pixel/access token and, for Google Ads, the conversion ID plus the label of your lead conversion action (use the Purchase Label field for it).
+Generate and download tagioo-web-template.json and tagioo-server-template.json. Import the web file into Web GTM and the server file into Server GTM using Merge. Preview, then publish both containers yourself. Pause older lead or form tags to prevent duplicate sends.
+The generated tags listen for three data layer events: generate_lead (a form was accepted), contact (a click-to-call, WhatsApp or email click) and schedule (a booking was confirmed). They map to GA4 generate_lead/contact/schedule, Meta Lead/Contact/Schedule and TikTok SubmitForm/Contact, and Google Ads counts generate_lead as the conversion.
+Push generate_lead only AFTER your form or CRM confirms the submission succeeded. A button click is not a lead. Give every lead a unique event_id so the browser Pixel and the server copy are counted once:
+window.dataLayer.push({ event: "generate_lead", event_id: "lead_" + submissionId, lead_source: "contact_form", value: 0, currency: "${currency}", user_data: { email_address: email, phone_number: phone } });
+window.dataLayer.push({ event: "contact", event_id: "contact_" + Date.now(), lead_source: "whatsapp" });
+window.dataLayer.push({ event: "schedule", event_id: "booking_" + bookingId, lead_source: "calendar" });
+WordPress Contact Form 7 example (fires only after the message is sent):
+document.addEventListener("wpcf7mailsent", function (e) { var f = {}; (e.detail.inputs || []).forEach(function (i) { f[i.name] = i.value; }); window.dataLayer.push({ event: "generate_lead", event_id: "lead_" + e.detail.contactFormId + "_" + Date.now(), lead_source: "cf7_" + e.detail.contactFormId, user_data: { email_address: f["your-email"] || "" } }); });
+user_data is optional. Include email or phone only when your privacy notice and the visitor's consent allow it; Google hashes it as user-provided data and the server Meta/TikTok tags hash it before sending. Never push passwords or free-text message bodies.
+Value is optional. If some leads are worth more, send an estimated value so Smart Bidding can tell them apart; otherwise leave it at 0.
+Verify one test submission: Web GTM preview shows generate_lead once, Server GTM preview shows the GA4, Meta and Google Ads tags firing, then check Meta Test Events and the Google Ads conversion status.
+For leads that close later (a call, a signed contract), upload them as offline conversions so ad platforms learn which leads became customers.`;
+}
+
 function buildSetupAssistantTemplates(input) {
-  if (input.businessType === "saas") input = { ...input, platform: "custom" };
+  if (["saas", "lead"].includes(input.businessType)) input = { ...input, platform: "custom" };
   const destinations = selectedDestinations(input);
   const web = buildWebGtmTemplate({ ...input, destinations });
   const server = buildServerGtmTemplate({ ...input, destinations });
@@ -2681,7 +2748,7 @@ function buildSetupAssistantTemplates(input) {
     web,
     server,
     shopifyCustomPixel,
-    saasGuide: input.businessType === "saas" ? saasSetupGuide() : "",
+    saasGuide: input.businessType === "saas" ? saasSetupGuide() : input.businessType === "lead" ? leadSetupGuide(input) : "",
     warnings
   };
 }
@@ -12813,7 +12880,19 @@ const server = createServer(async (req, res) => {
     if (hostname.startsWith("app.") || pathname === "/index.html") {
       res.setHeader("X-Robots-Tag", "noindex, nofollow");
     }
-    if ((pathname === "/robots.txt" || pathname === "/sitemap.xml") && (req.method === "GET" || req.method === "HEAD")) {
+    const isReadRequest = req.method === "GET" || req.method === "HEAD";
+    // One canonical marketing host and one URL per page, so search engines don't split signals.
+    if (hostname === "www.tagioo.com" && isReadRequest) {
+      res.writeHead(301, { location: `https://tagioo.com${req.url || "/"}`, "cache-control": "public, max-age=86400" });
+      res.end();
+      return;
+    }
+    if (isReadRequest && /^\/(?:blog|features|pricing|compare|how-it-works|docs|shopify|woocommerce|website-tracking-checker|terms|privacy|refunds|blog\/[a-z0-9-]+)\/$/.test(pathname)) {
+      res.writeHead(301, { location: pathname.slice(0, -1) + reqUrl.search, "cache-control": "public, max-age=86400" });
+      res.end();
+      return;
+    }
+    if ((pathname === "/robots.txt" || pathname === "/sitemap.xml" || pathname === "/llms.txt") && isReadRequest) {
       if (pathname === "/robots.txt" && hostname.startsWith("app.")) {
         res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
         res.end(req.method === "HEAD" ? "" : "User-agent: *\nDisallow: /\n");
@@ -12822,11 +12901,11 @@ const server = createServer(async (req, res) => {
       }
       return;
     }
-    if ((pathname === "/blog" || pathname === "/blog/") && req.method === "GET") {
+    if (pathname === "/blog" && isReadRequest) {
       await servePublicPage(req, res, "blog/index.html");
       return;
     }
-    if (pathname.startsWith("/blog/") && req.method === "GET") {
+    if (pathname.startsWith("/blog/") && isReadRequest) {
       const slug = pathname.slice(6);
       if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
         await servePublicPage(req, res, `blog/${slug}.html`);

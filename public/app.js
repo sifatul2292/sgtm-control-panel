@@ -3366,6 +3366,11 @@ function updateLaravelAssistantFields() {
   if (!els.setupAssistantForm) return;
   const isSaas = els.setupAssistantForm.elements.businessType?.value === "saas";
   if (isSaas && els.setupAssistantForm.elements.platform) els.setupAssistantForm.elements.platform.value = "custom";
+  const isLead = els.setupAssistantForm.elements.businessType?.value === "lead";
+  const adsLabel = els.setupAssistantForm.querySelector("[data-ads-primary-label]");
+  if (adsLabel) adsLabel.textContent = isLead ? "Google Ads Lead Label" : "Google Ads Purchase Label";
+  const adsInput = els.setupAssistantForm.elements.googleAdsPurchaseLabel;
+  if (adsInput) adsInput.placeholder = isLead ? "Lead conversion label" : "Purchase conversion label";
   const isLaravel = els.setupAssistantForm.elements.platform?.value === "laravel";
   const isShopify = els.setupAssistantForm.elements.platform?.value === "shopify";
   const webGtmField = els.setupAssistantForm.querySelector("[data-shopify-web-gtm]");
@@ -3451,6 +3456,8 @@ function renderSaasSetupGuide(text) {
   if (!guide) return;
   guide.hidden = !text;
   guide.open = false;
+  const summary = guide.querySelector("summary");
+  if (summary) summary.textContent = /^Lead generation/.test(String(text || "")) ? "Lead generation event guide" : "SaaS event implementation guide";
   const blocks = [];
   let code = [];
   const flush = () => {
@@ -3458,7 +3465,7 @@ function renderSaasSetupGuide(text) {
     code = [];
   };
   for (const line of String(text || "").split("\n")) {
-    if (/^(\/\/|window\.dataLayer|dataLayer\.push)/.test(line)) code.push(line);
+    if (/^(\/\/|window\.dataLayer|dataLayer\.push|document\.addEventListener)/.test(line)) code.push(line);
     else { flush(); if (line.trim()) blocks.push("<p>" + escapeHtml(line) + "</p>"); }
   }
   flush();
