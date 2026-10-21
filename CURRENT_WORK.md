@@ -36,6 +36,8 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-20.
   verified 17.8% lower cost per result (facebook.com/business/news/pixel-conversionsapi-updates,
   Apr 2026) → +21.7% results, applied when Meta is browser-only; Google tag gateway 11% shown as
   signals only (not purchases). Unverified figures (EC 5%, EMQ % uplift) deliberately not used.
+  DEPLOYED 3e9ec32 as VPS merge 91c1cb2; live: woocommerce.com 38/F EMQ 3.5 Meta +21.7%;
+  shobaz 97/A Meta CAPI confirmed via Gateway, EMQ 10.
 - No headless browser on purpose: 1-core prod VPS; OOM would kill customer sGTM containers.
   Runtime checks (consent diff, network hits) would need a separate worker box.
 
