@@ -1,6 +1,31 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-10-20.
+Living status doc. Update after meaningful progress. Last updated: 2026-10-22.
+
+## 2026-10-22 — WP plugin 2.7.0 for WordPress.org submission — NOT DEPLOYED, NOT COMMITTED
+
+- tagioo-woocommerce.php → 2.7.0, hardened for the WP.org review: all inline JS via
+  wp_print_inline_script_tag (JSON via tagioo_json = JSON_HEX_TAG, fixes `</script>` breakout
+  from product/billing names), banner CSS via wp_add_inline_style, settings page fully escaped
+  (no `<?=`), $_SERVER/$_COOKIE sanitized, phpcs:ignore on read-only $_GET (fbclid, order key),
+  error_log → wc_get_logger (source "tagioo"), NO uninstall cleanup (panel customers update by
+  delete + re-upload; wiping tagioo_settings would lose GTM/sGTM/API secret), headers
+  (Requires Plugins, Text Domain tagioo-for-woocommerce, License URI, WC tested 11.2), marketing
+  claims ("10/10 EMQ", "replaces GTM4WP") removed. dataLayer payloads unchanged.
+- Behaviour change: BD dial code was '88' + number minus trunk 0 → +881712… (wrong, Meta phone
+  match broken for BD). Now 880 (+8801712…); empty country → store base country; unknown →
+  digits only; currency fallback BDT → USD. Tested with php-wasm.
+  Then: countries outside the 35-entry map use WC()->countries->get_country_calling_code()
+  (trimmed to the bare country code: +1 for NANP/Caribbean, +44 Jersey/Guernsey/IoM, +358
+  Åland, VA → 39); IT/SM/VA keep the leading 0; +1/+7 treat only 11-digit numbers as already
+  international; RU/KZ trunk 8 → +7. Compared old vs new over 35 mapped countries × 9 numbers
+  against WooCommerce's real i18n/phone.php: identical except BD (+880 fix) and IT landlines.
+- WP.org package: packages/tagioo-woocommerce-wporg/{readme.txt,build.sh} → build.sh makes
+  tagioo-for-woocommerce.zip (folder/slug tagioo-for-woocommerce, gitignored). Panel download
+  (server.js) still ships folder tagioo-woocommerce — WP.org installs live in a different folder,
+  so a store must not activate both (function redeclare fatal).
+- Lint: `npx @php-wasm/cli -l` clean. Plugin Check NOT run: WP Playground CLI crashes in
+  plugin-check even on Hello Dolly. Run Plugin Check on a real WP site before submitting.
 
 ## 2026-10-21 — Tracking checker rebuilt (deep inspection) — DEPLOYED
 

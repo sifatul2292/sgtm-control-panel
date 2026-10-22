@@ -1,20 +1,24 @@
 <?php
 /**
- * Plugin Name: Tagioo for WooCommerce
- * Plugin URI:  https://tagioo.com
- * Description: All-in-one server-side tracking — replaces GTM4WP and WooCommerce webhooks. Injects GTM, pushes GA4 ecommerce dataLayer with full user_data, and fires a server-side purchase hit to sGTM for 10/10 Meta EMQ.
- * Version:     2.6.0
+ * Plugin Name:       Tagioo for WooCommerce
+ * Plugin URI:        https://tagioo.com
+ * Description:       Server-side tracking for WooCommerce. Loads Google Tag Manager, pushes GA4 ecommerce events to the dataLayer and sends a server-side purchase hit to your server-side GTM container.
+ * Version:           2.7.0
  * Requires at least: 6.0
- * Requires PHP: 8.0
- * Author:      Tagioo
- * License:     GPL-2.0+
+ * Requires PHP:      8.0
+ * Requires Plugins:  woocommerce
+ * Author:            Tagioo
+ * Author URI:        https://tagioo.com
+ * License:           GPLv2 or later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       tagioo-for-woocommerce
  * WC requires at least: 7.0
- * WC tested up to: 9.0
+ * WC tested up to:   11.2
  */
 
 defined('ABSPATH') || exit;
 
-define('TAGIOO_VERSION', '2.6.0');
+define('TAGIOO_VERSION', '2.7.0');
 define('TAGIOO_OPTION',  'tagioo_settings');
 define('TAGIOO_META_FBP',   '_tagioo_fbp');
 define('TAGIOO_META_FBC',   '_tagioo_fbc');
@@ -95,13 +99,14 @@ add_action('admin_init', function () {
     register_setting('tagioo_group', TAGIOO_OPTION, ['sanitize_callback' => 'tagioo_sanitize_settings']);
 });
 
-function tagioo_sanitize_settings(array $in): array {
+function tagioo_sanitize_settings($in): array {
+    $in = is_array($in) ? $in : [];
     return [
         'gtm_id'          => sanitize_text_field($in['gtm_id'] ?? ''),
         'inject_gtm'      => isset($in['inject_gtm'])      ? '1' : '0',
         'custom_loader'   => isset($in['custom_loader'])   ? '1' : '0',
         'gtm_placement'   => ($in['gtm_placement'] ?? '') === 'consent' ? 'consent' : 'code',
-        'consent_mode'    => in_array($in['consent_mode'] ?? '', ['banner', 'external'], true) ? $in['consent_mode'] : 'off',
+        'consent_mode'    => in_array($in['consent_mode'] ?? '', ['banner', 'external'], true) ? sanitize_key($in['consent_mode']) : 'off',
         'consent_text'    => sanitize_textarea_field($in['consent_text'] ?? ''),
         'sgtm_domain'     => esc_url_raw(rtrim($in['sgtm_domain'] ?? '', '/')),
         'measurement_id'  => sanitize_text_field($in['measurement_id'] ?? ''),
@@ -120,14 +125,15 @@ function tagioo_sanitize_settings(array $in): array {
 }
 
 function tagioo_settings_page(): void {
-    $s = tagioo_settings();
+    $s    = tagioo_settings();
+    $name = TAGIOO_OPTION;
     $sgtm = tagioo_opt('sgtm_domain');
-    $collect_url = $sgtm ? $sgtm . '/g/collect?measurement_id=' . urlencode(tagioo_opt('measurement_id')) : '(set sGTM domain + Measurement ID first)';
+    $collect_url = $sgtm ? $sgtm . '/g/collect?measurement_id=' . rawurlencode(tagioo_opt('measurement_id')) : '(set sGTM domain + Measurement ID first)';
     ?>
     <div class="wrap">
         <h1>Tagioo — Server-Side Tracking</h1>
-        <p style="max-width:700px;color:#555">Single plugin replaces <strong>GTM4WP</strong> and <strong>WooCommerce webhooks</strong>.
-        Injects GTM, pushes GA4 ecommerce events with full <code>user_data</code>, and fires a server-side GA4 hit to sGTM on every payment — giving <strong>10/10 Meta EMQ</strong>.</p>
+        <p style="max-width:700px;color:#555">Loads Google Tag Manager, pushes GA4 ecommerce events with <code>user_data</code>,
+        and sends a server-side GA4 purchase hit to your server-side GTM container on every paid order — so purchases are recorded even when the browser pixel is blocked.</p>
 
         <form method="post" action="options.php">
             <?php settings_fields('tagioo_group'); ?>
@@ -136,15 +142,15 @@ function tagioo_settings_page(): void {
                 <tr>
                     <th><label for="t_gtm">GTM Container ID</label></th>
                     <td>
-                        <input name="<?= TAGIOO_OPTION ?>[gtm_id]" id="t_gtm" type="text"
-                               value="<?= esc_attr($s['gtm_id']) ?>" class="regular-text" placeholder="GTM-XXXXXXX" />
+                        <input name="<?php echo esc_attr($name . '[gtm_id]'); ?>" id="t_gtm" type="text"
+                               value="<?php echo esc_attr($s['gtm_id']); ?>" class="regular-text" placeholder="GTM-XXXXXXX" />
                     </td>
                 </tr>
                 <tr>
                     <th>Inject GTM snippet</th>
                     <td>
-                        <label><input type="checkbox" name="<?= TAGIOO_OPTION ?>[inject_gtm]" value="1"
-                               <?= checked('1', $s['inject_gtm'], false) ?> />
+                        <label><input type="checkbox" name="<?php echo esc_attr($name . '[inject_gtm]'); ?>" value="1"
+                               <?php checked('1', $s['inject_gtm']); ?> />
                         Add &lt;head&gt; + &lt;noscript&gt; tags automatically</label>
                         <p class="description">Disable only if you already inject GTM manually.</p>
                     </td>
@@ -152,19 +158,19 @@ function tagioo_settings_page(): void {
                 <tr>
                     <th>Custom Loader</th>
                     <td>
-                        <label><input type="checkbox" name="<?= TAGIOO_OPTION ?>[custom_loader]" value="1"
-                               <?= checked('1', $s['custom_loader'], false) ?> />
+                        <label><input type="checkbox" name="<?php echo esc_attr($name . '[custom_loader]'); ?>" value="1"
+                               <?php checked('1', $s['custom_loader']); ?> />
                         Load gtm.js first-party through the sGTM domain</label>
-                        <p class="description">Serves gtm.js via <code>&lt;sGTM domain&gt;/tagioo-loader/gtm.js</code> instead of googletagmanager.com, to bypass domain-based blockers (Brave, uBlock). Requires the sGTM domain below and the Custom Loader power-up enabled on the server.</p>
+                        <p class="description">Serves gtm.js via <code>&lt;sGTM domain&gt;/tagioo-loader/gtm.js</code> instead of googletagmanager.com, so domain-based blockers don't stop it. Requires the sGTM domain below and a server that proxies <code>/tagioo-loader/</code> (the Tagioo Custom Loader power-up).</p>
                     </td>
                 </tr>
                 <tr>
                     <th><label for="t_consent">Cookie consent</label></th>
                     <td>
-                        <select name="<?= TAGIOO_OPTION ?>[consent_mode]" id="t_consent">
-                            <option value="off" <?= selected('off', $s['consent_mode'], false) ?>>Off — consent not required (default)</option>
-                            <option value="banner" <?= selected('banner', $s['consent_mode'], false) ?>>Show Tagioo consent banner</option>
-                            <option value="external" <?= selected('external', $s['consent_mode'], false) ?>>Use my own cookie banner plugin</option>
+                        <select name="<?php echo esc_attr($name . '[consent_mode]'); ?>" id="t_consent">
+                            <option value="off" <?php selected('off', $s['consent_mode']); ?>>Off — consent not required (default)</option>
+                            <option value="banner" <?php selected('banner', $s['consent_mode']); ?>>Show Tagioo consent banner</option>
+                            <option value="external" <?php selected('external', $s['consent_mode']); ?>>Use my own cookie banner plugin</option>
                         </select>
                         <p class="description"><strong>Off:</strong> no banner; tracking and server-side purchases work for every visitor.<br>
                         <strong>Tagioo banner:</strong> shoppers see Accept / Reject. Uses Google Consent Mode v2 (denied until accepted), sets Meta cookies only after Accept, and Meta/TikTok skip purchases from shoppers who rejected.<br>
@@ -175,16 +181,16 @@ function tagioo_settings_page(): void {
                 <tr>
                     <th><label for="t_consent_text">Banner text</label></th>
                     <td>
-                        <textarea name="<?= TAGIOO_OPTION ?>[consent_text]" id="t_consent_text" rows="2" class="large-text" placeholder="<?= esc_attr(tagioo_default_consent_text()) ?>"><?= esc_textarea($s['consent_text']) ?></textarea>
+                        <textarea name="<?php echo esc_attr($name . '[consent_text]'); ?>" id="t_consent_text" rows="2" class="large-text" placeholder="<?php echo esc_attr(tagioo_default_consent_text()); ?>"><?php echo esc_textarea($s['consent_text']); ?></textarea>
                         <p class="description">Optional. Used only with the Tagioo banner. Your privacy policy page (Settings → Privacy) is linked automatically. Shoppers can reopen the banner with a link to <code>#tagioo-cookie-settings</code> or the <code>[tagioo_cookie_settings]</code> shortcode.</p>
                     </td>
                 </tr>
                 <tr>
                     <th><label for="t_place">GTM loading</label></th>
                     <td>
-                        <select name="<?= TAGIOO_OPTION ?>[gtm_placement]" id="t_place">
-                            <option value="code" <?= selected('code', $s['gtm_placement'], false) ?>>Always load GTM (default)</option>
-                            <option value="consent" <?= selected('consent', $s['gtm_placement'], false) ?>>Wait for consent (Google Consent Mode)</option>
+                        <select name="<?php echo esc_attr($name . '[gtm_placement]'); ?>" id="t_place">
+                            <option value="code" <?php selected('code', $s['gtm_placement']); ?>>Always load GTM (default)</option>
+                            <option value="consent" <?php selected('consent', $s['gtm_placement']); ?>>Wait for consent (Google Consent Mode)</option>
                         </select>
                         <p class="description">Only applies when Cookie consent is on. “Wait for consent” keeps GTM paused until the banner grants <code>ad_storage</code> or <code>analytics_storage</code>. “Always” loads GTM straight away and lets Consent Mode control what Google tags send (recommended).</p>
                     </td>
@@ -196,8 +202,8 @@ function tagioo_settings_page(): void {
                 <tr>
                     <th><label for="t_sgtm">sGTM Domain</label></th>
                     <td>
-                        <input name="<?= TAGIOO_OPTION ?>[sgtm_domain]" id="t_sgtm" type="url"
-                               value="<?= esc_attr($s['sgtm_domain']) ?>" class="regular-text"
+                        <input name="<?php echo esc_attr($name . '[sgtm_domain]'); ?>" id="t_sgtm" type="url"
+                               value="<?php echo esc_attr($s['sgtm_domain']); ?>" class="regular-text"
                                placeholder="https://sgtm.yourdomain.com" />
                         <p class="description">Used for the server-side purchase hit and first-party data collection. Also the host for Custom Loader (gtm.js served via /tagioo-loader/).</p>
                     </td>
@@ -205,26 +211,26 @@ function tagioo_settings_page(): void {
                 <tr>
                     <th><label for="t_mid">GA4 Measurement ID</label></th>
                     <td>
-                        <input name="<?= TAGIOO_OPTION ?>[measurement_id]" id="t_mid" type="text"
-                               value="<?= esc_attr($s['measurement_id']) ?>" class="regular-text" placeholder="G-XXXXXXXXXX" />
+                        <input name="<?php echo esc_attr($name . '[measurement_id]'); ?>" id="t_mid" type="text"
+                               value="<?php echo esc_attr($s['measurement_id']); ?>" class="regular-text" placeholder="G-XXXXXXXXXX" />
                         <p class="description">GA4 property ID (G-XXX). Required for server-side purchase hit.</p>
                     </td>
                 </tr>
                 <tr>
                     <th><label for="t_sec">GA4 API Secret</label></th>
                     <td>
-                        <input name="<?= TAGIOO_OPTION ?>[api_secret]" id="t_sec" type="password"
-                               value="<?= esc_attr($s['api_secret']) ?>" class="regular-text" />
+                        <input name="<?php echo esc_attr($name . '[api_secret]'); ?>" id="t_sec" type="password"
+                               value="<?php echo esc_attr($s['api_secret']); ?>" class="regular-text" />
                         <p class="description">GA4 → Admin → Data Streams → your stream → Measurement Protocol API secrets.</p>
                     </td>
                 </tr>
                 <tr>
                     <th>Server-side purchase hit</th>
                     <td>
-                        <label><input type="checkbox" name="<?= TAGIOO_OPTION ?>[server_hit]" value="1"
-                               <?= checked('1', $s['server_hit'], false) ?> />
-                        POST to sGTM on payment complete (replaces WooCommerce webhook)</label>
-                        <p class="description">Fires even if browser is closed / pixel blocked. Endpoint: <code><?= esc_html($collect_url) ?></code></p>
+                        <label><input type="checkbox" name="<?php echo esc_attr($name . '[server_hit]'); ?>" value="1"
+                               <?php checked('1', $s['server_hit']); ?> />
+                        Send a purchase hit to sGTM when an order is paid</label>
+                        <p class="description">Fires even if the browser is closed or the pixel is blocked. Endpoint: <code><?php echo esc_html($collect_url); ?></code></p>
                         <p class="description">When Cookie consent is on, the shopper's choice at checkout is sent with the hit as <code>consent_marketing</code>. Tagioo's Meta and TikTok server tags skip purchases marked denied; GA4 still records the order. Developers can change or skip the hit with the <code>tagioo_server_purchase_params</code> filter.</p>
                     </td>
                 </tr>
@@ -246,11 +252,11 @@ function tagioo_settings_page(): void {
                 ];
                 foreach ($events as $key => [$event, $desc]) : ?>
                     <tr>
-                        <th><?= esc_html($event) ?></th>
+                        <th><?php echo esc_html($event); ?></th>
                         <td>
-                            <label><input type="checkbox" name="<?= TAGIOO_OPTION ?>[<?= $key ?>]" value="1"
-                                   <?= checked('1', $s[$key], false) ?> />
-                            <?= esc_html($desc) ?></label>
+                            <label><input type="checkbox" name="<?php echo esc_attr($name . '[' . $key . ']'); ?>" value="1"
+                                   <?php checked('1', $s[$key]); ?> />
+                            <?php echo esc_html($desc); ?></label>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -262,8 +268,16 @@ function tagioo_settings_page(): void {
 }
 
 // ---------------------------------------------------------------------------
-// GTM injection — replaces GTM4WP
+// GTM injection
 // ---------------------------------------------------------------------------
+
+// JSON for inline <script> blocks. JSON_HEX_TAG escapes < and > as unicode escapes
+// so store or shopper text (product names, billing names) can never close the
+// script tag.
+function tagioo_json($data): string {
+    return (string) wp_json_encode($data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+}
+
 add_action('wp_head', function () {
     $id = tagioo_opt('gtm_id');
     if (!$id || tagioo_opt('inject_gtm') !== '1') return;
@@ -273,23 +287,22 @@ add_action('wp_head', function () {
     // uBlock) that block the googletagmanager.com host outright.
     $sgtm = tagioo_opt('sgtm_domain');
     if (tagioo_opt('custom_loader') === '1' && $sgtm) {
-        $loader = rtrim($sgtm, '/') . '/tagioo-loader/gtm.js?id=' . esc_js($id);
+        $loader = rtrim($sgtm, '/') . '/tagioo-loader/gtm.js?id=' . rawurlencode($id);
     } else {
-        $loader = 'https://www.googletagmanager.com/gtm.js?id=' . esc_js($id);
+        $loader = 'https://www.googletagmanager.com/gtm.js?id=' . rawurlencode($id);
     }
-    $id_e   = esc_js($id);
+    $src = tagioo_json(esc_url_raw($loader));
     if (tagioo_wait_for_consent()) {
         // Same idea as Stape's "Load GTM with consent": keep GTM paused until the
         // cookie banner reports Consent Mode ad_storage or analytics_storage
         // granted, checking pushes made before and after this script runs.
-        $src = $loader;
         echo "\n<!-- Tagioo GTM (waits for consent) -->\n";
-        echo "<script>(function(w,d,l,src){w[l]=w[l]||[];var done=false;function load(){if(done)return;done=true;w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName('script')[0],j=d.createElement('script');j.async=true;j.src=src;f.parentNode.insertBefore(j,f);}function ok(e){if(!e||e[0]!=='consent'||(e[1]!=='default'&&e[1]!=='update'))return false;var c=e[2]||{};return c.ad_storage==='granted'||c.analytics_storage==='granted';}var q=w[l];for(var i=0;i<q.length;i++){if(ok(q[i])){load();break;}}if(!done){var p=q.push;q.push=function(){var r=p.apply(q,arguments);for(var k=0;k<arguments.length;k++){if(ok(arguments[k]))load();}return r;};}})(window,document,'dataLayer','{$src}');</script>\n";
+        wp_print_inline_script_tag("(function(w,d,l,src){w[l]=w[l]||[];var done=false;function load(){if(done)return;done=true;w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName('script')[0],j=d.createElement('script');j.async=true;j.src=src;f.parentNode.insertBefore(j,f);}function ok(e){if(!e||e[0]!=='consent'||(e[1]!=='default'&&e[1]!=='update'))return false;var c=e[2]||{};return c.ad_storage==='granted'||c.analytics_storage==='granted';}var q=w[l];for(var i=0;i<q.length;i++){if(ok(q[i])){load();break;}}if(!done){var p=q.push;q.push=function(){var r=p.apply(q,arguments);for(var k=0;k<arguments.length;k++){if(ok(arguments[k]))load();}return r;};}})(window,document,'dataLayer'," . $src . ");");
         echo "<!-- End Tagioo GTM -->\n";
         return;
     }
     echo "\n<!-- Tagioo GTM -->\n";
-    echo "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='{$loader}'+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','{$id_e}');</script>\n";
+    wp_print_inline_script_tag("(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=" . $src . "+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer'," . tagioo_json($id) . ");");
     echo "<!-- End Tagioo GTM -->\n";
 }, 1);
 
@@ -297,31 +310,36 @@ add_action('wp_head', function () {
 add_action('wp_head', function () {
     if (tagioo_consent_mode() !== 'banner' || is_admin()) return;
     echo "\n<!-- Tagioo consent defaults -->\n";
-    echo "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}(function(){var all={ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted'};gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',wait_for_update:500});var m=document.cookie.match(/(?:^|; )tagioo_consent=([^;]*)/);if(m&&m[1]==='granted')gtag('consent','update',all);})();</script>\n";
+    wp_print_inline_script_tag("window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}(function(){var all={ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted'};gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',wait_for_update:500});var m=document.cookie.match(/(?:^|; )tagioo_consent=([^;]*)/);if(m&&m[1]==='granted')gtag('consent','update',all);})();");
 }, 0);
 
 function tagioo_default_consent_text(): string {
     return 'We use cookies to measure our ads and improve your shopping experience. You can accept or reject them.';
 }
 
+add_action('wp_enqueue_scripts', function () {
+    if (tagioo_consent_mode() !== 'banner') return;
+    wp_register_style('tagioo-consent', false, [], TAGIOO_VERSION);
+    wp_enqueue_style('tagioo-consent');
+    wp_add_inline_style('tagioo-consent', '.tagioo-consent,.tagioo-consent *{box-sizing:border-box}.tagioo-consent{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:2147483647;margin:0;padding:16px 20px calc(16px + env(safe-area-inset-bottom));background:#fff;color:#1d2327;border-top:1px solid #dcdcde;box-shadow:0 -8px 30px rgba(0,0,0,.12);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;transform:none}.tagioo-consent[hidden]{display:none}.tagioo-consent-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:20px}.tagioo-consent p{margin:0;flex:1}.tagioo-consent a{color:inherit;text-decoration:underline}.tagioo-consent-actions{display:flex;gap:10px;flex:none}.tagioo-consent button{min-width:120px;min-height:44px;padding:0 18px;border-radius:8px;border:1px solid #1d2327;background:#fff;color:#1d2327;font-family:inherit;font-size:15px;font-weight:600;line-height:1;cursor:pointer}.tagioo-consent button[data-tagioo-consent=granted]{background:#1d2327;color:#fff}.tagioo-consent button:focus-visible{outline:3px solid #2271b1;outline-offset:2px}@media(max-width:640px){.tagioo-consent-inner{flex-direction:column;align-items:stretch;gap:12px}.tagioo-consent-actions button{flex:1;min-width:0}}');
+});
+
 add_action('wp_footer', function () {
     if (tagioo_consent_mode() !== 'banner' || is_admin()) return;
     $text    = tagioo_opt('consent_text') ?: tagioo_default_consent_text();
     $privacy = function_exists('get_privacy_policy_url') ? get_privacy_policy_url() : '';
-    $link    = $privacy ? ' <a href="' . esc_url($privacy) . '">Privacy policy</a>' : '';
     ?>
 <div id="tagioo-consent" class="tagioo-consent" role="dialog" aria-live="polite" aria-label="Cookie consent" hidden>
   <div class="tagioo-consent-inner">
-    <p><?= esc_html($text) ?><?= $link ?></p>
+    <p><?php echo esc_html($text); ?><?php if ($privacy) : ?> <a href="<?php echo esc_url($privacy); ?>">Privacy policy</a><?php endif; ?></p>
     <div class="tagioo-consent-actions">
       <button type="button" data-tagioo-consent="denied">Reject</button>
       <button type="button" data-tagioo-consent="granted">Accept</button>
     </div>
   </div>
 </div>
-<style>.tagioo-consent,.tagioo-consent *{box-sizing:border-box}.tagioo-consent{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:2147483647;margin:0;padding:16px 20px calc(16px + env(safe-area-inset-bottom));background:#fff;color:#1d2327;border-top:1px solid #dcdcde;box-shadow:0 -8px 30px rgba(0,0,0,.12);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;transform:none}.tagioo-consent[hidden]{display:none}.tagioo-consent-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:20px}.tagioo-consent p{margin:0;flex:1}.tagioo-consent a{color:inherit;text-decoration:underline}.tagioo-consent-actions{display:flex;gap:10px;flex:none}.tagioo-consent button{min-width:120px;min-height:44px;padding:0 18px;border-radius:8px;border:1px solid #1d2327;background:#fff;color:#1d2327;font-family:inherit;font-size:15px;font-weight:600;line-height:1;cursor:pointer}.tagioo-consent button[data-tagioo-consent=granted]{background:#1d2327;color:#fff}.tagioo-consent button:focus-visible{outline:3px solid #2271b1;outline-offset:2px}@media(max-width:640px){.tagioo-consent-inner{flex-direction:column;align-items:stretch;gap:12px}.tagioo-consent-actions button{flex:1;min-width:0}}</style>
-<script>(function(){var box=document.getElementById('tagioo-consent');if(!box)return;if(box.parentNode!==document.body)document.body.appendChild(box);var all={ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted'};var none={ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied'};function saved(){var m=document.cookie.match(/(?:^|; )tagioo_consent=([^;]*)/);return m?m[1]:'';}function choose(v){document.cookie='tagioo_consent='+v+';path=/;max-age=15552000;SameSite=Lax'+(location.protocol==='https:'?';Secure':'');window.dataLayer=window.dataLayer||[];if(typeof gtag==='function')gtag('consent','update',v==='granted'?all:none);window.dataLayer.push({event:'tagioo_consent_update',tagioo_consent:v});box.hidden=true;}box.addEventListener('click',function(e){var b=e.target.closest('[data-tagioo-consent]');if(b)choose(b.getAttribute('data-tagioo-consent'));});document.addEventListener('click',function(e){var a=e.target.closest('a[href$="#tagioo-cookie-settings"]');if(a){e.preventDefault();box.hidden=false;}});if(!saved())box.hidden=false;})();</script>
     <?php
+    wp_print_inline_script_tag("(function(){var box=document.getElementById('tagioo-consent');if(!box)return;if(box.parentNode!==document.body)document.body.appendChild(box);var all={ad_storage:'granted',ad_user_data:'granted',ad_personalization:'granted',analytics_storage:'granted'};var none={ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied'};function saved(){var m=document.cookie.match(/(?:^|; )tagioo_consent=([^;]*)/);return m?m[1]:'';}function choose(v){document.cookie='tagioo_consent='+v+';path=/;max-age=15552000;SameSite=Lax'+(location.protocol==='https:'?';Secure':'');window.dataLayer=window.dataLayer||[];if(typeof gtag==='function')gtag('consent','update',v==='granted'?all:none);window.dataLayer.push({event:'tagioo_consent_update',tagioo_consent:v});box.hidden=true;}box.addEventListener('click',function(e){var b=e.target.closest('[data-tagioo-consent]');if(b)choose(b.getAttribute('data-tagioo-consent'));});document.addEventListener('click',function(e){var a=e.target.closest('a[href$=\"#tagioo-cookie-settings\"]');if(a){e.preventDefault();box.hidden=false;}});if(!saved())box.hidden=false;})();");
 }, 100);
 
 add_shortcode('tagioo_cookie_settings', function () {
@@ -332,13 +350,12 @@ add_action('wp_body_open', function () {
     $id = tagioo_opt('gtm_id');
     if (!$id || tagioo_opt('inject_gtm') !== '1') return;
     if (tagioo_wait_for_consent()) return;   // no JS means no consent signal
-    $id_e = esc_attr($id);
     $sgtm = tagioo_opt('sgtm_domain');
     $ns   = (tagioo_opt('custom_loader') === '1' && $sgtm)
-        ? rtrim($sgtm, '/') . '/tagioo-loader/ns.html?id=' . $id_e
-        : 'https://www.googletagmanager.com/ns.html?id=' . $id_e;
+        ? rtrim($sgtm, '/') . '/tagioo-loader/ns.html?id=' . rawurlencode($id)
+        : 'https://www.googletagmanager.com/ns.html?id=' . rawurlencode($id);
     echo "\n<!-- Tagioo GTM noscript -->\n";
-    echo "<noscript><iframe src=\"{$ns}\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript>\n";
+    echo '<noscript><iframe src="' . esc_url($ns) . '" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>' . "\n";
     echo "<!-- End Tagioo GTM noscript -->\n";
 }, 1);
 
@@ -346,7 +363,7 @@ add_action('wp_body_open', function () {
 // Helpers
 // ---------------------------------------------------------------------------
 function tagioo_currency(): string {
-    return function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : 'BDT';
+    return function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : 'USD';
 }
 
 function tagioo_price(string $price): float {
@@ -387,27 +404,61 @@ function tagioo_items_from_order(\WC_Order $order): array {
 }
 
 // E.164 dial code per country, used to normalize phone numbers for Meta hashing.
-// Unknown country falls back to the store's Bangladesh default (+88).
+// Empty country falls back to the store's base country. Countries missing from
+// the map use WooCommerce's own calling-code table (every country); none → ''.
 function tagioo_dial_code(string $cc): string {
+    $countries = function_exists('WC') ? WC()->countries : null;
+    if ($cc === '' && $countries) $cc = (string) $countries->get_base_country();
     $map = [
-        'BD'=>'88','US'=>'1','CA'=>'1','GB'=>'44','IN'=>'91','PK'=>'92','AU'=>'61',
+        'BD'=>'880','US'=>'1','CA'=>'1','GB'=>'44','IN'=>'91','PK'=>'92','AU'=>'61',
         'AE'=>'971','SA'=>'966','MY'=>'60','SG'=>'65','DE'=>'49','FR'=>'33','IT'=>'39',
         'ES'=>'34','NL'=>'31','SE'=>'46','NO'=>'47','DK'=>'45','BR'=>'55','MX'=>'52',
         'ID'=>'62','PH'=>'63','TH'=>'66','VN'=>'84','JP'=>'81','CN'=>'86','KR'=>'82',
         'TR'=>'90','EG'=>'20','ZA'=>'27','NG'=>'234','KE'=>'254','NP'=>'977','LK'=>'94',
     ];
-    return $map[strtoupper($cc)] ?? '88';
+    $cc = strtoupper($cc);
+    if (isset($map[$cc])) return $map[$cc];
+    if ($cc === '' || !$countries || !method_exists($countries, 'get_country_calling_code')) return '';
+    if ($cc === 'VA') return '39';   // Vatican numbers use Italy's +39 06 698…
+    $code = $countries->get_country_calling_code($cc);
+    if (is_array($code)) $code = reset($code);
+    $code = (string) preg_replace('/\D/', '', (string) $code);
+    // WooCommerce lists some codes with the area code included (+1 876 Jamaica,
+    // +44 1534 Jersey, +358 18 Åland). Shoppers type the area code themselves,
+    // so keep only the country code or it would be doubled.
+    if (str_starts_with($code, '1')) return '1';
+    if (str_starts_with($code, '44')) return '44';
+    if (str_starts_with($code, '358')) return '358';
+    return $code;
 }
 
 // Normalize a raw phone to E.164 (+<cc><number>) so the Meta hash matches.
 // Honors an already-international number (+ or 00 prefix); else prepends the
-// dial code for the order's billing country.
+// dial code for the order's billing country, dropping the national trunk 0
+// (BD 01712345678 → +8801712345678). Italy, San Marino and Vatican City keep
+// the leading 0 (Italian landlines: 06… → +3906…). A number that already starts
+// with the dial code (BD shoppers often type 8801…) is kept as is. Unknown
+// country → digits only, which Meta still accepts.
 function tagioo_normalize_phone(string $raw, string $country = ''): string {
     $phone = preg_replace('/[^0-9+]/', '', $raw);
     if (!$phone) return '';
     if (str_starts_with($phone, '+'))  return $phone;
     if (str_starts_with($phone, '00')) return '+' . substr($phone, 2);
-    return '+' . tagioo_dial_code($country) . ltrim($phone, '0');
+    $cc = strtoupper($country);
+    if ($cc === '' && function_exists('WC') && WC()->countries) $cc = strtoupper((string) WC()->countries->get_base_country());
+    $dial = tagioo_dial_code($cc);
+    if ($dial === '') return $phone;
+    // +1 and +7 numbers are always 10 national digits, so only an 11-digit number
+    // already carries the code (a Kazakh mobile 701… must not be mistaken for +7 01…).
+    if (strlen($dial) === 1) {
+        if (strlen($phone) === 11 && str_starts_with($phone, $dial)) return '+' . $phone;
+    } elseif (str_starts_with($phone, $dial) && strlen($phone) > strlen($dial) + 8) {
+        return '+' . $phone;
+    }
+    // Russia and Kazakhstan dial a trunk 8 instead of 0 (8 912 … → +7 912 …).
+    if ($dial === '7' && strlen($phone) === 11 && str_starts_with($phone, '8')) return '+7' . substr($phone, 1);
+    if (in_array($cc, ['IT', 'SM', 'VA'], true)) return '+' . $dial . $phone;
+    return '+' . $dial . ltrim($phone, '0');
 }
 
 /**
@@ -454,16 +505,13 @@ function tagioo_purchase_event_id(\WC_Order $order): string {
     return (string) $order->get_id();
 }
 
-function tagioo_push_script(array $data, bool $echo = true): string {
-    $out = '';
+function tagioo_push_script(array $data): void {
+    $js = 'window.dataLayer=window.dataLayer||[];';
     // GTM v2 merges nested objects — always clear stale ecommerce before each event.
-    if (isset($data['ecommerce'])) {
-        $out .= "\n<script>window.dataLayer=window.dataLayer||[];dataLayer.push({ecommerce:null});</script>\n";
-    }
-    $json = wp_json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    $out .= "\n<script>window.dataLayer=window.dataLayer||[];dataLayer.push({$json});</script>\n";
-    if ($echo) echo $out;
-    return $out;
+    if (isset($data['ecommerce'])) $js .= 'dataLayer.push({ecommerce:null});';
+    $js .= 'dataLayer.push(' . tagioo_json($data) . ');';
+    echo "\n";
+    wp_print_inline_script_tag($js);
 }
 
 /**
@@ -504,7 +552,7 @@ function tagioo_client_ip(): string {
     $candidates = [];
     foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_TRUE_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR'] as $h) {
         if (empty($_SERVER[$h])) continue;
-        foreach (explode(',', (string) wp_unslash($_SERVER[$h])) as $part) {
+        foreach (explode(',', sanitize_text_field(wp_unslash($_SERVER[$h]))) as $part) {
             $ip = trim($part);
             if ($ip !== '' && filter_var($ip, FILTER_VALIDATE_IP)) $candidates[] = $ip;
         }
@@ -547,8 +595,9 @@ add_action('init', function () {
     $fbc = isset($_COOKIE['_fbc']) ? sanitize_text_field(wp_unslash($_COOKIE['_fbc'])) : '';
 
     // fbclid in the landing URL → build _fbc now. Only when no _fbc cookie set.
-    if (!$fbc && !empty($_GET['fbclid'])) {
-        $fbclid = sanitize_text_field(wp_unslash($_GET['fbclid']));
+    // Read-only ad click ID on a public landing page; no state change, no nonce.
+    if (!$fbc && !empty($_GET['fbclid'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $fbclid = sanitize_text_field(wp_unslash($_GET['fbclid'])); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         $fbc = 'fb.1.' . (string) round(microtime(true) * 1000) . '.' . $fbclid;
     }
 
@@ -607,7 +656,7 @@ function tagioo_marketing_consent(): array {
     if (function_exists('wp_has_consent') && function_exists('wp_get_consent_type') && wp_get_consent_type()) {
         return [wp_has_consent('marketing') ? 'granted' : 'denied', 'wp_consent_api'];
     }
-    $c = static fn(string $name): string => isset($_COOKIE[$name]) ? strtolower(rawurldecode(wp_unslash((string) $_COOKIE[$name]))) : '';
+    $c = static fn(string $name): string => isset($_COOKIE[$name]) ? strtolower(sanitize_text_field(rawurldecode(wp_unslash($_COOKIE[$name])))) : '';
     if (($v = $c('cookieyes-consent')) !== '') {
         if (strpos($v, 'advertisement:yes') !== false) return ['granted', 'cookieyes'];
         if (strpos($v, 'advertisement:no') !== false) return ['denied', 'cookieyes'];
@@ -702,15 +751,13 @@ add_action('wp_ajax_nopriv_tagioo_take_add_to_cart', 'tagioo_ajax_take_add_to_ca
 // for both, fetch the server-built ecommerce payload, and push it immediately.
 add_action('wp_footer', function () {
     if (tagioo_opt('track_add_cart') !== '1' && tagioo_opt('track_remove_cart') !== '1') return;
-    $endpoint = esc_url(admin_url('admin-ajax.php'));
-    $nonce    = esc_js(wp_create_nonce('tagioo_take_add_to_cart'));
-    ?>
-    <script>
-    (function () {
+    $cfg = tagioo_json(['endpoint' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('tagioo_take_add_to_cart')]);
+    $js  = <<<'JS'
+    (function (cfg) {
         if (window.__tagiooAtcBridge) return;
         window.__tagiooAtcBridge = true;
-        var endpoint = <?= wp_json_encode($endpoint) ?>;
-        var nonce = <?= wp_json_encode($nonce) ?>;
+        var endpoint = cfg.endpoint;
+        var nonce = cfg.nonce;
         var busy = false;
 
         function pushEvent(payload) {
@@ -762,9 +809,9 @@ add_action('wp_footer', function () {
         } else {
             bind();
         }
-    })();
-    </script>
-    <?php
+    })(
+JS;
+    wp_print_inline_script_tag($js . $cfg . ');');
 }, 5);
 
 add_action('wp_footer', function () {
@@ -937,14 +984,13 @@ add_action('wp_footer', function () {
     if (function_exists('is_order_received_page') && is_order_received_page()) return;
     $ecommerce = tagioo_cart_ecommerce();
     if (!$ecommerce) return;
-    $needs_shipping = WC()->cart && WC()->cart->needs_shipping();
-    ?>
-    <script>
-    (function () {
+    $cfg = tagioo_json(['base' => $ecommerce, 'needsShipping' => (bool) (WC()->cart && WC()->cart->needs_shipping())]);
+    $js  = <<<'JS'
+    (function (cfg) {
         if (window.__tagiooCheckoutSteps) return;
         window.__tagiooCheckoutSteps = true;
-        var base = <?= wp_json_encode($ecommerce, JSON_UNESCAPED_UNICODE) ?>;
-        var needsShipping = <?= $needs_shipping ? 'true' : 'false' ?>;
+        var base = cfg.base;
+        var needsShipping = cfg.needsShipping;
         var sent = {};
         function id(prefix) { return 'tagioo-' + prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
         function checked(selector) {
@@ -974,9 +1020,9 @@ add_action('wp_footer', function () {
             }, true);
         }
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind, {once: true}); else bind();
-    })();
-    </script>
-    <?php
+    })(
+JS;
+    wp_print_inline_script_tag($js . $cfg . ');');
 }, 23);
 
 // ---------------------------------------------------------------------------
@@ -1013,8 +1059,8 @@ function tagioo_emit_browser_purchase(int $order_id): void {
     // Purchase when the first response was interrupted or GTM loaded late.
     // Dedup inside the current browser session only after dataLayer accepts the
     // event; the raw order ID still deduplicates browser/server hits at Meta.
-    $json = wp_json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    echo "\n<script>(function(){var p={$json},k='tagioo_purchase_'+String(p.event_id||''),s=window.__tagiooDataLayerSent=window.__tagiooDataLayerSent||{};if(s[k])return;try{if(window.sessionStorage&&sessionStorage.getItem(k))return;}catch(e){}var d=window.dataLayer=window.dataLayer||[];d.push({ecommerce:null});d.push(p);s[k]=1;try{if(window.sessionStorage)sessionStorage.setItem(k,'1');}catch(e){}})();</script>\n";
+    echo "\n";
+    wp_print_inline_script_tag('(function(){var p=' . tagioo_json($payload) . ",k='tagioo_purchase_'+String(p.event_id||''),s=window.__tagiooDataLayerSent=window.__tagiooDataLayerSent||{};if(s[k])return;try{if(window.sessionStorage&&sessionStorage.getItem(k))return;}catch(e){}var d=window.dataLayer=window.dataLayer||[];d.push({ecommerce:null});d.push(p);s[k]=1;try{if(window.sessionStorage)sessionStorage.setItem(k,'1');}catch(e){}})();");
 }
 add_action('woocommerce_thankyou', 'tagioo_emit_browser_purchase', 10, 1);
 
@@ -1023,7 +1069,8 @@ add_action('woocommerce_thankyou', 'tagioo_emit_browser_purchase', 10, 1);
 // order-received URL without exposing an order selected by ID alone.
 add_action('wp_footer', function () {
     if (tagioo_opt('track_purchase') !== '1' || !function_exists('is_order_received_page') || !is_order_received_page()) return;
-    $order_key = isset($_GET['key']) ? sanitize_text_field(wp_unslash($_GET['key'])) : '';
+    // WooCommerce's own order-received key, verified with hash_equals below; read-only.
+    $order_key = isset($_GET['key']) ? sanitize_text_field(wp_unslash($_GET['key'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
     if ($order_key === '') return;
 
     $order_id = absint(get_query_var('order-received'));
@@ -1045,6 +1092,11 @@ add_action('wp_footer', function () {
 // Meta deduplicates both to 1; GA4 dedups by transaction_id.
 // ---------------------------------------------------------------------------
 define('TAGIOO_SS_MAX_RETRY', 5);
+
+// WooCommerce → Status → Logs, source "tagioo".
+function tagioo_log(string $level, string $message): void {
+    if (function_exists('wc_get_logger')) wc_get_logger()->log($level, $message, ['source' => 'tagioo']);
+}
 define('TAGIOO_SS_LOCK_TTL', 300);
 
 // WP-Cron may start two workers when payment_complete and the processing status
@@ -1204,7 +1256,7 @@ add_action('tagioo_server_purchase', function (int $order_id, int $attempt = 1) 
     // Developers can adjust the hit, or return false to skip it (e.g. stricter consent rules).
     $params = apply_filters('tagioo_server_purchase_params', $params, $order);
     if ($params === false) {
-        error_log("[tagioo] server purchase #{$order_num} skipped by tagioo_server_purchase_params filter");
+        tagioo_log('info', "server purchase #{$order_num} skipped by tagioo_server_purchase_params filter");
         tagioo_release_server_purchase($order_id);
         return;
     }
@@ -1230,11 +1282,11 @@ add_action('tagioo_server_purchase', function (int $order_id, int $attempt = 1) 
 
     // Failure → log + retry with linear backoff (60s, 120s, ...), capped.
     $err = is_wp_error($res) ? $res->get_error_message() : ('HTTP ' . $code);
-    error_log("[tagioo] server purchase #{$order_num} attempt {$attempt} failed: {$err}");
+    tagioo_log('warning', "server purchase #{$order_num} attempt {$attempt} failed: {$err}");
     if ($attempt < TAGIOO_SS_MAX_RETRY) {
         wp_schedule_single_event(time() + 60 * $attempt, 'tagioo_server_purchase', [$order_id, $attempt + 1]);
     } else {
-        error_log("[tagioo] server purchase #{$order_num} gave up after {$attempt} attempts");
+        tagioo_log('error', "server purchase #{$order_num} gave up after {$attempt} attempts");
     }
     tagioo_release_server_purchase($order_id);
 }, 10, 2);
