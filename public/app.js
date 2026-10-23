@@ -5560,7 +5560,7 @@ function renderPaymentStatusCard(billing) {
   if (billing.paymentProvider === "shopify") {
     panel.hidden = false;
     panel.className = "payment-status-card is-active";
-    panel.innerHTML = '<div class="psc-main"><div class="psc-text"><strong>Billing through Shopify</strong><p>All plans and hosting charges for this workspace use Shopify billing. Choose a plan above for more events or containers. Complete your Shopify connection in Setup Assistant if plan selection is unavailable.</p></div></div>';
+    panel.innerHTML = '<div class="psc-main"><div class="psc-text"><strong>Billing through Shopify</strong><p>All plans and hosting charges for this workspace are billed through Shopify. Choose a plan below to open plan selection in your Shopify admin. If plan selection is unavailable, install the Tagioo app in Shopify and connect your store in Setup Assistant.</p></div></div>';
     manageBillingPolling(false, billing.subscriptionStatus, billing.paymentStatus);
     return;
   }

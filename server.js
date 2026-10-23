@@ -9,8 +9,9 @@ import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeE
 import { brotliCompress, constants as zlibConstants, deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
 import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
-import { highestActiveShopifyPlan, normalizeShopifyBillingState, requiresShopifyBilling } from "./shopify-billing.js";
+import { SHOPIFY_HANDOFF_TTL_MS, SIGNUP_STORE_PLATFORMS, highestActiveShopifyPlan, makeShopifyHandoffCookie, normalizeShopDomain, normalizeShopifyBillingState, readShopifyHandoffCookie, requiresShopifyBilling, shopifyAdoptionBlocker, shopifyPlanSelectionUrl, shopifyShopForTenant } from "./shopify-billing.js";
 import { redactShopifyBackups, privacySafeBackupData } from "./shopify-privacy-backups.js";
+import { findShopifyWorkspace, tenantShopifyShops, usableShopifyAppSecret, verifyShopifyAppToken } from "./shopify-workspace.js";
 import { privacyTokenHash, retainShopifyPrivacyRoute, removeShopifyOrders, shopifyCustomerOrders } from "./shopify-privacy.js";
 import { parseDataProtectionKey, parseProtectedJson, serializeProtectedJson } from "./data-protection.js";
 import { appendProtectedDataAudit } from "./protected-data-audit.js";
@@ -179,6 +180,9 @@ const config = {
     ? (process.env.PADDLE_LIVE_API_KEY || "")
     : (process.env.PADDLE_SANDBOX_API_KEY || ""),
   paddleWebhookSecret: process.env.PADDLE_WEBHOOK_SECRET || "",
+  // Shared with the Tagioo Shopify app: signs its workspace calls and one-click
+  // dashboard links. Unset (or under 32 chars) disables both.
+  shopifyAppSecret: usableShopifyAppSecret(process.env.TAGIOO_SHOPIFY_APP_SECRET),
   paddleEnv: process.env.PADDLE_ENV || "sandbox",
   paddleApiBase: (process.env.PADDLE_ENV || "sandbox") === "production"
     ? "https://api.paddle.com"
@@ -651,6 +655,20 @@ async function emailWelcome(toEmail, fullName) {
   });
 }
 
+async function emailShopifyWorkspaceReady(toEmail, fullName, shop) {
+  const name = String(fullName || "").trim().split(" ")[0] || "there";
+  return sendEmail({
+    to: toEmail,
+    subject: "Your Tagioo workspace for Shopify is ready",
+    bodyHtml: [
+      `<p style="font-size:22px;font-weight:900;margin:0 0 8px;color:#0F0A1E">Welcome, ${escapeHtml(name)}!</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Your Tagioo workspace for <strong>${escapeHtml(shop)}</strong> is ready on the <strong>Free</strong> plan (15,000 tracked events per 30 days). Open it any time from Shopify admin: <strong>Apps → Tagioo Tracking → Open Tagioo dashboard</strong>.</p>`,
+      `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Paid plans are chosen and billed in Shopify, never on tagioo.com. To sign in at tagioo.com directly, use <strong>Forgot password</strong> with this email address to set a password.</p>`,
+      `<p style="color:#9BA8C0;font-size:13px;margin:24px 0 0">Need a hand? Reply to this email and we'll help you get live.</p>`
+    ].join("")
+  });
+}
+
 async function sendPasswordResetEmail(toEmail, resetUrl) {
   return sendEmail({
     to: toEmail,
@@ -772,9 +790,20 @@ function purchaseStatHtml({ purchases, revenue, currency }) {
   return `<p style="background:#F8FAFC;border:1px solid #E5E7EB;border-radius:10px;padding:14px 16px;color:#0F0A1E;margin:0 0 20px;line-height:1.6">Tagioo has already tracked <strong>${purchases.toLocaleString()} purchase${purchases === 1 ? "" : "s"}${rev}</strong> for you this cycle. If your tracking pauses, sales like these stop reaching your ad platforms.</p>`;
 }
 
+// Shopify-billed workspaces upgrade in Shopify admin, never through a Tagioo checkout.
+function upgradeCta(tenant, label) {
+  if (!requiresShopifyBilling(tenant)) return { href: "https://tagioo.com/#billing", label, note: "" };
+  return {
+    href: shopifyPlanSelectionUrl(shopifyShopForTenant(tenant)) || "https://tagioo.com/#billing",
+    label: "Choose a plan in Shopify",
+    note: `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">Paid plans for your Shopify store are billed through Shopify. In Shopify admin, open <strong>Apps → Tagioo Tracking → View or change Shopify plan</strong>.</p>`
+  };
+}
+
 async function emailFreeTierNudge(toEmail, tenant, threshold, used, limit, purchaseData) {
   const tier = FREE_NUDGE_TIERS[threshold] || FREE_NUDGE_TIERS[12000];
   const remaining = Math.max(0, limit - used);
+  const cta = upgradeCta(tenant, "Upgrade now");
   return sendEmail({
     to: toEmail,
     subject: `Tagioo Free plan: ${tier.heading}`,
@@ -783,12 +812,14 @@ async function emailFreeTierNudge(toEmail, tenant, threshold, used, limit, purch
       `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">${escapeHtml(tier.tone)}</p>`,
       `<div style="background:#F8FAFC;border-radius:10px;padding:14px 16px;margin:0 0 18px"><div style="height:8px;background:#E5E7EB;border-radius:99px;overflow:hidden"><div style="height:8px;width:${Math.min(100, Math.round((used / limit) * 100))}%;background:${tier.color}"></div></div><p style="margin:8px 0 0;font-size:13px;color:#5B6B8A"><strong style="color:${tier.color}">${used.toLocaleString()}</strong> / ${limit.toLocaleString()} events used · ${remaining.toLocaleString()} left this cycle</p></div>`,
       purchaseStatHtml(purchaseData || {}),
-      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:${tier.color};color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Upgrade now →</a>`
+      cta.note,
+      `<a href="${escapeHtml(cta.href)}" style="display:inline-block;background:${tier.color};color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">${escapeHtml(cta.label)} →</a>`
     ].join("")
   });
 }
 
 async function emailFreeTierCapped(toEmail, tenant, purchaseData) {
+  const cta = upgradeCta(tenant, "Upgrade & resume tracking");
   return sendEmail({
     to: toEmail,
     subject: `Tagioo tracking paused at your Free plan limit`,
@@ -796,7 +827,8 @@ async function emailFreeTierCapped(toEmail, tenant, purchaseData) {
       `<p style="font-size:21px;font-weight:900;margin:0 0 8px;color:#DC2626">🛑 Your tracking is paused</p>`,
       `<p style="color:#5B6B8A;margin:0 0 18px;line-height:1.6">You've used all 15,000 free events this cycle, so your sGTM container is paused. New conversions are <strong>not</strong> reaching Meta, GA4, or Google Ads right now. Upgrade to a paid plan to resume tracking immediately.</p>`,
       purchaseStatHtml(purchaseData || {}),
-      `<a href="https://tagioo.com/#billing" style="display:inline-block;background:#DC2626;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">Upgrade & resume tracking →</a>`
+      cta.note,
+      `<a href="${escapeHtml(cta.href)}" style="display:inline-block;background:#DC2626;color:#fff;font-weight:800;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:16px">${escapeHtml(cta.label)} →</a>`
     ].join("")
   });
 }
@@ -2800,7 +2832,7 @@ function buildSetupAssistantTemplates(input) {
 }
 
 function loginPage(error = "", opts = {}) {
-  const { resetSent = false, resetDone = false } = opts;
+  const { resetSent = false, resetDone = false, shopifyShop = "" } = opts;
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -2870,6 +2902,7 @@ function loginPage(error = "", opts = {}) {
               <p class="lf-subtitle">Sign in to view your tracking dashboard.</p>
             </div>
             ${resetDone ? `<div class="lf-success">Password updated. Sign in with your new password.</div>` : ""}
+            ${shopifyShop ? `<div class="lf-success">Signing in from Shopify for <strong>${escapeHtml(shopifyShop)}</strong>. This workspace's plan will be chosen and billed in your Shopify admin.</div>` : ""}
             ${error ? `<div class="lf-error">${error}</div>` : ""}
             <form method="post" action="/login" class="lf-form">
               <div class="lf-field">
@@ -3115,6 +3148,36 @@ ${gtmHead()}
 <a href=${JSON.stringify(landing)}>Continue to your account</a>
 <noscript><meta http-equiv="refresh" content="0;url=${landing}"></noscript>
 </main></body></html>`;
+}
+
+function shopifyNoticePage(message) {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=brand-2">
+<meta name="robots" content="noindex, nofollow"><title>Tagioo for Shopify</title>
+<link rel="stylesheet" href="/login.css">
+</head><body class="login-body"><main class="login-form-panel" style="margin:auto"><div class="login-form-wrap">
+<div class="lf-header"><h1>Tagioo for Shopify</h1></div>
+<div class="lf-error">${escapeHtml(message)}</div>
+<p class="lf-signup-prompt"><a href="/login">Sign in with a password</a></p>
+</div></main></body></html>`;
+}
+
+// Shown to a signed-in customer who followed the "Sign in" link in the Tagioo
+// Shopify app: confirms which workspace becomes Shopify-billed.
+function shopifyHandoffPage({ shop = "", workspace = "", error = "" } = {}) {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=brand-2">
+<meta name="robots" content="noindex, nofollow"><title>Connect your Shopify store — Tagioo</title>
+<link rel="stylesheet" href="/login.css">
+</head><body class="login-body"><main class="login-form-panel" style="margin:auto"><div class="login-form-wrap">
+<div class="lf-header"><h1>Connect your Shopify store</h1>
+<p class="lf-subtitle">You're signed in to the Tagioo workspace <strong>${escapeHtml(workspace)}</strong>.</p></div>
+${error ? `<div class="lf-error">${escapeHtml(error)}</div>` : `<p>Use this workspace with <strong>${escapeHtml(shop)}</strong>? Its plan is then chosen and billed in your Shopify admin. Tagioo won't charge you anywhere else.</p>
+<form method="post" action="/shopify/start" class="lf-form"><button type="submit" class="lf-btn-primary">Use this workspace →</button></form>`}
+<p class="lf-signup-prompt"><a href="/logout">Use a different Tagioo account</a> · <a href="/">Go to dashboard</a></p>
+</div></main></body></html>`;
 }
 
 function verifyPage({ email = "", error = "", info = "", leadEventId = "" } = {}) {
@@ -3438,6 +3501,15 @@ function signupPage(error = "", values = {}) {
     ["OTHER", "Other"]
   ].map(([value, label]) => `<option value="${value}"${selectedCountry === value ? " selected" : ""}>${label}</option>`)
     .join("");
+  const storePlatform = values.shopifyShop ? "shopify" : String(values.storePlatform || "");
+  const platformOptions = [
+    ["", "Select your store platform"],
+    ["shopify", "Shopify"],
+    ["woocommerce", "WooCommerce / WordPress"],
+    ["custom", "Custom-built website"],
+    ["other", "Other"]
+  ].map(([value, label]) => `<option value="${value}"${storePlatform === value ? " selected" : ""}>${label}</option>`)
+    .join("");
   const referralOptions = ["", "Google Search", "Facebook", "YouTube", "Friend or colleague", "Agency", "Other"]
     .map((item) => `<option value="${escapeHtml(item)}"${values.referral === item ? " selected" : ""}>${item || "Select an option (optional)"}</option>`)
     .join("");
@@ -3516,7 +3588,9 @@ function signupPage(error = "", values = {}) {
           <form method="post" action="/signup" class="lf-form" id="signupForm">
             <input type="hidden" name="plan" value="${escapeHtml(values.plan || "")}" />
             <input type="hidden" name="billingCycle" value="${escapeHtml(values.billingCycle || "")}" />
-            ${values.plan && values.plan !== "Free" ? `<div class="lf-plan-note su-anim" style="--d:60ms;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#5B21B6;font-size:14px">You're signing up for the <strong>${escapeHtml(values.plan)}</strong> plan. After email verification, choose a payment method to activate it. Card payments are billed in USD via Paddle; Bangladesh customers can also pay locally via bKash or Nagad.</div>` : ""}
+            ${values.shopifyShop ? `<input type="hidden" name="storePlatform" value="shopify" />` : ""}
+            <div class="su-shopify-note su-anim" style="--d:60ms;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#166534;font-size:14px"${storePlatform === "shopify" ? "" : " hidden"}>${values.shopifyShop ? `Creating a Tagioo account for <strong>${escapeHtml(values.shopifyShop)}</strong>. ` : ""}Shopify stores start on the Free plan. Paid plans are chosen and billed in your Shopify admin through the Tagioo app — no card is needed here.</div>
+            ${values.plan && values.plan !== "Free" && storePlatform !== "shopify" ? `<div class="lf-plan-note su-anim" style="--d:60ms;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px 14px;margin-bottom:14px;color:#5B21B6;font-size:14px">You're signing up for the <strong>${escapeHtml(values.plan)}</strong> plan. After email verification, choose a payment method to activate it. Card payments are billed in USD via Paddle; Bangladesh customers can also pay locally via bKash or Nagad.</div>` : ""}
 
             <div class="lf-field su-anim" style="--d:80ms">
               <label for="suFullName">Full name</label>
@@ -3538,6 +3612,11 @@ function signupPage(error = "", values = {}) {
                 <input id="suPhone" name="phone" type="tel" autocomplete="tel" placeholder="1712345678" value="${escapeHtml(values.phone || "")}" required />
               </div>
             </div>
+
+            ${values.shopifyShop ? "" : `<div class="lf-field su-anim" style="--d:205ms">
+              <label for="suPlatform">Store platform</label>
+              <select id="suPlatform" name="storePlatform" class="su-select" required>${platformOptions}</select>
+            </div>`}
 
             <div class="lf-field su-anim" style="--d:230ms">
               <label for="suPw">Password</label>
@@ -3587,6 +3666,14 @@ function signupPage(error = "", values = {}) {
       }
       setupPwToggle("suPw", "pw1Toggle", "eye1Show", "eye1Hide");
       setupPwToggle("suPwConfirm", "pw2Toggle", "eye2Show", "eye2Hide");
+
+      const platformSelect = document.getElementById("suPlatform");
+      platformSelect?.addEventListener("change", () => {
+        const shopify = platformSelect.value === "shopify";
+        document.querySelector(".su-shopify-note").hidden = !shopify;
+        const planNote = document.querySelector(".lf-plan-note");
+        if (planNote) planNote.hidden = shopify;
+      });
 
       document.getElementById("signupForm").addEventListener("submit", () => {
         const btn = document.getElementById("suSubmit");
@@ -7067,6 +7154,7 @@ async function validateSignupInput(input) {
   if (!phone) errors.push("Phone number is required.");
   if (password.length < 8) errors.push("Password must be at least 8 characters.");
   if (password !== confirmPassword) errors.push("Passwords do not match.");
+  if (!SIGNUP_STORE_PLATFORMS.includes(String(input.storePlatform || ""))) errors.push("Choose your store platform.");
   if (errors.length) return { ok: false, errors };
 
   // Validation is read-only; share the dashboard's in-flight read instead of
@@ -7162,7 +7250,15 @@ async function addCustomerSignupLocked(input, visitor) {
   if (visitor) {
     tenant.tracking = { ...(tenant.tracking || {}), tagiooVisitor: { at: new Date().toISOString(), ...visitor } };
   }
-  const chosenPlan = String(input.plan || "").trim();
+  const storePlatform = SIGNUP_STORE_PLATFORMS.includes(String(input.storePlatform || "")) ? input.storePlatform : "";
+  if (storePlatform) tenant.signupPlatform = storePlatform;
+  // Shopify stores are billed only through Shopify App Pricing (requirement 1.2.1).
+  if (storePlatform === "shopify") {
+    tenant.shopifyBillingRequired = true;
+    tenant.shopifyShop = normalizeShopDomain(input.shopifyShop);
+    if (tenant.shopifyShop) tenant.shopifyShops = [tenant.shopifyShop];
+  }
+  const chosenPlan = storePlatform === "shopify" ? "" : String(input.plan || "").trim();
   if (["Starter", "Pro", "Enterprise"].includes(chosenPlan)) {
     const staged = await selectCustomerPlanLocked(
       { plan: chosenPlan, billingCycle: input.billingCycle || "monthly" },
@@ -7329,41 +7425,135 @@ async function releaseUnpaidSignupToFree(tenantId) {
     const index = (data.tenants || []).findIndex((tenant) => tenant.id === tenantId);
     if (index === -1) return { released: false };
     const tenant = data.tenants[index];
-    if (!checkoutRequired(tenant, data)) return { released: false };
-    // Defensive: a live paid plan mislabeled pending_payment is repaired by
-    // enforcePaidRenewals — never downgrade it here.
-    if (tenant.plan !== "Free" && tenant.paymentStatus === "paid") return { released: false };
+    if (!unpaidSignupReleasable(tenant, data)) return { released: false };
+    data.tenants[index] = unpaidSignupReleasedToFree(tenant, data, new Date());
+    await writeDatabase(data);
+    return { released: true, tenant: data.tenants[index] };
+  });
+}
 
+function unpaidSignupReleasable(tenant, data) {
+  // Defensive: a live paid plan mislabeled pending_payment is repaired by
+  // enforcePaidRenewals — never downgrade it here.
+  return checkoutRequired(tenant, data) && !(tenant.plan !== "Free" && tenant.paymentStatus === "paid");
+}
+
+function unpaidSignupReleasedToFree(tenant, data, now) {
+  const profile = resourceProfileForPlan("Free");
+  // Keep any existing free cycle window: releasing must never hand out a fresh
+  // 15k allowance to a tenant that already burned part of one.
+  const cycleStart = tenant.cycleStart || now.toISOString();
+  const cycleEnd = tenant.cycleEnd || new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString();
+  return {
+    ...tenant,
+    plan: "Free",
+    requestLimit: profile.monthlyRequestLimit,
+    containerLimit: profile.containerLimit,
+    domainLimit: profile.domainLimit,
+    extraContainers: 0,
+    monthlyAmount: 0,
+    subscriptionStatus: "free",
+    paymentStatus: "free",
+    pendingPlan: "",
+    pendingAmount: 0,
+    pendingBillingCycle: "",
+    pendingInvoiceNo: "",
+    scheduledPlan: "",
+    scheduledPlanCycle: "",
+    cycleStart,
+    cycleEnd,
+    cycleBaseline: tenant.cycleStart && tenant.cycleEnd ? Number(tenant.cycleBaseline || 0) : tenantRequestBaselineNow(data, tenant.id, now),
+    suspensionEnforcedAt: "",
+    updatedAt: now.toISOString()
+  };
+}
+
+// A merchant arriving from the Tagioo Shopify app is billed only through Shopify
+// App Pricing (App Store requirement 1.2.1), even before a store is connected, so
+// the panel never offers Paddle or bKash/Nagad to them. An unpaid staged invoice
+// is dropped; nothing was charged for it.
+async function adoptShopifyBilling(tenantId, shop) {
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+    const data = loaded.data;
+    const index = (data.tenants || []).findIndex((tenant) => tenant.id === tenantId);
+    const tenant = index === -1 ? null : data.tenants[index];
+    const blocker = shopifyAdoptionBlocker(tenant, data.payments || []);
+    if (blocker) return { ok: false, status: tenant ? 409 : 404, errors: [blocker] };
     const now = new Date();
-    const profile = resourceProfileForPlan("Free");
-    // Keep any existing free cycle window: releasing must never hand out a fresh
-    // 15k allowance to a tenant that already burned part of one.
-    const cycleStart = tenant.cycleStart || now.toISOString();
-    const cycleEnd = tenant.cycleEnd || new Date(now.getTime() + FREE_CYCLE_DAYS * 86400000).toISOString();
+    const base = unpaidSignupReleasable(tenant, data) ? unpaidSignupReleasedToFree(tenant, data, now) : tenant;
     data.tenants[index] = {
-      ...tenant,
-      plan: "Free",
-      requestLimit: profile.monthlyRequestLimit,
-      containerLimit: profile.containerLimit,
-      domainLimit: profile.domainLimit,
-      extraContainers: 0,
-      monthlyAmount: 0,
-      subscriptionStatus: "free",
-      paymentStatus: "free",
+      ...base,
+      shopifyBillingRequired: true,
+      shopifyShop: tenant.shopifyShop || normalizeShopDomain(shop),
+      shopifyShops: [...new Set([...(tenant.shopifyShops || []), normalizeShopDomain(shop)].filter(Boolean))],
       pendingPlan: "",
       pendingAmount: 0,
       pendingBillingCycle: "",
       pendingInvoiceNo: "",
-      scheduledPlan: "",
-      scheduledPlanCycle: "",
-      cycleStart,
-      cycleEnd,
-      cycleBaseline: tenant.cycleStart && tenant.cycleEnd ? Number(tenant.cycleBaseline || 0) : tenantRequestBaselineNow(data, tenant.id, now),
-      suspensionEnforcedAt: "",
       updatedAt: now.toISOString()
     };
     await writeDatabase(data);
-    return { released: true, tenant: data.tenants[index] };
+    return { ok: true, tenant: data.tenants[index] };
+  });
+}
+
+// Nonces of one-click Shopify sign-in links already used, kept until they expire.
+const usedShopifyLoginNonces = new Map();
+
+function claimShopifyLoginNonce(nonce, exp, now = Date.now()) {
+  for (const [key, expiresAt] of usedShopifyLoginNonces) if (expiresAt < now) usedShopifyLoginNonces.delete(key);
+  if (usedShopifyLoginNonces.has(nonce)) return false;
+  usedShopifyLoginNonces.set(nonce, exp);
+  return true;
+}
+
+// The Tagioo Shopify app creates the workspace for a store that has none, so a
+// Shopify merchant never signs up (or meets a checkout) on tagioo.com. The
+// password is random: they open the workspace from Shopify admin, or set a
+// password with "Forgot password".
+async function createShopifyAppWorkspace(input) {
+  const shop = normalizeShopDomain(input.shop);
+  const email = String(input.email || "").trim().toLowerCase();
+  if (!shop) return { ok: false, status: 400, errors: ["Invalid Shopify store domain."] };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, status: 400, errors: ["Add a store contact email in Shopify Settings, then try again."] };
+  }
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
+    const data = loaded.data;
+    const existing = findShopifyWorkspace(data, shop);
+    if (existing) return { ok: true, created: false, tenant: existing };
+    if ((data.customerAccounts || []).some((account) => account.username === email)) {
+      return { ok: false, status: 409, code: "account_exists", errors: [`A Tagioo account already uses ${email}. Sign in to link it to this store.`] };
+    }
+    const handle = shop.replace(/\.myshopify\.com$/, "");
+    const shopName = String(input.shopName || "").trim().slice(0, 120) || handle;
+    const fullName = String(input.ownerName || "").trim().slice(0, 120) || shopName;
+    const tenantId = uniqueTenantId(sanitizeId(shopName) || sanitizeId(handle) || "shopify-store", data);
+    const result = await addCustomerAccountLocked({
+      tenantId,
+      tenantName: shopName,
+      fullName,
+      email,
+      username: email,
+      password: randomBytes(32).toString("hex"),
+      country: String(input.country || "").trim().toUpperCase().slice(0, 2),
+      plan: "Free",
+      source: "shopify_app",
+      subscriptionStatus: "free",
+      paymentStatus: "free",
+      status: "active"
+    }, { allowUpdate: false, loaded, persist: false });
+    if (!result.ok) {
+      return { ok: false, status: 400, errors: [`Tagioo could not create a login for ${email}. Create a Tagioo account, then use Sign in to link it to this store.`] };
+    }
+    const tenant = data.tenants.find((entry) => entry.id === tenantId);
+    Object.assign(tenant, { shopifyBillingRequired: true, shopifyShop: shop, shopifyShops: [shop], signupPlatform: "shopify" });
+    await writeDatabase(data);
+    return { ok: true, created: true, tenant, email, fullName };
   });
 }
 
@@ -12210,7 +12400,6 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
   const connectedShopifyShop = tenant
     ? scopedTrackingEntries(tenant, tenantSetupRequests).find((entry) => entry.tracking?.shopify?.shop)?.tracking.shopify.shop || ""
     : "";
-  const connectedShopifyHandle = connectedShopifyShop.replace(/\.myshopify\.com$/i, "");
   const billingPeriod = billingPeriodForTenant(tenant, tenantSetupRequests);
   const customerSummaryOptions = { lineLimit: config.customerSummaryTailLines, ttl: CUSTOMER_SUMMARY_CACHE_TTL_MS };
 
@@ -12383,9 +12572,7 @@ async function customerDashboardData(data, session, requestedContainerId = "") {
     // Free accounts see the card catalog; existing manual paid plans retain BDT.
     paymentProvider: requiresShopifyBilling(tenant) ? "shopify" : (tenant?.paymentProvider || ""),
     billingCurrency: billingCurrencyForTenant(tenant),
-    shopifyPlanSelectionUrl: connectedShopifyHandle
-      ? `https://admin.shopify.com/store/${encodeURIComponent(connectedShopifyHandle)}/charges/tagioo-tracking/pricing_plans`
-      : "",
+    shopifyPlanSelectionUrl: requiresShopifyBilling(tenant) ? shopifyPlanSelectionUrl(connectedShopifyShop || tenant?.shopifyShop) : "",
     requestsToday: todayLiveCount,
     requestsMonth,
     requestLimit,
@@ -13113,7 +13300,11 @@ const server = createServer(async (req, res) => {
         return;
       }
       const resetParam = reqUrl.searchParams.get("reset");
-      const opts = { resetSent: resetParam === "sent", resetDone: resetParam === "done" };
+      const opts = {
+        resetSent: resetParam === "sent",
+        resetDone: resetParam === "done",
+        shopifyShop: readShopifyHandoffCookie(parseCookies(req.headers.cookie).tg_shopify, signSession)
+      };
       htmlResponse(res, 200, loginPage(config.authPassword ? "" : "Set AUTH_PASSWORD in .env before using the panel.", opts));
       return;
     }
@@ -13180,21 +13371,116 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Entry point from the Tagioo Shopify app. The signed tg_shopify cookie makes
+    // the next signup or login Shopify-billed, so these merchants never reach
+    // Paddle or bKash/Nagad (Shopify App Store requirement 1.2.1).
+    if (pathname === "/shopify/start" && req.method === "GET") {
+      const shop = normalizeShopDomain(reqUrl.searchParams.get("shop"));
+      const handoffCookie = shop
+        ? [`tg_shopify=${encodeURIComponent(makeShopifyHandoffCookie(shop, signSession))}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SHOPIFY_HANDOFF_TTL_MS / 1000}`]
+        : [];
+      const session = getSession(req);
+      if (session?.role === "customer" && shop) {
+        const loaded = await readDatabaseCached();
+        const tenant = loaded.available ? (loaded.data.tenants || []).find((item) => item.id === session.tenantId) || null : null;
+        if (tenant && tenant.shopifyBillingRequired && tenantShopifyShops(tenant, loaded.data.customerSetupRequests || []).includes(shop)) {
+          redirect(res, "/#setupAssistant");
+          return;
+        }
+        htmlResponse(res, 200, shopifyHandoffPage({
+          shop,
+          workspace: tenant?.name || session.tenantId,
+          error: loaded.available ? shopifyAdoptionBlocker(tenant, loaded.data.payments || []) : "Tagioo is temporarily unavailable. Try again shortly."
+        }), { "set-cookie": handoffCookie, "cache-control": "no-store" });
+        return;
+      }
+      if (session) {
+        redirect(res, "/");
+        return;
+      }
+      res.writeHead(302, {
+        location: reqUrl.searchParams.get("account") === "existing" ? "/login" : "/signup",
+        "set-cookie": handoffCookie,
+        "cache-control": "no-store"
+      });
+      res.end();
+      return;
+    }
+
+    // One-click dashboard sign-in from the Tagioo Shopify app. The app signs a
+    // short-lived, single-use link for the store's workspace, so a merchant who
+    // installed from Shopify never needs the tagioo.com signup or login forms.
+    if (pathname === "/shopify/login" && req.method === "GET") {
+      if (!checkRateLimit(req, "shopify-login", 30, 10 * 60 * 1000)) { tooManyRequests(res); return; }
+      const claims = verifyShopifyAppToken(reqUrl.searchParams.get("token"), config.shopifyAppSecret);
+      if (!claims) {
+        htmlResponse(res, 400, shopifyNoticePage("This sign-in link has expired. Open Tagioo again from Apps in your Shopify admin."));
+        return;
+      }
+      const loaded = await readDatabaseCached();
+      const tenant = loaded.available ? findShopifyWorkspace(loaded.data, claims.shop, claims.tenantId) : null;
+      const account = tenant
+        ? (loaded.data.customerAccounts || []).find((item) => item.tenantId === tenant.id && item.status === "active")
+        : null;
+      if (!claimShopifyLoginNonce(claims.nonce, claims.exp)) {
+        // A second click on the same link keeps a session already opened by it.
+        if (account && getSession(req)?.tenantId === account.tenantId) { redirect(res, "/"); return; }
+        htmlResponse(res, 400, shopifyNoticePage("This sign-in link was already used. Open Tagioo again from Apps in your Shopify admin."));
+        return;
+      }
+      if (!account) {
+        htmlResponse(res, 404, shopifyNoticePage("No Tagioo workspace is linked to this store yet. Open Tagioo from Apps in your Shopify admin and create one there."));
+        return;
+      }
+      res.writeHead(302, {
+        location: "/",
+        "set-cookie": [`sgtm_session=${makeSessionCookie({ username: account.username, role: "customer", tenantId: account.tenantId })}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`],
+        "cache-control": "no-store",
+        "referrer-policy": "no-referrer"
+      });
+      res.end();
+      return;
+    }
+
+    if (pathname === "/shopify/start" && req.method === "POST") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") { redirect(res, "/login"); return; }
+      const shop = readShopifyHandoffCookie(parseCookies(req.headers.cookie).tg_shopify, signSession);
+      if (!shop) { redirect(res, "/"); return; }
+      const result = await adoptShopifyBilling(session.tenantId, shop);
+      if (!result.ok) {
+        htmlResponse(res, result.status || 400, shopifyHandoffPage({ shop, workspace: session.tenantId, error: (result.errors || []).join(" ") }));
+        return;
+      }
+      invalidateOwnerDashboardCache();
+      res.writeHead(302, {
+        location: "/#setupAssistant",
+        "set-cookie": "tg_shopify=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
+        "cache-control": "no-store"
+      });
+      res.end();
+      return;
+    }
+
     if (pathname === "/signup" && req.method === "GET") {
       if (isAuthenticated(req)) {
         redirect(res, "/");
         return;
       }
       const prefillEmail = reqUrl.searchParams.get("email") || "";
+      const cookies = parseCookies(req.headers.cookie);
+      const shopifyShop = readShopifyHandoffCookie(cookies.tg_shopify, signSession);
+      const rawPlatform = String(reqUrl.searchParams.get("platform") || "").trim().toLowerCase();
+      const storePlatform = shopifyShop ? "shopify" : SIGNUP_STORE_PLATFORMS.includes(rawPlatform) ? rawPlatform : "";
       // Carry a chosen paid plan from the pricing page through signup so a
       // paid-plan visitor is routed to payment after registering, not dropped
       // onto the Free/trial dashboard. Only accept known paid plans; anything
-      // else (incl. "Free") falls through to the normal free signup.
+      // else (incl. "Free") falls through to the normal free signup. Shopify
+      // stores choose paid plans in Shopify admin instead.
       const rawPlan = String(reqUrl.searchParams.get("plan") || "").trim();
-      const selectedPlan = ["Starter", "Pro", "Enterprise"].includes(rawPlan) ? rawPlan : "";
+      const selectedPlan = ["Starter", "Pro", "Enterprise"].includes(rawPlan) && storePlatform !== "shopify" ? rawPlan : "";
       const rawCycle = String(reqUrl.searchParams.get("cycle") || "").trim();
       const selectedCycle = billingCycleConfig[rawCycle] ? rawCycle : "monthly";
-      const cookies = parseCookies(req.headers.cookie);
       // Viewing the form is not a lead: bots, link previews and reloads hit this
       // route too. Lead now fires on a valid form submission (POST /signup).
       // tg_vid is a stable per-visitor seed reused as Meta external_id and the
@@ -13210,7 +13496,7 @@ const server = createServer(async (req, res) => {
         setCookies.push(`tg_vid=${visitorId}; Path=/; Max-Age=7776000; SameSite=Lax`);
       }
       const headers = setCookies.length ? { "set-cookie": setCookies } : {};
-      htmlResponse(res, 200, signupPage("", { email: prefillEmail, plan: selectedPlan, billingCycle: selectedCycle }), headers);
+      htmlResponse(res, 200, signupPage("", { email: prefillEmail, plan: selectedPlan, billingCycle: selectedCycle, storePlatform, shopifyShop }), headers);
       return;
     }
 
@@ -13218,6 +13504,18 @@ const server = createServer(async (req, res) => {
       if (!checkRateLimit(req, "signup", 5, 60 * 60 * 1000)) { tooManyRequests(res); return; }
       const form = await readForm(req);
       const values = Object.fromEntries(form.entries());
+      // Only the signed handoff cookie may name a shop; a posted value is ignored.
+      delete values.shopifyShop;
+      const shopifyShop = readShopifyHandoffCookie(parseCookies(req.headers.cookie).tg_shopify, signSession);
+      if (shopifyShop) {
+        values.storePlatform = "shopify";
+        values.shopifyShop = shopifyShop;
+      }
+      // Shopify stores pay through Shopify App Pricing, never a Tagioo checkout.
+      if (values.storePlatform === "shopify") {
+        values.plan = "";
+        values.billingCycle = "";
+      }
       // Don't create the account yet — validate, then email a code. The account
       // is only created once the code is confirmed at POST /verify, so an
       // unverified email never becomes a usable login.
@@ -13388,7 +13686,9 @@ const server = createServer(async (req, res) => {
       htmlResponse(res, 200, signupCompletePage(signupEventId, landing), {
         "set-cookie": [
           `sgtm_session=${makeSessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`,
-          `tg_signup=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
+          `tg_signup=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`,
+          // The handoff is consumed; it must not mark a later login on this browser.
+          `tg_shopify=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
         ],
         "cache-control": "no-store"
       });
@@ -13454,13 +13754,27 @@ const server = createServer(async (req, res) => {
       const account = await authenticateLogin(username, password);
 
       if (!account) {
-        htmlResponse(res, 401, loginPage("Invalid username or password."));
+        htmlResponse(res, 401, loginPage("Invalid username or password.", { shopifyShop: readShopifyHandoffCookie(parseCookies(req.headers.cookie).tg_shopify, signSession) }));
         return;
       }
 
+      let location = account.role === "customer" && account.releaseUnpaidSignup ? "/checkout" : "/";
+      const loginCookies = [`sgtm_session=${makeSessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`];
+      const shopifyShop = account.role === "customer" ? readShopifyHandoffCookie(parseCookies(req.headers.cookie).tg_shopify, signSession) : "";
+      if (shopifyShop) {
+        const adopted = await adoptShopifyBilling(account.tenantId, shopifyShop).catch(() => ({ ok: false }));
+        if (adopted.ok) {
+          invalidateOwnerDashboardCache();
+          location = "/#setupAssistant";
+          loginCookies.push("tg_shopify=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
+        } else {
+          // Explains why this workspace can't be Shopify-billed (e.g. an external plan).
+          location = `/shopify/start?shop=${encodeURIComponent(shopifyShop)}`;
+        }
+      }
       res.writeHead(302, {
-        location: account.role === "customer" && account.releaseUnpaidSignup ? "/checkout" : "/",
-        "set-cookie": `sgtm_session=${makeSessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`,
+        location,
+        "set-cookie": loginCookies,
         "cache-control": "no-store"
       });
       res.end();
@@ -13834,6 +14148,59 @@ const server = createServer(async (req, res) => {
         count: result.removed
       });
       jsonResponse(res, 200, { accepted: true, removed: result.removed });
+      return;
+    }
+
+    // Server calls from the Tagioo Shopify app, signed with the shared app
+    // secret: find, or create, the Shopify-billed workspace for a store.
+    if (pathname === "/api/integrations/shopify/workspace" && req.method === "POST") {
+      if (!config.shopifyAppSecret) {
+        jsonResponse(res, 503, { error: "Shopify app workspace linking is not configured." });
+        return;
+      }
+      let rawBody;
+      try {
+        rawBody = await readRawBody(req, 20000);
+      } catch (error) {
+        jsonResponse(res, 413, { error: error.message });
+        return;
+      }
+      if (!isShopifyIntegrationAuthorized(req, rawBody, config.shopifyAppSecret)) {
+        jsonResponse(res, 401, { error: "Invalid Shopify app signature." });
+        return;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(rawBody.toString("utf8"));
+      } catch {
+        jsonResponse(res, 400, { error: "Invalid JSON." });
+        return;
+      }
+      const shop = normalizeShopDomain(payload?.shop);
+      if (!shop) {
+        jsonResponse(res, 400, { error: "Invalid Shopify store domain." });
+        return;
+      }
+      if (payload.intent === "create") {
+        const result = await createShopifyAppWorkspace({ ...payload, shop });
+        if (!result.ok) {
+          jsonResponse(res, result.status || 400, { error: (result.errors || []).join(" "), code: result.code || "" });
+          return;
+        }
+        if (result.created) {
+          invalidateOwnerDashboardCache();
+          emailShopifyWorkspaceReady(result.email, result.fullName, shop).catch(() => {});
+        }
+        jsonResponse(res, 200, { linked: true, created: result.created, tenantId: result.tenant.id, tenantName: result.tenant.name || result.tenant.id });
+        return;
+      }
+      const loaded = await readDatabaseCached();
+      if (!loaded.available) {
+        jsonResponse(res, 503, { error: "Tagioo is temporarily unavailable." });
+        return;
+      }
+      const tenant = findShopifyWorkspace(loaded.data, shop, sanitizeId(payload.tenantId || ""));
+      jsonResponse(res, 200, tenant ? { linked: true, tenantId: tenant.id, tenantName: tenant.name || tenant.id } : { linked: false });
       return;
     }
 

@@ -1,4 +1,4 @@
-import { requiresShopifyBilling } from "../shopify-billing.js";
+import { SIGNUP_STORE_PLATFORMS, normalizeShopDomain, requiresShopifyBilling } from "../shopify-billing.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -18,7 +18,7 @@ for (const plan of ["Free", "Starter", "Pro", "Enterprise"]) {
   test(`${plan} verified signup commits account, attribution and plan in one read/write`, async () => {
     let reads = 0, writes = 0, locks = 0, welcomes = 0, saved;
     const context = {
-      requiresShopifyBilling, randomBytes,
+      requiresShopifyBilling, randomBytes, SIGNUP_STORE_PLATFORMS, normalizeShopDomain,
       withDbLock: async (fn) => { locks++; return fn(); },
       readDatabase: async () => { reads++; return { available: true, data: { tenants: [], customerAccounts: [], payments: [] } }; },
       writeDatabase: async (data) => { writes++; saved = structuredClone(data); },
