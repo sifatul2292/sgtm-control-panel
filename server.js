@@ -8381,7 +8381,9 @@ async function getCustomerBilling(session) {
   const data = loaded.data;
   const tenant = (data.tenants || []).find((t) => t.id === session.tenantId);
   if (!tenant) return { ok: false, status: 404, errors: ["Customer account was not found."] };
-  const claims = (data.payments || [])
+  // Shopify bills these workspaces and lists the charges in Shopify admin, so
+  // Tagioo's own manual-payment records (e.g. an old rejected claim) stay hidden.
+  const claims = requiresShopifyBilling(tenant) ? [] : (data.payments || [])
     .filter((p) => p.tenantId === tenant.id)
     .sort((a, b) => String(b.claimedAt).localeCompare(String(a.claimedAt)));
   const latestPending = claims.find((p) => p.status === "pending") || null;

@@ -5484,6 +5484,10 @@ function invoiceMoney(amount, currency = "BDT") {
 function renderInvoices(billing) {
   const list = document.getElementById("invoicesList");
   if (!list) return;
+  if (billing.paymentProvider === "shopify") {
+    list.innerHTML = `<div class="invoices-empty">This workspace is billed by Shopify. Its charges appear in Shopify admin under Settings → Billing.</div>`;
+    return;
+  }
   const claims = Array.isArray(billing.claims) ? billing.claims : [];
   if (!claims.length) {
     list.innerHTML = `<div class="invoices-empty">No invoices yet. They appear here after your first payment.</div>`;

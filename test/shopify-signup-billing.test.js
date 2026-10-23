@@ -178,3 +178,27 @@ test("Free-tier emails send Shopify-billed workspaces to Shopify plan selection"
   assert.doesNotMatch(shopify.note + shopify.label, /bKash|Nagad|Paddle|card/i);
   assert.equal(ctx.upgradeCta({ plan: "Free" }, "Upgrade now").href, "https://tagioo.com/#billing");
 });
+
+test("Shopify workspaces never receive Tagioo's manual invoices or payment numbers", async () => {
+  const data = {
+    tenants: [{ id: "review", plan: "Pro", paymentProvider: "shopify", shopifyBillingRequired: true }],
+    payments: [{ tenantId: "review", status: "rejected", invoiceNo: "review-INV001", method: "bkash", amount: 2900, claimedAt: "2026-10-09" }],
+  };
+  const ctx = vm.createContext({
+    requiresShopifyBilling,
+    readDatabase: async () => ({ available: true, data }),
+    getTenantContainers: () => [],
+    listPayments: () => [],
+    paymentInstructionsFor: () => null,
+    paymentSettings: () => ({ bkashNumber: "01700000000", nagadNumber: "01800000000" }),
+    resourceProfileForPlan: () => ({ monthlyRequestLimit: 2000000, containerLimit: 3, domainLimit: 2 }),
+    EXTRA_CONTAINER_PRICE: 1200,
+  });
+  vm.runInContext(extractFunction("getCustomerBilling", true), ctx);
+  const result = await ctx.getCustomerBilling({ tenantId: "review" });
+  assert.equal(result.ok, true);
+  assert.equal(result.billing.claims.length, 0);
+  assert.equal(result.billing.latestPending, null);
+  assert.equal(result.billing.paymentNumbers, null);
+  assert.doesNotMatch(JSON.stringify(result.billing), /bkash|01700000000|INV001/i);
+});
