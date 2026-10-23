@@ -191,6 +191,64 @@ Limits: USD only and no one-time charges, neither of which Tagioo needs.
    - In Billing, Upgrade should open Shopify plan selection.
    - Reuse an old dashboard link; it should be refused.
 
+## Deployed 2026-10-23 (owner approved; not resubmitted)
+
+Deployed through the Hostinger web terminal on srv1736566.
+
+- **Backups:** `/var/backups/tagioo-review-135263-billing-20261023085*`, mode 700, path
+  recorded in `/root/.tagioo-135263-backup-dir`. It holds:
+  - the previous panel code
+  - the previous panel `.env`, mode 600
+  - a copy of the app's SQLite database
+- **Secret:** generated on the VPS with `openssl rand -hex 32` and never displayed.
+  It was appended to `/var/www/tagioo/.env` and written to
+  `/etc/tagioo-shopify-app/panel-link.env`, mode 600. Both copies are 64
+  characters and identical, checked by comparing sha256 hashes.
+- **Panel:**
+  - Files checked out from `origin/feat/us-launch` at 78c7b03 and committed on the
+    VPS branch as `bb6b3da`. The follow-up 0b97f7f is VPS commit
+    `deploy: hide manual invoices…`.
+  - `npm run check` passed, and 28 of 28 focused tests passed (20 of 20 after the
+    follow-up).
+  - After `pm2 restart sgtm-control-panel`: online, `/login` 200, `/shopify/login`
+    with no token 400, unsigned workspace API 401 (so the secret is loaded).
+- **Shopify app:**
+  - d9fa904 pushed to GitHub `main` together with the 4 earlier local commits,
+    which were already live under different SHAs. On the VPS it was cherry-picked
+    as `a507de0`; the files match origin.
+  - Image `tagioo-shopify-app:release-d9fa904` built with exit 0; 15 of 15 tests
+    pass inside the image.
+  - Canary on port 3201 with an empty database and billing sync off: `/` 200,
+    `/auth/login` 200. A signed status call to `https://tagioo.com` returned 200,
+    so the secret works end to end through Cloudflare.
+  - Production swap: the old container was stopped and kept as
+    `tagioo-shopify-app-before-d9fa904`. The new container runs with the same
+    port, mount and restart policy, using env file
+    `/etc/tagioo-shopify-app/runtime-d9fa904.env` (the old env plus the secret,
+    mode 600). Local and public `/`, `/auth/login` and `/app` give
+    200 / 200 / 410, the same as before.
+- **Live check on tagioo-test-store** (connected to Shopify Review Workspace, Pro):
+  - The embedded app shows **Open Tagioo dashboard**. It signed in to the Pro
+    workspace, billed by Shopify with no payment numbers; `app.js` v=121 is live.
+  - Billing shows only Shopify plan buttons, and Upgrade opened Shopify's own
+    Select a plan page. No plan was changed.
+  - A link minted in the container worked once: first use 302, reuse 400
+    "already used", tampered 400.
+- **Found live and fixed (0b97f7f):** Billing → Invoices still listed an old
+  rejected bKash invoice (৳2,900). Shopify-billed workspaces no longer receive
+  manual payment records. The page now says charges appear in Shopify admin, and
+  it has no ৳, bKash, Nagad or Paddle text.
+- **Not exercised live:** "Create my free Tagioo workspace". The review store is
+  already connected, so testing it would mean disconnecting the reviewer setup.
+  The production canary's signed status call for an unknown shop answered
+  `{"linked":false}`, and create was covered by the local end-to-end run.
+- **Rollback:**
+  - App: `docker stop tagioo-shopify-app && docker rename tagioo-shopify-app tagioo-shopify-app-failed-d9fa904 && docker rename tagioo-shopify-app-before-d9fa904 tagioo-shopify-app && docker start tagioo-shopify-app`.
+  - Panel: `git revert` the two VPS deploy commits, then restart pm2.
+  - The secret can stay in place; it is unused by old code.
+- **After the deploy:** this Chrome was signed out of tagioo.com. The owner needs to
+  sign in again there.
+
 ## Resubmission note for the Partner Dashboard
 
 > Fixed 1.2.1. Merchants who install Tagioo from Shopify are billed only through
