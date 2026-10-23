@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       Tagioo for WooCommerce
- * Plugin URI:        https://tagioo.com
+ * Plugin URI:        https://tagioo.com/woocommerce
  * Description:       Server-side tracking for WooCommerce. Loads Google Tag Manager, pushes GA4 ecommerce events to the dataLayer and sends a server-side purchase hit to your server-side GTM container.
  * Version:           2.7.0
  * Requires at least: 6.0
