@@ -8503,7 +8503,9 @@ async function createShopifyConnectionCode(session, containerId = "") {
     setTrackingForContainer(tenant, requests, containerId, tracking);
     tenant.updatedAt = now.toISOString();
     await writeDatabase(data);
-    return { ok: true, code, expiresAt: tracking.shopify.connectCodeExpiresAt };
+    // A connected container can only be reconnected by the same store; the UI
+    // tells the merchant to add a container for any other store.
+    return { ok: true, code, expiresAt: tracking.shopify.connectCodeExpiresAt, connectedShop: normalizeShopDomain(tracking.shopify.shop) };
   });
 }
 
@@ -8534,6 +8536,12 @@ async function redeemShopifyConnectionCode(input) {
     if (!tenant || !setup.connectCodeExpiresAt || new Date(setup.connectCodeExpiresAt) < new Date()) {
       return { ok: false, status: 401, errors: ["This connection code is invalid or expired. Generate a new code in Tagioo."] };
     }
+    // One store per container. Connecting a second store would silently take
+    // the container over, cut the first store off and drop its Shopify plan.
+    const connectedShop = normalizeShopDomain(setup.shop);
+    if (connectedShop && connectedShop !== shop && setup.status !== "disconnected") {
+      return { ok: false, status: 409, code: "container_in_use", errors: [`This code is for a Tagioo container already connected to ${connectedShop}. Each store needs its own container: in your Tagioo dashboard open Containers, add a container for this store, then generate a connection code for it.`] };
+    }
     if (tenant.plan !== "Free" && tenant.paymentStatus === "paid" && tenant.paymentProvider !== "shopify" && !tenant.lifetimeAccess) {
       return { ok: false, status: 409, errors: ["This workspace has an externally billed paid plan. Cancel that subscription and move the workspace to Free before connecting Shopify, or use a separate Free workspace. All Shopify hosting charges must use Shopify billing."] };
     }
@@ -8553,6 +8561,8 @@ async function redeemShopifyConnectionCode(input) {
     setTrackingForContainer(tenant, data.customerSetupRequests || [], matchedContainerId, updatedTracking);
     if (!matchedContainerId || matchedContainerId === primaryContainerId(tenant, data.customerSetupRequests || [])) tenant.platform = "shopify";
     tenant.shopifyBillingRequired = true;
+    tenant.shopifyShop ||= shop;
+    tenant.shopifyShops = [...new Set([...(tenant.shopifyShops || []), shop])];
     tenant.updatedAt = new Date().toISOString();
     await writeDatabase(data);
     return {
@@ -14215,7 +14225,7 @@ const server = createServer(async (req, res) => {
         trackingDomain: result.trackingDomain,
         measurementId: result.measurementId,
         integrationToken: result.integrationToken
-      } : { errors: result.errors });
+      } : { errors: result.errors, code: result.code || "" });
       return;
     }
 
@@ -14474,7 +14484,7 @@ const server = createServer(async (req, res) => {
       const containerId = normalizeContainerId(reqUrl.searchParams.get("container") || "");
       const result = await createShopifyConnectionCode(session, containerId);
       jsonResponse(res, result.ok ? 200 : result.status || 400, result.ok
-        ? { code: result.code, expiresAt: result.expiresAt }
+        ? { code: result.code, expiresAt: result.expiresAt, connectedShop: result.connectedShop }
         : { errors: result.errors });
       return;
     }

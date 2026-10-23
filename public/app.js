@@ -6767,6 +6767,7 @@ document.addEventListener("click", (event) => {
     if (scrollTarget.dataset.scrollTarget === "customerContainerCreate" && needsContainerUpgrade(latestData, currentSession.role)) {
       const dialog = document.getElementById("containerUpgradeDialog");
       document.getElementById("containerUpgradePlan").textContent = latestData.usage.plan;
+      document.getElementById("containerUpgradeBilling").textContent = latestData.usage.paymentProvider === "shopify" ? "Choose a plan in Shopify" : "Upgrade plan";
       if (!dialog.open) dialog.showModal();
       return;
     }
@@ -6861,7 +6862,10 @@ document.querySelector("#generateShopifyConnectCode")?.addEventListener("click",
     const response = await fetch(`/api/customer/shopify/connect-code${query}`, { method: "POST" });
     const result = await response.json();
     if (!response.ok) throw new Error((result.errors || [result.error || "Could not generate a connection code."]).join(" "));
-    if (output) output.innerHTML = `Connection code: <strong><code>${escapeHtml(result.code)}</code></strong> · expires ${new Date(result.expiresAt).toLocaleTimeString()}`;
+    if (output) output.innerHTML = `Connection code: <strong><code>${escapeHtml(result.code)}</code></strong> · expires ${new Date(result.expiresAt).toLocaleTimeString()}`
+      + (result.connectedShop
+        ? `<br><span class="shopify-container-in-use">This container is connected to <strong>${escapeHtml(result.connectedShop)}</strong>. Use this code only to reconnect that store. Each store needs its own container, so for another store <button class="button" type="button" data-view-shortcut="customerContainers" data-scroll-target="customerContainerCreate">add a container</button> and generate its code.</span>`
+        : "");
   } catch (error) {
     if (output) output.textContent = error.message;
   } finally {
@@ -7537,7 +7541,9 @@ const containerUpgradeDialog = document.getElementById("containerUpgradeDialog")
 document.getElementById("containerUpgradeClose").addEventListener("click", () => containerUpgradeDialog.close());
 document.getElementById("containerUpgradeBilling").addEventListener("click", () => {
   containerUpgradeDialog.close();
-  setView("billing");
+  const usage = latestData?.usage || {};
+  if (usage.paymentProvider === "shopify" && usage.shopifyPlanSelectionUrl) window.location.assign(usage.shopifyPlanSelectionUrl);
+  else setView("billing");
 });
 
 document.querySelector("#copyCustomerDnsTarget")?.addEventListener("click", async () => {
