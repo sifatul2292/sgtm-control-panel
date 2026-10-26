@@ -228,6 +228,25 @@ container names are in CURRENT_WORK.md.
 - **Cosmetic, not from this change:** a stray serif "$" under the app card in the embedded
   view.
 
+## Second deploy 2026-10-27
+
+- **Shown only within plan limits.** At the plan's container limit (Free and Starter: 1) the app
+  hides the add-container form and shows "Container limit reached" with a Shopify plan link.
+- **"Use a different Tagioo account"** unlinks the store from its workspace (signed `unlink`).
+  It is refused while the store is connected; the workspace stays Shopify-billed.
+- **Only Shopify containers.** Connect is offered only on containers meant for Shopify (or not set
+  up for any site). A container serving another website shows "Set up for your <site> site", and
+  the panel refuses `connect` to it (409 `container_other_site`).
+- **Disconnect** gives Tagioo 30 s with one retry, and the error names the service that timed out.
+- **Stray "$" under the app** fixed: pages are rendered complete (onAllReady), so React's `$RC`
+  stream helper no longer runs.
+- **Status call** now waits 9 s, because the panel's frequent owner-dashboard rebuild can pause it
+  for a few seconds.
+- **Customer data:** a workspace that a test click had switched to Shopify-only billing was put
+  back as it was, with the owner's OK and a backup.
+- Checked live in Shopify admin on both dev stores. Production tracking containers stayed healthy
+  throughout.
+
 ## Reviewer path (owner steps before resubmitting)
 
 The reviewer installs on their own dev store, and each store needs its own container. The
