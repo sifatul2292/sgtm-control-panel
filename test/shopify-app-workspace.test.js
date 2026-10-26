@@ -42,16 +42,24 @@ test("panel accepts the app's dashboard token and rejects altered, stale or unsi
 test("a store finds its workspace; a connected workspace wins over a merely linked one", () => {
   const data = {
     tenants: [
-      { id: "linked", shopifyShops: ["store-a.myshopify.com", "store-b.myshopify.com"] },
+      { id: "linked", shopifyShops: ["store-a.myshopify.com", "store-b.myshopify.com"], shopifyAppShops: ["store-a.myshopify.com", "store-b.myshopify.com"] },
       { id: "connected", tracking: { shopify: { shop: "store-b.myshopify.com" } } },
-      { id: "other", shopifyShop: "store-c.myshopify.com" },
+      { id: "app-made", source: "shopify_app", shopifyShop: "store-c.myshopify.com" },
     ],
   };
   assert.equal(findShopifyWorkspace(data, "store-a.myshopify.com").id, "linked");
   assert.equal(findShopifyWorkspace(data, "STORE-B.myshopify.com").id, "connected");
   assert.equal(findShopifyWorkspace(data, "store-b.myshopify.com", "linked").id, "linked");
+  assert.equal(findShopifyWorkspace(data, "store-c.myshopify.com").id, "app-made");
   assert.equal(findShopifyWorkspace(data, "store-d.myshopify.com"), null);
   assert.equal(findShopifyWorkspace(data, "not-a-shop"), null);
+});
+
+test("a store named only by a bare ?shop= link does not find that workspace", () => {
+  // Anyone can open /shopify/start?shop=<any store> and sign in; that link
+  // decides billing but must never route the store to this workspace.
+  const data = { tenants: [{ id: "attacker", shopifyShop: "victim.myshopify.com", shopifyShops: ["victim.myshopify.com"], shopifyBillingRequired: true }] };
+  assert.equal(findShopifyWorkspace(data, "victim.myshopify.com"), null);
 });
 
 function workspaceContext(data) {
@@ -94,6 +102,7 @@ test("the app creates one Free, Shopify-billed workspace per store with no usabl
   assert.equal(tenant.country, "US");
   assert.equal(tenant.shopifyShop, "review-store.myshopify.com");
   assert.deepEqual([...tenant.shopifyShops], ["review-store.myshopify.com"]);
+  assert.deepEqual([...tenant.shopifyAppShops], ["review-store.myshopify.com"]);
   assert.equal(requiresShopifyBilling(tenant), true);
   assert.equal(data.customerAccounts[0].username, "owner@example.com");
   assert.match(data.customerAccounts[0].passwordHash, /^scrypt:/);

@@ -18,23 +18,31 @@ export function shopifyPlanSelectionUrl(shop) {
 
 // The embedded app links merchants here with their shop. The cookie only marks
 // the browser's next signup or login as Shopify-billed; `sign` is the panel's
-// session HMAC, so the shop cannot be edited client-side.
-export function makeShopifyHandoffCookie(shop, sign, now = Date.now()) {
-  const payload = `${normalizeShopDomain(shop)}:${now}`;
+// session HMAC, so the shop cannot be edited client-side. `verified` records
+// that the link was signed by the app, which proves the merchant came from that
+// store's admin; a bare ?shop= link only decides billing.
+export function makeShopifyHandoffCookie(shop, sign, now = Date.now(), verified = false) {
+  const payload = `${normalizeShopDomain(shop)}:${now}${verified ? ":app" : ""}`;
   return `${Buffer.from(payload).toString("base64url")}.${sign(payload)}`;
 }
 
-export function readShopifyHandoffCookie(value, sign, now = Date.now()) {
+export function readShopifyHandoff(value, sign, now = Date.now()) {
+  const none = { shop: "", verified: false };
   const [encoded, signature] = String(value || "").split(".");
-  if (!encoded || !signature) return "";
+  if (!encoded || !signature) return none;
   const payload = Buffer.from(encoded, "base64url").toString("utf8");
   const expected = Buffer.from(sign(payload));
   const actual = Buffer.from(signature);
-  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return "";
-  const [shop, issuedAt] = payload.split(":");
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return none;
+  const [shop, issuedAt, mark] = payload.split(":");
   const age = now - Number(issuedAt);
-  if (!Number.isFinite(age) || age < 0 || age > SHOPIFY_HANDOFF_TTL_MS) return "";
-  return normalizeShopDomain(shop);
+  if (!Number.isFinite(age) || age < 0 || age > SHOPIFY_HANDOFF_TTL_MS) return none;
+  const normalized = normalizeShopDomain(shop);
+  return { shop: normalized, verified: Boolean(normalized) && mark === "app" };
+}
+
+export function readShopifyHandoffCookie(value, sign, now = Date.now()) {
+  return readShopifyHandoff(value, sign, now).shop;
 }
 
 // A workspace already paying outside Shopify (or waiting on a manual claim) must

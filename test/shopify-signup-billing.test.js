@@ -158,12 +158,15 @@ test("other platforms keep the existing paid-plan checkout", async () => {
 test("signup and login honour only the signed handoff cookie and clear it once used", () => {
   const signup = extractBetween('if (pathname === "/signup" && req.method === "POST")', 'if (pathname === "/verify" && req.method === "GET")');
   assert.match(signup, /delete values\.shopifyShop/);
-  assert.match(signup, /readShopifyHandoffCookie\(/);
+  assert.match(signup, /readShopifyHandoff\(/);
+  // Only the handoff cookie may mark the link as proven by the app.
+  assert.match(signup, /delete values\.shopifyAppVerified/);
+  assert.match(signup, /if \(handoff\.verified\) values\.shopifyAppVerified = "1"/);
   assert.match(signup, /values\.plan = ""/);
   const verify = extractBetween('if (pathname === "/verify" && req.method === "POST")', 'if (pathname === "/checkout" && req.method === "GET")');
   assert.match(verify, /tg_shopify=; HttpOnly; SameSite=Lax; Path=\/; Max-Age=0/);
   const login = extractBetween('if (pathname === "/login" && req.method === "POST")', 'if (pathname === "/logout")');
-  assert.match(login, /adoptShopifyBilling\(account\.tenantId, shopifyShop\)/);
+  assert.match(login, /adoptShopifyBilling\(account\.tenantId, shopifyShop, \{ verified: handoff\.verified \}\)/);
   const start = extractBetween('if (pathname === "/shopify/start" && req.method === "GET")', 'if (pathname === "/signup" && req.method === "GET")');
   // The GET only sets a cookie or asks for confirmation; the workspace changes on POST.
   assert.doesNotMatch(start.slice(0, start.indexOf('req.method === "POST"')), /adoptShopifyBilling\(/);

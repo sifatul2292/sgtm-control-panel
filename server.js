@@ -9,9 +9,9 @@ import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeE
 import { brotliCompress, constants as zlibConstants, deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
 import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
-import { SHOPIFY_HANDOFF_TTL_MS, SIGNUP_STORE_PLATFORMS, highestActiveShopifyPlan, makeShopifyHandoffCookie, normalizeShopDomain, normalizeShopifyBillingState, readShopifyHandoffCookie, requiresShopifyBilling, shopifyAdoptionBlocker, shopifyPlanSelectionUrl, shopifyShopForTenant } from "./shopify-billing.js";
+import { SHOPIFY_HANDOFF_TTL_MS, SIGNUP_STORE_PLATFORMS, highestActiveShopifyPlan, makeShopifyHandoffCookie, normalizeShopDomain, normalizeShopifyBillingState, readShopifyHandoff, readShopifyHandoffCookie, requiresShopifyBilling, shopifyAdoptionBlocker, shopifyPlanSelectionUrl, shopifyShopForTenant } from "./shopify-billing.js";
 import { redactShopifyBackups, privacySafeBackupData } from "./shopify-privacy-backups.js";
-import { findShopifyWorkspace, tenantShopifyShops, usableShopifyAppSecret, verifyShopifyAppToken } from "./shopify-workspace.js";
+import { SHOPIFY_START_TOKEN_TTL_MS, findShopifyWorkspace, tenantShopifyShops, usableShopifyAppSecret, verifiedShopifyShops, verifyShopifyAppToken } from "./shopify-workspace.js";
 import { privacyTokenHash, retainShopifyPrivacyRoute, removeShopifyOrders, shopifyCustomerOrders } from "./shopify-privacy.js";
 import { parseDataProtectionKey, parseProtectedJson, serializeProtectedJson } from "./data-protection.js";
 import { appendProtectedDataAudit } from "./protected-data-audit.js";
@@ -7257,6 +7257,7 @@ async function addCustomerSignupLocked(input, visitor) {
     tenant.shopifyBillingRequired = true;
     tenant.shopifyShop = normalizeShopDomain(input.shopifyShop);
     if (tenant.shopifyShop) tenant.shopifyShops = [tenant.shopifyShop];
+    if (tenant.shopifyShop && input.shopifyAppVerified === "1") tenant.shopifyAppShops = [tenant.shopifyShop];
   }
   const chosenPlan = storePlatform === "shopify" ? "" : String(input.plan || "").trim();
   if (["Starter", "Pro", "Enterprise"].includes(chosenPlan)) {
@@ -7472,7 +7473,7 @@ function unpaidSignupReleasedToFree(tenant, data, now) {
 // App Pricing (App Store requirement 1.2.1), even before a store is connected, so
 // the panel never offers Paddle or bKash/Nagad to them. An unpaid staged invoice
 // is dropped; nothing was charged for it.
-async function adoptShopifyBilling(tenantId, shop) {
+async function adoptShopifyBilling(tenantId, shop, { verified = false } = {}) {
   return withDbLock(async () => {
     const loaded = await readDatabase();
     if (!loaded.available) return { ok: false, status: 500, errors: [loaded.detail || loaded.message || "Database unavailable."] };
@@ -7488,6 +7489,7 @@ async function adoptShopifyBilling(tenantId, shop) {
       shopifyBillingRequired: true,
       shopifyShop: tenant.shopifyShop || normalizeShopDomain(shop),
       shopifyShops: [...new Set([...(tenant.shopifyShops || []), normalizeShopDomain(shop)].filter(Boolean))],
+      ...(verified ? { shopifyAppShops: [...new Set([...(tenant.shopifyAppShops || []), normalizeShopDomain(shop)].filter(Boolean))] } : {}),
       pendingPlan: "",
       pendingAmount: 0,
       pendingBillingCycle: "",
@@ -7551,7 +7553,7 @@ async function createShopifyAppWorkspace(input) {
       return { ok: false, status: 400, errors: [`Tagioo could not create a login for ${email}. Create a Tagioo account, then use Sign in to link it to this store.`] };
     }
     const tenant = data.tenants.find((entry) => entry.id === tenantId);
-    Object.assign(tenant, { shopifyBillingRequired: true, shopifyShop: shop, shopifyShops: [shop], signupPlatform: "shopify" });
+    Object.assign(tenant, { shopifyBillingRequired: true, shopifyShop: shop, shopifyShops: [shop], shopifyAppShops: [shop], signupPlatform: "shopify" });
     await writeDatabase(data);
     return { ok: true, created: true, tenant, email, fullName };
   });
@@ -8536,44 +8538,205 @@ async function redeemShopifyConnectionCode(input) {
     if (!tenant || !setup.connectCodeExpiresAt || new Date(setup.connectCodeExpiresAt) < new Date()) {
       return { ok: false, status: 401, errors: ["This connection code is invalid or expired. Generate a new code in Tagioo."] };
     }
-    // One store per container. Connecting a second store would silently take
-    // the container over, cut the first store off and drop its Shopify plan.
-    const connectedShop = normalizeShopDomain(setup.shop);
-    if (connectedShop && connectedShop !== shop && setup.status !== "disconnected") {
-      return { ok: false, status: 409, code: "container_in_use", errors: [`This code is for a Tagioo container already connected to ${connectedShop}. Each store needs its own container: in your Tagioo dashboard open Containers, add a container for this store, then generate a connection code for it.`] };
+    const result = connectShopifyContainerLocked(data, tenant, matchedContainerId, matchedTracking, shop);
+    if (result.ok) await writeDatabase(data);
+    return result;
+  });
+}
+
+// Connects one store to one container of a workspace. Shared by the one-time
+// code (older app builds) and the app's signed one-click connect. The caller
+// holds the database lock and writes the database when this succeeds.
+function connectShopifyContainerLocked(data, tenant, containerId, tracking, shop) {
+  const setup = tracking?.shopify || {};
+  // One store per container. Connecting a second store would silently take
+  // the container over, cut the first store off and drop its Shopify plan.
+  const connectedShop = normalizeShopDomain(setup.shop);
+  if (connectedShop && connectedShop !== shop && setup.status !== "disconnected") {
+    return { ok: false, status: 409, code: "container_in_use", errors: [`This Tagioo container is already connected to ${connectedShop}. Each store needs its own container: add a container for this store and connect that one.`] };
+  }
+  if (tenant.plan !== "Free" && tenant.paymentStatus === "paid" && tenant.paymentProvider !== "shopify" && !tenant.lifetimeAccess) {
+    return { ok: false, status: 409, errors: ["This workspace has an externally billed paid plan. Cancel that subscription and move the workspace to Free before connecting Shopify, or use a separate Free workspace. All Shopify hosting charges must use Shopify billing."] };
+  }
+  const requests = data.customerSetupRequests || [];
+  const primaryId = primaryContainerId(tenant, requests);
+  retainShopifyPrivacyRoute(data, tenant, containerId, tracking, containerId === primaryId ? "" : containerId);
+  const integrationToken = randomBytes(32).toString("hex");
+  const now = new Date().toISOString();
+  const updatedTracking = {
+    ...tracking,
+    shopify: {
+      shop,
+      status: "connected",
+      integrationToken,
+      connectedAt: now,
+      updatedAt: now
     }
-    if (tenant.plan !== "Free" && tenant.paymentStatus === "paid" && tenant.paymentProvider !== "shopify" && !tenant.lifetimeAccess) {
-      return { ok: false, status: 409, errors: ["This workspace has an externally billed paid plan. Cancel that subscription and move the workspace to Free before connecting Shopify, or use a separate Free workspace. All Shopify hosting charges must use Shopify billing."] };
-    }
-    retainShopifyPrivacyRoute(data, tenant, matchedContainerId, matchedTracking,
-      matchedContainerId === primaryContainerId(tenant, data.customerSetupRequests || []) ? "" : matchedContainerId);
-    const integrationToken = randomBytes(32).toString("hex");
-    const updatedTracking = {
-      ...matchedTracking,
-      shopify: {
-        shop,
-        status: "connected",
-        integrationToken,
-        connectedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    };
-    setTrackingForContainer(tenant, data.customerSetupRequests || [], matchedContainerId, updatedTracking);
-    if (!matchedContainerId || matchedContainerId === primaryContainerId(tenant, data.customerSetupRequests || [])) tenant.platform = "shopify";
-    tenant.shopifyBillingRequired = true;
-    tenant.shopifyShop ||= shop;
-    tenant.shopifyShops = [...new Set([...(tenant.shopifyShops || []), shop])];
-    tenant.updatedAt = new Date().toISOString();
-    await writeDatabase(data);
+  };
+  setTrackingForContainer(tenant, requests, containerId, updatedTracking);
+  if (!containerId || containerId === primaryId) tenant.platform = "shopify";
+  tenant.shopifyBillingRequired = true;
+  tenant.shopifyShop ||= shop;
+  tenant.shopifyShops = [...new Set([...(tenant.shopifyShops || []), shop])];
+  tenant.updatedAt = now;
+  return {
+    ok: true,
+    tenantId: tenant.id,
+    tenantName: tenant.name || tenant.id,
+    containerId,
+    trackingDomain: updatedTracking.domain,
+    measurementId: updatedTracking.measurementId,
+    integrationToken
+  };
+}
+
+// The workspace's containers as the Tagioo app lists them, and whether this
+// store may connect to each one (it needs a tracking domain and a GA4 ID, and
+// no other store on it).
+function shopifyAppContainers(data, tenant, shop) {
+  const requests = data.customerSetupRequests || [];
+  const listed = getTenantContainers(tenant.id, tenant, requests, data.provisioning?.requests || []);
+  return scopedTrackingEntries(tenant, requests).map(({ containerId, tracking }) => {
+    const container = listed.find((item) => item.id === containerId) || (containerId ? null : listed[0]) || {};
+    const connectedShop = tracking?.shopify?.status === "disconnected" ? "" : normalizeShopDomain(tracking?.shopify?.shop);
+    const ready = Boolean(tracking?.domain && tracking?.measurementId);
     return {
-      ok: true,
-      tenantId: tenant.id,
-      tenantName: tenant.name || tenant.id,
-      containerId: matchedContainerId,
-      trackingDomain: updatedTracking.domain,
-      measurementId: updatedTracking.measurementId,
-      integrationToken
+      id: containerId,
+      name: String(container.name || tenant.containerName || tenant.name || tenant.id),
+      trackingDomain: String(tracking?.domain || (container.domain ? `https://${container.domain}` : "")),
+      measurementId: String(tracking?.measurementId || ""),
+      status: String(container.status || ""),
+      ready,
+      connectedShop,
+      connectable: ready && (!connectedShop || connectedShop === shop)
     };
+  }).filter((container) => container.ready || container.status);
+}
+
+function shopifyAppWorkspaceFor(data, shop, tenantId) {
+  const tenant = findShopifyWorkspace(data, shop, tenantId);
+  return tenant && (!tenantId || tenant.id === tenantId) ? tenant : null;
+}
+
+const shopifyAppWorkspaceMissing = { ok: false, status: 404, code: "workspace_not_linked", errors: ["This store is not linked to that Tagioo workspace. Reload the app and try again."] };
+
+// One-click connect from the Tagioo app. The app proves the store with its
+// Shopify session and signs the call; the panel only connects stores whose
+// link to the workspace was proven (see verifiedShopifyShops).
+async function connectShopifyAppContainer({ shop, tenantId = "", containerId = "" }) {
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 503, errors: ["Tagioo is temporarily unavailable."] };
+    const data = loaded.data;
+    const tenant = shopifyAppWorkspaceFor(data, shop, tenantId);
+    if (!tenant) return shopifyAppWorkspaceMissing;
+    const entry = scopedTrackingEntries(tenant, data.customerSetupRequests || []).find((item) => item.containerId === containerId);
+    if (!entry) return { ok: false, status: 404, errors: ["That Tagioo container was not found in this workspace."] };
+    if (!entry.tracking?.domain || !entry.tracking?.measurementId) {
+      return { ok: false, status: 400, errors: ["This container is not set up yet: it needs a tracking domain and a GA4 Measurement ID."] };
+    }
+    const result = connectShopifyContainerLocked(data, tenant, containerId, entry.tracking, shop);
+    if (result.ok) await writeDatabase(data);
+    return result;
+  });
+}
+
+// Creates a tracking container from inside the Tagioo app, saves its GA4 and
+// Meta details, and connects the store to it, so a Shopify merchant never has
+// to visit the Tagioo dashboard to finish setup.
+async function createShopifyAppContainer(input) {
+  const shop = normalizeShopDomain(input.shop);
+  const loaded = await readDatabaseCached();
+  if (!loaded.available) return { ok: false, status: 503, errors: ["Tagioo is temporarily unavailable."] };
+  const tenant = shopifyAppWorkspaceFor(loaded.data, shop, sanitizeId(input.tenantId || ""));
+  if (!tenant) return shopifyAppWorkspaceMissing;
+  const measurementId = String(input.ga4MeasurementId || "").trim().toUpperCase();
+  const metaPixelId = String(input.metaPixelId || "").trim();
+  const metaAccessToken = String(input.metaAccessToken || "").trim();
+  const errors = [];
+  if (!/^G-[A-Z0-9]{4,20}$/.test(measurementId)) errors.push("Enter your GA4 Measurement ID, such as G-ABC123XYZ.");
+  if (metaPixelId && !/^\d{5,20}$/.test(metaPixelId)) errors.push("The Meta Pixel ID is the number shown in Meta Events Manager.");
+  if (Boolean(metaPixelId) !== Boolean(metaAccessToken)) errors.push("Enter both the Meta Pixel ID and its Conversions API access token, or leave both empty.");
+  if (errors.length) return { ok: false, status: 400, errors };
+  const created = await addCustomerSetupRequest({
+    containerName: String(input.shopName || "").trim().slice(0, 120) || shop.replace(/\.myshopify\.com$/, ""),
+    websiteUrl: input.websiteUrl,
+    trackingDomain: input.trackingDomain,
+    containerConfig: input.containerConfig,
+    platform: "shopify",
+    notes: `Created from the Tagioo Shopify app for ${shop}.`
+  }, { role: "customer", tenantId: tenant.id });
+  if (!created.ok) {
+    return created.status === 402
+      ? { ok: false, status: 402, code: "container_limit", errors: ["This workspace has used every container its plan includes. Choose a larger plan in Shopify, then add the container."] }
+      : { ok: false, status: created.status || 400, errors: created.errors || ["Tagioo could not create the container."] };
+  }
+  const containerId = created.request.id;
+  await saveTenantTrackingConfig(tenant.id, {
+    ga4MeasurementId: measurementId,
+    trackingDomain: created.request.trackingDomain,
+    metaPixelId,
+    metaAccessToken,
+    platform: "shopify",
+    businessType: "ecommerce"
+  }, containerId);
+  const connected = await connectShopifyAppContainer({ shop, tenantId: tenant.id, containerId });
+  return connected.ok ? { ...connected, container: created.request } : connected;
+}
+
+// The container a store is connected to, with what the app needs to show its
+// remaining setup steps.
+function shopifyConnectedContainer(data, tenant, shop) {
+  const requests = data.customerSetupRequests || [];
+  const entry = scopedTrackingEntries(tenant, requests).find((item) => normalizeShopDomain(item.tracking?.shopify?.shop) === shop);
+  if (!entry) return null;
+  const setup = customerContainerRequests(requests, tenant.id).find((item) => item.id === entry.containerId) || null;
+  const provision = (data.provisioning?.requests || []).find((item) => (setup?.provisioningRequestId && item.id === setup.provisioningRequestId)
+    || (setup && item.sourceRequestId === setup.id)) || null;
+  return { entry, setup, provision };
+}
+
+// Server GTM template for a store's connected container. GA4 needs no ID on
+// the server side (the GA4 client forwards each hit to its own Measurement
+// ID); Meta CAPI is included when its pixel and token are saved.
+function shopifyAppServerTemplate(tracking) {
+  const meta = tracking.meta || {};
+  const includeMeta = Boolean(meta.pixelId && meta.capiToken);
+  const templates = buildSetupAssistantTemplates({
+    platform: "shopify",
+    businessType: "ecommerce",
+    destinations: includeMeta ? ["ga4", "meta"] : ["ga4"],
+    trackingDomain: tracking.domain,
+    metaPixelId: includeMeta ? meta.pixelId : "",
+    metaAccessToken: includeMeta ? meta.capiToken : "",
+    metaTestEventCode: meta.testEventCode || "",
+    cookieExtensionEnabled: Boolean(tracking.cookieExtension?.enabled),
+    cookieExtensionDays: tracking.cookieExtension?.days
+  });
+  return { fileName: templates.fileNames.server, template: templates.server, includesMeta: includeMeta };
+}
+
+// A container waits in dns_pending until its tracking subdomain points at
+// Tagioo. "Check DNS" in the app retries the normal launch, at most once a
+// minute per container; any other state is left alone.
+const shopifyDnsChecks = new Map();
+async function retryShopifyAppContainerLaunch({ shop, tenantId = "" }) {
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 503, errors: ["Tagioo is temporarily unavailable."] };
+    const data = loaded.data;
+    const tenant = shopifyAppWorkspaceFor(data, shop, tenantId);
+    if (!tenant) return shopifyAppWorkspaceMissing;
+    const found = shopifyConnectedContainer(data, tenant, shop);
+    if (!found?.provision) return { ok: false, status: 404, errors: ["This store's Tagioo container was not found."] };
+    const { provision } = found;
+    if (provision.status !== "dns_pending") return { ok: true, status: provision.status, checked: false };
+    const last = shopifyDnsChecks.get(provision.id) || 0;
+    if (Date.now() - last < 60_000) return { ok: true, status: provision.status, checked: false, retryAfterSeconds: Math.ceil((60_000 - (Date.now() - last)) / 1000) };
+    shopifyDnsChecks.set(provision.id, Date.now());
+    await autoLaunchProvisioningRequest(data, provision);
+    await writeDatabase(data);
+    return { ok: true, status: provision.status, checked: true };
   });
 }
 
@@ -13387,15 +13550,29 @@ const server = createServer(async (req, res) => {
     // the next signup or login Shopify-billed, so these merchants never reach
     // Paddle or bKash/Nagad (Shopify App Store requirement 1.2.1).
     if (pathname === "/shopify/start" && req.method === "GET") {
-      const shop = normalizeShopDomain(reqUrl.searchParams.get("shop"));
+      // The app signs these links, which proves the merchant came from that
+      // store's admin; only a signed link lets the app connect the store to the
+      // workspace. A bare ?shop= (older app builds) still routes billing.
+      const hasToken = reqUrl.searchParams.has("token");
+      const signed = hasToken
+        ? verifyShopifyAppToken(reqUrl.searchParams.get("token"), config.shopifyAppSecret, Date.now(), { purpose: "start", maxTtlMs: SHOPIFY_START_TOKEN_TTL_MS })
+        : null;
+      if (hasToken && !signed) {
+        htmlResponse(res, 400, shopifyNoticePage("This link has expired. Open Tagioo again from Apps in your Shopify admin."));
+        return;
+      }
+      const shop = signed ? signed.shop : normalizeShopDomain(reqUrl.searchParams.get("shop"));
+      const verified = Boolean(signed);
       const handoffCookie = shop
-        ? [`tg_shopify=${encodeURIComponent(makeShopifyHandoffCookie(shop, signSession))}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SHOPIFY_HANDOFF_TTL_MS / 1000}`]
+        ? [`tg_shopify=${encodeURIComponent(makeShopifyHandoffCookie(shop, signSession, Date.now(), verified))}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SHOPIFY_HANDOFF_TTL_MS / 1000}`]
         : [];
       const session = getSession(req);
       if (session?.role === "customer" && shop) {
         const loaded = await readDatabaseCached();
         const tenant = loaded.available ? (loaded.data.tenants || []).find((item) => item.id === session.tenantId) || null : null;
-        if (tenant && tenant.shopifyBillingRequired && tenantShopifyShops(tenant, loaded.data.customerSetupRequests || []).includes(shop)) {
+        const requests = loaded.available ? loaded.data.customerSetupRequests || [] : [];
+        if (tenant && tenant.shopifyBillingRequired && tenantShopifyShops(tenant, requests).includes(shop)
+          && (!verified || verifiedShopifyShops(tenant, requests).includes(shop))) {
           redirect(res, "/#setupAssistant");
           return;
         }
@@ -13457,9 +13634,9 @@ const server = createServer(async (req, res) => {
     if (pathname === "/shopify/start" && req.method === "POST") {
       const session = getSession(req);
       if (!session || session.role !== "customer") { redirect(res, "/login"); return; }
-      const shop = readShopifyHandoffCookie(parseCookies(req.headers.cookie).tg_shopify, signSession);
+      const { shop, verified } = readShopifyHandoff(parseCookies(req.headers.cookie).tg_shopify, signSession);
       if (!shop) { redirect(res, "/"); return; }
-      const result = await adoptShopifyBilling(session.tenantId, shop);
+      const result = await adoptShopifyBilling(session.tenantId, shop, { verified });
       if (!result.ok) {
         htmlResponse(res, result.status || 400, shopifyHandoffPage({ shop, workspace: session.tenantId, error: (result.errors || []).join(" ") }));
         return;
@@ -13518,10 +13695,12 @@ const server = createServer(async (req, res) => {
       const values = Object.fromEntries(form.entries());
       // Only the signed handoff cookie may name a shop; a posted value is ignored.
       delete values.shopifyShop;
-      const shopifyShop = readShopifyHandoffCookie(parseCookies(req.headers.cookie).tg_shopify, signSession);
-      if (shopifyShop) {
+      delete values.shopifyAppVerified;
+      const handoff = readShopifyHandoff(parseCookies(req.headers.cookie).tg_shopify, signSession);
+      if (handoff.shop) {
         values.storePlatform = "shopify";
-        values.shopifyShop = shopifyShop;
+        values.shopifyShop = handoff.shop;
+        if (handoff.verified) values.shopifyAppVerified = "1";
       }
       // Shopify stores pay through Shopify App Pricing, never a Tagioo checkout.
       if (values.storePlatform === "shopify") {
@@ -13772,9 +13951,10 @@ const server = createServer(async (req, res) => {
 
       let location = account.role === "customer" && account.releaseUnpaidSignup ? "/checkout" : "/";
       const loginCookies = [`sgtm_session=${makeSessionCookie(account)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=43200`];
-      const shopifyShop = account.role === "customer" ? readShopifyHandoffCookie(parseCookies(req.headers.cookie).tg_shopify, signSession) : "";
+      const handoff = account.role === "customer" ? readShopifyHandoff(parseCookies(req.headers.cookie).tg_shopify, signSession) : { shop: "", verified: false };
+      const shopifyShop = handoff.shop;
       if (shopifyShop) {
-        const adopted = await adoptShopifyBilling(account.tenantId, shopifyShop).catch(() => ({ ok: false }));
+        const adopted = await adoptShopifyBilling(account.tenantId, shopifyShop, { verified: handoff.verified }).catch(() => ({ ok: false }));
         if (adopted.ok) {
           invalidateOwnerDashboardCache();
           location = "/#setupAssistant";
@@ -14206,13 +14386,59 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 200, { linked: true, created: result.created, tenantId: result.tenant.id, tenantName: result.tenant.name || result.tenant.id });
         return;
       }
+      const tenantId = sanitizeId(payload.tenantId || "");
+      const failed = (result) => jsonResponse(res, result.status || 400, { error: (result.errors || []).join(" "), code: result.code || "" });
+      const linkedStore = (result) => ({
+        tenantId: result.tenantId,
+        tenantName: result.tenantName,
+        containerId: result.containerId,
+        trackingDomain: result.trackingDomain,
+        measurementId: result.measurementId,
+        integrationToken: result.integrationToken
+      });
+      if (payload.intent === "connect") {
+        const result = await connectShopifyAppContainer({ shop, tenantId, containerId: normalizeContainerId(payload.containerId || "") });
+        if (!result.ok) { failed(result); return; }
+        invalidateCustomerDashboardCache(result.tenantId);
+        jsonResponse(res, 200, linkedStore(result));
+        return;
+      }
+      if (payload.intent === "create-container") {
+        const result = await createShopifyAppContainer({ ...payload, shop, tenantId });
+        if (!result.ok) { failed(result); return; }
+        invalidateCustomerDashboardCache(result.tenantId);
+        invalidateOwnerDashboardCache({ structural: true });
+        jsonResponse(res, 200, { ...linkedStore(result), container: result.container, dnsTarget: config.provisionDnsTarget });
+        return;
+      }
+      if (payload.intent === "check-dns") {
+        const result = await retryShopifyAppContainerLaunch({ shop, tenantId });
+        if (!result.ok) { failed(result); return; }
+        if (result.checked) invalidateCustomerDashboardCache(tenantId);
+        jsonResponse(res, 200, { status: result.status, checked: result.checked, retryAfterSeconds: result.retryAfterSeconds || 0 });
+        return;
+      }
       const loaded = await readDatabaseCached();
       if (!loaded.available) {
         jsonResponse(res, 503, { error: "Tagioo is temporarily unavailable." });
         return;
       }
-      const tenant = findShopifyWorkspace(loaded.data, shop, sanitizeId(payload.tenantId || ""));
-      jsonResponse(res, 200, tenant ? { linked: true, tenantId: tenant.id, tenantName: tenant.name || tenant.id } : { linked: false });
+      const tenant = shopifyAppWorkspaceFor(loaded.data, shop, tenantId);
+      if (payload.intent === "server-template") {
+        const found = tenant ? shopifyConnectedContainer(loaded.data, tenant, shop) : null;
+        if (!found) { failed(tenant ? { status: 404, errors: ["Connect this store to a Tagioo container first."] } : shopifyAppWorkspaceMissing); return; }
+        jsonResponse(res, 200, shopifyAppServerTemplate(found.entry.tracking));
+        return;
+      }
+      jsonResponse(res, 200, tenant
+        ? {
+          linked: true,
+          tenantId: tenant.id,
+          tenantName: tenant.name || tenant.id,
+          containers: shopifyAppContainers(loaded.data, tenant, shop),
+          dnsTarget: config.provisionDnsTarget
+        }
+        : { linked: false });
       return;
     }
 

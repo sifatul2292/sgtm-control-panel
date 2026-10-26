@@ -31,7 +31,11 @@ function setup(shopify) {
     readDatabase: async () => ({ available: true, data }),
     writeDatabase: async () => { writes++; },
   });
-  vm.runInContext(`${extractFunction("redeemShopifyConnectionCode", true)}\n${extractFunction("createShopifyConnectionCode", true)}`, ctx);
+  vm.runInContext([
+    extractFunction("redeemShopifyConnectionCode", true),
+    extractFunction("connectShopifyContainerLocked"),
+    extractFunction("createShopifyConnectionCode", true),
+  ].join("\n"), ctx);
   return { ctx, data, writes: () => writes };
 }
 
@@ -79,8 +83,11 @@ test("generating a code tells the dashboard which store already uses the contain
   assert.equal((await fresh.ctx.createShopifyConnectionCode({ tenantId: "review" }, "")).connectedShop, "");
 });
 
-test("the dashboard turns that into an add-container button and a direct Shopify upgrade", () => {
+test("the dashboard sends Shopify merchants to the app instead of a code, and upgrades go to Shopify", () => {
   const app = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
-  assert.match(app, /data-view-shortcut="customerContainers" data-scroll-target="customerContainerCreate">add a container<\/button>/);
+  const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+  assert.doesNotMatch(app, /shopify\/connect-code/);
+  assert.doesNotMatch(html, /generateShopifyConnectCode|connection code/i);
+  assert.match(html, /click <strong>Connect<\/strong> next to the one for your store\. There is no code to copy/);
   assert.match(app, /usage\.paymentProvider === "shopify" && usage\.shopifyPlanSelectionUrl\) window\.location\.assign\(usage\.shopifyPlanSelectionUrl\)/);
 });

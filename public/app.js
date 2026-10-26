@@ -6851,28 +6851,6 @@ els.assistantBack?.addEventListener("click", () => {
   updateSetupAssistantStep();
 });
 els.setupAssistantForm?.elements.platform?.addEventListener("change", updateLaravelAssistantFields);
-document.querySelector("#generateShopifyConnectCode")?.addEventListener("click", async (event) => {
-  const button = event.currentTarget;
-  const output = document.querySelector("#shopifyConnectCode");
-  button.disabled = true;
-  button.textContent = "Generating…";
-  if (output) output.textContent = "";
-  try {
-    const query = selectedCustomerContainerId ? `?container=${encodeURIComponent(selectedCustomerContainerId)}` : "";
-    const response = await fetch(`/api/customer/shopify/connect-code${query}`, { method: "POST" });
-    const result = await response.json();
-    if (!response.ok) throw new Error((result.errors || [result.error || "Could not generate a connection code."]).join(" "));
-    if (output) output.innerHTML = `Connection code: <strong><code>${escapeHtml(result.code)}</code></strong> · expires ${new Date(result.expiresAt).toLocaleTimeString()}`
-      + (result.connectedShop
-        ? `<br><span class="shopify-container-in-use">This container is connected to <strong>${escapeHtml(result.connectedShop)}</strong>. Use this code only to reconnect that store. Each store needs its own container, so for another store <button class="button" type="button" data-view-shortcut="customerContainers" data-scroll-target="customerContainerCreate">add a container</button> and generate its code.</span>`
-        : "");
-  } catch (error) {
-    if (output) output.textContent = error.message;
-  } finally {
-    button.disabled = false;
-    button.textContent = "Generate new connection code";
-  }
-});
 document.querySelector("#laravelMapOrdersTable")?.addEventListener("change", (event) => {
   const reportTable = latestData?.tracking?.laravelSelfService?.report?.orders?.table || "";
   if (event.currentTarget.value === reportTable) return;
