@@ -8590,9 +8590,29 @@ function connectShopifyContainerLocked(data, tenant, containerId, tracking, shop
   };
 }
 
+const containerSiteLabels = { woocommerce: "WooCommerce", laravel: "Laravel", custom: "custom website", other: "other website" };
+
+// The kind of site a container was set up for: Setup Assistant records it on
+// the container's tracking, the container request keeps the creation choice
+// ("custom" there is only the default), and the tenant row holds it for the
+// legacy primary container. "" means not decided yet.
+function containerSitePlatform(tenant, requests, containerId, tracking) {
+  const request = customerContainerRequests(requests, tenant.id).find((item) => item.id === containerId);
+  const fromRequest = request?.platform && request.platform !== "custom" ? request.platform : "";
+  const fromTenant = containerId === primaryContainerId(tenant, requests) ? tenant.platform : "";
+  return String(tracking?.platform || fromRequest || fromTenant || "").trim().toLowerCase();
+}
+
+// A Shopify store may only use a container meant for Shopify (or not set up
+// for any site yet), never one that serves another website: that would mix
+// two sites' events in one container.
+function containerServesOtherSite(site) {
+  return Boolean(site) && site !== "shopify";
+}
+
 // The workspace's containers as the Tagioo app lists them, and whether this
-// store may connect to each one (it needs a tracking domain and a GA4 ID, and
-// no other store on it).
+// store may connect to each one (it needs a tracking domain and a GA4 ID, no
+// other store on it, and must not belong to another website).
 function shopifyAppContainers(data, tenant, shop) {
   const requests = data.customerSetupRequests || [];
   const listed = getTenantContainers(tenant.id, tenant, requests, data.provisioning?.requests || []);
@@ -8600,6 +8620,8 @@ function shopifyAppContainers(data, tenant, shop) {
     const container = listed.find((item) => item.id === containerId) || (containerId ? null : listed[0]) || {};
     const connectedShop = tracking?.shopify?.status === "disconnected" ? "" : normalizeShopDomain(tracking?.shopify?.shop);
     const ready = Boolean(tracking?.domain && tracking?.measurementId);
+    const site = containerSitePlatform(tenant, requests, containerId, tracking);
+    const otherSite = containerServesOtherSite(site) ? site : "";
     return {
       id: containerId,
       name: String(container.name || tenant.containerName || tenant.name || tenant.id),
@@ -8608,7 +8630,9 @@ function shopifyAppContainers(data, tenant, shop) {
       status: String(container.status || ""),
       ready,
       connectedShop,
-      connectable: ready && (!connectedShop || connectedShop === shop)
+      otherSite,
+      otherSiteLabel: otherSite ? containerSiteLabels[otherSite] || otherSite : "",
+      connectable: ready && !otherSite && (!connectedShop || connectedShop === shop)
     };
   }).filter((container) => container.ready || container.status);
 }
@@ -8668,6 +8692,10 @@ async function connectShopifyAppContainer({ shop, tenantId = "", containerId = "
     if (!entry) return { ok: false, status: 404, errors: ["That Tagioo container was not found in this workspace."] };
     if (!entry.tracking?.domain || !entry.tracking?.measurementId) {
       return { ok: false, status: 400, errors: ["This container is not set up yet: it needs a tracking domain and a GA4 Measurement ID."] };
+    }
+    const site = containerSitePlatform(tenant, data.customerSetupRequests || [], containerId, entry.tracking);
+    if (containerServesOtherSite(site)) {
+      return { ok: false, status: 409, code: "container_other_site", errors: [`This container is set up for your ${containerSiteLabels[site] || site} site. Each store needs its own container: add one for this Shopify store.`] };
     }
     const result = connectShopifyContainerLocked(data, tenant, containerId, entry.tracking, shop);
     if (result.ok) await writeDatabase(data);

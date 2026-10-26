@@ -113,6 +113,9 @@ function appContext(data, overrides = {}) {
     extractFunction("getTenantContainers"),
     extractFunction("trackingOrigin"),
     extractFunction("saveTenantTrackingConfig", true),
+    extractConst("containerSiteLabels"),
+    extractFunction("containerSitePlatform"),
+    extractFunction("containerServesOtherSite"),
     extractFunction("connectShopifyContainerLocked"),
     extractFunction("shopifyAppContainers"),
     extractFunction("shopifyAppWorkspaceFor"),
@@ -310,4 +313,30 @@ test("Use a different Tagioo account unlinks the store, but only once it is disc
   assert.equal(connected.status, 409);
   assert.equal(connected.code, "store_connected");
   assert.equal(writes(), 1);
+});
+
+test("a container set up for another website is never offered to, or connected by, a Shopify store", async () => {
+  const data = reviewData();
+  // The workspace's primary container serves its WooCommerce site.
+  data.tenants[0].tracking.platform = "woocommerce";
+  const { ctx, writes } = appContext(data);
+  const listed = ctx.shopifyAppContainers(data, data.tenants[0], "reviewer.myshopify.com");
+  const primary = listed.find((item) => item.id === "setup_a");
+  assert.equal(primary.connectable, false);
+  assert.equal(primary.otherSiteLabel, "WooCommerce");
+  const refused = await ctx.connectShopifyAppContainer({ shop: "reviewer.myshopify.com", tenantId: "review", containerId: "setup_a" });
+  assert.equal(refused.status, 409);
+  assert.equal(refused.code, "container_other_site");
+  assert.match(refused.errors[0], /set up for your WooCommerce site/);
+  assert.equal(writes(), 0);
+
+  // Shopify containers, and ones not set up for any site yet, stay connectable.
+  data.tenants[0].tracking.platform = "shopify";
+  assert.equal(ctx.shopifyAppContainers(data, data.tenants[0], "reviewer.myshopify.com").find((item) => item.id === "setup_a").connectable, true);
+  delete data.tenants[0].tracking.platform;
+  data.customerSetupRequests.find((item) => item.id === "setup_a").platform = "custom"; // creation default, not a choice
+  assert.equal(ctx.shopifyAppContainers(data, data.tenants[0], "reviewer.myshopify.com").find((item) => item.id === "setup_a").connectable, true);
+  // A legacy primary container keeps its site on the tenant row.
+  data.tenants[0].platform = "woocommerce";
+  assert.equal(ctx.shopifyAppContainers(data, data.tenants[0], "reviewer.myshopify.com").find((item) => item.id === "setup_a").otherSite, "woocommerce");
 });
