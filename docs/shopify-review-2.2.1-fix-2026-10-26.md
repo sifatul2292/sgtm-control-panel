@@ -6,7 +6,7 @@ Shopify flagged "Tagioo Server-Side Tracking" under **2.2.1 Use Shopify APIs**:
 > the external Tagioo dashboard, and the store connection remains incomplete without it.
 > The app displays "Could not connect" and "Enter the connection code from Tagioo."
 
-Status: **built locally, not committed, not deployed, not resubmitted.**
+Status: **deployed 2026-10-27 (owner asked); not resubmitted.** See "Deployed 2026-10-27" below.
 Branch `fix/shopify-codeless-connect` in two worktrees made from the deployed code, so the
 uncommitted grace-period work in the main checkouts stays separate:
 
@@ -193,6 +193,40 @@ App: `app/tagioo.server.js`, `app/routes/app._index.jsx`, `shopify.app.toml`,
 3. The grace work, uncommitted in both main checkouts, will conflict in `app._index.jsx`,
    `tagioo.server.js`, the workspace endpoint and the `?v=` bump. Rebase it on top
    afterwards and bump app.js past 124.
+
+## Deployed 2026-10-27
+
+Deployed through the Hostinger web terminal on srv1736566. Backups, server commits and the
+container names are in CURRENT_WORK.md.
+
+- **Panel:**
+  - The server's versions of every changed file matched base 49698ef. The files were checked
+    out from `origin/fix/shopify-codeless-connect` and committed on the server branch.
+  - `npm run check` passed and 42 of 42 focused tests passed.
+  - After the pm2 restart: `/login` 200; a bad account-link token 400; `/shopify` and `/docs`
+    200 with the new copy; unsigned workspace API 401; `app.js?v=124` served.
+  - Cloudflare passes `/shopify` and `/docs` through (`DYNAMIC`).
+- **Shopify app:**
+  - Cherry-picked on the server; 22 of 22 tests passed there and inside image `release-47c5f02`.
+  - Canary 200 / 200 / 410, then the production swap with the same env file, port, mount and
+    restart policy. The old container is kept stopped for rollback. `connect.tagioo.com` shows
+    the new name.
+- **Shopify app version:** `tagioo-server-side-tracking-3`, released with
+  `shopify app deploy --allow-updates`. The only change is the name; the pixel code is the same.
+- **Checked in Chrome:**
+  - `/shopify` and `/docs#shopify` are live.
+  - Shopify admin shows the new name.
+  - The container list and the in-app form render. A submission with an invalid GA4 ID returned
+    the validation message and wrote nothing, which confirms the form fields submit in a real
+    admin.
+  - A store with no proven link shows Create workspace / Sign in to link.
+- **Not exercised live:** Connect, Check DNS, the template download, workspace creation and the
+  dashboard Setup Assistant card.
+- **Found, not changed:** an older customer tenant still records tagioo-test-store as a
+  connected Shopify store (from 2026-09-12), so the app offers that tenant's container on the
+  test store. Do not connect it. The fix is to remove that stale link (needs owner OK).
+- **Cosmetic, not from this change:** a stray serif "$" under the app card in the embedded
+  view.
 
 ## Reviewer path (owner steps before resubmitting)
 
