@@ -8632,6 +8632,8 @@ function shopifyAppContainers(data, tenant, shop) {
       connectedShop,
       otherSite,
       otherSiteLabel: otherSite ? containerSiteLabels[otherSite] || otherSite : "",
+      // Templates were generated in Setup Assistant or downloaded in the app.
+      setupDone: Boolean(tracking?.setupAssistantCompletedAt || tracking?.serverTemplateDownloadedAt),
       connectable: ready && !otherSite && (!connectedShop || connectedShop === shop)
     };
   }).filter((container) => container.ready || container.status);
@@ -8776,6 +8778,25 @@ function shopifyAppServerTemplate(tracking) {
     cookieExtensionDays: tracking.cookieExtension?.days
   });
   return { fileName: templates.fileNames.server, template: templates.server, includesMeta: includeMeta };
+}
+
+// Remembers that the app handed out the server template, so the app stops
+// listing it as a setup step to finish.
+async function markShopifyServerTemplateDownloaded({ shop, tenantId = "" }) {
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return false;
+    const data = loaded.data;
+    const tenant = shopifyAppWorkspaceFor(data, shop, tenantId);
+    const found = tenant ? shopifyConnectedContainer(data, tenant, shop) : null;
+    if (!found || found.entry.tracking.serverTemplateDownloadedAt) return false;
+    setTrackingForContainer(tenant, data.customerSetupRequests || [], found.entry.containerId, {
+      ...found.entry.tracking,
+      serverTemplateDownloadedAt: new Date().toISOString()
+    });
+    await writeDatabase(data);
+    return true;
+  });
 }
 
 // A container waits in dns_pending until its tracking subdomain points at
@@ -14497,6 +14518,7 @@ const server = createServer(async (req, res) => {
         const found = tenant ? shopifyConnectedContainer(loaded.data, tenant, shop) : null;
         if (!found) { failed(tenant ? { status: 404, errors: ["Connect this store to a Tagioo container first."] } : shopifyAppWorkspaceMissing); return; }
         jsonResponse(res, 200, shopifyAppServerTemplate(found.entry.tracking));
+        markShopifyServerTemplateDownloaded({ shop, tenantId: tenant.id }).catch(() => false);
         return;
       }
       jsonResponse(res, 200, tenant

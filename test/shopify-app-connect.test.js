@@ -124,6 +124,7 @@ function appContext(data, overrides = {}) {
     extractFunction("createShopifyAppContainer", true),
     extractFunction("shopifyConnectedContainer"),
     extractFunction("shopifyAppServerTemplate"),
+    extractFunction("markShopifyServerTemplateDownloaded", true),
     extractFunction("shopifyAppContainerAllowance"),
     extractFunction("unlinkShopifyAppWorkspace", true),
     extractConst("shopifyDnsChecks"),
@@ -339,4 +340,19 @@ test("a container set up for another website is never offered to, or connected b
   // A legacy primary container keeps its site on the tenant row.
   data.tenants[0].platform = "woocommerce";
   assert.equal(ctx.shopifyAppContainers(data, data.tenants[0], "reviewer.myshopify.com").find((item) => item.id === "setup_a").otherSite, "woocommerce");
+});
+
+test("setup counts as done once templates were generated or downloaded", async () => {
+  const data = freshWorkspace();
+  const { ctx } = appContext(data);
+  await ctx.createShopifyAppContainer(containerInput);
+  const listed = () => ctx.shopifyAppContainers(data, data.tenants[0], "new-store.myshopify.com")[0];
+  assert.equal(listed().setupDone, false);
+  assert.equal(await ctx.markShopifyServerTemplateDownloaded({ shop: "new-store.myshopify.com", tenantId: "new-store" }), true);
+  assert.equal(listed().setupDone, true);
+  // Recorded once; a second download does not rewrite the database.
+  assert.equal(await ctx.markShopifyServerTemplateDownloaded({ shop: "new-store.myshopify.com", tenantId: "new-store" }), false);
+  const review = reviewData();
+  review.tenants[0].tracking.setupAssistantCompletedAt = "2026-10-26T19:59:34.780Z";
+  assert.equal(appContext(review).ctx.shopifyAppContainers(review, review.tenants[0], "reviewer.myshopify.com")[0].setupDone, true);
 });
