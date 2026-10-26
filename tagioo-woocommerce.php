@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       Tagioo for WooCommerce
+ * Plugin Name:       Tagioo Server-Side Tracking for WooCommerce
  * Plugin URI:        https://tagioo.com/woocommerce
  * Description:       Server-side tracking for WooCommerce. Loads Google Tag Manager, pushes GA4 ecommerce events to the dataLayer and sends a server-side purchase hit to your server-side GTM container.
  * Version:           2.7.0
@@ -656,7 +656,9 @@ function tagioo_marketing_consent(): array {
     if (function_exists('wp_has_consent') && function_exists('wp_get_consent_type') && wp_get_consent_type()) {
         return [wp_has_consent('marketing') ? 'granted' : 'denied', 'wp_consent_api'];
     }
-    $c = static fn(string $name): string => isset($_COOKIE[$name]) ? strtolower(sanitize_text_field(rawurldecode(wp_unslash($_COOKIE[$name])))) : '';
+    // CMP cookies are URL-encoded and sanitize_text_field() strips %xx octets, so the
+    // value is tag-stripped, decoded, then sanitized again.
+    $c = static fn(string $name): string => isset($_COOKIE[$name]) ? strtolower(sanitize_text_field(rawurldecode(wp_strip_all_tags(wp_unslash($_COOKIE[$name]))))) : '';
     if (($v = $c('cookieyes-consent')) !== '') {
         if (strpos($v, 'advertisement:yes') !== false) return ['granted', 'cookieyes'];
         if (strpos($v, 'advertisement:no') !== false) return ['denied', 'cookieyes'];

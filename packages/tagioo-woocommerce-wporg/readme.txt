@@ -1,4 +1,4 @@
-=== Tagioo for WooCommerce ===
+=== Tagioo Server-Side Tracking for WooCommerce ===
 Contributors: sifatul92
 Tags: woocommerce, server-side tracking, google tag manager, ga4, conversions api
 Requires at least: 6.0
@@ -12,7 +12,7 @@ Server-side tracking for WooCommerce: GTM, GA4 ecommerce dataLayer events and a 
 
 == Description ==
 
-Tagioo for WooCommerce connects your store to Google Tag Manager and to a server-side Google Tag Manager (sGTM) container, so purchases are still recorded when a browser pixel is blocked or the shopper closes the tab.
+Tagioo Server-Side Tracking for WooCommerce connects your store to Google Tag Manager and to a server-side Google Tag Manager (sGTM) container, so purchases are still recorded when a browser pixel is blocked or the shopper closes the tab.
 
 **What it does**
 
@@ -75,7 +75,7 @@ You are responsible for telling shoppers about this tracking in your privacy pol
 == Installation ==
 
 1. Install and activate WooCommerce.
-2. Upload the plugin through Plugins → Add New, or search for "Tagioo for WooCommerce", then activate it.
+2. Upload the plugin through Plugins → Add New, or search for "Tagioo Server-Side Tracking for WooCommerce", then activate it.
 3. Go to WooCommerce → Tagioo.
 4. Enter your GTM Container ID.
 5. For the server-side purchase hit, enter your sGTM domain, GA4 Measurement ID and GA4 API secret.
