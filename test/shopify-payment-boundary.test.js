@@ -74,3 +74,29 @@ test("Shopify workspaces cannot request a Paddle plan change or portal", async (
     assert.equal((await ctx.createPaddlePortalSession(tenant)).status, 409);
   }
 });
+
+test("the /shopify page sends Shopify stores to the app and Shopify billing only", async () => {
+  const { renderMarketingRegion } = await import("../marketing-region.js");
+  const raw = readFileSync(new URL("../public/shopify.html", import.meta.url), "utf8");
+  for (const region of ["intl", "bd"]) {
+    const html = renderMarketingRegion(raw, region);
+    // No Tagioo checkout, card trial or BDT/bKash route for a Shopify store.
+    assert.doesNotMatch(html, /href="\/signup|\/checkout|3-day|free trial|add a card|bKash|Nagad|\/bd\?next/i, region);
+    assert.doesNotMatch(html, /coming soon|Custom Pixel|connection code/i, region);
+    assert.match(html, /href="https:\/\/apps\.shopify\.com\//, region);
+    assert.match(html, /billed through Shopify/i, region);
+  }
+});
+
+test("the Shopify docs describe the app flow and Shopify billing, not the manual pixel", () => {
+  const docs = readFileSync(new URL("../public/docs.html", import.meta.url), "utf8");
+  const start = docs.indexOf('<section id="shopify"');
+  const section = docs.slice(start, docs.indexOf("</section>", start));
+  assert.ok(start > 0);
+  assert.doesNotMatch(section, /coming soon|Add custom pixel|Copy custom pixel code|tagioo:video shopify|connection code|\/signup|trial/i);
+  assert.match(section, /Tagioo Server-Side Tracking/);
+  assert.match(section, /billed (through|on your) Shopify/i);
+  assert.match(section, /Add container and connect/);
+  assert.match(section, /href="https:\/\/apps\.shopify\.com\//);
+  assert.doesNotMatch(docs, /Shopify Custom Pixel, or the self-service/);
+});

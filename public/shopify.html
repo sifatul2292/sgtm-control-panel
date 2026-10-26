@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/png" sizes="64x64" href="/assets/tagioo-icon-64.png?v=1" />
     <title>Server-Side Tracking for Shopify Stores | Tagioo</title>
-    <meta name="description" content="Send Shopify purchases to Meta and GA4 from your own tracking domain. Guided setup with a Shopify Custom Pixel, no GTM expertise needed. Start free." />
+    <meta name="description" content="Send Shopify purchases to Meta and GA4 from your own tracking domain. Install the Tagioo app, connect in one click, and pay through your Shopify bill. Start free." />
     <meta name="theme-color" content="#ffffff" />
     <meta property="og:title" content="Server-Side Tracking for Shopify Stores | Tagioo" />
-    <meta property="og:description" content="Send Shopify purchases to Meta and GA4 from your own tracking domain. Guided setup with a Shopify Custom Pixel, no GTM expertise needed. Start free." />
+    <meta property="og:description" content="Send Shopify purchases to Meta and GA4 from your own tracking domain. Install the Tagioo app, connect in one click, and pay through your Shopify bill. Start free." />
     <meta property="og:url" content="https://tagioo.com/shopify" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://tagioo.com/assets/og-tagioo.png" /><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:site_name" content="Tagioo" /><meta name="twitter:card" content="summary_large_image" />
     <link rel="canonical" href="https://tagioo.com/shopify" />
-    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is there a Shopify app?", "acceptedAnswer": {"@type": "Answer", "text": "The Tagioo Shopify app is coming soon. Today, Shopify stores connect with a Custom Pixel under Settings → Customer events, which needs no app install or theme changes."}}, {"@type": "Question", "name": "Do I need to know Google Tag Manager?", "acceptedAnswer": {"@type": "Answer", "text": "No GTM expertise needed. Tagioo's Setup Assistant generates ready-made Web and Server GTM container files; you import them, preview and publish. You need a Google account with a Web and a Server GTM container."}}, {"@type": "Question", "name": "Will purchases be counted twice in Meta?", "acceptedAnswer": {"@type": "Answer", "text": "No. The browser pixel and the server event share the same event_id (the order ID for purchases), which Meta uses to merge them into one event."}}, {"@type": "Question", "name": "What happens when the Free plan reaches 15,000 events?", "acceptedAnswer": {"@type": "Answer", "text": "Tagioo emails you as you approach the limit. At 15,000 events the container pauses until your 30-day cycle resets or you upgrade. Nothing is deleted."}}, {"@type": "Question", "name": "How does the 3-day Pro trial work?", "acceptedAnswer": {"@type": "Answer", "text": "Choose Pro and add a card at checkout. You pay $0 for 3 days; after that the plan renews at $50/month plus applicable taxes unless you cancel before the trial ends."}}, {"@type": "Question", "name": "Can I get help with setup?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Email hello@tagioo.com with your store URL and we'll help you finish the setup."}}, {"@type": "Question", "name": "Does it respect customer privacy settings?", "acceptedAnswer": {"@type": "Answer", "text": "The Custom Pixel runs under the Customer events permissions you choose in Shopify (for example Analytics and Marketing consent). You remain responsible for your consent configuration."}}]}</script>
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is there a Shopify app?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Install Tagioo Server-Side Tracking from the Shopify App Store. It creates your free Tagioo workspace inside Shopify admin, sets up your tracking container and connects your store with one click. No theme edits and no code to copy."}}, {"@type": "Question", "name": "How are Shopify stores billed?", "acceptedAnswer": {"@type": "Answer", "text": "Through Shopify. You choose or change a plan inside the Tagioo app, Shopify shows the exact charge before you approve it, and it appears on your Shopify bill. Tagioo never asks a Shopify store for a card."}}, {"@type": "Question", "name": "What do I need before I start?", "acceptedAnswer": {"@type": "Answer", "text": "A Google Tag Manager server container (you paste its Container Config into the app), your GA4 Measurement ID and access to your domain's DNS. Meta Conversions API details are optional. The app gives you a ready-made server container template to import."}}, {"@type": "Question", "name": "Will purchases be counted twice in Meta?", "acceptedAnswer": {"@type": "Answer", "text": "No. The browser and server copies of each purchase share the Shopify order ID as event_id, which Meta uses to merge them into one event."}}, {"@type": "Question", "name": "What happens when the Free plan reaches 15,000 events?", "acceptedAnswer": {"@type": "Answer", "text": "Tagioo emails you as you approach the limit. At 15,000 events the container pauses until your 30-day cycle resets or you choose a paid plan in Shopify. Nothing is deleted."}}, {"@type": "Question", "name": "Can I get help with setup?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Email hello@tagioo.com with your store URL and we'll help you finish the setup."}}, {"@type": "Question", "name": "Does it respect customer privacy settings?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The Tagioo app pixel follows Shopify's customer privacy settings: Shopify only runs it when a visitor's consent allows analytics and marketing. You remain responsible for your consent banner and policies."}}]}</script>
     <link rel="preload" href="/assets/fonts/inter-latin-var.woff2?v=1" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/assets/site-base.css?v=1" />
     <link rel="stylesheet" href="/assets/landing-pages.css?v=1" />
@@ -48,7 +48,7 @@
         <a href="/docs">Docs</a>
         <a href="/blog">Blog</a>
         <a href="/login" class="nav-login">Sign in</a>
-        <a class="nav-cta" href="/signup">Get started free</a>
+        <a class="nav-cta" href="https://apps.shopify.com/search?q=tagioo" target="_blank" rel="noopener">Install the Shopify app</a>
       </nav>
       <button class="menu-btn" id="menuBtn" aria-controls="mobileNav" aria-label="Open menu" aria-expanded="false">
         <span></span><span></span><span></span>
@@ -66,21 +66,21 @@
         <a href="/docs">Docs</a>
         <a href="/blog">Blog</a>
         <a href="/login">Sign in</a>
-        <a class="mobile-cta" href="/signup">Get started free →</a>
+        <a class="mobile-cta" href="https://apps.shopify.com/search?q=tagioo" target="_blank" rel="noopener">Install the Shopify app →</a>
       </nav>
     </div>
     <main id="main">
       <section class="hero">
         <div class="wrap">
           <div>
-            <span class="pill"><span class="pill-dot"></span>For Shopify stores · Shopify app coming soon</span>
+            <span class="pill"><span class="pill-dot"></span>Shopify app · Billed through Shopify</span>
             <h1>Server-side tracking for <span class="hl">Shopify stores</span></h1>
             <p class="hero-sub">Your Shopify admin shows the order. Does Meta? Tagioo sends checkout and purchase events through your own tracking domain, so your ads optimize on the sales you actually make.</p>
             <div class="hero-ctas">
-            <a class="btn btn-primary" href="/signup">Start free — no card required <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></a>
-            <a class="btn btn-secondary" href="/signup?plan=Pro&amp;cycle=monthly">Try Pro free for 3 days</a>
+            <a class="btn btn-primary" href="https://apps.shopify.com/search?q=tagioo" target="_blank" rel="noopener">Install the Shopify app <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></a>
+            <a class="btn btn-secondary" href="#setup">See how setup works</a>
           </div>
-            <ul class="checks"><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>No credit card for Free</li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>15,000 events every 30 days</li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Set up in about 10 minutes</li></ul>
+            <ul class="checks"><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Free plan, no card</li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>15,000 events every 30 days</li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Plans billed through Shopify</li></ul>
           </div>
           <figure class="flow" aria-label="Illustration: how a purchase reaches your ad platforms">
             <div class="flow-head"><span>How a purchase flows</span><span class="flow-tag">Illustration</span></div>
@@ -124,19 +124,18 @@
         <div class="wrap setup">
           <div>
             <span class="eyebrow">Setup</span>
-            <h2 style="font-size:clamp(1.7rem,4.6vw,2.5rem);font-weight:800;margin-bottom:28px">Live in about 10 minutes</h2>
+            <h2 style="font-size:clamp(1.7rem,4.6vw,2.5rem);font-weight:800;margin-bottom:28px">Set up inside Shopify admin</h2>
             <ol class="steps" data-reveal>
-            <li><strong>Create your free account</strong>Add a container and choose a tracking subdomain.</li>
-            <li><strong>Add one DNS record</strong>A single CNAME. SSL is issued automatically.</li>
-            <li><strong>Generate your GTM files</strong>In Setup Assistant choose Shopify, then import web.json and server.json.</li>
-            <li><strong>Paste the Custom Pixel</strong>Shopify Admin → Settings → Customer events → Add custom pixel.</li>
-            <li><strong>Test one order</strong>Confirm it in Meta Test Events and your Tagioo event log.</li>
+            <li><strong>Install the Tagioo app</strong>From the Shopify App Store. Open it from Apps in your Shopify admin.</li>
+            <li><strong>Create your free workspace</strong>One click in the app, with no separate sign-up and no card. Already use Tagioo? Sign in to link your account.</li>
+            <li><strong>Add your tracking container</strong>Enter a subdomain such as track.yourstore.com, your GTM server Container Config and your GA4 Measurement ID. The app connects your store.</li>
+            <li><strong>Add one DNS record</strong>A single CNAME, shown in the app. SSL is issued automatically.</li>
+            <li><strong>Import the template and test one order</strong>Download the server container template from the app, import it into GTM, publish, then confirm a test order in Meta Test Events.</li>
             </ol>
-            <p class="setup-note">No theme edits and no app install needed. The Tagioo Shopify app is coming soon.</p>
+            <p class="setup-note">No theme edits and no code to copy. Free to start; paid plans are chosen in the app and billed through Shopify.</p>
           </div>
-          <div class="setup-media" data-reveal>
-            <!-- tagioo:video shopify title="How to set up Tagioo with Shopify" -->
-            <p>Prefer reading? <a href="/docs#shopify">Step-by-step Shopify docs →</a></p>
+          <div class="setup-media">
+            <div class="compare-col good" data-reveal><h3><span class="badge badge-ok">Installed by the app</span> In your store</h3><ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>A Shopify app pixel for page, product, cart and checkout events</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>A signed paid-order webhook that sends every Purchase from Shopify's backend</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Matching order IDs so browser and server purchases deduplicate</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Plan selection and billing through your Shopify bill</span></li></ul></div>
           </div>
         </div>
       </section>
@@ -157,30 +156,30 @@
 
       <section class="sec" id="pricing">
         <div class="wrap">
-          <div class="sec-head" data-reveal><span class="eyebrow">Pricing</span><h2>Start free. Upgrade when you grow.</h2><p>Paid plans start with a 3-day free trial, then bill monthly. Cancel any time before the trial ends.</p></div>
+          <div class="sec-head" data-reveal><span class="eyebrow">Pricing</span><h2>Start free. Upgrade in Shopify when you grow.</h2><p>Choose and change plans inside the Tagioo app. Shopify shows the exact charge before you approve it and bills it on your Shopify invoice.</p></div>
           <div class="prices">
           <article class="price" data-reveal>
             <h3>Free</h3><p class="price-amt">$0<small></small></p><p class="price-desc">Test with real events.</p>
-            <ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>15,000 events / 30 days</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>1 sGTM container</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>First-party domain + SSL</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Setup Assistant + live event log</span></li></ul>
-            <a class="btn btn-primary" href="/signup">Start free</a>
+            <ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>15,000 events / 30 days</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>1 sGTM container</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>First-party domain + SSL</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>In-app setup + live event log</span></li></ul>
+            <a class="btn btn-primary" href="https://apps.shopify.com/search?q=tagioo" target="_blank" rel="noopener">Install free</a>
           </article>
           <article class="price" data-reveal>
             <h3>Starter</h3><p class="price-amt">$30<small>/mo</small></p><p class="price-desc">For stores starting out.</p>
             <ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>500,000 events / cycle</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>1 sGTM container</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Meta CAPI + deduplication</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Server-side purchase recovery</span></li></ul>
-            <a class="btn btn-secondary" href="/signup?plan=Starter&amp;cycle=monthly">Start 3-day trial</a>
+            <a class="btn btn-secondary" href="https://apps.shopify.com/search?q=tagioo" target="_blank" rel="noopener">Install the app</a>
           </article>
           <article class="price featured" data-reveal><span class="price-flag">Most popular</span>
             <h3>Pro</h3><p class="price-amt">$50<small>/mo</small></p><p class="price-desc">For stores running ads.</p>
             <ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>2,000,000 events / cycle</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Up to 3 sGTM containers</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Offline conversions to Meta</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Advanced diagnostics</span></li></ul>
-            <a class="btn btn-primary" href="/signup?plan=Pro&amp;cycle=monthly">Try Pro free for 3 days</a>
+            <a class="btn btn-primary" href="https://apps.shopify.com/search?q=tagioo" target="_blank" rel="noopener">Install the app</a>
           </article>
           <article class="price" data-reveal>
             <h3>Enterprise</h3><p class="price-amt">$100<small>/mo</small></p><p class="price-desc">For agencies & high volume.</p>
             <ul><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>5,000,000 events / cycle</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Up to 5 sGTM containers</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Multiple container workspaces</span></li><li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Container status monitoring</span></li></ul>
-            <a class="btn btn-secondary" href="/signup?plan=Enterprise&amp;cycle=monthly">Start 3-day trial</a>
+            <a class="btn btn-secondary" href="https://apps.shopify.com/search?q=tagioo" target="_blank" rel="noopener">Install the app</a>
           </article>
           </div>
-          <p class="price-note">Prices in USD, excluding applicable taxes. <a href="/pricing">Compare all plan features →</a></p>
+          <p class="price-note">Prices in USD, billed monthly through Shopify, excluding applicable taxes.</p>
         </div>
       </section>
 
@@ -188,13 +187,13 @@
         <div class="wrap">
           <div class="sec-head" data-reveal><span class="eyebrow">FAQ</span><h2>Questions, answered</h2></div>
           <div class="faq" data-reveal>
-          <details><summary>Is there a Shopify app?</summary><p>The Tagioo Shopify app is coming soon. Today, Shopify stores connect with a Custom Pixel under Settings → Customer events, which needs no app install or theme changes.</p></details>
-          <details><summary>Do I need to know Google Tag Manager?</summary><p>No GTM expertise needed. Tagioo's Setup Assistant generates ready-made Web and Server GTM container files; you import them, preview and publish. You need a Google account with a Web and a Server GTM container.</p></details>
-          <details><summary>Will purchases be counted twice in Meta?</summary><p>No. The browser pixel and the server event share the same <code>event_id</code> (the order ID for purchases), which Meta uses to merge them into one event.</p></details>
-          <details><summary>What happens when the Free plan reaches 15,000 events?</summary><p>Tagioo emails you as you approach the limit. At 15,000 events the container pauses until your 30-day cycle resets or you upgrade. Nothing is deleted.</p></details>
-          <details><summary>How does the 3-day Pro trial work?</summary><p>Choose Pro and add a card at checkout. You pay $0 for 3 days; after that the plan renews at $50/month plus applicable taxes unless you cancel before the trial ends.</p></details>
+          <details><summary>Is there a Shopify app?</summary><p>Yes. Install Tagioo Server-Side Tracking from the Shopify App Store. It creates your free Tagioo workspace inside Shopify admin, sets up your tracking container and connects your store with one click. No theme edits and no code to copy.</p></details>
+          <details><summary>How are Shopify stores billed?</summary><p>Through Shopify. You choose or change a plan inside the Tagioo app, Shopify shows the exact charge before you approve it, and it appears on your Shopify bill. Tagioo never asks a Shopify store for a card.</p></details>
+          <details><summary>What do I need before I start?</summary><p>A Google Tag Manager server container (you paste its Container Config into the app), your GA4 Measurement ID and access to your domain's DNS. Meta Conversions API details are optional. The app gives you a ready-made server container template to import.</p></details>
+          <details><summary>Will purchases be counted twice in Meta?</summary><p>No. The browser and server copies of each purchase share the Shopify order ID as <code>event_id</code>, which Meta uses to merge them into one event.</p></details>
+          <details><summary>What happens when the Free plan reaches 15,000 events?</summary><p>Tagioo emails you as you approach the limit. At 15,000 events the container pauses until your 30-day cycle resets or you choose a paid plan in Shopify. Nothing is deleted.</p></details>
           <details><summary>Can I get help with setup?</summary><p>Yes. Email <a href="mailto:hello@tagioo.com">hello@tagioo.com</a> with your store URL and we'll help you finish the setup.</p></details>
-          <details><summary>Does it respect customer privacy settings?</summary><p>The Custom Pixel runs under the Customer events permissions you choose in Shopify (for example Analytics and Marketing consent). You remain responsible for your consent configuration.</p></details>
+          <details><summary>Does it respect customer privacy settings?</summary><p>Yes. The Tagioo app pixel follows Shopify's customer privacy settings: Shopify only runs it when a visitor's consent allows analytics and marketing. You remain responsible for your consent banner and policies.</p></details>
           </div>
         </div>
       </section>
@@ -202,10 +201,10 @@
       <section class="final">
         <div class="wrap">
           <h2 data-reveal>Track every Shopify sale your ads drive.</h2>
-          <p>Start on the Free plan with 15,000 events. Upgrade when your volume grows.</p>
+          <p>Start on the Free plan with 15,000 events. Upgrade in Shopify when your volume grows.</p>
           <div class="hero-ctas">
-            <a class="btn btn-primary" href="/signup">Start free — no card required <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></a>
-            <a class="btn btn-secondary" href="/signup?plan=Pro&amp;cycle=monthly">Try Pro free for 3 days</a>
+            <a class="btn btn-primary" href="https://apps.shopify.com/search?q=tagioo" target="_blank" rel="noopener">Install the Shopify app <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg></a>
+            <a class="btn btn-secondary" href="#setup">See how setup works</a>
           </div>
         </div>
       </section>
@@ -214,12 +213,12 @@
       <div class="wrap">
         <div>
           <p>Questions? <a href="mailto:hello@tagioo.com">hello@tagioo.com</a><span data-bd-only> · <a href="https://wa.me/+8801990208987" target="_blank" rel="noopener">WhatsApp</a></span></p>
-          <p>Prices in USD, excluding applicable taxes. <a href="/bd?next=/pricing">Bangladesh? See BDT pricing</a> · © 2026 Tagioo</p>
+          <p>Shopify stores are billed in USD through Shopify. · © 2026 Tagioo</p>
         </div>
         <nav aria-label="Footer"><a href="/pricing">Pricing</a><a href="/docs">Docs</a><a href="/compare">Compare</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav>
       </div>
     </footer>
-    <div class="sticky-cta"><a class="btn btn-primary" href="/signup">Start free — no card</a></div>
+    <div class="sticky-cta"><a class="btn btn-primary" href="https://apps.shopify.com/search?q=tagioo" target="_blank" rel="noopener">Install the Shopify app</a></div>
     <script src="/assets/geo.js?v=1" defer></script>
     <script src="/assets/video.js?v=1" defer></script>
     <script src="/assets/lp.js?v=1" defer></script>

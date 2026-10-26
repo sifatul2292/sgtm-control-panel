@@ -102,7 +102,7 @@
               <li>Point a subdomain at Tagioo via one CNAME record</li>
               <li>Create a container in your Tagioo dashboard</li>
               <li>Generate and import Web + Server GTM templates via Setup Assistant</li>
-              <li>Connect your store (WooCommerce plugin, Shopify Custom Pixel, or the self-service Laravel Bridge)</li>
+              <li>Connect your store (WooCommerce plugin, the Tagioo Shopify app, or the self-service Laravel Bridge)</li>
               <li>Test in Meta Events Manager and confirm events in your dashboard</li>
             </ul>
             <p>See the <a href="/how-it-works">full step-by-step walkthrough</a> for screenshots and detail on each step.</p>
@@ -128,43 +128,51 @@
 
           <section id="shopify" class="docs-section">
             <h2>Shopify Setup</h2>
-            <p>Shopify stores connect through a <strong>Custom Pixel</strong> (Shopify Admin → Settings → Customer events). No theme edits and no App Store install are needed. The <strong>Tagioo Shopify app is coming soon</strong>; until then, this manual pixel is the supported path.</p>
-
-            <!-- tagioo:video shopify title="Shopify setup with Tagioo" -->
+            <p>Shopify stores use the <strong>Tagioo Server-Side Tracking</strong> app from the Shopify App Store. Setup happens inside Shopify admin: the app creates your Tagioo workspace, adds your tracking container and connects your store with one click. Plans are chosen in the app and billed through Shopify.</p>
 
             <h3>Before you start</h3>
             <ul>
-              <li>A Tagioo account (the Free plan is enough to test).</li>
-              <li>A <strong>Web</strong> container and a <strong>Server</strong> container in Google Tag Manager.</li>
-              <li>Access to your domain's DNS (to add one CNAME record) and Shopify Admin.</li>
+              <li>Permission to install apps in your Shopify admin.</li>
+              <li>A <strong>Server</strong> container in Google Tag Manager. You only need its Container Config; no Web container is needed, because the app pixel sends the browser events.</li>
+              <li>Your GA4 Measurement ID (<code>G-XXXXXXXXXX</code>). Optional: your Meta Pixel ID and a Conversions API access token.</li>
+              <li>Access to your domain's DNS, to add one CNAME record.</li>
             </ul>
 
-            <h3>Step 1 — Create your Tagioo container</h3>
-            <p>In Google Tag Manager, open the Server container, click its container ID → <strong>Manually provision tagging server</strong> and copy the Container Config. In the Tagioo dashboard, create a container, paste the Container Config and choose a tracking subdomain such as <code>track.yourstore.com</code>.</p>
+            <h3>Step 1 — Install the app</h3>
+            <p>Find <a href="https://apps.shopify.com/search?q=tagioo" target="_blank" rel="noopener">Tagioo Server-Side Tracking in the Shopify App Store</a> and install it. Open it any time from <strong>Apps</strong> in your Shopify admin.</p>
 
-            <h3>Step 2 — Point your tracking subdomain at Tagioo</h3>
-            <p>Add the CNAME record shown in your dashboard at your DNS provider. Tagioo issues the SSL certificate automatically once DNS resolves.</p>
+            <h3>Step 2 — Create or link your Tagioo workspace</h3>
+            <p>Click <strong>Create my free Tagioo workspace</strong>. Tagioo creates a Free workspace from your store's details, with no separate sign-up and no card. Already use Tagioo for other websites? Click <strong>Sign in to link that account</strong> instead; that workspace then moves to Shopify billing for all its sites.</p>
 
-            <h3>Step 3 — Generate the GTM templates</h3>
-            <p>Open <strong>Setup Assistant</strong>, choose platform <strong>Shopify</strong>, enter your <strong>Web GTM Container ID</strong> (GTM-XXXXXXX) and pick your destinations (for example GA4 and Meta CAPI). Generate <code>web.json</code> and <code>server.json</code>, import each into the matching GTM container using <strong>Merge</strong>, preview, then publish both.</p>
-
-            <h3>Step 4 — Add the Custom Pixel in Shopify</h3>
-            <ol>
-              <li>In Setup Assistant, click <strong>Copy custom pixel code</strong>.</li>
-              <li>In Shopify Admin go to <strong>Settings → Customer events → Add custom pixel</strong>, name it "Tagioo" and paste the code.</li>
-              <li>Set the pixel permission to require <strong>Analytics</strong> and <strong>Marketing</strong> consent where applicable.</li>
-              <li>Click <strong>Save</strong>, then <strong>Connect</strong>.</li>
-            </ol>
-            <p>The pixel loads your Web GTM container inside Shopify's pixel sandbox and sends these events: <code>page_view</code>, <code>view_item</code>, <code>view_item_list</code>, <code>search</code>, <code>add_to_cart</code>, <code>remove_from_cart</code>, <code>view_cart</code>, <code>begin_checkout</code>, <code>add_shipping_info</code>, <code>add_payment_info</code> and <code>purchase</code>. The Shopify order ID is used as the purchase <code>transaction_id</code> and <code>event_id</code>, so Meta can deduplicate browser and server copies.</p>
-
-            <h3>Step 5 — Test</h3>
+            <h3>Step 3 — Add your tracking container</h3>
+            <p>In Google Tag Manager, open your Server container and go to <strong>Admin → Container settings → Manually provision tagging server</strong>, then copy the Container Config. In the app, enter:</p>
             <ul>
-              <li>Place a test order and check it in <strong>GTM Preview</strong> (Web and Server) and <strong>Meta Events Manager → Test events</strong>.</li>
-              <li>Confirm the events in your Tagioo dashboard's Event Logs and Purchase Inspector.</li>
+              <li>a tracking subdomain such as <code>track.yourstore.com</code>;</li>
+              <li>the Container Config;</li>
+              <li>your GA4 Measurement ID, and optionally your Meta Pixel ID and Conversions API access token.</li>
             </ul>
+            <p>Click <strong>Add container and connect</strong>. The app installs its Shopify app pixel and starts sending paid orders to Tagioo. If your workspace already has a container for this store, click <strong>Connect</strong> next to it instead. Each store needs its own container.</p>
+
+            <h3>Step 4 — Point your tracking subdomain at Tagioo</h3>
+            <p>Under <strong>Finish setup</strong>, the app shows the CNAME record to add at your DNS provider. Add it, then click <strong>Check DNS</strong>. Tagioo issues the SSL certificate automatically once DNS resolves; this can take up to an hour.</p>
+
+            <h3>Step 5 — Import the server container template</h3>
+            <p>Under <strong>Finish setup</strong>, click <strong>Download server container template</strong>. In your GTM Server container go to <strong>Admin → Import container</strong>, choose the file and select <strong>Merge</strong>, then preview and publish. The template includes GA4, and Meta Conversions API when you entered its details.</p>
+
+            <h3>Step 6 — Test</h3>
+            <ul>
+              <li>Place a test order and check it in <strong>GTM Preview</strong> for the Server container and in <strong>Meta Events Manager → Test events</strong>.</li>
+              <li>Click <strong>Open Tagioo dashboard</strong> in the app to sign in to Tagioo, then confirm the events in Event Logs and Purchase Inspector.</li>
+            </ul>
+
+            <h3>What the app sends</h3>
+            <p>The app pixel sends <code>page_view</code>, <code>view_item</code>, <code>add_to_cart</code>, <code>begin_checkout</code>, <code>add_shipping_info</code>, <code>add_payment_info</code> and <code>purchase</code> to your tracking subdomain. Shopify's signed <code>orders/paid</code> webhook also sends every paid order from Shopify's backend, so a purchase still reaches Tagioo when the browser event is lost. Both copies use the Shopify order ID as <code>transaction_id</code> and <code>event_id</code>, so GA4 and Meta count each purchase once.</p>
+
+            <h3>Plans and billing</h3>
+            <p>Every store starts on the Free plan: 15,000 events per 30-day cycle. To upgrade, click <strong>View or change Shopify plan</strong> in the app. Shopify shows the exact charge before you approve it, and the plan is billed on your Shopify invoice. Tagioo never asks a Shopify store for a card. At the Free limit the container pauses until your cycle resets or you choose a paid plan in Shopify; nothing is deleted.</p>
 
             <div class="docs-callout">
-              <p><strong>Good to know:</strong> don't run this Custom Pixel and another pixel that sends the same events to the same GTM container at the same time, or purchases will be counted twice. Shopify's checkout "Additional scripts" field is retired; use Customer events instead. The manual pixel covers browser and checkout events; backend order recovery (<code>orders/paid</code>) will come with the Tagioo Shopify app.</p>
+              <p><strong>Good to know:</strong> the app pixel follows Shopify's customer privacy settings, so Shopify only runs it when a visitor's consent allows analytics and marketing. Don't also run a manual Custom Pixel or other tags that send the same events to the same server container, or purchases will be counted twice. If you added a Tagioo Custom Pixel before installing the app, remove it under <strong>Settings → Customer events</strong>.</p>
             </div>
           </section>
 
