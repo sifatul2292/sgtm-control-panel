@@ -60,7 +60,7 @@ test("routes: account links are verified as start links, signed calls are checke
   assert.match(startPost, /adoptShopifyBilling\(session\.tenantId, shop, \{ verified \}\)/);
   const api = between('if (pathname === "/api/integrations/shopify/workspace" && req.method === "POST")', 'if (pathname === "/api/integrations/shopify/connect"');
   const authorized = api.indexOf("isShopifyIntegrationAuthorized(req, rawBody, config.shopifyAppSecret)");
-  for (const intent of ["connectShopifyAppContainer(", "createShopifyAppContainer(", "retryShopifyAppContainerLaunch(", "shopifyAppServerTemplate("]) {
+  for (const intent of ["connectShopifyAppContainer(", "createShopifyAppContainer(", "retryShopifyAppContainerLaunch(", "shopifyAppServerTemplate(", "unlinkShopifyAppWorkspace("]) {
     assert.ok(authorized > 0 && authorized < api.indexOf(intent), intent);
   }
 });
@@ -104,6 +104,7 @@ function appContext(data, overrides = {}) {
     },
     buildSetupAssistantTemplates: (input) => ({ fileNames: { server: "tagioo-server-template.json" }, server: { input } }),
     autoLaunchProvisioningRequest: async (_data, request) => { launches.push(request.id); request.status = "live"; return request; },
+    resourceProfileForPlan: (plan) => ({ containerLimit: { Free: 1, Starter: 1, Pro: 3 }[plan] || 1 }),
     ...overrides,
   });
   vm.runInContext([
@@ -120,6 +121,8 @@ function appContext(data, overrides = {}) {
     extractFunction("createShopifyAppContainer", true),
     extractFunction("shopifyConnectedContainer"),
     extractFunction("shopifyAppServerTemplate"),
+    extractFunction("shopifyAppContainerAllowance"),
+    extractFunction("unlinkShopifyAppWorkspace", true),
     extractConst("shopifyDnsChecks"),
     extractFunction("retryShopifyAppContainerLaunch", true),
   ].join("\n"), ctx);
@@ -271,4 +274,40 @@ test("Check DNS relaunches only a DNS-pending container, at most once a minute",
   const other = await ctx.retryShopifyAppContainerLaunch({ shop: "new-store.myshopify.com", tenantId: "new-store" });
   assert.equal(other.checked, false);
   assert.deepEqual(launches, ["req_1"]);
+});
+
+test("the app sees the plan's container allowance: Free and Starter hold one container", () => {
+  const data = reviewData();
+  const { ctx } = appContext(data);
+  const tenant = data.tenants[0];
+  assert.deepEqual({ ...ctx.shopifyAppContainerAllowance(data, tenant) }, { plan: "Pro", containerLimit: 3, containersUsed: 2, canAddContainer: true });
+  tenant.plan = "Starter";
+  assert.equal(ctx.shopifyAppContainerAllowance(data, tenant).canAddContainer, false);
+  tenant.containerLimit = 3; // a paid extra container raises the stored limit
+  assert.equal(ctx.shopifyAppContainerAllowance(data, tenant).canAddContainer, true);
+  const fresh = freshWorkspace();
+  assert.equal(appContext(fresh).ctx.shopifyAppContainerAllowance(fresh, fresh.tenants[0]).canAddContainer, true);
+});
+
+test("Use a different Tagioo account unlinks the store, but only once it is disconnected", async () => {
+  const data = reviewData();
+  data.tenants[0].shopifyShop = "reviewer.myshopify.com";
+  data.tenants[0].shopifyShops = ["owner-store.myshopify.com", "reviewer.myshopify.com"];
+  data.tenants[0].shopifyBillingRequired = true;
+  const { ctx, writes } = appContext(data);
+  const result = await ctx.unlinkShopifyAppWorkspace({ shop: "reviewer.myshopify.com", tenantId: "review" });
+  assert.equal(result.ok, true);
+  const tenant = data.tenants[0];
+  assert.deepEqual([...tenant.shopifyAppShops], []);
+  assert.deepEqual([...tenant.shopifyShops], ["owner-store.myshopify.com"]);
+  assert.equal(tenant.shopifyShop, "owner-store.myshopify.com");
+  // Still Shopify-billed: unlinking never opens an off-Shopify checkout.
+  assert.equal(tenant.shopifyBillingRequired, true);
+  assert.equal(findShopifyWorkspace(data, "reviewer.myshopify.com"), null);
+  assert.equal(writes(), 1);
+
+  const connected = await ctx.unlinkShopifyAppWorkspace({ shop: "owner-store.myshopify.com", tenantId: "review" });
+  assert.equal(connected.status, 409);
+  assert.equal(connected.code, "store_connected");
+  assert.equal(writes(), 1);
 });

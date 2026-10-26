@@ -8613,6 +8613,40 @@ function shopifyAppContainers(data, tenant, shop) {
   }).filter((container) => container.ready || container.status);
 }
 
+// How many containers the workspace's plan allows, as the app shows it. Uses
+// the same limit as addCustomerSetupRequest, so the form is hidden exactly
+// when creating would be refused.
+function shopifyAppContainerAllowance(data, tenant) {
+  const limit = Number(tenant.containerLimit) > 0
+    ? Number(tenant.containerLimit)
+    : resourceProfileForPlan(tenant.plan || "Free").containerLimit;
+  const used = getTenantContainers(tenant.id, tenant, data.customerSetupRequests || [], data.provisioning?.requests || []).length;
+  return { plan: tenant.plan || "Free", containerLimit: limit, containersUsed: used, canAddContainer: used < limit };
+}
+
+// "Use a different Tagioo account" in the app. The store stops finding this
+// workspace; the workspace stays Shopify-billed so it is never offered an
+// off-Shopify checkout. A connected store must be disconnected first.
+async function unlinkShopifyAppWorkspace({ shop, tenantId = "" }) {
+  return withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) return { ok: false, status: 503, errors: ["Tagioo is temporarily unavailable."] };
+    const data = loaded.data;
+    const tenant = shopifyAppWorkspaceFor(data, shop, tenantId);
+    if (!tenant) return shopifyAppWorkspaceMissing;
+    if (shopifyConnectedContainer(data, tenant, shop)) {
+      return { ok: false, status: 409, code: "store_connected", errors: ["Disconnect this store from its Tagioo container first, then choose a different account."] };
+    }
+    const others = (list) => (list || []).map(normalizeShopDomain).filter((item) => item && item !== shop);
+    tenant.shopifyAppShops = others(tenant.shopifyAppShops);
+    tenant.shopifyShops = others(tenant.shopifyShops);
+    if (normalizeShopDomain(tenant.shopifyShop) === shop) tenant.shopifyShop = tenant.shopifyShops[0] || "";
+    tenant.updatedAt = new Date().toISOString();
+    await writeDatabase(data);
+    return { ok: true, tenantId: tenant.id };
+  });
+}
+
 function shopifyAppWorkspaceFor(data, shop, tenantId) {
   const tenant = findShopifyWorkspace(data, shop, tenantId);
   return tenant && (!tenantId || tenant.id === tenantId) ? tenant : null;
@@ -14411,6 +14445,13 @@ const server = createServer(async (req, res) => {
         jsonResponse(res, 200, { ...linkedStore(result), container: result.container, dnsTarget: config.provisionDnsTarget });
         return;
       }
+      if (payload.intent === "unlink") {
+        const result = await unlinkShopifyAppWorkspace({ shop, tenantId });
+        if (!result.ok) { failed(result); return; }
+        invalidateCustomerDashboardCache(result.tenantId);
+        jsonResponse(res, 200, { unlinked: true });
+        return;
+      }
       if (payload.intent === "check-dns") {
         const result = await retryShopifyAppContainerLaunch({ shop, tenantId });
         if (!result.ok) { failed(result); return; }
@@ -14436,6 +14477,7 @@ const server = createServer(async (req, res) => {
           tenantId: tenant.id,
           tenantName: tenant.name || tenant.id,
           containers: shopifyAppContainers(loaded.data, tenant, shop),
+          ...shopifyAppContainerAllowance(loaded.data, tenant),
           dnsTarget: config.provisionDnsTarget
         }
         : { linked: false });
