@@ -4,8 +4,8 @@ seoTitle: "Meta Purchases Not Matching Shopify? How to Fix It (2026)"
 description: "Meta purchases not matching Shopify orders? Find out which problem you have in 10 minutes, then fix it step by step: lost events, duplicates or attribution."
 category: Troubleshooting
 keyword: meta purchases not matching shopify
-published: 2026-11-02
-updated: 2026-11-02
+published: 2026-10-29
+updated: 2026-10-29
 summary: "A 10-minute test that shows which gap you have, then step-by-step fixes for lost purchases, duplicates and Shopify not crediting Meta."
 related: conversion-tracking-discrepancies, meta-capi-deduplication-checklist, shopify-server-side-tracking
 featured: false

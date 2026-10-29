@@ -32,7 +32,7 @@ Status key: **LIVE** = published · **QUEUED** = written and scheduled (date sho
 | tiktok-events-api | server side tracking tiktok, conversions api tiktok | QUEUED 10-31 |
 | safari-itp-ios-tracking | ITP / iOS | QUEUED 11-01 |
 | google-ads-server-side-tracking | server side tracking google ads, google ads server side tracking, server side conversion tracking google ads, google tag gateway vs server side, google ads conversion tracking setup / in GTM / extension, is it necessary, is it legal, $20/day | QUEUED 10-21 |
-| meta-purchases-not-matching-shopify | meta purchases not matching shopify, meta shows fewer sales than shopify, facebook shows more sales than shopify, facebook purchases but no shopify orders, normal gap shopify vs meta, events manager double purchases (2026-10-27 Shorts + blog plan #1, #6, #7 merged) | QUEUED 11-02 |
+| meta-purchases-not-matching-shopify | meta purchases not matching shopify, meta shows fewer sales than shopify, facebook shows more sales than shopify, facebook purchases but no shopify orders, normal gap shopify vs meta, events manager double purchases (2026-10-27 Shorts + blog plan #1, #6, #7 merged) | LIVE 10-29 |
 
 ## New article candidates (pick which to write)
 
