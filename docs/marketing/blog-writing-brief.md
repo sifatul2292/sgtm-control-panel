@@ -132,4 +132,4 @@ server-side-gtm-setup, stape-alternative, woocommerce-server-side-tracking,
 meta-capi-woocommerce, meta-conversions-api, ad-blocker-tracking-loss,
 server-side-tagging-cost, first-party-tracking, safari-itp-ios-tracking,
 tiktok-events-api, ga4-server-side-tracking, shopify-server-side-tracking,
-google-ads-server-side-tracking
+google-ads-server-side-tracking, meta-purchases-not-matching-shopify

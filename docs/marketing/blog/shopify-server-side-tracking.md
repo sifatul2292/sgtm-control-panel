@@ -271,6 +271,8 @@ Compare two to four weeks of Shopify orders, GA4 purchases and ad platform purch
 
 Some gap stays normal. Not every buyer clicked an ad, and consent and attribution windows differ. [Conversion tracking discrepancies](/blog/conversion-tracking-discrepancies) explains which differences to expect.
 
+> **Recommended article:** [Meta purchases not matching Shopify orders? How to fix it](/blog/meta-purchases-not-matching-shopify)
+
 ## How can Tagioo help?
 
 [Tagioo](/features) hosts a dedicated server GTM container on your own tracking subdomain, with DNS guidance and automatic SSL.

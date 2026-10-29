@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Which problem do you have? A decision flow for Meta vs Shopify purchases</title>
+<desc id="d">Decision flow. Compare Purchase events received in Events Manager, for one connection method at a time, with Shopify Online Store orders for the same dates. If events are clearly below orders, events are missing: check data sharing level, paused app pixels, old scripts and consent. If they are close, tracking works and the remaining gap is attribution: compare attribution settings and Shopify's Meta Ads channel report. If events are clearly above orders, there are extra events: check deduplication, test orders and other sites using the same Pixel.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+</defs>
+<rect width="1200" height="660" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Which problem do you have?</text>
+<text x="48" y="84" font-size="15" fill="#626975">Start in Events Manager. Same dates, same time zone, one connection method at a time.</text>
+
+<!-- start box -->
+<rect x="300" y="112" width="600" height="96" rx="14" fill="#fff" stroke="#5145cd" stroke-width="2"/>
+<text x="600" y="148" text-anchor="middle" font-size="17" font-weight="700" fill="#101721">Purchase events received (one source)</text>
+<text x="600" y="176" text-anchor="middle" font-size="15" fill="#626975">compared with Shopify Online Store orders</text>
+
+<!-- arrows -->
+<path d="M400 208 L200 268" fill="none" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+<line x1="600" y1="208" x2="600" y2="266" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+<path d="M800 208 L1000 268" fill="none" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+
+<!-- three columns -->
+<g font-size="15">
+<!-- below -->
+<rect x="48" y="276" width="344" height="72" rx="14" fill="#fde8e8"/>
+<text x="220" y="306" text-anchor="middle" font-weight="700" fill="#b4232c">Clearly below</text>
+<text x="220" y="330" text-anchor="middle" font-size="14" fill="#b4232c">Events are missing</text>
+<rect x="48" y="364" width="344" height="216" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="398" font-weight="700" fill="#101721">Check</text>
+<g font-size="14" fill="#626975">
+<text x="72" y="428">• Data sharing level (Standard = Pixel only)</text>
+<text x="72" y="456">• Paused app pixel in Customer events</text>
+<text x="72" y="484">• Old code in Additional scripts</text>
+<text x="72" y="512">• Thank you page not loading</text>
+<text x="72" y="540">• Consent banner settings</text>
+</g>
+
+<!-- close -->
+<rect x="428" y="276" width="344" height="72" rx="14" fill="#c5eb8c"/>
+<text x="600" y="306" text-anchor="middle" font-weight="700" fill="#1a3123">Close</text>
+<text x="600" y="330" text-anchor="middle" font-size="14" fill="#395e33">Tracking works. The gap is attribution</text>
+<rect x="428" y="364" width="344" height="216" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="452" y="398" font-weight="700" fill="#101721">Check</text>
+<g font-size="14" fill="#626975">
+<text x="452" y="428">• Compare attribution settings</text>
+<text x="452" y="456">• Click-only vs view and engage-through</text>
+<text x="452" y="484">• Shopify's Meta Ads channel report</text>
+<text x="452" y="512">• Impression date and time zones</text>
+<text x="452" y="540">• Event Match Quality</text>
+</g>
+
+<!-- above -->
+<rect x="808" y="276" width="344" height="72" rx="14" fill="#fff3e0"/>
+<text x="980" y="306" text-anchor="middle" font-weight="700" fill="#a85f00">Clearly above</text>
+<text x="980" y="330" text-anchor="middle" font-size="14" fill="#a85f00">Extra events</text>
+<rect x="808" y="364" width="344" height="216" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="832" y="398" font-weight="700" fill="#101721">Check</text>
+<g font-size="14" fill="#626975">
+<text x="832" y="428">• Event Deduplication tab</text>
+<text x="832" y="456">• Two apps or tags sending Purchase</text>
+<text x="832" y="484">• Purchase firing on reload or wrong page</text>
+<text x="832" y="512">• Test orders</text>
+<text x="832" y="540">• Same Pixel on another site</text>
+</g>
+</g>
+
+<text x="48" y="616" font-size="14" fill="#626975"><tspan font-weight="700" fill="#101721">Tip:</tspan> the Overview headline counts events before deduplication, so Pixel + Conversions API can show about 2× orders. That alone is fine.</text>
+<text x="48" y="642" font-size="13" fill="#9aa1ab">Source: Meta for Developers, Verifying your Conversions API setup; Shopify Help, Facebook data sharing.</text>
+</svg>

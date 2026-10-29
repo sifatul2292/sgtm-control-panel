@@ -184,7 +184,7 @@ You'll see the **rate of events deduplicated** and the **rate of deduplication k
 | Same ID, but still double counted | Event names differ, or arrived more than 48 hours apart | Match names exactly; send in real time |
 | Three or more Purchases for one order | Two integrations, or Pixel fires on reload | One owner per event; fire once per order |
 | Low "deduplication key usage" for one source | That source doesn't send `event_id` | Add the ID to that path |
-| Dedup looks fine, Meta still above orders | Attribution (view-through, windows, dates) | Compare 2–4 weeks; see our [discrepancies guide](/blog/conversion-tracking-discrepancies) |
+| Dedup looks fine, Meta still above orders | Attribution (view-through, windows, dates) | Compare 2–4 weeks; see our [discrepancies guide](/blog/conversion-tracking-discrepancies) or, on Shopify, [Meta purchases not matching Shopify](/blog/meta-purchases-not-matching-shopify) |
 | Meta far *below* orders | Missing events, not duplicates | Check coverage and blocked or missing events |
 
 PixelYourSite shows how to test CAPI events in Events Manager here:

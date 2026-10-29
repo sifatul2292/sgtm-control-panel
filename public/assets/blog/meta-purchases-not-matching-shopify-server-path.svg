@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Where a Shopify purchase gets lost, and how server-side tracking changes the path</title>
+<desc id="d">Two paths for the same Shopify purchase. With the browser pixel only, the shopper's browser sends the purchase straight to Meta, and an ad blocker, a privacy setting or a closed tab can stop it. With server-side tracking, the browser sends the purchase to the store's own tracking subdomain, and a server sends it on to Meta's Conversions API with the order ID as event ID and the customer's email, phone and address for matching. A note at the bottom says server-side tracking does not change attribution windows, consent choices or settings mistakes inside Meta.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2f7d32"/></marker>
+</defs>
+<rect width="1200" height="640" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Same purchase, two paths</text>
+<text x="48" y="84" font-size="15" fill="#626975">Server-side tracking moves the last step off the shopper's browser and onto a server you control.</text>
+
+<!-- Lane 1: browser only -->
+<rect x="48" y="112" width="1104" height="190" rx="14" fill="#fff" stroke="#dce0e3"/>
+<rect x="48" y="112" width="1104" height="40" rx="14" fill="#fde8e8"/>
+<rect x="48" y="138" width="1104" height="14" fill="#fde8e8"/>
+<text x="72" y="138" font-size="15" font-weight="700" fill="#b4232c">Browser pixel only</text>
+
+<rect x="80" y="180" width="200" height="84" rx="12" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="180" y="216" text-anchor="middle" font-size="16" font-weight="700" fill="#101721">Shopify checkout</text>
+<text x="180" y="240" text-anchor="middle" font-size="13" fill="#626975">order placed</text>
+
+<line x1="280" y1="222" x2="350" y2="222" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+
+<rect x="356" y="180" width="220" height="84" rx="12" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="466" y="216" text-anchor="middle" font-size="16" font-weight="700" fill="#101721">Shopper's browser</text>
+<text x="466" y="240" text-anchor="middle" font-size="13" fill="#626975">sends Purchase to Meta</text>
+
+<line x1="576" y1="222" x2="676" y2="222" stroke="#b4232c" stroke-width="2" stroke-dasharray="6 6"/>
+<circle cx="700" cy="222" r="22" fill="#fde8e8" stroke="#b4232c" stroke-width="2"/>
+<path d="M690 212 L710 232 M710 212 L690 232" stroke="#b4232c" stroke-width="3" stroke-linecap="round"/>
+<line x1="724" y1="222" x2="880" y2="222" stroke="#b4232c" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#a)"/>
+
+<rect x="886" y="180" width="236" height="84" rx="12" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="1004" y="216" text-anchor="middle" font-size="16" font-weight="700" fill="#101721">Meta</text>
+<text x="1004" y="240" text-anchor="middle" font-size="13" fill="#626975">never hears about the sale</text>
+
+<text x="700" y="278" text-anchor="middle" font-size="13" fill="#b4232c">ad blocker · privacy setting · tab closed</text>
+
+<!-- Lane 2: server-side -->
+<rect x="48" y="326" width="1104" height="210" rx="14" fill="#fff" stroke="#dce0e3"/>
+<rect x="48" y="326" width="1104" height="40" rx="14" fill="#c5eb8c"/>
+<rect x="48" y="352" width="1104" height="14" fill="#c5eb8c"/>
+<text x="72" y="352" font-size="15" font-weight="700" fill="#2f7d32">Server-side tracking</text>
+
+<rect x="80" y="394" width="200" height="84" rx="12" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="180" y="430" text-anchor="middle" font-size="16" font-weight="700" fill="#101721">Shopify checkout</text>
+<text x="180" y="454" text-anchor="middle" font-size="13" fill="#626975">order placed</text>
+
+<line x1="280" y1="436" x2="350" y2="436" stroke="#2f7d32" stroke-width="2" marker-end="url(#g)"/>
+
+<rect x="356" y="394" width="220" height="84" rx="12" fill="#f7f8fa" stroke="#dce0e3"/>
+<text x="466" y="430" text-anchor="middle" font-size="16" font-weight="700" fill="#101721">Shopper's browser</text>
+<text x="466" y="454" text-anchor="middle" font-size="13" fill="#626975">sends to your own domain</text>
+
+<line x1="576" y1="436" x2="626" y2="436" stroke="#2f7d32" stroke-width="2" marker-end="url(#g)"/>
+
+<rect x="632" y="394" width="222" height="84" rx="12" fill="#eceaff" stroke="#5145cd" stroke-width="2"/>
+<text x="743" y="430" text-anchor="middle" font-size="16" font-weight="700" fill="#101721">track.yourstore.com</text>
+<text x="743" y="454" text-anchor="middle" font-size="13" fill="#5145cd">your server</text>
+
+<line x1="854" y1="436" x2="880" y2="436" stroke="#2f7d32" stroke-width="2" marker-end="url(#g)"/>
+
+<rect x="886" y="394" width="236" height="84" rx="12" fill="#f7f8fa" stroke="#2f7d32" stroke-width="2"/>
+<text x="1004" y="430" text-anchor="middle" font-size="16" font-weight="700" fill="#101721">Meta Conversions API</text>
+<text x="1004" y="454" text-anchor="middle" font-size="13" fill="#2f7d32">purchase received</text>
+
+<text x="743" y="506" text-anchor="middle" font-size="13" fill="#626975">first-party domain</text>
+<text x="1004" y="506" text-anchor="middle" font-size="13" fill="#626975">order ID as event ID · email, phone,</text>
+<text x="1004" y="524" text-anchor="middle" font-size="13" fill="#626975">address for matching</text>
+
+<!-- Footer -->
+<rect x="48" y="556" width="1104" height="56" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="590" font-size="14" fill="#101721"><tspan font-weight="700">What it doesn't change:</tspan><tspan fill="#626975"> attribution windows, consent choices, and settings mistakes inside Meta. Fix those separately.</tspan></text>
+</svg>

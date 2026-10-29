@@ -148,6 +148,8 @@ So which direction is "normal"?
 | Meta roughly **double** Shopify | Likely duplicates. Check Pixel + CAPI deduplication |
 | Meta far below, and GA4 low too | Collection problem: tags blocked or not firing |
 
+> **Recommended article:** [Meta purchases not matching Shopify orders? How to fix it](/blog/meta-purchases-not-matching-shopify)
+
 > **Recommended article:** [Meta CAPI deduplication: how to fix duplicate Pixel and Conversions API events](/blog/meta-capi-deduplication-checklist)
 
 ## How big a conversion tracking discrepancy is normal?

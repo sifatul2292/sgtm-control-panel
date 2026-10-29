@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="Inter,-apple-system,Segoe UI,sans-serif" role="img" aria-labelledby="t d">
+<title id="t">Why Meta and Shopify file the same sale on different days</title>
+<desc id="d">Timeline from Monday to Friday. A shopper sees and clicks a Meta ad on Monday and buys on Thursday. Ads Manager records the purchase on Monday, the impression date. Shopify records the order on Thursday. A second example shows an order placed at 11:30 pm Pacific time on Thursday, which is 2:30 am Friday in an ad account set to Eastern time, so the two tools file it on different days.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#626975"/></marker>
+<marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5145cd"/></marker>
+</defs>
+<rect width="1200" height="600" fill="#f7f8fa"/>
+<text x="48" y="56" font-size="22" font-weight="700" fill="#101721">Same sale, different days</text>
+<text x="48" y="84" font-size="15" fill="#626975">Meta reports on the ad impression date. Shopify reports on the order date.</text>
+
+<text x="48" y="134" font-size="15" font-weight="700" letter-spacing="2" fill="#5145cd">IMPRESSION DATE VS ORDER DATE</text>
+
+<!-- day columns -->
+<g font-size="15" font-weight="700" fill="#101721" text-anchor="middle">
+<text x="250" y="176">Mon</text>
+<text x="450" y="176">Tue</text>
+<text x="650" y="176">Wed</text>
+<text x="850" y="176">Thu</text>
+<text x="1050" y="176">Fri</text>
+</g>
+<line x1="150" y1="190" x2="1150" y2="190" stroke="#dce0e3" stroke-width="2"/>
+<g stroke="#dce0e3"><line x1="350" y1="160" x2="350" y2="380"/><line x1="550" y1="160" x2="550" y2="380"/><line x1="750" y1="160" x2="750" y2="380"/><line x1="950" y1="160" x2="950" y2="380"/></g>
+
+<text x="48" y="232" font-size="14" font-weight="700" fill="#626975">Shopper</text>
+<circle cx="250" cy="228" r="9" fill="#5145cd"/>
+<text x="270" y="233" font-size="14" fill="#101721">Clicks ad</text>
+<line x1="345" y1="228" x2="826" y2="228" stroke="#626975" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#a)"/>
+<circle cx="850" cy="228" r="9" fill="#2f7d32"/>
+<text x="870" y="233" font-size="14" fill="#101721">Buys</text>
+
+<text x="48" y="294" font-size="14" font-weight="700" fill="#626975">Ads Manager</text>
+<rect x="168" y="270" width="164" height="44" rx="10" fill="#eceaff" stroke="#5145cd"/>
+<text x="250" y="298" text-anchor="middle" font-size="15" font-weight="700" fill="#5145cd">+1 purchase</text>
+
+<text x="48" y="356" font-size="14" font-weight="700" fill="#626975">Shopify</text>
+<rect x="768" y="332" width="164" height="44" rx="10" fill="#c5eb8c"/>
+<text x="850" y="360" text-anchor="middle" font-size="15" font-weight="700" fill="#1a3123">+1 order</text>
+
+<line x1="48" y1="414" x2="1152" y2="414" stroke="#dce0e3"/>
+
+<text x="48" y="456" font-size="15" font-weight="700" letter-spacing="2" fill="#e58a17">TIME ZONES</text>
+<g font-size="15">
+<rect x="48" y="474" width="520" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="72" y="506" font-weight="700" fill="#101721">Shopify store · Pacific time</text>
+<text x="72" y="534" font-size="14" fill="#626975">Order at 11:30 pm → filed on <tspan font-weight="700" fill="#101721">Thursday</tspan></text>
+<line x1="576" y1="516" x2="618" y2="516" stroke="#626975" stroke-width="2" marker-end="url(#a)"/>
+<rect x="632" y="474" width="520" height="84" rx="14" fill="#fff" stroke="#dce0e3"/>
+<text x="656" y="506" font-weight="700" fill="#101721">Meta ad account · Eastern time</text>
+<text x="656" y="534" font-size="14" fill="#626975">Same moment is 2:30 am → filed on <tspan font-weight="700" fill="#101721">Friday</tspan></text>
+</g>
+<text x="48" y="586" font-size="13" fill="#9aa1ab">Illustrative. Sources: Jon Loomer on impression-date reporting; Shopify and Meta each use their own account time zone.</text>
+</svg>

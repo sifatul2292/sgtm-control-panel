@@ -1,6 +1,72 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-10-22.
+Living status doc. Update after meaningful progress. Last updated: 2026-10-29.
+
+## 2026-10-29 — meta-purchases-not-matching-shopify: server-side + Tagioo woven in
+
+- Owner asked for more Tagioo/server-side presence. Added: intro line + takeaway on
+  server-side as the long-term fix; "With server-side tracking / With Tagioo" notes on
+  fewer-Fix 1/2/3/6/7 and more-Fix 1; new H2 "Why is server-side tracking the long-term fix
+  for lost purchases?" (new SVG `meta-purchases-not-matching-shopify-server-path.svg`,
+  problem table, "what it doesn't change", F&I app vs Tagioo table); Tagioo setup H2 moved up
+  with 6 steps + Tagioo video LX7BDDENcII ("How to Set Up Tagioo with Shopify in 10 Minutes",
+  2026-09-15, channel @tagiootracking); new FAQ on server-side.
+- Kept honest: owner wanted "server-side solves all tracking issues"; post says it fixes
+  collection (blockers, match quality, dupes, silent breaks, off-checkout orders) but not
+  attribution, consent or Meta settings mistakes. Tagioo claims match public/shopify.html.
+- ~5,700 words, 3 videos, 5 diagrams, checker 0/0, links verified. Preview build; nothing
+  committed.
+- Follow-up (owner: "not much about server-side"): server-side H2 moved up to right after
+  the "fewer purchases" fixes and renamed "How does server-side tracking fix Meta purchases
+  not matching Shopify?". New H3s: what it is, purchase flow (5 steps), why it recovers
+  purchases (+ Optimized row: Shopify describes it for app pixels, not Custom Pixels), why it
+  matters for ad delivery (Meta CAPI best practices: only matched events feed attribution +
+  optimization), how to check it works, what breaks it, what it doesn't change (incl. the
+  Shopify pixel still starts in the browser; gtm.js loads from google). Added Tagioo video
+  OGtzig1opkI (57s, 2026-09-15). Now ~6,300 words, 4 videos, checker 0/0.
+
+## 2026-10-29 — Rewrite: meta-purchases-not-matching-shopify is now fix-first
+
+- Owner feedback on the first draft: it explained causes but gave no solutions, and the
+  research felt thin. Rewrote the post as "How to Fix It": 10-minute test (Events Manager
+  per connection method vs Online Store orders) → symptom table with anchor links → fixes,
+  each as Sign / Why / Fix (exact Shopify + Meta click paths) / How to check.
+- Fewer in Meta: Maximum data sharing, reconnect F&I app (silent token break), move code off
+  old Thank you page (Additional scripts view-only 2025-08-28; non-Plus deadline 2026-08-26),
+  app pixel Always on (Optimized default 2026-01-13), ads vs store dataset mismatch, consent
+  banner not on Customer Privacy API, COD/draft/renewal/POS orders.
+- More in Meta: second Purchase sender (where to look), Event Setup Tool rules creating fake
+  purchases, Traffic permissions allow list, test + draft orders (draft-order CAPI is merchant
+  reports only, labeled so). Plus UTM string for Meta ads, Shopify attribution models, and
+  "don't cut budgets on Meta ROAS while tracking is broken".
+- New research sources: Shopify Community threads (Aug 2026 checkout upgrade gap, fake
+  purchases from an Event Setup Tool rule), Shopify checkout-upgrade page, pixel data-sharing
+  changelog, conversion summary help, Jon Loomer traffic permissions. Reddit is blocked to
+  our fetcher; Shopify Community rate-limits after a few requests.
+- ~4,900 words, checker 0/0, all 26 outbound links load, cover re-rendered with new title.
+  Link text in conversion-tracking-discrepancies + shopify-server-side-tracking updated.
+  Still a PREVIEW build locally; nothing committed.
+
+## 2026-10-27 — New post: meta-purchases-not-matching-shopify (QUEUED 2026-11-02)
+
+- First post from the owner's Shorts + blog keyword plan: ideas #1 (Meta fewer than Shopify),
+  #6 (Facebook more than Shopify) and #7 (normal gap) merged into one post so they don't
+  compete in Google; the Shorts can still be 3 separate videos linking here.
+- `docs/marketing/blog/meta-purchases-not-matching-shopify.md`, ~3,400 words, 6 FAQ, 4 new
+  SVGs (`meta-purchases-not-matching-shopify-*.svg`), 2 Jon Loomer videos, cover rendered.
+  Checker: 0 errors, 0 warnings, all links verified.
+- Key facts used (all sourced in the post): Events Manager Overview counts events BEFORE
+  dedup (Pixel + CAPI ≈ 2× orders is fine); Shopify marketing reports = Online Store orders
+  only, test orders excluded, last non-direct click default; Meta 2026 default = 7-day click,
+  1-day engage-through, 1-day view; Meta reports on impression date.
+- Linked from conversion-tracking-discrepancies, shopify-server-side-tracking (Recommended
+  boxes) and meta-capi-deduplication-checklist (table cell); hidden until 11-02. Brief slug
+  list + keyword research table updated.
+- Local `public/blog` is a PREVIEW build (BUILD_DATE=2026-11-02). Run `npm run build:blog`
+  before committing. Nothing committed.
+- Screenshots requested from owner (Events Manager Purchase overview with connection
+  methods, Event Deduplication tab, Ads Manager compare-attribution columns, Shopify
+  Online Store orders report) — post works without them; add when supplied.
 
 ## 2026-10-22 — WP plugin 2.7.0 for WordPress.org submission — NOT DEPLOYED, NOT COMMITTED
 
