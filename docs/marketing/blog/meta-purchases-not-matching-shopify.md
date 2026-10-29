@@ -1,7 +1,7 @@
 ---
-title: "Meta Purchases Not Matching Shopify Orders? How to Fix It (2026)"
-seoTitle: "Meta Purchases Not Matching Shopify? How to Fix It (2026)"
-description: "Meta purchases not matching Shopify orders? Find out which problem you have in 10 minutes, then fix it step by step: lost events, duplicates or attribution."
+title: "Meta (Facebook) Purchases Not Matching Shopify Orders? How to Fix It (2026)"
+seoTitle: "Facebook (Meta) Purchases Not Matching Shopify? Fix It"
+description: "Facebook (Meta) purchases not matching Shopify orders? Find which problem you have in 10 minutes, then fix lost purchases, duplicates or attribution."
 category: Troubleshooting
 keyword: meta purchases not matching shopify
 published: 2026-10-29
@@ -10,9 +10,9 @@ summary: "A 10-minute test that shows which gap you have, then step-by-step fixe
 related: conversion-tracking-discrepancies, meta-capi-deduplication-checklist, shopify-server-side-tracking
 featured: false
 ---
-# Meta Purchases Not Matching Shopify Orders? How to Fix It (2026)
+# Meta (Facebook) Purchases Not Matching Shopify Orders? How to Fix It (2026)
 
-Shopify shows 86 orders last week. Meta Ads Manager shows 61.
+Shopify shows 86 orders last week. Facebook Ads Manager shows 61.
 
 Then you look at Monday, and it flips. Facebook says 3 sales. Shopify says zero.
 
@@ -25,6 +25,8 @@ Let's find the problem first, then fix it.
 Each of those three problems has its own fix. Most take a few minutes in your Shopify or Meta settings.
 
 For lost purchases, the lasting fix is **server-side tracking**: your purchases reach Meta from a server on your own domain, not only from the shopper's browser.
+
+A quick note on names: Facebook's ad tools now sit under the Meta brand. Facebook Ads Manager is Meta Ads Manager, and the Facebook pixel is the Meta Pixel. This guide uses the Meta names you'll see on screen.
 
 > **Key takeaways**
 > - Don't start with Ads Manager. Compare **Events Manager** with **Shopify Online Store orders**. That one number tells you which problem you have.
@@ -60,6 +62,8 @@ The first and third are almost never close. That's an **attribution** question: 
 2. **Get your Shopify number.** In Shopify Analytics, open a sales report and filter it to the **Online Store** sales channel. Count orders, not sales.
 3. **Get your Meta number from Events Manager.** Open your dataset, then the **Purchase** event on the Overview. Look at the **connection method** breakdown, browser and server, and write down each one.
 4. **Compare each source with your orders on its own.** Don't use the total. Meta counts events on the Overview *before* deduplication ([Meta's verification guide](https://developers.facebook.com/docs/marketing-api/conversions-api/verifying-setup)), so with the Pixel and the Conversions API both on, one order shows up twice.
+5. **Look for a second Pixel.** Open your store in Chrome with Meta's free [Pixel Helper](https://chromewebstore.google.com/detail/meta-pixel-helper/fdgfkebogiimcoedlicjlajpkdmockpc) extension, or run the free [Website Tracking Checker](/website-tracking-checker). Two Pixel IDs, or one Pixel loading twice, usually means duplicate purchases.
+6. **Note your Event Match Quality.** If you send server events, Events Manager shows an **Event Match Quality** score for Purchase. It rates how well the customer details sent with each purchase, like email and phone, let Meta match it to a person. A low score means Meta can credit fewer sales to your ads.
 
 Now read the result:
 
@@ -205,6 +209,7 @@ Some of the gap stays even when tracking works well:
 | Orders that didn't come from Meta ads | Email, Google, direct and returning customers all create orders. Ads Manager only shows sales it credits to an ad |
 | Sales outside the attribution window | Meta's default credits a purchase within 7 days of a link click, or 1 day after a view or engagement ([Jon Loomer](https://www.jonloomer.com/meta-ads-attribution-2026/)) |
 | Purchases Meta can't tie to a person | Different device, or not enough customer details. Maximum data sharing and server-side tracking with customer details help, but never close this fully |
+| iPhone privacy features | Safari caps cookies set by scripts at 7 days ([WebKit](https://webkit.org/blog/8613/intelligent-tracking-prevention-2-1/)), and Link Tracking Protection removes click IDs from links in Private Browsing, Mail and Messages ([Apple](https://www.apple.com/newsroom/2023/06/apple-announces-powerful-new-privacy-and-security-features/)). Customer details sent from a server help Meta match some of these buyers, not all |
 | Declined consent | Correct behavior. Leave it alone |
 | Recent days | Meta files purchases under the ad impression date, so last week keeps filling in ([Jon Loomer](https://www.jonloomer.com/are-ads-manager-results-too-good-to-be-true/)) |
 
@@ -244,7 +249,7 @@ Here's how that path maps to the problems in this guide:
 
 | Problem | Browser Pixel only | With server-side tracking |
 |---|---|---|
-| Ad blockers and browser privacy | Requests to Meta's domain are on most blocklists | The browser talks to your own subdomain, and the server-to-Meta step can't be blocked by a browser |
+| Ad blockers and browser privacy, including Safari on iPhone | Requests to Meta's domain are on most blocklists | The browser talks to your own subdomain, and the server-to-Meta step can't be blocked by a browser |
 | Shopify pausing a pixel | Marketing app pixels default to Optimized and can be paused | Shopify describes Optimized as a setting for app pixels. A Custom Pixel isn't described as covered ([Shopify's app pixels help](https://help.shopify.com/en/manual/promoting-marketing/pixels/app-pixels)) |
 | Weak match quality | Meta gets only what the browser can send | The server sends the customer's email, phone and address with the purchase |
 | Duplicate purchases | Each tool sends its own Purchase with its own ID | One owner. Browser and server copies share the order ID as event ID, and Meta merges them |
@@ -492,6 +497,8 @@ All three. Each one, for its own job.
 
 What you shouldn't do is treat Ads Manager as your order count, or Shopify's last-click report as the full value of your Meta ads. Both ignore part of the picture.
 
+Not sure where your store stands? Start with the free [Website Tracking Checker](/website-tracking-checker). It shows whether your Meta Pixel and other tags are browser-only or server-side, and flags duplicate tags. When you're ready, Tagioo's [Free plan](/signup) covers 15,000 events per 30 days, with no card.
+
 ## Sources and further reading
 
 - [Shopify Help: Facebook data sharing](https://help.shopify.com/en/manual/promoting-marketing/analyze-marketing/meta-data-sharing): what Standard, Enhanced and Maximum send, where to change the level, and the purchase value definition
@@ -521,12 +528,6 @@ Events Manager's Overview counts events before deduplication. If the Pixel and t
 
 Compare each connection method separately. If a *single* method shows double, you have two senders: see the fix for duplicates above.
 
-### Does Shopify's Maximum data sharing fix the mismatch?
-
-It fixes part of it. Maximum adds the Conversions API, so purchases still reach Meta when a browser blocks the Pixel.
-
-It doesn't change attribution. Meta and Shopify will still credit sales differently, so Ads Manager won't match your order count.
-
 ### Does server-side tracking fix Meta purchases not matching Shopify?
 
 It fixes the tracking side: purchases lost to ad blockers, browser privacy and failed pages, plus duplicates, once one setup owns Purchase. Purchases go to Meta from your own subdomain, deduplicated by order ID.
@@ -539,11 +540,23 @@ Usually because the ad links carry no UTM parameters, so Shopify can't tell wher
 
 Add UTM parameters under **Tracking → URL parameters** in each ad, then check a test order's conversion details.
 
-### How much difference between Shopify and Meta purchases is normal?
+### Will Shopify and Facebook purchase numbers ever match exactly?
 
-There's no official number from Meta or Shopify. It depends on how much of your business comes from Meta ads.
+No, and they shouldn't. Shopify counts every order from every channel. Facebook only counts purchases it can link to an ad, inside its attribution window, from people who allowed tracking.
 
-Track two ratios every week instead: Purchase events ÷ Online Store orders, and Ads Manager purchases ÷ Online Store orders. A steady gap is normal. A sudden drop means something changed.
+There's no official "normal" gap from Meta or Shopify. Track two ratios every week instead: Purchase events ÷ Online Store orders, and Ads Manager purchases ÷ Online Store orders. A steady gap is normal. A sudden drop means something changed.
+
+### Do iPhones make Facebook miss Shopify purchases?
+
+Partly. Safari limits how long tracking cookies last and removes Meta's click ID from some links, so the browser Pixel loses track of some buyers.
+
+Sending purchases from a server with customer details, through Shopify's Maximum data sharing or a server-side setup, helps Meta match more of them. Some will always stay unmatched.
+
+### Do I need a developer to fix this?
+
+Usually not. Most fixes in this guide are settings in Shopify and Meta.
+
+A managed server-side setup like Tagioo needs no coding on Shopify either: you import ready-made containers and paste a Custom Pixel, in about 10 minutes. If you get stuck, email hello@tagioo.com with your store URL and the Tagioo team will help you finish.
 
 ### Should I use Ads Manager or Shopify to calculate ROAS?
 

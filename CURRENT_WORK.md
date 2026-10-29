@@ -2,6 +2,23 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-29.
 
+## 2026-10-29 — Facebook wording merged into meta-purchases-not-matching-shopify (branch, NOT deployed)
+
+- Owner brief asked for a new post "Why Shopify and Facebook Show Different Purchase Numbers".
+  Owner chose to MERGE into the live Meta post instead (same intent → would cannibalize) and to
+  leave WhatsApp out (site shows WhatsApp to BD visitors only).
+- Branch `blog/facebook-shopify-merge`: title/H1 "Meta (Facebook) Purchases Not Matching Shopify
+  Orders? How to Fix It (2026)", seoTitle "Facebook (Meta) Purchases Not Matching Shopify? Fix
+  It" (54), Facebook description; names note; 10-minute test steps 5-6 (Pixel Helper / Website
+  Tracking Checker, Event Match Quality); Safari/iPhone row in the can't-fix table (WebKit 7-day
+  cap + Apple Link Tracking Protection); closing checker + Free plan CTA; FAQs now 8 (+ match
+  exactly, iPhones, developer; − normal-gap, Maximum data sharing). Cover re-rendered. Slug/URL
+  unchanged. Checker 0/0, links verified.
+- `npm run test:paddle` has 1 failure ("activation, replay, renewal...") that also fails on a
+  clean HEAD worktree — pre-existing, unrelated.
+- To deploy: push branch, VPS `git checkout <branch> -- docs/marketing/blog/meta-purchases-not-matching-shopify.md
+  public/assets/blog/covers` + `node scripts/build-blog.mjs`.
+
 ## 2026-10-29 — Blog share buttons — DEPLOYED
 
 - `scripts/build-blog.mjs`: `shareBar(post, compact)` renders plain share links, no third-party
