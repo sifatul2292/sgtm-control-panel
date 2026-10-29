@@ -5,7 +5,7 @@ description: "WooCommerce purchase tracking broken? Follow one order through 12 
 category: Ecommerce
 keyword: woocommerce purchase tracking
 published: 2026-10-12
-updated: 2026-10-20
+updated: 2026-10-29
 summary: "Follow one missing order through 12 checks, find the exact step where WooCommerce purchase tracking breaks, and fix it."
 related: woocommerce-server-side-tracking, meta-capi-woocommerce, conversion-tracking-discrepancies
 featured: false
@@ -30,10 +30,36 @@ The good news: every one of those causes leaves a trace. You just have to follow
 > - A healthy purchase event fires **once**, with `transaction_id`, `value`, `currency` and `items`.
 > - Some gap between WooCommerce and your ad platforms is normal. Not every buyer clicked an ad.
 > - If orders still go missing when the thank-you page never loads, you need a **backend purchase hit**, not another browser plugin.
+> - If WooCommerce's own **Analytics** reports are wrong, that's a report import problem, not a tracking one.
 
-In this guide you'll find a quick way to read your gap, the 12-point checklist itself, a symptom-to-fix table, and answers to questions like *"Why are PayPal orders missing?"* and *"Why don't my WooCommerce orders match GA4 revenue?"*
+In this guide you'll find a fix list for when WooCommerce's own Analytics stops updating, a quick way to read your gap, the 12-point checklist itself, a symptom-to-fix table, and answers to questions like *"Why are PayPal orders missing?"* and *"Why don't my WooCommerce orders match GA4 revenue?"*
 
 So, why the wait? Let's begin.
+
+## Is WooCommerce Analytics not working, or is it GA4?
+
+First, check which "analytics" is wrong. They break in different ways.
+
+- **WooCommerce Analytics** is the built-in report area under **Analytics** in your WordPress admin. It reads orders from your own store's database.
+- **GA4, Meta and your ad platforms** only know about an order if a tracking tag sent it. That's what the 12-point checklist below is for.
+
+So if the **Orders** screen shows a sale but **Analytics** doesn't, no tracking plugin or GTM change will fix it. The problem is the report import, not your tags.
+
+Here's the quick fix list for WooCommerce's own reports. Most of it comes from [WooCommerce's Analytics documentation](https://woocommerce.com/document/woocommerce-analytics/).
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| No Analytics menu at all | The Analytics feature is switched off | **WooCommerce → Settings → Advanced → Features**, tick **Analytics**, save |
+| Today's orders aren't in the reports yet | **Updates** is set to **Scheduled**, which imports every 12 hours | Click **Update Now** on the data status indicator (WooCommerce 10.5+), or set **Analytics → Settings → Updates** to **Immediately** |
+| Totals don't match the Orders screen | Stale report cache | **WooCommerce → Status → Tools → Clear Analytics Cache** |
+| Older orders are missing | History was never imported, or the import failed | **Analytics → Settings → Import Historical Data**. If a failed-import warning shows, read the log, fix the cause, then **Retry failed imports** |
+| The import never finishes | Background jobs aren't running | Look in **WooCommerce → Status → Scheduled Actions** for pending or failed `wc-admin_import_orders` jobs, and ask your host whether WP-Cron runs |
+| Pending, Failed or Cancelled orders are missing | Excluded by default | That's by design. Change **Excluded statuses** in Analytics → Settings only if you need them |
+| Revenue lands on different days than your orders | **Date type** is set to **Date paid** | Pick the date type you want in Analytics → Settings, and compare like with like |
+
+One caution: WooCommerce notes that **Immediately** can slow down busy stores. That's why **Scheduled** exists.
+
+Once WooCommerce Analytics shows the right orders, treat it as your source of truth. If GA4 or Meta still show fewer, carry on with the checklist below.
 
 ## How does WooCommerce purchase tracking work?
 
@@ -231,7 +257,7 @@ Now look the other way: is anything counted twice?
 
 PixelYourSite has a short video on the most common purchase tracking problems:
 
-@[youtube](3KVppeZDZtg "WooCommerce: Is there a problem with Purchase tracking? (PixelYourSite)")
+@[youtube](3KVppeZDZtg "WooCommerce: Is there a problem with Purchase tracking? (PixelYourSite)" 2023-10-10)
 
 ## Symptom, cause, fix: the quick table
 
@@ -301,6 +327,7 @@ The Free plan includes 15,000 events per 30 days, with no card. See [pricing](/p
 ## Sources and further reading
 
 - WooCommerce: [Order statuses](https://woocommerce.com/document/managing-orders/order-statuses/)
+- WooCommerce: [WooCommerce Analytics](https://woocommerce.com/document/woocommerce-analytics/)
 - WooCommerce: [Cart and Checkout blocks status](https://woocommerce.com/document/cart-checkout-blocks-status/)
 - WooCommerce: [Configuring caching plugins](https://developer.woocommerce.com/docs/best-practices/performance/configuring-caching-plugins)
 - Google: [GA4 ecommerce measurement](https://developers.google.com/analytics/devguides/collection/ga4/ecommerce)
@@ -341,6 +368,12 @@ Test the return flow, and consider a backend purchase hit so the order is sent w
 Yes. WooCommerce includes Analytics reports, such as Orders and Revenue, under **WooCommerce → Overview** ([WooCommerce Analytics docs](https://woocommerce.com/document/woocommerce-analytics/)).
 
 They count orders on your server, so they're your source of truth for sales. They don't send anything to GA4 or ad platforms.
+
+### Why is WooCommerce Analytics not showing recent orders?
+
+Usually because **Updates** is set to **Scheduled**, which imports new orders every 12 hours, or because the report cache is stale.
+
+Click **Update Now** on the data status indicator, or clear the cache under **WooCommerce → Status → Tools**. The [fix list above](#is-woocommerce-analytics-not-working-or-is-it-ga4) covers the other causes.
 
 ### Why are my WooCommerce purchases counted twice?
 
