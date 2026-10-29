@@ -2,6 +2,24 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-29.
 
+## 2026-10-29 — Blog share buttons — DEPLOYED
+
+- `scripts/build-blog.mjs`: `shareBar(post, compact)` renders plain share links, no third-party
+  scripts. Hero row under the post meta (icon-only: Facebook, LinkedIn, X, WhatsApp, copy link)
+  and an end-of-article box before the CTA (all of those + Reddit, Email, and a native "More"
+  share-sheet button that blog.js unhides only when `navigator.share` exists).
+- Network links carry `utm_source=<net>&utm_medium=social&utm_campaign=blog_share` (email:
+  `utm_source=share&utm_medium=email`); copy link + native share use the clean canonical URL.
+- `public/assets/blog.js`: copy-to-clipboard (execCommand fallback), "Copied!" state, aria-live
+  status, and `dataLayer.push({event:"share", method, content_type:"article", item_id})` for
+  GA4's recommended share event (needs a GTM trigger on the marketing container to report).
+- `public/assets/blog.css`: share styles; mobile shows icon-only in the box. CSS_VERSION 5 → 6
+  (blog.css/blog.js `?v=`). Checked in preview at 1280px (one row) and phone width; no console
+  errors.
+- Commit bf73343, pushed as `blog/share-buttons-2026-10-29`. VPS: 3 files unchanged vs base
+  0946e3b, checked out + `node scripts/build-blog.mjs` → VPS commit 662c170, tree clean. Live:
+  both share rows on posts, blog.css rules inlined into the page, blog.js?v=6 served.
+
 ## 2026-10-29 — Search Console review + WooCommerce SEO fixes — DEPLOYED
 
 - GSC export 10-19..10-27 (owner's zip): 163 impressions, 2 clicks, avg position 58 → 35. Best
