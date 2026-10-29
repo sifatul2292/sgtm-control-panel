@@ -2,6 +2,54 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-29.
 
+## 2026-10-29 — Search Console review + WooCommerce SEO fixes — DEPLOYED
+
+- GSC export 10-19..10-27 (owner's zip): 163 impressions, 2 clicks, avg position 58 → 35. Best
+  blog pages: woocommerce-purchase-tracking-checklist (pos 33), conversion-tracking-discrepancies
+  (pos 39, 1 click). Tools pages already top 10 (checker 6.5, /compare 2.7, /docs 10.5).
+- Finding: "woocommerce server side tracking" ranks the /woocommerce LANDING at pos 77; the guide
+  /blog/woocommerce-server-side-tracking got no impressions. Landing linked to no blog posts.
+- Fix 1 `public/woocommerce.html`: title + og:title → "WooCommerce Server-Side Tracking Plugin |
+  Tagioo" (plugin intent; guide keeps the "setup guide" intent). New `#guides` section (3 cards:
+  setup guide, checklist, meta-capi-woocommerce) before the final CTA. No CSS change.
+- Fix 2 checklist post: new H2 "Is WooCommerce Analytics not working, or is it GA4?" (built-in
+  report fix table: Features toggle, Scheduled 12h updates / Update Now in 10.5+, Clear Analytics
+  Cache, Import Historical Data, Scheduled Actions `wc-admin_import_orders`, excluded statuses,
+  date type) + takeaway + FAQ + source; PixelYourSite video dated 2023-10-10. updated 10-29.
+  Checker 0/0, links verified.
+- Local public/blog rebuilt for today (no longer a preview build).
+- Commit 0946e3b, pushed as `blog/woo-seo-2026-10-29`. VPS: checked its woocommerce.html +
+  checklist md were unchanged vs base 90da605, then `git checkout FETCH_HEAD -- <2 files> &&
+  node scripts/build-blog.mjs` → VPS commit be77c86, tree clean. No restart needed
+  (marketing page cache keys on file mtime). Live check: new title + #guides on /woocommerce
+  (BD + USD renders), checklist section + FAQ live, sitemap lastmod 10-29.
+- Note: /woocommerce is also a Meta ad landing page; guides section sits below pricing/FAQ so it
+  shouldn't pull ad traffic away from signup. Watch its signup rate.
+- Owner TODO in GSC: URL Inspection → Request indexing for /woocommerce,
+  /blog/woocommerce-server-side-tracking and /blog/woocommerce-purchase-tracking-checklist.
+- Next SEO candidate: conversion-tracking-discrepancies (GA4 vs CRM/HubSpot, GA4 vs Google Ads,
+  GA4 double counting queries). Re-check GSC ~11-20.
+
+## 2026-10-29 — Blog DEPLOYED: 8 overdue posts + meta-purchases-not-matching-shopify LIVE
+
+- Owner: publish now, cron later. Meta post re-dated 11-02 → 10-29 (local commit 90da605).
+  Pushed `blog/publish-2026-10-29` (= origin/feat/us-launch + 1839ba4 + 90da605) to GitHub.
+- VPS (Hostinger web console, owner's "Browser 2" Chrome): `git fetch origin
+  blog/publish-2026-10-29 && git checkout origin/blog/publish-2026-10-29 -- docs/marketing/blog
+  public/assets/blog scripts/build-blog.mjs && node scripts/build-blog.mjs` → "Built 17 posts
+  (as of 2026-10-29)". VPS commit 3db2549 on feat/saas-phase1-payments; tree clean except the
+  pre-existing untracked `.env.before-password-reset`. VPS had uncommitted generated
+  public/blog + sitemap from an earlier build; regenerated, now committed.
+- Live check: all 9 new posts 200, first-party-tracking 404 (queued 10-30), sitemap 17 blog
+  URLs, /blog index + homepage slider + llms.txt include the new post, SVG + cover 200.
+  Cloudflare shows DYNAMIC (no cache purge needed). `/blog/index.html` redirects to /login
+  (server routing, pre-existing); canonical `/blog` is correct.
+- STILL QUEUED, need a rebuild on/after their day (cron not set up yet): first-party-tracking
+  10-30, tiktok-events-api 10-31, safari-itp-ios-tracking 11-01.
+- Local: seo-keyword-research rows 10-22..10-29 marked LIVE (uncommitted).
+- Local `public/blog` is now a PREVIEW build (BUILD_DATE=2026-11-01) so the owner can review
+  the 3 queued posts. Run `npm run build:blog` before committing anything generated.
+
 ## 2026-10-29 — meta-purchases-not-matching-shopify: server-side + Tagioo woven in
 
 - Owner asked for more Tagioo/server-side presence. Added: intro line + takeaway on
