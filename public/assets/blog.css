@@ -172,6 +172,25 @@
 .blog-page .post-related h2 { font-size: 28px; letter-spacing: -.022em; margin: 0 0 26px; }
 
 /* ── Responsive ──────────────────────────────────────── */
+/* ── Share buttons (hero row + end-of-article box) ───── */
+.blog-page .share-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.blog-page .post-hero .share-row { justify-content: center; margin-top: 18px; }
+.blog-page .share-label { font-size: 13px; font-weight: 600; color: var(--b-muted); margin-right: 4px; }
+.blog-page .share-row .share-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; min-width: 38px; padding: 0 12px; border: 1px solid var(--b-line); border-radius: 999px; background: #fff; color: var(--b-ink); font: inherit; font-size: 14px; font-weight: 600; line-height: 1; text-decoration: none; cursor: pointer; transition: color .15s, border-color .15s, transform .15s; }
+.blog-page .share-row .share-btn[hidden] { display: none; }
+.blog-page .share-row .share-btn svg { flex: none; }
+.blog-page .post-hero .share-row .share-btn { width: 38px; padding: 0; }
+.blog-page .share-row .share-btn:hover { transform: translateY(-1px); border-color: currentColor; color: var(--b-accent); }
+.blog-page .share-row .share-btn[data-net="facebook"]:hover { color: #1877F2; }
+.blog-page .share-row .share-btn[data-net="linkedin"]:hover { color: #0A66C2; }
+.blog-page .share-row .share-btn[data-net="x"]:hover { color: #0E1015; }
+.blog-page .share-row .share-btn[data-net="whatsapp"]:hover { color: #128C7E; }
+.blog-page .share-row .share-btn[data-net="reddit"]:hover { color: #FF4500; }
+.blog-page .share-row .share-btn.is-copied { color: #15803D; border-color: currentColor; }
+.blog-page .post-share { margin: 56px 0 0; padding: 22px 24px 24px; border: 1px solid var(--b-line); border-radius: 16px; background: var(--b-soft); }
+.blog-page .post-share .post-share-title { margin: 0 0 14px; font-size: 16px; font-weight: 650; line-height: 1.4; color: var(--b-ink); }
+.blog-page .post-share + .post-cta { margin-top: 24px; }
+
 @media (max-width: 1100px) {
   .blog-page .post-layout { grid-template-columns: minmax(0, var(--b-measure)); }
   .blog-page .post-toc { display: none; }
@@ -207,6 +226,9 @@
   .blog-page .post-body .callout { padding: 18px 18px; }
   .blog-page .post-cta { padding: 28px 22px; }
   .blog-page .post-cta .post-cta-actions a { flex: 1; }
+  .blog-page .post-share { padding: 18px 16px 20px; }
+  .blog-page .post-share .share-btn .share-text { display: none; }
+  .blog-page .post-share .share-row .share-btn { width: 42px; height: 42px; padding: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .blog-page .card-link, .blog-page .card-cover img, .blog-page .featured-card { transition: none; }

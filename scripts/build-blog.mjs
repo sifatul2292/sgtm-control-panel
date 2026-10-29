@@ -11,7 +11,7 @@ const root = new URL("../", import.meta.url);
 const srcDir = new URL("docs/marketing/blog/", root);
 const outDir = new URL("public/blog/", root);
 const SITE = "https://tagioo.com";
-const CSS_VERSION = 5;
+const CSS_VERSION = 6;
 const CATEGORY_ORDER = ["Getting started", "Ecommerce", "Meta", "Google", "TikTok", "Privacy", "Comparisons", "Troubleshooting", "Lead generation"];
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -240,6 +240,46 @@ function postCard(post, { eager = false } = {}) {
     `<span class="card-meta">${readMinutes(post)} min read · ${shortDate(meta.updated)}</span></div></a></article>`;
 }
 
+const SHARE_ICONS = {
+  facebook: '<path d="M13.5 21v-7.5h2.5l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.5V4.4a20 20 0 0 0-2.2-.1c-2.2 0-3.7 1.3-3.7 3.8v2.4H8.1v3h2.5V21h2.9z"/>',
+  linkedin: '<path d="M6.94 5a2 2 0 1 1-4-.002 2 2 0 0 1 4 .002zM7 8.48H3V21h4V8.48zm6.32 0H9.34V21h3.94v-6.57c0-3.66 4.77-4 4.77 0V21H22v-7.93c0-6.17-7.06-5.94-8.72-2.91l.04-1.68z"/>',
+  x: '<path d="M17.75 3h3.07l-6.7 7.66L22 21h-6.17l-4.83-6.32L5.47 21H2.4l7.17-8.2L2 3h6.33l4.37 5.77L17.75 3zm-1.08 16.2h1.7L7.4 4.73H5.58l11.09 14.47z"/>',
+  whatsapp: '<path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.1 5.1 0 0 0 1.1 2.7 11.7 11.7 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.4-.3z"/>',
+  reddit: '<path d="M22 12.1a2.2 2.2 0 0 0-3.7-1.6 10.8 10.8 0 0 0-5.8-1.8l1-4.6 3.2.7a1.6 1.6 0 1 0 .2-1l-3.6-.8a.5.5 0 0 0-.6.4l-1.1 5.3a10.8 10.8 0 0 0-5.9 1.8 2.2 2.2 0 1 0-2.4 3.6 4.3 4.3 0 0 0 0 .7c0 3.3 3.9 6 8.7 6s8.7-2.7 8.7-6a4.3 4.3 0 0 0 0-.7 2.2 2.2 0 0 0 1.3-2zM7.3 13.6a1.6 1.6 0 1 1 1.6 1.6 1.6 1.6 0 0 1-1.6-1.6zm8.8 4.1a5.8 5.8 0 0 1-4.1 1.3 5.8 5.8 0 0 1-4.1-1.3.4.4 0 0 1 .6-.6 4.9 4.9 0 0 0 3.5 1 4.9 4.9 0 0 0 3.5-1 .4.4 0 1 1 .6.6zm-.2-2.5a1.6 1.6 0 1 1 1.6-1.6 1.6 1.6 0 0 1-1.6 1.6z"/>',
+};
+const STROKE_ICONS = {
+  email: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
+  copy: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  native: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>',
+};
+const shareIcon = (name) => SHARE_ICONS[name]
+  ? `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">${SHARE_ICONS[name]}</svg>`
+  : `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${STROKE_ICONS[name]}</svg>`;
+
+// Plain share links (no third-party scripts). Shared URLs carry UTM tags so GA4 shows
+// which network sent the visit; copy link and the native share sheet use the clean URL.
+function shareBar(post, compact) {
+  const url = `${SITE}/blog/${post.slug}`;
+  const title = post.meta.title;
+  const tagged = (source, medium = "social") => `${url}?utm_source=${source}&utm_medium=${medium}&utm_campaign=blog_share`;
+  const enc = encodeURIComponent;
+  const nets = [
+    ["facebook", "Facebook", `https://www.facebook.com/sharer/sharer.php?u=${enc(tagged("facebook"))}`],
+    ["linkedin", "LinkedIn", `https://www.linkedin.com/sharing/share-offsite/?url=${enc(tagged("linkedin"))}`],
+    ["x", "X", `https://twitter.com/intent/tweet?url=${enc(tagged("x"))}&text=${enc(title)}`],
+    ["whatsapp", "WhatsApp", `https://wa.me/?text=${enc(`${title} ${tagged("whatsapp")}`)}`],
+    ["reddit", "Reddit", `https://www.reddit.com/submit?url=${enc(tagged("reddit"))}&title=${enc(title)}`],
+    ["email", "Email", `mailto:?subject=${enc(title)}&body=${enc(`${post.meta.description}\n\n${tagged("share", "email")}`)}`],
+  ].filter(([net]) => !compact || ["facebook", "linkedin", "x", "whatsapp"].includes(net));
+  // Reddit and email stay icon-only so the labelled row fits on one line.
+  const label = (text, net) => (compact || net === "reddit" || net === "email" ? "" : `<span class="share-text">${text}</span>`);
+  const links = nets.map(([net, name, href]) =>
+    `<a class="share-btn" data-net="${net}" href="${esc(href)}"${net === "email" ? "" : ' target="_blank" rel="noopener nofollow"'} aria-label="Share on ${name}" title="Share on ${name}">${shareIcon(net)}${label(name, net)}</a>`).join("");
+  const copy = `<button type="button" class="share-btn" data-share-copy aria-label="Copy link" title="Copy link">${shareIcon("copy")}${label("Copy link")}</button>`;
+  const native = compact ? "" : `<button type="button" class="share-btn" data-share-native hidden aria-label="More sharing options" title="More sharing options">${shareIcon("native")}${label("More")}</button>`;
+  return `<div class="share-row" data-share-url="${url}">${compact ? '<span class="share-label">Share</span>' : ""}${links}${copy}${native}<span class="sr-only" aria-live="polite" data-share-status></span></div>`;
+}
+
 function articlePage(post, all, chrome) {
   const { meta, md, slug } = post;
   const url = `${SITE}/blog/${slug}`;
@@ -296,11 +336,12 @@ function articlePage(post, all, chrome) {
     `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/blog">Blog</a><span aria-hidden="true">/</span><a href="/blog?topic=${encodeURIComponent(meta.category)}">${esc(meta.category)}</a></nav>` +
     `<h1>${inline(md.h1 || meta.title)}</h1><p class="post-dek">${esc(meta.description)}</p>` +
     `<div class="post-meta"><span class="post-author"><img src="/assets/tagioo-icon-64.png?v=1" alt="" width="28" height="28">Tagioo team</span>` +
-    `<span>Updated <time datetime="${meta.updated}">${longDate(meta.updated)}</time></span><span>${minutes} min read</span></div></div>` +
+    `<span>Updated <time datetime="${meta.updated}">${longDate(meta.updated)}</time></span><span>${minutes} min read</span></div>${shareBar(post, true)}</div>` +
     (cover ? `<figure class="post-cover"><img src="${cover}" alt="" width="1200" height="630" fetchpriority="high" decoding="async"></figure>` : "") +
     `</header><div class="post-layout">` +
     `<aside class="post-toc"><nav aria-label="On this page"><p>On this page</p><ol>${tocItems}</ol></nav></aside>` +
     `<article class="post-body"><details class="toc-mobile"><summary>On this page</summary><ol>${tocItems}</ol></details>\n${md.html}` +
+    `<aside class="post-share" aria-label="Share this article"><p class="post-share-title">Found this useful? Share it with your team.</p>${shareBar(post, false)}</aside>` +
     `<section class="post-cta"><h2>See your own events, server-side.</h2><p>Tagioo hosts your server-side GTM container on your own domain and generates the GA4, Google Ads, Meta and TikTok setup for you. Free for 15,000 events a month, no card needed.</p><div class="post-cta-actions"><a class="btn-primary" href="/signup">Start free →</a><a class="btn-ghost" href="/pricing">See pricing</a></div></section>` +
     `</article></div>` +
     (related.length ? `<section class="post-related"><div class="wrap"><h2>Keep reading</h2><div class="card-grid">${related.map((p) => postCard(p)).join("")}</div></div></section>` : "") +

@@ -1,5 +1,5 @@
 // Tagioo blog: guide search + topic filter, reading progress, active TOC link,
-// shared-header scroll state and click-to-load YouTube embeds.
+// shared-header scroll state, share buttons and click-to-load YouTube embeds.
 (() => {
   // Shared header gets its "scrolled" style like the rest of the site.
   const header = document.getElementById("siteHeader");
@@ -70,6 +70,48 @@
       if (visible.length) setActive(visible[0].target.id);
     }, { rootMargin: "-90px 0px -65% 0px" });
     headings.forEach((h) => observer.observe(h));
+  }
+
+  // ── Article: share buttons (copy link, native share sheet, GA4 "share" event) ──
+  const shareRow = document.querySelector("[data-share-url]");
+  if (shareRow) {
+    const pageUrl = shareRow.dataset.shareUrl;
+    const track = (method) => (window.dataLayer = window.dataLayer || []).push({ event: "share", method, content_type: "article", item_id: location.pathname });
+    const announce = (text) => document.querySelectorAll("[data-share-status]").forEach((el) => { el.textContent = text; });
+    if (navigator.share) document.querySelectorAll("[data-share-native]").forEach((btn) => { btn.hidden = false; });
+    document.addEventListener("click", async (event) => {
+      const link = event.target.closest("a[data-net]");
+      if (link) { track(link.dataset.net); return; }
+      if (event.target.closest("[data-share-native]")) {
+        const title = document.querySelector('meta[property="og:title"]')?.content || document.title;
+        try { await navigator.share({ title, url: pageUrl }); track("native"); } catch { /* dismissed */ }
+        return;
+      }
+      const copy = event.target.closest("[data-share-copy]");
+      if (!copy) return;
+      try {
+        await navigator.clipboard.writeText(pageUrl);
+      } catch {
+        const field = document.createElement("textarea");
+        field.value = pageUrl;
+        document.body.append(field);
+        field.select();
+        document.execCommand("copy");
+        field.remove();
+      }
+      track("copy_link");
+      const text = copy.querySelector(".share-text");
+      copy.classList.add("is-copied");
+      if (text) text.textContent = "Copied!";
+      copy.title = "Link copied";
+      announce("Link copied to clipboard");
+      setTimeout(() => {
+        copy.classList.remove("is-copied");
+        if (text) text.textContent = "Copy link";
+        copy.title = "Copy link";
+        announce("");
+      }, 2000);
+    });
   }
 
   // ── Videos load from youtube-nocookie only after a click ──
