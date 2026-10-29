@@ -2,7 +2,7 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-10-29.
 
-## 2026-10-29 — Facebook wording merged into meta-purchases-not-matching-shopify (branch, NOT deployed)
+## 2026-10-29 — Facebook wording merged into meta-purchases-not-matching-shopify — DEPLOYED
 
 - Owner brief asked for a new post "Why Shopify and Facebook Show Different Purchase Numbers".
   Owner chose to MERGE into the live Meta post instead (same intent → would cannibalize) and to
@@ -16,8 +16,10 @@ Living status doc. Update after meaningful progress. Last updated: 2026-10-29.
   unchanged. Checker 0/0, links verified.
 - `npm run test:paddle` has 1 failure ("activation, replay, renewal...") that also fails on a
   clean HEAD worktree — pre-existing, unrelated.
-- To deploy: push branch, VPS `git checkout <branch> -- docs/marketing/blog/meta-purchases-not-matching-shopify.md
-  public/assets/blog/covers` + `node scripts/build-blog.mjs`.
+- Deployed 2026-10-29: branch pushed; VPS checked out the post .md + its cover/manifest from the branch,
+  ran `node scripts/build-blog.mjs`, committed `f446cf9` on feat/saas-phase1-payments. Verified live:
+  new title/description, 8 FAQ entries, new cover (105131 B), new title on blog index + homepage
+  slider. Sitemap lastmod already 2026-10-29 (post published today), so no sitemap change.
 
 ## 2026-10-29 — Blog share buttons — DEPLOYED
 
