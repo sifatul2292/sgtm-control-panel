@@ -8,7 +8,7 @@ import { execFile, spawn } from "node:child_process";
 import { createHash, createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from "node:crypto";
 import { brotliCompress, constants as zlibConstants, deflateRawSync, gzip } from "node:zlib";
 import { promisify } from "node:util";
-import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
+import { customerContainerRequests, normalizedHost, primaryContainerId, scopedTrackingEntries, selectedContainer, setTrackingForContainer, trackingForContainer } from "./container-scope.js";
 import { SHOPIFY_HANDOFF_TTL_MS, SIGNUP_STORE_PLATFORMS, highestActiveShopifyPlan, makeShopifyHandoffCookie, normalizeShopDomain, normalizeShopifyBillingState, readShopifyHandoff, readShopifyHandoffCookie, requiresShopifyBilling, shopifyAdoptionBlocker, shopifyPlanSelectionUrl, shopifyShopForTenant } from "./shopify-billing.js";
 import { redactShopifyBackups, privacySafeBackupData } from "./shopify-privacy-backups.js";
 import { SHOPIFY_START_TOKEN_TTL_MS, findShopifyWorkspace, tenantShopifyShops, usableShopifyAppSecret, verifiedShopifyShops, verifyShopifyAppToken } from "./shopify-workspace.js";
@@ -222,7 +222,8 @@ const SSL_NETWORK_TIMEOUT_MS = 1000;
 const SUMMARY_CACHE_TTL_MS = Number(process.env.SUMMARY_CACHE_TTL_MS || 30000);
 // Customer summaries are less time-sensitive than owner real-time view.
 // Longer TTL means fewer cold-cache misses on customer dashboard reloads.
-const CUSTOMER_SUMMARY_CACHE_TTL_MS = Number(process.env.CUSTOMER_SUMMARY_CACHE_TTL_MS || 120000);
+// Short so a purchase shows in "Purchases today" seconds after it happens.
+const CUSTOMER_SUMMARY_CACHE_TTL_MS = Number(process.env.CUSTOMER_SUMMARY_CACHE_TTL_MS || 10000);
 const alertMemory = new Map();
 const summaryCache = new Map();
 const resetTokens = new Map();
@@ -8611,15 +8612,21 @@ function containerServesOtherSite(site) {
 }
 
 // The workspace's containers as the Tagioo app lists them, and whether this
-// store may connect to each one (it needs a tracking domain and a GA4 ID, no
-// other store on it, and must not belong to another website).
+// store may connect to each one. Only real containers are listed: tracking
+// settings saved without a container (Setup Assistant allows that), or whose
+// tracking domain is not the container's own, would send the store's events
+// to a container whose Event Logs and Purchases this workspace never sees.
+// A container also needs a GA4 ID, no other store on it, and must not serve
+// another website.
 function shopifyAppContainers(data, tenant, shop) {
   const requests = data.customerSetupRequests || [];
   const listed = getTenantContainers(tenant.id, tenant, requests, data.provisioning?.requests || []);
   return scopedTrackingEntries(tenant, requests).map(({ containerId, tracking }) => {
-    const container = listed.find((item) => item.id === containerId) || (containerId ? null : listed[0]) || {};
+    const container = listed.find((item) => item.id === containerId) || (containerId ? null : listed[0]) || null;
+    if (!container) return null;
     const connectedShop = tracking?.shopify?.status === "disconnected" ? "" : normalizeShopDomain(tracking?.shopify?.shop);
-    const ready = Boolean(tracking?.domain && tracking?.measurementId);
+    const ownsDomain = Boolean(tracking?.domain) && normalizedHost(tracking.domain) === normalizedHost(container.domain);
+    const ready = Boolean(tracking?.domain && tracking?.measurementId) && ownsDomain;
     const site = containerSitePlatform(tenant, requests, containerId, tracking);
     const otherSite = containerServesOtherSite(site) ? site : "";
     return {
@@ -8629,6 +8636,7 @@ function shopifyAppContainers(data, tenant, shop) {
       measurementId: String(tracking?.measurementId || ""),
       status: String(container.status || ""),
       ready,
+      domainMismatch: Boolean(tracking?.domain) && !ownsDomain,
       connectedShop,
       otherSite,
       otherSiteLabel: otherSite ? containerSiteLabels[otherSite] || otherSite : "",
@@ -8636,7 +8644,7 @@ function shopifyAppContainers(data, tenant, shop) {
       setupDone: Boolean(tracking?.setupAssistantCompletedAt || tracking?.serverTemplateDownloadedAt),
       connectable: ready && !otherSite && (!connectedShop || connectedShop === shop)
     };
-  }).filter((container) => container.ready || container.status);
+  }).filter(Boolean);
 }
 
 // How many containers the workspace's plan allows, as the app shows it. Uses
@@ -8691,13 +8699,18 @@ async function connectShopifyAppContainer({ shop, tenantId = "", containerId = "
     const tenant = shopifyAppWorkspaceFor(data, shop, tenantId);
     if (!tenant) return shopifyAppWorkspaceMissing;
     const entry = scopedTrackingEntries(tenant, data.customerSetupRequests || []).find((item) => item.containerId === containerId);
-    if (!entry) return { ok: false, status: 404, errors: ["That Tagioo container was not found in this workspace."] };
-    if (!entry.tracking?.domain || !entry.tracking?.measurementId) {
+    const listing = entry ? shopifyAppContainers(data, tenant, shop).find((item) => item.id === containerId) : null;
+    if (!entry || !listing) {
+      return { ok: false, status: 404, code: "no_container", errors: ["This workspace has no Tagioo container to connect yet. Add a tracking container for this store first."] };
+    }
+    if (listing.domainMismatch) {
+      return { ok: false, status: 409, code: "domain_mismatch", errors: ["This container's saved tracking domain is not its own domain. Fix it in Setup Assistant, or add a new container for this store."] };
+    }
+    if (!listing.ready) {
       return { ok: false, status: 400, errors: ["This container is not set up yet: it needs a tracking domain and a GA4 Measurement ID."] };
     }
-    const site = containerSitePlatform(tenant, data.customerSetupRequests || [], containerId, entry.tracking);
-    if (containerServesOtherSite(site)) {
-      return { ok: false, status: 409, code: "container_other_site", errors: [`This container is set up for your ${containerSiteLabels[site] || site} site. Each store needs its own container: add one for this Shopify store.`] };
+    if (listing.otherSite) {
+      return { ok: false, status: 409, code: "container_other_site", errors: [`This container is set up for your ${listing.otherSiteLabel} site. Each store needs its own container: add one for this Shopify store.`] };
     }
     const result = connectShopifyContainerLocked(data, tenant, containerId, entry.tracking, shop);
     if (result.ok) await writeDatabase(data);
@@ -12411,6 +12424,9 @@ async function getCustomerDashboardData(session, requestedContainerId = "") {
 // logout→login round-trip paints real numbers right away instead of waiting on log parsing.
 const CUSTOMER_DASHBOARD_FRESH_MS = Number(process.env.CUSTOMER_DASHBOARD_FRESH_MS || 8000);
 const CUSTOMER_DASHBOARD_STALE_MS = Number(process.env.CUSTOMER_DASHBOARD_STALE_MS || 3600000);
+// On a stale hit, wait this long for the rebuild before falling back to the old
+// payload, so opening Event Logs after a purchase shows the purchase.
+const CUSTOMER_DASHBOARD_WAIT_MS = Number(process.env.CUSTOMER_DASHBOARD_WAIT_MS || 5000);
 const customerDashboardCache = new Map();
 const customerDashboardBuilds = new Map();
 
@@ -12452,11 +12468,14 @@ async function getCustomerDashboardDataCached(session, containerId = "") {
   }
 
   if (entry && now - entry.at < CUSTOMER_DASHBOARD_STALE_MS) {
-    if (!entry.refreshing) {
-      entry.refreshing = true;
-      refreshCustomerDashboardCache(session, containerId, key)
-        .catch(() => { entry.refreshing = false; });
-    }
+    if (!entry.refreshing) entry.refreshing = true;
+    const build = refreshCustomerDashboardCache(session, containerId, key);
+    build.catch(() => { entry.refreshing = false; });
+    const fresh = await Promise.race([
+      build.catch(() => null),
+      new Promise((resolve) => { setTimeout(resolve, CUSTOMER_DASHBOARD_WAIT_MS, null); })
+    ]);
+    if (fresh) return fresh;
     return { ...entry.payload, timing: { ...entry.payload.timing, cache: "stale" } };
   }
 
@@ -14225,6 +14244,8 @@ const server = createServer(async (req, res) => {
       const primaryId = primaryContainerId(tenant, loadedForSecret.data.customerSetupRequests || []);
       const containerId = matchedIntegration.containerId === primaryId ? "" : matchedIntegration.containerId;
       const result = await addOrderWebhook({ ...payload, shop_domain: matchedIntegration.tracking.shopify.shop, tenant_id: tenantId, container_id: containerId, source: "tagioo-shopify-app" });
+      // The merchant may be watching the dashboard; show the order on the next load.
+      if (result.ok) invalidateCustomerDashboardCache(tenantId);
       jsonResponse(res, result.ok ? (result.created ? 202 : 200) : 400, result.ok
         ? { accepted: true, created: result.created, order_id: result.order.id }
         : { errors: result.errors });

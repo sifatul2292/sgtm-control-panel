@@ -7,7 +7,7 @@ const server = readFileSync(new URL('../server.js', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 const cacheSource = server.slice(server.indexOf('const CUSTOMER_DASHBOARD_FRESH_MS'), server.indexOf('// ── Owner dashboard cache'));
 function cache(build) {
-  const context = vm.createContext({ process: { env: {} }, Date, Map, getCustomerDashboardData: build });
+  const context = vm.createContext({ process: { env: { CUSTOMER_DASHBOARD_WAIT_MS: '40' } }, Date, Map, setTimeout, getCustomerDashboardData: build });
   vm.runInContext(cacheSource, context);
   const load = (tenantId, container = '') => context.getCustomerDashboardDataCached({ tenantId }, container);
   load.age = () => vm.runInContext('for (const entry of customerDashboardCache.values()) entry.at -= 600000;', context);
@@ -15,7 +15,18 @@ function cache(build) {
   return load;
 }
 
-test('returning after ten minutes serves stored data without waiting for rebuild', async () => {
+test('returning after ten minutes shows fresh data when the rebuild is quick', async () => {
+  let attempts = 0;
+  const load = cache(() => Promise.resolve({ total: 123 + attempts++ }));
+  await load('a');
+  load.age();
+  const result = await load('a');
+  // A purchase made a moment ago must be visible on this load, not the next one.
+  assert.equal(result.total, 124);
+  assert.notEqual(result.timing.cache, 'stale');
+});
+
+test('returning after ten minutes falls back to stored data when the rebuild is slow', async () => {
   let rebuild;
   let attempts = 0;
   const load = cache(() => ++attempts === 1 ? Promise.resolve({ total: 123 }) : new Promise(resolve => { rebuild = resolve; }));
@@ -87,6 +98,7 @@ test('a hung dashboard request times out, unlocks Refresh, and can be retried', 
   const els = { refreshButton: {}, generatedAt: {}, containerCards: {} };
   const context = vm.createContext({
     els, AbortController, currentSession: { role: 'customer' }, selectedCustomerContainerId: 'one', latestData: null,
+    currentViewName: 'settings', LIVE_REFRESH_VIEWS: new Set(['dashboard', 'logs']), LIVE_REFRESH_MS: 10000, latestDataAt: 0,
     setTimeout: (fn, ms) => {
       if (ms === 10000) { refreshLater = fn; return 2; }
       assert.equal(ms, 45000); timeout = fn; return 1;

@@ -5,7 +5,7 @@ import { createHmac, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { makeShopifyHandoffCookie, normalizeShopDomain, readShopifyHandoff, readShopifyHandoffCookie } from "../shopify-billing.js";
 import { SHOPIFY_START_TOKEN_TTL_MS, findShopifyWorkspace, signShopifyAppToken, verifyShopifyAppToken } from "../shopify-workspace.js";
-import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, setTrackingForContainer, trackingForContainer } from "../container-scope.js";
+import { customerContainerRequests, normalizedHost, primaryContainerId, scopedTrackingEntries, setTrackingForContainer, trackingForContainer } from "../container-scope.js";
 
 const source = readFileSync(new URL("../server.js", import.meta.url), "utf8");
 function extractFunction(name, async = false) {
@@ -90,7 +90,7 @@ function appContext(data, overrides = {}) {
   const launches = [];
   const ctx = vm.createContext({
     Date, Map, Math, URL, randomBytes, normalizeShopDomain, findShopifyWorkspace, scopedTrackingEntries, primaryContainerId,
-    setTrackingForContainer, trackingForContainer, customerContainerRequests,
+    setTrackingForContainer, trackingForContainer, customerContainerRequests, normalizedHost,
     config: { provisionDnsTarget: "bd.tagioo.example" },
     retainShopifyPrivacyRoute: () => {},
     withDbLock: async (fn) => fn(),
@@ -355,4 +355,62 @@ test("setup counts as done once templates were generated or downloaded", async (
   const review = reviewData();
   review.tenants[0].tracking.setupAssistantCompletedAt = "2026-10-26T19:59:34.780Z";
   assert.equal(appContext(review).ctx.shopifyAppContainers(review, review.tenants[0], "reviewer.myshopify.com")[0].setupDone, true);
+});
+
+test("tracking settings without a real container are never offered or connected (review 2.1.4)", async () => {
+  // What the reviewer had: a new workspace with a tracking domain typed into Setup
+  // Assistant (another workspace's container) and no container of its own.
+  const data = {
+    tenants: [{ id: "veil", name: "Veil & Vow", source: "shopify_app", shopifyShop: "veil.myshopify.com", tracking: { domain: "https://review-track.tagioo.example", measurementId: "G-REVIEW", platform: "shopify" } }],
+    customerSetupRequests: [],
+    provisioning: { requests: [] },
+  };
+  const { ctx, writes } = appContext(data);
+  assert.deepEqual([...ctx.shopifyAppContainers(data, data.tenants[0], "veil.myshopify.com")], []);
+  const refused = await ctx.connectShopifyAppContainer({ shop: "veil.myshopify.com", tenantId: "veil", containerId: "" });
+  assert.equal(refused.status, 404);
+  assert.equal(refused.code, "no_container");
+  assert.match(refused.errors[0], /Add a tracking container for this store first/);
+  assert.equal(writes(), 0);
+});
+
+test("a container whose saved tracking domain is not its own is not connectable", async () => {
+  const data = reviewData();
+  data.tenants[0].tracking.domain = "https://someone-else.example";
+  const { ctx, writes } = appContext(data);
+  const primary = ctx.shopifyAppContainers(data, data.tenants[0], "reviewer.myshopify.com").find((item) => item.id === "setup_a");
+  assert.equal(primary.domainMismatch, true);
+  assert.equal(primary.connectable, false);
+  const refused = await ctx.connectShopifyAppContainer({ shop: "reviewer.myshopify.com", tenantId: "review", containerId: "setup_a" });
+  assert.equal(refused.status, 409);
+  assert.equal(refused.code, "domain_mismatch");
+  assert.equal(writes(), 0);
+});
+
+test("opening the dashboard waits briefly for fresh data instead of an old snapshot", async () => {
+  const build = (ms, payload) => () => new Promise((resolve) => setTimeout(() => resolve(payload), ms));
+  const run = async (buildMs) => {
+    const cache = new Map([["t:default", { payload: { orders: "old", timing: {} }, at: Date.now() - 60_000, refreshing: false }]]);
+    const ctx = vm.createContext({
+      Date, Promise, setTimeout,
+      CUSTOMER_DASHBOARD_FRESH_MS: 8000, CUSTOMER_DASHBOARD_STALE_MS: 3600000, CUSTOMER_DASHBOARD_WAIT_MS: 60,
+      customerDashboardCache: cache,
+      refreshCustomerDashboardCache: build(buildMs, { orders: "new", timing: { cache: "miss" } }),
+    });
+    vm.runInContext(extractFunction("getCustomerDashboardDataCached", true), ctx);
+    return ctx.getCustomerDashboardDataCached({ tenantId: "t" });
+  };
+  assert.equal((await run(5)).orders, "new");
+  const slow = await run(500);
+  assert.equal(slow.orders, "old");
+  assert.equal(slow.timing.cache, "stale");
+});
+
+test("a Shopify order clears the workspace's dashboard cache and summaries stay short-lived", () => {
+  const route = between('if (pathname === "/api/orders/shopify" && req.method === "POST")', 'if (pathname === "/api/integrations/shopify/subscription"');
+  assert.match(route, /if \(result\.ok\) invalidateCustomerDashboardCache\(tenantId\);/);
+  assert.match(source, /const CUSTOMER_SUMMARY_CACHE_TTL_MS = Number\(process\.env\.CUSTOMER_SUMMARY_CACHE_TTL_MS \|\| 10000\);/);
+  const app = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
+  assert.match(app, /const LIVE_REFRESH_VIEWS = new Set\(\["dashboard", "logs"\]\);/);
+  assert.ok(app.indexOf("const LIVE_REFRESH_VIEWS") < app.indexOf("function setView("), "declared before setView uses it");
 });

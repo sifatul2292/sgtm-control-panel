@@ -270,6 +270,11 @@ let setupAssistantStep = 1;
 let generatedAssistantTemplates = null;
 let currentSession = { role: "pending" };
 let currentViewName = "dashboard";
+let latestDataAt = 0;
+// Customers watching Home or Event Logs see new events (a Shopify purchase,
+// say) within seconds, without clicking Refresh. Paused while the tab is hidden.
+const LIVE_REFRESH_VIEWS = new Set(["dashboard", "logs"]);
+const LIVE_REFRESH_MS = 10000;
 const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "customers", "errorLogs", "integrations", "docs"]);
 const customerOnlyViews = new Set(["customerContainers", "setupAssistant", "customerAccountSettings", "offlineConversions"]);
 const customerNavViews = new Set(["support", "notifications", "dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "customerAccountSettings", "billing"]);
@@ -544,6 +549,9 @@ function setView(name, options = {}) {
   els.pageTitle.textContent = currentSession.role === "customer" ? (customerPageLabels[next] || viewTitles[next][1]) : viewTitles[next][1];
   window.location.hash = next;
   if (!options.skipRender && latestData) renderCurrentView(latestData);
+  if (currentSession.role === "customer" && LIVE_REFRESH_VIEWS.has(next) && latestData && Date.now() - latestDataAt > LIVE_REFRESH_MS) {
+    loadDashboard();
+  }
   // Payment panels load independently of the (sometimes-failing) dashboard fetch.
   if (next === "admin") { loadOwnerPayments(); loadPaymentSettings(); loadBackups(); }
   if (next === "errorLogs") loadErrorLogs();
@@ -6670,6 +6678,14 @@ function renderAll(data) {
 }
 
 let dashboardRefreshTimer;
+function scheduleLiveRefresh() {
+  clearTimeout(dashboardRefreshTimer);
+  if (currentSession.role !== "customer") return;
+  dashboardRefreshTimer = setTimeout(() => {
+    if (document.hidden || !LIVE_REFRESH_VIEWS.has(currentViewName)) scheduleLiveRefresh();
+    else loadDashboard();
+  }, LIVE_REFRESH_MS);
+}
 async function loadDashboard(staleRetry = 0) {
   clearTimeout(dashboardRefreshTimer);
   els.refreshButton.disabled = true;
@@ -6684,8 +6700,11 @@ async function loadDashboard(staleRetry = 0) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || data.error || "Request failed");
     latestData = data;
+    latestDataAt = Date.now();
     renderAll(data);
-    if (currentSession.role === "customer" && data.timing?.cache === "stale" && staleRetry < 3) {
+    if (currentSession.role === "customer" && LIVE_REFRESH_VIEWS.has(currentViewName)) {
+      scheduleLiveRefresh();
+    } else if (currentSession.role === "customer" && data.timing?.cache === "stale" && staleRetry < 3) {
       dashboardRefreshTimer = setTimeout(() => loadDashboard(staleRetry + 1), 10000);
     }
     document.body.classList.remove("app-loading");

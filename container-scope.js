@@ -1,4 +1,4 @@
-function normalizedHost(value) {
+export function normalizedHost(value) {
   const raw = String(value || "").trim().toLowerCase();
   if (!raw) return "";
   try {
