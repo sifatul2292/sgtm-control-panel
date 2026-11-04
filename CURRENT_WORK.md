@@ -46,7 +46,10 @@ Living status doc. Update after meaningful progress. Last updated: 2026-11-04.
   store token and billing on); an uninstall with no app-side connection queues a
   release-only job; Disconnect calls it too. Unknown intents return 200 status, so
   either deploy order is safe; the release only takes effect once the panel ships.
-- Browser/Server labels (app.js v=127): Incoming Requests shows "Browser" or "Server"
+- Browser/Server labels DEPLOYED 2026-11-04 as VPS commit df9aede (app.js,
+  index.html and tests from 563d085; 22 tests pass on VPS; no restart needed, the
+  static cache reloads changed files).
+  Labels (app.js v=127): Incoming Requests shows "Browser" or "Server"
   under the client (Referer present = browser; Tagioo's order backup, WooCommerce
   server hits and other server sends carry none). Purchase Inspector column is now
   "Sent from": one order from both shows a green "Browser + Server"; repeats from
