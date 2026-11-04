@@ -17,6 +17,21 @@ Living status doc. Update after meaningful progress. Last updated: 2026-11-04.
   answers 401 without a session (local + public). shopify-app-reviewer's container
   log is local, so the live feed covers it. Rollback: `git revert --no-edit dc5a5fd`
   then `pm2 restart sgtm-control-panel --update-env`.
+- Owner test purchase on tagioo-test-store (13:22 UTC) never reached Tagioo: the app
+  was reinstalled at 13:17 and had no StoreConnection, so the orders/paid webhook was
+  skipped and no pixel hits were sent. The workspace's only container
+  (shopify-review-workspace / review-track.tagioo.com) was still bound to
+  app-review-d37e3417-r176897-a0, a reviewer store that had uninstalled the app, so
+  no other store could connect (409 container_in_use). Released 13:53 UTC with
+  owner OK by sending the app's own signed "disconnected" subscription state
+  (POST /api/integrations/shopify/subscription, that store's token): 200, binding
+  removed, tenant stays Free/15K, no resize. Follow-up: uninstall must always
+  release the binding (app treats a 401 from the panel as disconnected and keeps going).
+- Reviewer's screencast workspace was "Veil & Vow" (veil-vow, created by the app
+  2026-10-29 for 6ybwxh-vs.myshopify.com): no container, Setup Assistant set to
+  review-track.tagioo.com / G-4NHBWV9DKR. Its 35 hits (6 purchases, Nov 2
+  07:43-08:02 UTC) landed in the review workspace's container log, so the owner saw
+  them and the reviewer saw 0. 788080a (now live) blocks connecting such a workspace.
 
 - Branch claude/vigorous-clarke-230994, on top of fix/shopify-codeless-connect 788080a.
   app.js v=126 (125 = 788080a, 124 = perf/owner-dashboard-stall, 123 = grace work).
