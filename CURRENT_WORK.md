@@ -2,7 +2,21 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-11-04.
 
-## 2026-11-04 — Live Event Logs (Shopify review 135263) — NOT DEPLOYED
+## 2026-11-04 — Live Event Logs (Shopify review 135263) — DEPLOYED
+
+- DEPLOYED 2026-11-04 13:08 UTC as VPS commit dc5a5fd on feat/saas-phase1-payments
+  (Hostinger web console, Chrome): checked out server.js, public/app.js,
+  public/index.html, container-scope.js, live-events.js, tests and
+  docs/event-store.md from origin/fix/shopify-codeless-connect b3b0fe9. This also
+  shipped 788080a (Shopify connect lists only real containers; 404 no_container,
+  409 domain_mismatch) for the first time; its app half (ee51af7) is NOT deployed.
+  Before checkout every VPS code file matched 942ab86; VPS CURRENT_WORK.md differs
+  and was left alone. On VPS: syntax checks, 12 live-event tests (end-to-end test
+  skipped: it spawns server.js, which would load the production .env) and 25
+  dashboard/Shopify-connect tests pass. pm2 restarted; /api/customer/live-events
+  answers 401 without a session (local + public). shopify-app-reviewer's container
+  log is local, so the live feed covers it. Rollback: `git revert --no-edit dc5a5fd`
+  then `pm2 restart sgtm-control-panel --update-env`.
 
 - Branch claude/vigorous-clarke-230994, on top of fix/shopify-codeless-connect 788080a.
   app.js v=126 (125 = 788080a, 124 = perf/owner-dashboard-stall, 123 = grace work).
