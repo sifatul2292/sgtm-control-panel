@@ -22,6 +22,7 @@ import { renderMarketingRegion } from "./marketing-region.js";
 import { paddleEventIsStale } from "./paddle-billing.js";
 import { attachEventHistory, archiveEventHistory } from "./history-archive.js";
 import { applyMarketingContent } from "./marketing-content.js";
+import { createLiveEventTails } from "./live-events.js";
 
 const gzipAsync = promisify(gzip);
 const brotliAsync = promisify(brotliCompress);
@@ -12612,6 +12613,40 @@ async function customerAccessLogForTenant(data, tenantId, containerId = "") {
   };
 }
 
+// Live Event Log feed (see live-events.js). Log paths are resolved once a
+// minute per tenant+container from the cached database read, so a poll costs a
+// stat and a read of the new bytes, never a history.json parse.
+const liveEventTails = createLiveEventTails({
+  parseLine: (line) => {
+    const parsed = parseTrackingAccessLine(line);
+    return parsed && !classifyTrackingNoise(parsed) ? serializeEventRow(parsed) : null;
+  }
+});
+const LIVE_EVENT_PATHS_TTL_MS = 60000;
+const liveEventPathCache = new Map();
+
+// The same log paths customerDashboardData reads for this tenant and container.
+async function liveEventPathsFor(tenantId, requestedContainerId = "") {
+  const key = `${tenantId}:${requestedContainerId || "default"}`;
+  const cached = liveEventPathCache.get(key);
+  if (cached && Date.now() - cached.at < LIVE_EVENT_PATHS_TTL_MS) return cached.paths;
+  const loaded = await readDatabaseCached();
+  if (!loaded.available) return cached?.paths || [];
+  const setupRequests = loaded.data.customerSetupRequests || [];
+  const tenant = (loaded.data.tenants || []).find((item) => item.id === tenantId) || { id: tenantId };
+  const tenantSetupRequests = customerContainerRequests(setupRequests, tenantId);
+  const scopedContainerId = tenantSetupRequests.length > 1
+    ? selectedContainer(tenant, tenantSetupRequests, requestedContainerId)?.id || ""
+    : "";
+  const paths = customerAccessLogPaths({
+    customerSetup: { requests: setupRequests },
+    provisioning: loaded.data.provisioning || { requests: [] }
+  }, tenantId, scopedContainerId);
+  if (liveEventPathCache.size > 1000) liveEventPathCache.clear();
+  liveEventPathCache.set(key, { at: Date.now(), paths });
+  return paths;
+}
+
 function tenantBillingUsageMap(data, tenants = []) {
   // Owner hot path: derive each tenant's billing-period usage from the stored
   // daily counts (rotation-safe, maintained by persistDailySummary) — NOT from a
@@ -14784,6 +14819,24 @@ const server = createServer(async (req, res) => {
         console.warn(`[dashboard] owner dashboard cold build took ${payload.timing.dashboardMs}ms`);
       }
       await jsonResponseGzip(req, res, 200, payload);
+      return;
+    }
+
+    // Event Logs live feed: tracking requests newer than the client's cursor,
+    // read from the container's access log (not the dashboard build).
+    if (pathname === "/api/customer/live-events" && req.method === "GET") {
+      const session = getSession(req);
+      if (!session || session.role !== "customer") {
+        jsonResponse(res, 401, { error: "Customer session required." });
+        return;
+      }
+      const containerId = normalizeContainerId(reqUrl.searchParams.get("container") || "");
+      const paths = await liveEventPathsFor(session.tenantId, containerId);
+      const result = await liveEventTails.read(paths, {
+        cursor: reqUrl.searchParams.get("cursor") || "",
+        since: reqUrl.searchParams.get("since") || ""
+      });
+      jsonResponse(res, 200, { available: result.readable > 0, ...result });
       return;
     }
 

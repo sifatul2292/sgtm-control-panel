@@ -1,6 +1,37 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-10-22.
+Living status doc. Update after meaningful progress. Last updated: 2026-11-04.
+
+## 2026-11-04 — Live Event Logs (Shopify review 135263) — NOT DEPLOYED
+
+- Branch claude/vigorous-clarke-230994, on top of fix/shopify-codeless-connect 788080a.
+  app.js v=126 (125 = 788080a, 124 = perf/owner-dashboard-stall, 123 = grace work).
+- Why events took ~1 min: the Event Log reads the SQLite event store, which ingests
+  the container access logs once a minute (INGEST_INTERVAL_MS), and the dashboard
+  prefers that SQLite "today" summary over the live tail whenever it has as many
+  events, so the newest minute was missing even after a full reload.
+- New live-events.js + GET /api/customer/live-events?container=&cursor=&since=: one
+  tail per container access log, shared by all viewers; a poll stats the file and
+  reads only the bytes appended since the last read (at most once a second per
+  file; 256 KB backfill on first read; 300 rows kept; idle tails dropped after
+  10 min). Log paths come from the cached DB read and are cached 60 s per
+  tenant+container, so polls never parse history.json. Same parser/noise filter
+  as the dashboard (parseTrackingAccessLine + classifyTrackingNoise).
+- app.js: while Event Logs is open and visible, polls every 3 s, merges new rows
+  into latestData (table, Purchase Inspector, Purchases stat, last-event age) and
+  keeps a 300-row buffer re-merged into each dashboard reload until SQLite has
+  them (dedupe by date|method|path|status|host, counting copies). With the live
+  feed working, Event Logs reloads the full dashboard every 60 s instead of 10 s.
+  Home still reloads every 10 s (788080a).
+- Verified locally: a purchase line appended to a container log showed in the open
+  Event Log after ~1 s; reload kept one row; a server copy of the same order shows
+  "re-sent x2" with Purchases 1. Tests: test/live-event-log.test.js (13, including
+  a real-server end-to-end). Full suite: only the 3 known failures.
+- Limits: containers on a remote worker VPS have no local log, so the feed reports
+  unavailable and Event Logs falls back to the 10 s reload (still bounded by the
+  worker agent's 60 s shipping interval). Shopify-side delay: the web pixel fires
+  on the thank-you page (only after analytics + marketing consent where consent is
+  required); the orders/paid webhook copy depends on Shopify's webhook delivery.
 
 ## 2026-10-22 — WP plugin 2.7.0 for WordPress.org submission — NOT DEPLOYED, NOT COMMITTED
 

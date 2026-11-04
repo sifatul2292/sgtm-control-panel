@@ -109,7 +109,7 @@ test('a hung dashboard request times out, unlocks Refresh, and can be retried', 
       if (!hung) return Promise.resolve({ ok: true, json: async () => reply });
       return new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(Object.assign(Error('Aborted'), { name: 'AbortError' }))));
     },
-    renderAll: () => { rendered++; }, escapeHtml: value => value,
+    renderAll: () => { rendered++; }, escapeHtml: value => value, applyLiveEvents: () => {},
     document: { body: { classList: { remove() {} } } }
   });
   vm.runInContext(body, context);

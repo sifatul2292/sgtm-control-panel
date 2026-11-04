@@ -273,8 +273,19 @@ let currentViewName = "dashboard";
 let latestDataAt = 0;
 // Customers watching Home or Event Logs see new events (a Shopify purchase,
 // say) within seconds, without clicking Refresh. Paused while the tab is hidden.
+// Event Logs polls a small live feed (new access-log lines only) every few
+// seconds, so it reloads the full dashboard just once a minute.
 const LIVE_REFRESH_VIEWS = new Set(["dashboard", "logs"]);
 const LIVE_REFRESH_MS = 10000;
+const LOGS_FULL_REFRESH_MS = 60000;
+const LIVE_EVENTS_MS = 3000;
+const LIVE_EVENTS_KEEP = 300;
+let liveEventsTimer;
+let liveEventsInFlight = false;
+let liveEventsAvailable = false;
+let liveEventsCursor = "";
+let liveEventsScope = null;
+let liveEventRows = [];
 const ownerOnlyViews = new Set(["analytics", "settings", "deployment", "provisioning", "admin", "customers", "errorLogs", "integrations", "docs"]);
 const customerOnlyViews = new Set(["customerContainers", "setupAssistant", "customerAccountSettings", "offlineConversions"]);
 const customerNavViews = new Set(["support", "notifications", "dashboard", "logs", "customerContainers", "powerUps", "setupAssistant", "customerAccountSettings", "billing"]);
@@ -552,6 +563,8 @@ function setView(name, options = {}) {
   if (currentSession.role === "customer" && LIVE_REFRESH_VIEWS.has(next) && latestData && Date.now() - latestDataAt > LIVE_REFRESH_MS) {
     loadDashboard();
   }
+  if (currentSession.role === "customer" && next === "logs") scheduleLiveEvents(0);
+  else clearTimeout(liveEventsTimer);
   // Payment panels load independently of the (sometimes-failing) dashboard fetch.
   if (next === "admin") { loadOwnerPayments(); loadPaymentSettings(); loadBackups(); }
   if (next === "errorLogs") loadErrorLogs();
@@ -6415,6 +6428,132 @@ function renderLastEventFreshness(data) {
     `<span class="freshness-label">Last event <strong>${escapeHtml(label)}</strong></span>`;
 }
 
+// Event Logs live feed. New access-log lines come from /api/customer/live-events
+// and are kept for a while, because the next dashboard payload may not have
+// them yet (the event store ingests once a minute): each payload gets them merged in.
+function liveEventKey(event) {
+  return [event.date, event.method, event.path, event.status, event.host].join("|");
+}
+
+// Rows from `rows` that `list` does not contain. Counts copies, so two identical
+// requests in the same second stay two. A full list (the server caps it) cannot
+// say whether it had a row older than its oldest one, so those are left out.
+function liveRowsMissingFrom(rows, list, cap) {
+  const floor = list.length >= cap ? String(list.at(-1)?.date || "") : "";
+  if (floor) rows = rows.filter((event) => String(event.date || "") >= floor);
+  const copies = new Map();
+  for (const event of list) copies.set(liveEventKey(event), (copies.get(liveEventKey(event)) || 0) + 1);
+  return rows.filter((event) => {
+    const count = copies.get(liveEventKey(event)) || 0;
+    if (count) copies.set(liveEventKey(event), count - 1);
+    return !count;
+  });
+}
+
+const byNewestEvent = (a, b) => String(b.date || "").localeCompare(String(a.date || ""));
+
+// Adds live rows the payload does not have yet to its today and retained event
+// lists and counts new purchases. Repeating it with the same rows changes nothing.
+function mergeLiveEvents(data, rows) {
+  const nginx = data?.nginx;
+  if (!nginx || !rows?.length) return false;
+  if (!nginx.retainedEvents?.available && !nginx.todayEvents?.available) {
+    nginx.todayEvents = { available: true, count: 0, recentEvents: [], purchaseEvents: [], purchases: { rawCount: 0, uniqueCount: 0 } };
+  }
+  let added = false;
+  for (const summary of [nginx.retainedEvents, nginx.todayEvents]) {
+    if (!summary?.available) continue;
+    const recent = summary.recentEvents || [];
+    const purchases = Array.isArray(summary.purchaseEvents) ? summary.purchaseEvents : null;
+    const freshRecent = liveRowsMissingFrom(rows, recent, Number(summary.eventLogLimit || 500));
+    const freshPurchases = purchases ? liveRowsMissingFrom(rows.filter((event) => event.eventName === "Purchase"), purchases, 2000) : [];
+    if (!freshRecent.length && !freshPurchases.length) continue;
+    const knownTransactions = new Set([...recent, ...(purchases || [])]
+      .filter((event) => event.eventName === "Purchase" && event.transactionId)
+      .map((event) => event.transactionId));
+    const newPurchases = purchases ? freshPurchases : freshRecent.filter((event) => event.eventName === "Purchase");
+    summary.recentEvents = [...freshRecent, ...recent].sort(byNewestEvent).slice(0, Math.max(recent.length, LIVE_EVENTS_KEEP));
+    if (purchases) summary.purchaseEvents = [...freshPurchases, ...purchases].sort(byNewestEvent);
+    summary.count = Number(summary.count || 0) + freshRecent.length;
+    if (newPurchases.length) {
+      summary.purchases = { ...(summary.purchases || {}) };
+      summary.purchases.rawCount = Number(summary.purchases.rawCount || 0) + newPurchases.length;
+      for (const event of newPurchases) {
+        if (event.transactionId && knownTransactions.has(event.transactionId)) continue;
+        if (event.transactionId) knownTransactions.add(event.transactionId);
+        summary.purchases.uniqueCount = Number(summary.purchases.uniqueCount || 0) + 1;
+      }
+    }
+    added = true;
+  }
+  return added;
+}
+
+function newestEventDate(data) {
+  return [data?.nginx?.retainedEvents?.recentEvents?.[0]?.date, data?.nginx?.todayEvents?.recentEvents?.[0]?.date]
+    .filter(Boolean).sort().at(-1) || "";
+}
+
+// A payload for another container starts a new live buffer; otherwise the
+// buffered rows are merged in.
+function applyLiveEvents(data) {
+  const scope = data?.activeContainer?.id || "";
+  if (scope !== liveEventsScope) {
+    liveEventsScope = scope;
+    liveEventsCursor = "";
+    liveEventRows = [];
+    return;
+  }
+  mergeLiveEvents(data, liveEventRows);
+}
+
+function scheduleLiveEvents(delay = LIVE_EVENTS_MS) {
+  clearTimeout(liveEventsTimer);
+  if (currentSession.role !== "customer" || currentViewName !== "logs") return;
+  liveEventsTimer = setTimeout(pollLiveEvents, delay);
+}
+
+async function pollLiveEvents() {
+  if (liveEventsInFlight || currentSession.role !== "customer" || currentViewName !== "logs") return;
+  if (document.hidden || !latestData) {
+    scheduleLiveEvents();
+    return;
+  }
+  const scope = latestData.activeContainer?.id || "";
+  if (scope !== liveEventsScope) applyLiveEvents(latestData);
+  const params = new URLSearchParams();
+  if (scope) params.set("container", scope);
+  if (liveEventsCursor) params.set("cursor", liveEventsCursor);
+  else if (newestEventDate(latestData)) params.set("since", newestEventDate(latestData));
+  liveEventsInFlight = true;
+  try {
+    const response = await fetch(`/api/customer/live-events?${params}`, { cache: "no-store" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Live events unavailable");
+    liveEventsAvailable = Boolean(result.available);
+    // No readable access log for this container: the regular dashboard reload
+    // keeps Event Logs current and tries the live feed again afterwards.
+    if (!liveEventsAvailable) return;
+    if (scope !== (latestData.activeContainer?.id || "")) return;
+    liveEventsCursor = result.cursor || "";
+    const rows = result.events || [];
+    if (rows.length) {
+      liveEventRows = [...rows, ...liveEventRows].slice(0, LIVE_EVENTS_KEEP);
+      if (mergeLiveEvents(latestData, rows) && currentViewName === "logs") renderLogs(latestData);
+    }
+    scheduleLiveEvents();
+  } catch {
+    // A network blip: try again on the next tick.
+    scheduleLiveEvents();
+  } finally {
+    liveEventsInFlight = false;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && currentViewName === "logs") scheduleLiveEvents(0);
+});
+
 function renderLogs(data) {
   renderEventTable(data);
   renderPurchaseInspector(data);
@@ -6684,7 +6823,7 @@ function scheduleLiveRefresh() {
   dashboardRefreshTimer = setTimeout(() => {
     if (document.hidden || !LIVE_REFRESH_VIEWS.has(currentViewName)) scheduleLiveRefresh();
     else loadDashboard();
-  }, LIVE_REFRESH_MS);
+  }, currentViewName === "logs" && liveEventsAvailable ? LOGS_FULL_REFRESH_MS : LIVE_REFRESH_MS);
 }
 async function loadDashboard(staleRetry = 0) {
   clearTimeout(dashboardRefreshTimer);
@@ -6699,11 +6838,13 @@ async function loadDashboard(staleRetry = 0) {
     const response = await fetch(`/api/dashboard${query}`, { cache: "no-store", signal: controller.signal });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || data.error || "Request failed");
+    if (currentSession.role === "customer") applyLiveEvents(data);
     latestData = data;
     latestDataAt = Date.now();
     renderAll(data);
     if (currentSession.role === "customer" && LIVE_REFRESH_VIEWS.has(currentViewName)) {
       scheduleLiveRefresh();
+      scheduleLiveEvents();
     } else if (currentSession.role === "customer" && data.timing?.cache === "stale" && staleRetry < 3) {
       dashboardRefreshTimer = setTimeout(() => loadDashboard(staleRetry + 1), 10000);
     }

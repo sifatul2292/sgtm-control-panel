@@ -30,6 +30,10 @@ worker VPS 1..N                          panel VPS
   same aggregation as the live log tail (`aggregateTrackingLines`), so numbers match.
   Closed days are computed once and cached in `daily_summaries`. Per date the
   dashboard keeps whichever source (SQLite vs history.json/live tail) saw more events.
+- **Live Event Logs**: the store lags up to one ingest tick, so an open Event Log
+  also polls `GET /api/customer/live-events`, which reads only the bytes appended
+  to the container's access log since the last poll (`live-events.js`) and merges
+  them in the browser until the store has them.
 - **Retention**: lines and cached summaries older than `EVENT_RETENTION_DAYS`
   (default 35 = 30-day window + buffer) are pruned once a day.
 - **Fallback**: if `better-sqlite3` fails to load, the panel logs a warning and keeps
