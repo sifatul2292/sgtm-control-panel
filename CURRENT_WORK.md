@@ -25,8 +25,16 @@ Living status doc. Update after meaningful progress. Last updated: 2026-11-04.
   no other store could connect (409 container_in_use). Released 13:53 UTC with
   owner OK by sending the app's own signed "disconnected" subscription state
   (POST /api/integrations/shopify/subscription, that store's token): 200, binding
-  removed, tenant stays Free/15K, no resize. Follow-up: uninstall must always
-  release the binding (app treats a 401 from the panel as disconnected and keeps going).
+  removed, tenant stays Free/15K, no resize.
+- Fix (committed, NOT deployed): uninstall/disconnect now always frees the container.
+  Panel: app-secret-signed `release` intent on /api/integrations/shopify/workspace
+  (releaseShopifyAppStore) frees every container tied to the shop through
+  syncShopifySubscription's disconnect path; `before` skips bindings connected
+  later (reconnect). App (tagioo-shopify-app fix/shopify-codeless-connect): the
+  APP_UNINSTALLED job calls it after the billing call (which only works with a live
+  store token and billing on); an uninstall with no app-side connection queues a
+  release-only job; Disconnect calls it too. Unknown intents return 200 status, so
+  either deploy order is safe; the release only takes effect once the panel ships.
 - Reviewer's screencast workspace was "Veil & Vow" (veil-vow, created by the app
   2026-10-29 for 6ybwxh-vs.myshopify.com): no container, Setup Assistant set to
   review-track.tagioo.com / G-4NHBWV9DKR. Its 35 hits (6 purchases, Nov 2

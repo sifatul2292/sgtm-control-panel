@@ -414,3 +414,59 @@ test("a Shopify order clears the workspace's dashboard cache and summaries stay 
   assert.match(app, /const LIVE_REFRESH_VIEWS = new Set\(\["dashboard", "logs"\]\);/);
   assert.ok(app.indexOf("const LIVE_REFRESH_VIEWS") < app.indexOf("function setView("), "declared before setView uses it");
 });
+
+// Uninstall used to free a container only through the store's own token: a
+// stale token (401) or a store the app no longer had a connection for left the
+// container tied to a store that had left, and no other store could connect.
+function releaseContext(data) {
+  const synced = [];
+  const ctx = vm.createContext({
+    normalizeShopDomain, scopedTrackingEntries,
+    readDatabase: async () => ({ available: true, data }),
+    syncShopifySubscription: async (tenantId, containerId, state) => {
+      synced.push([tenantId, containerId, state.status]);
+      const tenant = data.tenants.find((item) => item.id === tenantId);
+      const tracking = trackingForContainer(tenant, data.customerSetupRequests, containerId);
+      if (tracking?.shopify?.shop !== state.shop) return { ok: false, status: 409 };
+      const next = { ...tracking };
+      delete next.shopify;
+      setTrackingForContainer(tenant, data.customerSetupRequests, containerId, next);
+      return { ok: true };
+    },
+  });
+  vm.runInContext(extractFunction("releaseShopifyAppStore", true), ctx);
+  return { release: ctx.releaseShopifyAppStore, synced };
+}
+
+test("uninstall frees every container still tied to the store", async () => {
+  const data = reviewData();
+  data.tenants[0].tracking.shopify = { shop: "left.myshopify.com", status: "connected", connectedAt: "2026-10-01T00:00:00.000Z" };
+  data.tenants[1].tracking.shopify = { shop: "left.myshopify.com", status: "connected" };
+  const { release, synced } = releaseContext(data);
+  const result = await release({ shop: "left.myshopify.com", before: "2026-11-04T13:00:00.000Z" });
+  assert.equal(result.released, 2);
+  assert.deepEqual([...result.tenantIds], ["review", "attacker"]);
+  assert.equal(data.tenants[0].tracking.shopify, undefined);
+  assert.equal(data.tenants[1].tracking.shopify, undefined);
+  // Another store's container in the same workspace stays connected.
+  assert.equal(data.tenants[0].tracking.containerConfigs.setup_b.shopify.shop, "owner-store.myshopify.com");
+  assert.ok(synced.every(([, , status]) => status === "disconnected"));
+  // Repeated uninstall deliveries are harmless.
+  assert.equal((await release({ shop: "left.myshopify.com" })).released, 0);
+});
+
+test("a late uninstall never frees a container the store has reconnected to since", async () => {
+  const data = reviewData();
+  data.tenants[0].tracking.shopify = { shop: "back.myshopify.com", status: "connected", connectedAt: "2026-11-04T13:30:00.000Z" };
+  const { release, synced } = releaseContext(data);
+  assert.equal((await release({ shop: "back.myshopify.com", before: "2026-11-04T13:00:00.000Z" })).released, 0);
+  assert.equal(data.tenants[0].tracking.shopify.shop, "back.myshopify.com");
+  assert.equal(synced.length, 0);
+});
+
+test("route: release is checked against the app secret and clears the freed workspaces' dashboards", () => {
+  const route = between('if (pathname === "/api/integrations/shopify/workspace" && req.method === "POST")', 'if (payload.intent === "unlink")');
+  assert.ok(route.indexOf("isShopifyIntegrationAuthorized(req, rawBody, config.shopifyAppSecret)") < route.indexOf('payload.intent === "release"'));
+  assert.match(route, /releaseShopifyAppStore\(\{ shop, before: String\(payload\.before \|\| ""\) \}\)/);
+  assert.match(route, /for \(const id of result\.tenantIds\) invalidateCustomerDashboardCache\(id\);/);
+});

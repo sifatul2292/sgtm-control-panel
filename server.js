@@ -8682,6 +8682,41 @@ async function unlinkShopifyAppWorkspace({ shop, tenantId = "" }) {
   });
 }
 
+// The Tagioo app calls this when a store uninstalls the app or disconnects:
+// every container still tied to the store is freed, so another store can use
+// it. Same change as the app's signed "disconnected" subscription state
+// (privacy route kept, workspace back to Free when no store is left), but
+// signed with the app secret. The store's own token can be gone or stale by
+// then, and a 401 on that call used to leave the container tied for good.
+// `before` keeps a late delivery from freeing a container the store has
+// reconnected to since.
+async function releaseShopifyAppStore({ shop, before = "" }) {
+  const loaded = await readDatabase();
+  if (!loaded.available) return { ok: false, status: 503, errors: ["Tagioo is temporarily unavailable."] };
+  const cutoff = Date.parse(before);
+  const bindings = [];
+  for (const tenant of loaded.data.tenants || []) {
+    for (const entry of scopedTrackingEntries(tenant, loaded.data.customerSetupRequests || [])) {
+      const setup = entry.tracking?.shopify;
+      if (!setup || normalizeShopDomain(setup.shop) !== shop) continue;
+      const connectedAt = Date.parse(setup.connectedAt || "");
+      if (Number.isFinite(cutoff) && Number.isFinite(connectedAt) && connectedAt > cutoff) continue;
+      bindings.push({ tenantId: tenant.id, containerId: entry.containerId });
+    }
+  }
+  const tenantIds = [];
+  for (const { tenantId, containerId } of bindings) {
+    const result = await syncShopifySubscription(tenantId, containerId, {
+      shop, plan: "Free", status: "disconnected", billingPeriod: "", cycleStart: "", cycleEnd: "",
+      cancelAtEndOfCycle: false, amount: 0, currency: "USD"
+    });
+    // 409: the container changed hands since it was read; nothing left to free.
+    if (!result.ok && result.status !== 409) return result;
+    if (result.ok) tenantIds.push(tenantId);
+  }
+  return { ok: true, released: tenantIds.length, tenantIds };
+}
+
 function shopifyAppWorkspaceFor(data, shop, tenantId) {
   const tenant = findShopifyWorkspace(data, shop, tenantId);
   return tenant && (!tenantId || tenant.id === tenantId) ? tenant : null;
@@ -14548,6 +14583,14 @@ const server = createServer(async (req, res) => {
         invalidateCustomerDashboardCache(result.tenantId);
         invalidateOwnerDashboardCache({ structural: true });
         jsonResponse(res, 200, { ...linkedStore(result), container: result.container, dnsTarget: config.provisionDnsTarget });
+        return;
+      }
+      if (payload.intent === "release") {
+        const result = await releaseShopifyAppStore({ shop, before: String(payload.before || "") });
+        if (!result.ok) { failed(result); return; }
+        for (const id of result.tenantIds) invalidateCustomerDashboardCache(id);
+        if (result.released) invalidateOwnerDashboardCache();
+        jsonResponse(res, 200, { released: result.released });
         return;
       }
       if (payload.intent === "unlink") {
