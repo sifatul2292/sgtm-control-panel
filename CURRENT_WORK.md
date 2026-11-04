@@ -46,6 +46,12 @@ Living status doc. Update after meaningful progress. Last updated: 2026-11-04.
   store token and billing on); an uninstall with no app-side connection queues a
   release-only job; Disconnect calls it too. Unknown intents return 200 status, so
   either deploy order is safe; the release only takes effect once the panel ships.
+- Browser/Server labels (app.js v=127): Incoming Requests shows "Browser" or "Server"
+  under the client (Referer present = browser; Tagioo's order backup, WooCommerce
+  server hits and other server sends carry none). Purchase Inspector column is now
+  "Sent from": one order from both shows a green "Browser + Server"; repeats from
+  one side stay a yellow "re-sent xN". Owner saw two Purchase rows for one Shopify
+  order (pixel + order-webhook backup) and worried it looked like double tracking.
 - Reviewer's screencast workspace was "Veil & Vow" (veil-vow, created by the app
   2026-10-29 for 6ybwxh-vs.myshopify.com): no container, Setup Assistant set to
   review-track.tagioo.com / G-4NHBWV9DKR. Its 35 hits (6 purchases, Nov 2

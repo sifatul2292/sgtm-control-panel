@@ -65,3 +65,27 @@ test('registrations and trials appear separately without changing purchase total
   assert.match(badge.textContent, /^1 tracked/);
   assert.equal(context.normalizeEventName('generate_lead'), 'Lead');
 });
+
+test('requests are labelled Browser or Server from whether they carried a Referer', () => {
+  const { context } = harness();
+  assert.equal(context.mapServerEventRow(event(1, { referer: 'https://store.example/' })).origin, 'Browser');
+  assert.equal(context.mapServerEventRow(event(1, { referer: '' })).origin, 'Server');
+  // Rows stored without the field are not guessed at.
+  assert.equal(context.mapServerEventRow(event(1)).origin, '');
+});
+
+test('one order from the browser and from the server reads as Browser + Server, not a re-send', () => {
+  const { context, inspector, badge } = harness();
+  const browser = event(1, { referer: 'https://store.example/checkouts/thank-you', eventId: 'order-1' });
+  const server = event(1, { referer: '', eventId: '', date: new Date(Date.now() - 5000).toISOString(), path: '/g/collect?server=1' });
+  context.renderPurchaseInspector(data([browser, server]));
+  assert.match(badge.textContent, /^1 tracked/);
+  assert.match(inspector.innerHTML, /<span class="badge ok"[^>]*>Browser \+ Server<\/span>/);
+  assert.doesNotMatch(inspector.innerHTML, /re-sent/);
+  assert.match(inspector.innerHTML, /<th>Sent from<\/th>/);
+  // The same side sending twice is still flagged.
+  context.renderPurchaseInspector(data([browser, { ...browser, date: new Date(Date.now() - 1000).toISOString() }]));
+  assert.match(inspector.innerHTML, /badge warn[^>]*>Browser · re-sent ×2/);
+  context.renderPurchaseInspector(data([server]));
+  assert.match(inspector.innerHTML, /<span title="Sent server to server[^"]*">Server<\/span>/);
+});

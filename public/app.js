@@ -953,6 +953,7 @@ function parseNginxAccess(line) {
     date: parseNginxTime(time),
     displayDate: displayRequestDate(time),
     client,
+    origin: requestOrigin({ referer: referer === "-" ? "" : referer }),
     requestUrl,
     tracking,
     eventName: event.name,
@@ -1052,6 +1053,7 @@ function eventDetail(item) {
 function mapServerEventRow(item) {
   return {
     source: "access",
+    origin: "referer" in item ? requestOrigin(item) : "",
     level: Number(item.status) >= 500 ? "error" : Number(item.status) >= 400 ? "warn" : "info",
     status: item.status,
     method: item.method,
@@ -1069,6 +1071,18 @@ function mapServerEventRow(item) {
     transactionId: item.transactionId,
     detail: eventDetail(item)
   };
+}
+
+// Where a request came from. Browsers send the page they were on (Referer);
+// server-to-server sends (Tagioo's order backup, the WooCommerce plugin's
+// server purchase) do not. A purchase that reaches sGTM both ways is one order
+// sent twice on purpose, and the labels keep that from reading as double tracking.
+const requestOriginTitles = {
+  Browser: "Sent from the visitor's browser.",
+  Server: "Sent server to server, for example Tagioo's backup copy of a store order. GA4 and Meta count an order sent from both the browser and the server once."
+};
+function requestOrigin(item) {
+  return item.referer ? "Browser" : "Server";
 }
 
 function serverEventRows(data) {
@@ -1206,7 +1220,7 @@ function renderEventRows(visibleItems, emptyMessage) {
       <td class="request-date-cell">${escapeHtml(requestDateLabel(item))}</td>
       <td><span class="status-code ${requestStatusClass(item.status)}"><span class="request-status-dot" aria-hidden="true"></span>${escapeHtml(item.status || "Unknown")}</span></td>
       <td><div class="event-type-cell"><strong>${escapeHtml(item.eventName || "Other")}</strong>${item.value ? `<small>${escapeHtml(formatMoney(item.value, item.currency))}</small>` : ""}</div></td>
-      <td>${escapeHtml(item.client || "Other")}</td>
+      <td><div class="event-type-cell"><span>${escapeHtml(item.client || "Other")}</span>${item.origin ? `<small title="${escapeHtml(requestOriginTitles[item.origin] || "")}">${escapeHtml(item.origin)}</small>` : ""}</div></td>
       <td class="request-url-cell"><span class="request-url" title="${escapeHtml(item.requestUrl)}">${escapeHtml(item.requestUrl)}</span></td>
       <td><button class="more-button" type="button" aria-expanded="false" aria-controls="${detailId}" aria-label="Toggle request details ${index + 1}">Details</button></td>
     `;
@@ -1280,13 +1294,14 @@ function cleanPurchaseRows(data, includeConversions = false) {
     const current = grouped.get(key);
     const ts = item.date instanceof Date ? item.date.getTime() : 0;
     if (!current) {
-      grouped.set(key, { ...item, sentCount: 1, firstDate: item.date, lastDate: item.date });
+      grouped.set(key, { ...item, sentCount: 1, origins: item.origin ? [item.origin] : [], firstDate: item.date, lastDate: item.date });
       continue;
     }
     // Keep the richest record's fields, but track how many times this transaction
     // hit sGTM and the true first/last times it was seen.
     const winner = item.completeness > current.completeness ? { ...item } : { ...current };
     winner.sentCount = current.sentCount + 1;
+    winner.origins = [...new Set([...(current.origins || []), ...(item.origin ? [item.origin] : [])])];
     const firstTs = current.firstDate instanceof Date ? current.firstDate.getTime() : Infinity;
     const lastTs = current.lastDate instanceof Date ? current.lastDate.getTime() : -Infinity;
     winner.firstDate = ts && ts < firstTs ? item.date : current.firstDate;
@@ -1308,6 +1323,20 @@ function dhakaDayStartMs(ts = Date.now()) {
 }
 function dhakaDateKey(ts = Date.now()) {
   return new Date(ts + DHAKA_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+// One order from the browser and from the server is the backup working, not a
+// duplicate: shown as "Browser + Server". Repeats from one side stay a warning.
+function purchaseSentFrom(item, sentCount) {
+  const origins = item.origins || [];
+  if (origins.includes("Browser") && origins.includes("Server")) {
+    return `<span class="badge ok" title="${escapeHtml(requestOriginTitles.Server)}">Browser + Server${sentCount > 2 ? ` ×${sentCount}` : ""}</span>`;
+  }
+  const origin = origins[0] || "";
+  if (sentCount > 1) {
+    return `<span class="badge warn" title="This conversion reached sGTM ${sentCount} times.">${origin ? `${escapeHtml(origin)} · ` : ""}re-sent ×${sentCount}</span>`;
+  }
+  return origin ? `<span title="${escapeHtml(requestOriginTitles[origin] || "")}">${escapeHtml(origin)}</span>` : "1";
 }
 
 function renderPurchaseInspector(data) {
@@ -1368,7 +1397,7 @@ function renderPurchaseInspector(data) {
 
   els.purchaseInspector.innerHTML = `
     <div class="purchase-table-wrap"><table class="purchase-table">
-      <thead><tr><th>Date</th><th>Conversion</th><th>Transaction ID</th><th>Client</th><th>Domain</th><th>Status</th><th>Requests</th><th>More</th></tr></thead>
+      <thead><tr><th>Date</th><th>Conversion</th><th>Transaction ID</th><th>Client</th><th>Domain</th><th>Status</th><th>Sent from</th><th>More</th></tr></thead>
       <tbody>${rows.map((item, index) => {
         const sentCount = Number(item.sentCount || 1);
         const firstDate = item.firstDate instanceof Date ? item.firstDate : item.date;
@@ -1379,7 +1408,7 @@ function renderPurchaseInspector(data) {
           <td>${escapeHtml(item.client || "Other")}</td>
           <td><span class="purchase-domain" title="${escapeHtml(item.displayHost)}">${escapeHtml(item.displayHost)}</span></td>
           <td><span class="status-code ${requestStatusClass(item.status)}">${escapeHtml(item.status || "Unknown")}</span></td>
-          <td>${sentCount > 1 ? `<span class="badge warn" title="This conversion reached sGTM ${sentCount} times.">re-sent ×${sentCount}</span>` : "1"}</td>
+          <td>${purchaseSentFrom(item, sentCount)}</td>
           <td><button type="button" class="more-button" aria-expanded="false" aria-controls="purchase-detail-${index}" aria-label="Toggle purchase details ${index + 1}">Details</button></td>
         </tr><tr id="purchase-detail-${index}" class="purchase-detail-row" hidden><td colspan="8">
           <div class="event-detail-box"><strong>Event ID:</strong> ${escapeHtml(item.eventId || "Not provided")}<br>

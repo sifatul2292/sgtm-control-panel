@@ -204,7 +204,7 @@ test('Event Logs polls the live feed and reloads the full dashboard less often w
   assert.match(app, /fetch\(`\/api\/customer\/live-events\?\$\{params\}`/);
   assert.match(app, /currentViewName === "logs" && liveEventsAvailable \? LOGS_FULL_REFRESH_MS : LIVE_REFRESH_MS/);
   assert.match(app, /applyLiveEvents\(data\);\n    latestData = data;/);
-  assert.match(html, /app\.js\?v=126/);
+  assert.ok(Number(html.match(/app\.js\?v=(\d+)/)[1]) >= 126);
 });
 
 // End to end: a real server, a tenant's container access log on disk, and a

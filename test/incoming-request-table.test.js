@@ -51,3 +51,14 @@ test('compact rows preserve escaped full URLs and expandable metadata', () => {
   assert.equal(rows[0].button.expanded, 'true');
   rows[0].button.click(); assert.equal(rows[1].hidden, true);
 });
+
+test('incoming requests show whether each came from the browser or a server', () => {
+  const { context, rows } = harness();
+  context.requestOriginTitles = { Browser: 'Sent from the browser.', Server: 'Sent server to server.' };
+  context.renderEventRows([
+    { date: '2026-11-04T14:32:21Z', status: 200, eventName: 'Purchase', client: 'GA4', origin: 'Server', requestUrl: '/g/collect?en=purchase', detail: '' },
+    { date: '2026-11-04T14:32:16Z', status: 200, eventName: 'Purchase', client: 'GA4', origin: 'Browser', requestUrl: '/g/collect?en=purchase', detail: '' }
+  ], 'Empty');
+  assert.match(rows[0].innerHTML, /<span>GA4<\/span><small title="Sent server to server\.">Server<\/small>/);
+  assert.match(rows[2].innerHTML, /<span>GA4<\/span><small title="Sent from the browser\.">Browser<\/small>/);
+});
