@@ -26,7 +26,18 @@ Living status doc. Update after meaningful progress. Last updated: 2026-11-04.
   owner OK by sending the app's own signed "disconnected" subscription state
   (POST /api/integrations/shopify/subscription, that store's token): 200, binding
   removed, tenant stays Free/15K, no resize.
-- Fix (committed, NOT deployed): uninstall/disconnect now always frees the container.
+- Fix DEPLOYED 2026-11-04 ~14:20 UTC: panel 0b69463 as VPS commit ee65c50 (28 tests
+  pass on VPS, pm2 restarted); app 7021fe8 (+ ee51af7 "no real container" warning,
+  first deploy) cherry-picked on VPS /var/www/tagioo-shopify-app main as 9b70537 +
+  fc6295e, 35 app tests pass on VPS, image tagioo-shopify-app:release-7021fe8,
+  isolated canary on 3201 (backup copy) matched prod, swapped; old container kept
+  stopped as tagioo-shopify-app-before-7021fe8; DB backup
+  /var/backups/tagioo-shopify-20261104-141635-7021fe8 (quick_check ok). Live check:
+  signed release for a nonexistent shop → 200 {"released":0}; bad signature → 401.
+  App rollback: `docker stop tagioo-shopify-app && docker rm tagioo-shopify-app &&
+  docker rename tagioo-shopify-app-before-7021fe8 tagioo-shopify-app && docker start
+  tagioo-shopify-app`.
+- Fix details: uninstall/disconnect now always frees the container.
   Panel: app-secret-signed `release` intent on /api/integrations/shopify/workspace
   (releaseShopifyAppStore) frees every container tied to the shop through
   syncShopifySubscription's disconnect path; `before` skips bindings connected
