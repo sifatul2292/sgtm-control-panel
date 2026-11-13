@@ -1,6 +1,29 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-11-04.
+Living status doc. Update after meaningful progress. Last updated: 2026-11-13.
+
+## 2026-11-13 — Shopify 2.1.4 resubmission prep — LOCAL, NOT DEPLOYED, NOT COMMITTED
+
+- The review is paused until 2026-11-17. The full checklist, testing instructions, plan-copy
+  replacements and protected-data field list are in
+  `docs/shopify-review-2.1.4-resubmit-2026-11-17.md`.
+- Setup Assistant's manual Shopify Custom Pixel no longer forces Google consent to
+  'granted'. It reads `init.customerPrivacy` and follows `visitorConsentCollected`. There is
+  a new VM test in `test/saas-templates.test.js`.
+- The Shopify step in Setup Assistant now shows the app card first, marked "recommended".
+  The manual card is now "Without the app: Shopify Custom Pixel", and the line "No App
+  Store approval is required" is removed. Only index.html changed, so app.js stays v=127.
+- Checks: `npm run check` passes, and the suite is 241/244 with the same 3 old failures.
+  The local preview (new launch config `tagioo-shopify-worktree`, port 3111) shows the new
+  card order on a fresh Shopify signup.
+- Owner-only steps, all still open:
+  - Make sure the review container has no store connected (Free = 1 container).
+  - Change the Managed Pricing plan copy: Brave bypass → Custom Loader, SLA → Priority
+    support.
+  - Complete the protected customer data request.
+  - Set up Partner payouts.
+  - Record the screencast. Check that the test order shows one "Browser + Server" row; if
+    not, ship the app's uncommitted pixel `gid://` strip.
 
 ## 2026-11-04 — Live Event Logs (Shopify review 135263) — DEPLOYED
 

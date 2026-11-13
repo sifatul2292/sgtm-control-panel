@@ -1180,10 +1180,16 @@
                     <summary>SaaS event implementation guide</summary>
                     <div class="assistant-saas-guide-body"></div>
                   </details>
+                  <div id="shopifyAppConnectCard" class="assistant-download-card" hidden>
+                    <span class="assistant-download-icon" aria-hidden="true">S</span>
+                    <h2>Connect the Tagioo Shopify app (recommended)</h2>
+                    <p>Open <strong>Tagioo Server-Side Tracking</strong> from Apps in your Shopify admin and sign in with this account. The app lists this workspace's containers: click <strong>Connect</strong> next to the one for your store. There is no code to copy. Each store needs its own container.</p>
+                    <p class="assistant-laravel-note">When the app is connected, it installs the browser pixel and reliable backend Purchase webhook. Import <strong>server.json</strong>; do not also run Tagioo browser tags from <strong>web.json</strong>, or browser events can duplicate.</p>
+                  </div>
                   <div id="shopifyManualPixelCard" class="assistant-download-card" hidden>
                     <span class="assistant-download-icon" aria-hidden="true">M</span>
-                    <h2>Install manually with Shopify Custom Pixel</h2>
-                    <p>No App Store approval is required. Import and publish <strong>web.json</strong> and <strong>server.json</strong>, then paste the generated code into Shopify Admin → Settings → Customer events → Add custom pixel.</p>
+                    <h2>Without the app: Shopify Custom Pixel</h2>
+                    <p>Only if you do not use the Tagioo app. Import and publish <strong>web.json</strong> and <strong>server.json</strong>, then paste the generated code into Shopify Admin → Settings → Customer events → Add custom pixel. The code follows each shopper's consent choice from Shopify's Customer Privacy API.</p>
                     <div class="assistant-download-actions">
                       <button id="copyShopifyCustomPixel" class="button button-primary" type="button" disabled>Copy custom pixel code</button>
                     </div>
@@ -1195,12 +1201,6 @@
                       <li>Do not connect this manual pixel and the Tagioo Shopify app pixel at the same time.</li>
                     </ol>
                     <p class="assistant-laravel-note">The manual path tracks Shopify browser and checkout events. The app remains recommended because it also supplies reliable backend <code>orders/paid</code> Purchase recovery.</p>
-                  </div>
-                  <div id="shopifyAppConnectCard" class="assistant-download-card" hidden>
-                    <span class="assistant-download-icon" aria-hidden="true">S</span>
-                    <h2>Or connect the Tagioo Shopify app</h2>
-                    <p>Open <strong>Tagioo Server-Side Tracking</strong> from Apps in your Shopify admin and sign in with this account. The app lists this workspace's containers: click <strong>Connect</strong> next to the one for your store. There is no code to copy. Each store needs its own container.</p>
-                    <p class="assistant-laravel-note">When the app is connected, it installs the browser pixel and reliable backend Purchase webhook. Import <strong>server.json</strong>; do not also run Tagioo browser tags from <strong>web.json</strong>, or browser events can duplicate.</p>
                   </div>
                   <div class="assistant-import-guide">
                     <h3>How to import</h3>

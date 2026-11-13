@@ -2610,12 +2610,23 @@ function buildShopifyCustomPixel(input) {
 // Import and publish Tagioo web.json before connecting this pixel.
 window.dataLayer = window.dataLayer || [];
 function gtag(){window.dataLayer.push(arguments);}
-gtag('consent', 'update', {
-  ad_storage: 'granted',
-  analytics_storage: 'granted',
-  ad_user_data: 'granted',
-  ad_personalization: 'granted'
-});
+// Google consent mode follows the shopper's choice in Shopify's Customer
+// Privacy API: the state on load, then every later change from the banner.
+function tagiooConsent(privacy){
+  privacy=privacy||{};
+  var analytics=privacy.analyticsProcessingAllowed===false?'denied':'granted';
+  var marketing=privacy.marketingAllowed===false?'denied':'granted';
+  return {analytics_storage:analytics,ad_storage:marketing,ad_user_data:marketing,ad_personalization:marketing};
+}
+gtag('consent', 'default', tagiooConsent(typeof init!=='undefined'&&init&&init.customerPrivacy));
+(function(){
+  var privacyApi=(typeof customerPrivacy!=='undefined'&&customerPrivacy)||(typeof api!=='undefined'&&api&&api.customerPrivacy);
+  if(privacyApi&&typeof privacyApi.subscribe==='function'){
+    privacyApi.subscribe('visitorConsentCollected', function(event){
+      gtag('consent', 'update', tagiooConsent(event&&event.customerPrivacy));
+    });
+  }
+})();
 (function(w,d,s,l,i){
   w[l]=w[l]||[];
   w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});

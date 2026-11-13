@@ -39,6 +39,29 @@ test("existing ecommerce exports keep cart tags and Shopify instrumentation", ()
   assert.match(result.shopifyCustomPixel, /Shopify Custom Pixel/);
   assert.equal(result.saasGuide, "");
 });
+test("Shopify Custom Pixel takes Google consent from Shopify's Customer Privacy API", () => {
+  const pixel = ctx.buildSetupAssistantTemplates({ ...input, businessType: "ecommerce", webGtmContainerId: "GTM-TEST" }).shopifyCustomPixel;
+  assert.doesNotMatch(pixel, /:\s*'granted'\s*[,}]/);
+  const run = (privacy) => {
+    const listeners = {};
+    const sandbox = {
+      window: {},
+      document: { getElementsByTagName: () => [{ parentNode: { insertBefore() {} } }], createElement: () => ({}) },
+      init: { customerPrivacy: privacy, context: {} },
+      customerPrivacy: { subscribe: (name, fn) => { listeners[name] = fn; } },
+      analytics: { subscribe() {} },
+    };
+    vm.runInNewContext(pixel, sandbox);
+    const consent = () => sandbox.window.dataLayer.filter((row) => row[0] === "consent").map((row) => [row[1], { ...row[2] }]);
+    return { consent, listeners };
+  };
+  const optedOut = run({ analyticsProcessingAllowed: false, marketingAllowed: false });
+  assert.deepEqual(optedOut.consent()[0], ["default", { analytics_storage: "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" }]);
+  optedOut.listeners.visitorConsentCollected({ customerPrivacy: { analyticsProcessingAllowed: true, marketingAllowed: false } });
+  assert.deepEqual(optedOut.consent()[1], ["update", { analytics_storage: "granted", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" }]);
+  const allowed = run({ analyticsProcessingAllowed: true, marketingAllowed: true });
+  assert.equal(allowed.consent()[0][1].ad_storage, "granted");
+});
 test("SaaS generated files and guide cover GTM-owned Meta testing and backend migration", () => {
   const result = ctx.buildSetupAssistantTemplates({ ...input, metaTestEventCode: "TEST123" });
   assert.match(result.saasGuide, /tagioo-web-template\.json/);
