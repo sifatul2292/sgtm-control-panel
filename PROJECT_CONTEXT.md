@@ -34,7 +34,7 @@ npm run check            # = node --check server.js  (syntax check only — the 
 - Production VPS runs under **pm2** via `ecosystem.config.cjs` (app name `sgtm-control-panel`, logs to `/var/log/sgtm-control-panel*.log`, autorestart w/ backoff).
 - Fronted by **Nginx** (reverse proxy + SSL via certbot). App reads Nginx access/error logs for its dashboards.
 - VPS specifics in `docs/tagioo-vps-setup.md`. Per project memory: app path `/var/www/tagioo`, port 3100 in prod, Docker containers per tenant.
-- **Watchdog:** `tagioo-watchdog.sh` — restarts silently-exited sGTM containers (see project memory "Recurring no-events issue").
+- **Watchdog:** `tagioo-watchdog.sh` (root cron `*/5`) — restarts silently-exited sGTM containers (see project memory "Recurring no-events issue"). Must stay executable (git mode 100755) or cron fails silently. Liveness probe is `/` on the loopback port (live sGTM answers 400), never `/healthz`: sGTM answers `/healthz` with 503 while serving fine, so probing it would restart every container every run. Restarts only on two refused/timed-out probes, max once per 30 min per container.
 - **Worker agent:** `worker-agent.mjs` ships remote-VPS sGTM access-log lines to the panel's `/api/worker/ingest` (HMAC-signed, at-least-once, dedup by batchId). Runs under pm2 on each worker VPS with config at `/etc/tagioo/worker-agent.json`.
 
 ## Important files / dirs

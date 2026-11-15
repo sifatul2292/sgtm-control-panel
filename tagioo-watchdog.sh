@@ -12,11 +12,14 @@ ALERT_EMAIL="${ALERT_EMAIL:-sifatul.alams@gmail.com}"
 ALERT_FROM="${ALERT_FROM:-Tagioo Watchdog <watchdog@tagioo.com>}"   # from-domain must be verified in Resend
 RESEND_API_KEY="${RESEND_API_KEY:-}"
 ALERT_COOLDOWN_SECONDS="${ALERT_COOLDOWN_SECONDS:-1800}"   # 30 min per alert key
-ALERT_STATE_DIR="/tmp/tagioo-watchdog-alerts"
+ALERT_STATE_DIR="${ALERT_STATE_DIR:-/tmp/tagioo-watchdog-alerts}"
+# A container the watchdog restarted is not restarted again within this window.
+RESTART_COOLDOWN_SECONDS="${RESTART_COOLDOWN_SECONDS:-1800}"
+RESTART_STATE_DIR="${RESTART_STATE_DIR:-/tmp/tagioo-watchdog-restarts}"
 HOSTNAME_SHORT=$(hostname -s 2>/dev/null || echo tagioo)
 [ -f /etc/default/tagioo-watchdog ] && . /etc/default/tagioo-watchdog
 
-mkdir -p "$ALERT_STATE_DIR"
+mkdir -p "$ALERT_STATE_DIR" "$RESTART_STATE_DIR"
 
 log() { echo "[$TIMESTAMP] $*" >> "$LOG"; }
 
@@ -102,27 +105,72 @@ for container in $RESTARTING; do
   send_alert "restartloop-$container" "Container $container in restart loop" "sGTM container '$container' is stuck restarting (OOM flap or bad config). Check: docker logs $container --tail 50"
 done
 
-# ── 3. Sanity-check: can we reach each running sGTM container? ───────────────
+# ── 3. Liveness check: is each running sGTM container still serving? ─────────
+# Probe "/" on the container's loopback port. A live sGTM answers 400 there (no
+# client claims the path), so the probe creates no events.
+#
+# Do NOT probe /healthz. Since about late October 2026 every sGTM container
+# answers /healthz with 503 (Docker shows "unhealthy") while still serving
+# /g/collect normally. Restarting on that would bounce every customer container
+# every 5 minutes and drop their events each time.
+#
+# Restart only when the port refuses or times out on two probes in a row, and at
+# most once per RESTART_COOLDOWN_SECONDS per container. Any other 5xx answer
+# sends an alert but does not restart.
+
+# state_file <dir> <key>: path of the per-key timestamp file.
+state_file() { printf '%s/%s' "$1" "$(printf '%s' "$2" | tr -c 'A-Za-z0-9_' '_')"; }
+
+recently_restarted() {
+  local f last
+  f=$(state_file "$RESTART_STATE_DIR" "$1")
+  [ -f "$f" ] || return 1
+  last=$(cat "$f" 2>/dev/null || echo 0)
+  [ $(( $(date +%s) - last )) -lt "$RESTART_COOLDOWN_SECONDS" ]
+}
+
+mark_restarted() { date +%s > "$(state_file "$RESTART_STATE_DIR" "$1")"; }
+
+# probe_container <port> <timeout-seconds>: prints the HTTP code, "000" when the
+# port refuses the connection or times out.
+probe_container() {
+  curl -so /dev/null -w "%{http_code}" --max-time "$2" "http://127.0.0.1:$1/" 2>/dev/null
+}
+
 RUNNING=$(docker ps --filter "name=sgtm-" --format "{{.Names}} {{.Ports}}" 2>/dev/null)
 while IFS= read -r line; do
   [ -z "$line" ] && continue
   name=$(echo "$line" | awk '{print $1}')
-  port=$(echo "$line" | grep -oP '127\.0\.0\.1:\K[0-9]+(?=->)' | head -1)
-  if [ -n "$name" ] && [ -n "$port" ]; then
-    HTTP_CODE=$(curl -so /dev/null -w "%{http_code}" --max-time 3 "http://127.0.0.1:$port/healthz" 2>/dev/null)
-    # /healthz not always present; sGTM root returns 200/301/302/400 when alive.
-    if [[ "$HTTP_CODE" == "000" || "$HTTP_CODE" == "404" ]]; then
-      HTTP_CODE=$(curl -so /dev/null -w "%{http_code}" --max-time 3 "http://127.0.0.1:$port/" 2>/dev/null)
+  port=$(echo "$line" | grep -oE '127\.0\.0\.1:[0-9]+->' | head -1 | sed -E 's/.*:([0-9]+)->/\1/')
+  if [ -z "$name" ] || [ -z "$port" ]; then
+    continue
+  fi
+
+  HTTP_CODE=$(probe_container "$port" 5)
+  if [ "$HTTP_CODE" = "000" ]; then
+    sleep 5
+    HTTP_CODE=$(probe_container "$port" 10)
+    if [ "$HTTP_CODE" != "000" ]; then
+      log "WARN: $name on port $port missed one probe but answered the retry (http $HTTP_CODE) — not restarting"
     fi
-    # Dead: no connection (000) or server error (5xx).
-    if [[ "$HTTP_CODE" == "000" || "$HTTP_CODE" =~ ^5[0-9][0-9]$ ]]; then
-      log "ALERT: $name on port $port not responding (http $HTTP_CODE) — restarting"
-      docker restart "$name" >> "$LOG" 2>&1
-      sleep 3
-      AFTER=$(docker inspect --format='{{.State.Status}}' "$name" 2>/dev/null)
-      log "INFO: $name status after restart: $AFTER"
-      send_alert "unhealthy-$name" "Container $name unresponsive (http $HTTP_CODE), restarted" "sGTM container '$name' was running but not serving (http $HTTP_CODE) on port $port. Restarted. Status now: $AFTER."
+  fi
+
+  if [ "$HTTP_CODE" = "000" ]; then
+    if recently_restarted "$name"; then
+      log "ALERT: $name on port $port still not answering after a recent watchdog restart — not restarting again (cooldown)"
+      send_alert "unresponsive-repeat-$name" "Container $name still unresponsive after restart" "sGTM container '$name' on port $port is still not answering after the watchdog restarted it in the last $(( RESTART_COOLDOWN_SECONDS / 60 )) minutes. It will not be restarted again automatically until the cooldown ends. Check: docker logs $name --tail 50"
+      continue
     fi
+    log "ALERT: $name on port $port not answering (connection refused or timed out twice) — restarting"
+    mark_restarted "$name"
+    docker restart "$name" >> "$LOG" 2>&1
+    sleep 3
+    AFTER=$(docker inspect --format='{{.State.Status}}' "$name" 2>/dev/null)
+    log "INFO: $name status after restart: $AFTER"
+    send_alert "unresponsive-$name" "Container $name unresponsive, restarted" "sGTM container '$name' was running but not answering on port $port (connection refused or timed out twice). Restarted. Status now: $AFTER."
+  elif [[ "$HTTP_CODE" =~ ^5[0-9][0-9]$ ]]; then
+    log "WARN: $name on port $port answered http $HTTP_CODE on / (expected 400) — alert only, not restarting"
+    send_alert "http5xx-$name" "Container $name answering http $HTTP_CODE" "sGTM container '$name' on port $port answers http $HTTP_CODE on / (a live container answers 400). It was not restarted automatically. Check: docker logs $name --tail 50"
   fi
 done <<< "$RUNNING"
 
