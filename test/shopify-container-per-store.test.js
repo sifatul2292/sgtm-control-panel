@@ -4,7 +4,7 @@ import vm from "node:vm";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { normalizeShopDomain } from "../shopify-billing.js";
-import { customerContainerRequests, primaryContainerId, scopedTrackingEntries, setTrackingForContainer, trackingForContainer } from "../container-scope.js";
+import { customerContainerRequests, normalizedHost, primaryContainerId, scopedTrackingEntries, setTrackingForContainer, trackingForContainer } from "../container-scope.js";
 
 const source = readFileSync(new URL("../server.js", import.meta.url), "utf8");
 function extractFunction(name, async = false) {
@@ -19,12 +19,12 @@ const future = () => new Date(Date.now() + 10 * 60_000).toISOString();
 function setup(shopify) {
   const data = {
     tenants: [{ id: "review", plan: "Pro", paymentProvider: "shopify", paymentStatus: "paid", tracking: { domain: "https://review-track.example", measurementId: "G-TEST", shopify } }],
-    customerSetupRequests: [],
+    customerSetupRequests: [{ id: "setup_review", tenantId: "review", containerName: "review", trackingDomain: "review-track.example", status: "live" }],
   };
   let writes = 0;
   const ctx = vm.createContext({
     createHash, randomBytes, normalizeShopDomain, scopedTrackingEntries, primaryContainerId, setTrackingForContainer,
-    trackingForContainer, customerContainerRequests,
+    trackingForContainer, customerContainerRequests, normalizedHost,
     safeEqual: (a, b) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b)),
     retainShopifyPrivacyRoute: () => {},
     withDbLock: async (fn) => fn(),
@@ -32,6 +32,8 @@ function setup(shopify) {
     writeDatabase: async () => { writes++; },
   });
   vm.runInContext([
+    `const containerSiteLabels = { woocommerce: "WooCommerce", laravel: "Laravel", custom: "custom website", other: "other website" };`,
+    ...["sanitizeId", "isDeletedStatus", "getTenantContainers", "containerSitePlatform", "containerServesOtherSite", "shopifyAppContainers"].map(name => extractFunction(name)),
     extractFunction("redeemShopifyConnectionCode", true),
     extractFunction("connectShopifyContainerLocked"),
     extractFunction("createShopifyConnectionCode", true),
@@ -90,4 +92,21 @@ test("the dashboard sends Shopify merchants to the app instead of a code, and up
   assert.doesNotMatch(html, /generateShopifyConnectCode|connection code/i);
   assert.match(html, /click <strong>Connect<\/strong> next to the one for your store\. There is no code to copy/);
   assert.match(app, /usage\.paymentProvider === "shopify" && usage\.shopifyPlanSelectionUrl\) window\.location\.assign\(usage\.shopifyPlanSelectionUrl\)/);
+});
+
+test("legacy codes cannot connect settings without a container or a different container's domain", async () => {
+  for (const scenario of ["missing", "deleted", "wrong-domain", "other-site", "unfinished"]) {
+    const { ctx, data, writes } = setup({ status: "waiting", connectCodeHash: codeHash, connectCodeExpiresAt: future() });
+    if (scenario === "missing") data.customerSetupRequests = [];
+    if (scenario === "deleted") data.customerSetupRequests[0].status = "deleted";
+    if (scenario === "wrong-domain") data.tenants[0].tracking.domain = "https://another-workspace.example";
+    if (scenario === "other-site") data.tenants[0].tracking.platform = "woocommerce";
+    if (scenario === "unfinished") delete data.tenants[0].tracking.measurementId;
+    const result = await ctx.redeemShopifyConnectionCode({ code, shop: "store-b.myshopify.com" });
+    assert.equal(result.ok, false, scenario);
+    assert.equal(result.status, ["missing", "deleted"].includes(scenario) ? 404 : scenario === "unfinished" ? 400 : 409, scenario);
+    assert.equal(writes(), 0, scenario);
+    assert.equal(data.tenants[0].tracking.shopify.connectCodeHash, codeHash, scenario);
+    assert.equal(data.tenants[0].tracking.shopify.integrationToken, undefined, scenario);
+  }
 });

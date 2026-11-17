@@ -5671,7 +5671,28 @@ function normalizeWooOrderPayload(body, tenantId) {
 }
 
 async function addOrderWebhook(body) {
-  return withDbLock(() => addOrderWebhookLocked(body));
+  const { shopifyForward, ...result } = await withDbLock(() => addOrderWebhookLocked(body));
+  if (!shopifyForward) return result;
+  // Leave the app's durable order job pending until sGTM accepts the purchase.
+  // Network I/O stays outside the JSON database lock; replay uses the same ID.
+  try {
+    await forwardOrderToSgtm(result.order, shopifyForward.tracking, { requireSuccess: true });
+  } catch {
+    return { ok: false, status: 503, errors: ["The tracking container did not accept this purchase. Delivery will be retried."] };
+  }
+  await withDbLock(async () => {
+    const loaded = await readDatabase();
+    if (!loaded.available) throw new Error("Could not save purchase delivery status.");
+    const stored = (loaded.data.orders || []).find((item) =>
+      item.id === result.order.id && item.tenantId === result.order.tenantId && String(item.containerId || "") === String(result.order.containerId || "")
+    );
+    if (stored && !stored.forwardedToSgtmAt) {
+      stored.forwardedToSgtmAt = new Date().toISOString();
+      await writeDatabase(loaded.data);
+    }
+  });
+  sendOrderToMetaCapi({ ...shopifyForward.tenant, tracking: shopifyForward.tracking }, result.order).catch(() => {});
+  return result;
 }
 
 async function addOrderWebhookLocked(body) {
@@ -5696,8 +5717,8 @@ async function addOrderWebhookLocked(body) {
   // tenant's own sGTM as a GA4 Measurement Protocol purchase. GA4 dedupes by
   // transaction_id and Meta CAPI dedupes by event_id (both = order id), so this
   // recovers purchases the browser missed (ad blockers, iOS, payment redirects)
-  // without double-counting the ones it caught. Fire-and-forget; never blocks
-  // or fails the webhook response.
+  // without double-counting the ones it caught. Shopify's durable delivery job
+  // waits for acceptance outside this lock; other integrations stay best-effort.
   const tenant = (data.tenants || []).find((item) => item.id === order.tenantId);
   const tracking = tenant ? trackingForContainer(tenant, data.customerSetupRequests || [], order.containerId) : null;
   if (tenant && order.source === "tagioo-cpanel-bridge" && tracking?.laravelSelfService?.active) {
@@ -5721,15 +5742,16 @@ async function addOrderWebhookLocked(body) {
   // only the measurement id + sGTM domain. (apiSecret was required here when the
   // forward used Measurement Protocol; keeping it gated on apiSecret silently
   // disabled recovery for any tenant that never set one.)
+  const retryableShopify = order.source === "tagioo-shopify-app";
   const shouldForward =
-    index === -1 &&
+    (index === -1 || retryableShopify) &&
     !alreadyForwarded &&
     order.amount > 0 &&
     isPaidOrderStatus(order) &&
     tracking &&
     tracking.measurementId &&
     tracking.domain;
-  if (shouldForward) {
+  if (shouldForward && !retryableShopify) {
     const stored = data.orders.find((item) =>
       item.id === order.id && item.tenantId === order.tenantId && String(item.containerId || "") === String(order.containerId || "")
     );
@@ -5738,6 +5760,9 @@ async function addOrderWebhookLocked(body) {
 
   await writeDatabase(data);
 
+  if (shouldForward && retryableShopify) {
+    return { ok: true, order, created: index === -1, shopifyForward: { tenant, tracking } };
+  }
   if (shouldForward) {
     // gtag /g/collect → GA4 purchase + the in-container Meta tag (IP/UA match only).
     forwardOrderToSgtm(order, tracking).catch(() => {});
@@ -5767,7 +5792,7 @@ function mpClientId(seed) {
   return `${digest.readUInt32BE(0)}.${digest.readUInt32BE(4)}`;
 }
 
-async function forwardOrderToSgtm(order, tracking) {
+async function forwardOrderToSgtm(order, tracking, { requireSuccess = false } = {}) {
   // sGTM's GA4 client only claims the gtag collection paths (/g/collect); it has
   // no client that claims Measurement Protocol (/mp/collect), so MP posts return
   // 400 "unclaimed". Mirror a browser gtag purchase hit instead — the GA4 client
@@ -5809,13 +5834,16 @@ async function forwardOrderToSgtm(order, tracking) {
   try {
     const response = await fetch(endpoint, {
       method: "POST",
-      headers
+      headers,
+      ...(requireSuccess ? { signal: AbortSignal.timeout(5000) } : {})
     });
     if (!response.ok) {
+      if (requireSuccess) throw new Error(`sGTM returned HTTP ${response.status}`);
       console.warn(`[orders] sGTM purchase forward for ${order.id} returned ${response.status}`);
     }
   } catch (error) {
     console.warn(`[orders] sGTM purchase forward for ${order.id} failed: ${error.message}`);
+    if (requireSuccess) throw error;
   }
 }
 
@@ -8561,6 +8589,21 @@ async function redeemShopifyConnectionCode(input) {
 // code (older app builds) and the app's signed one-click connect. The caller
 // holds the database lock and writes the database when this succeeds.
 function connectShopifyContainerLocked(data, tenant, containerId, tracking, shop) {
+  const requests = data.customerSetupRequests || [];
+  const selectedId = containerId || primaryContainerId(tenant, requests);
+  const listing = shopifyAppContainers(data, tenant, shop).find((item) => item.id === selectedId);
+  if (!listing) {
+    return { ok: false, status: 404, code: "no_container", errors: ["This workspace has no Tagioo container to connect yet. Add a tracking container for this store first."] };
+  }
+  if (listing.domainMismatch) {
+    return { ok: false, status: 409, code: "domain_mismatch", errors: ["This container's saved tracking domain is not its own domain. Fix it in Setup Assistant, or add a new container for this store."] };
+  }
+  if (!listing.ready) {
+    return { ok: false, status: 400, errors: ["This container is not set up yet: it needs a tracking domain and a GA4 Measurement ID."] };
+  }
+  if (listing.otherSite) {
+    return { ok: false, status: 409, code: "container_other_site", errors: [`This container is set up for your ${listing.otherSiteLabel} site. Each store needs its own container: add one for this Shopify store.`] };
+  }
   const setup = tracking?.shopify || {};
   // One store per container. Connecting a second store would silently take
   // the container over, cut the first store off and drop its Shopify plan.
@@ -8571,7 +8614,6 @@ function connectShopifyContainerLocked(data, tenant, containerId, tracking, shop
   if (tenant.plan !== "Free" && tenant.paymentStatus === "paid" && tenant.paymentProvider !== "shopify" && !tenant.lifetimeAccess) {
     return { ok: false, status: 409, errors: ["This workspace has an externally billed paid plan. Cancel that subscription and move the workspace to Free before connecting Shopify, or use a separate Free workspace. All Shopify hosting charges must use Shopify billing."] };
   }
-  const requests = data.customerSetupRequests || [];
   const primaryId = primaryContainerId(tenant, requests);
   retainShopifyPrivacyRoute(data, tenant, containerId, tracking, containerId === primaryId ? "" : containerId);
   const integrationToken = randomBytes(32).toString("hex");
@@ -8746,19 +8788,7 @@ async function connectShopifyAppContainer({ shop, tenantId = "", containerId = "
     const tenant = shopifyAppWorkspaceFor(data, shop, tenantId);
     if (!tenant) return shopifyAppWorkspaceMissing;
     const entry = scopedTrackingEntries(tenant, data.customerSetupRequests || []).find((item) => item.containerId === containerId);
-    const listing = entry ? shopifyAppContainers(data, tenant, shop).find((item) => item.id === containerId) : null;
-    if (!entry || !listing) {
-      return { ok: false, status: 404, code: "no_container", errors: ["This workspace has no Tagioo container to connect yet. Add a tracking container for this store first."] };
-    }
-    if (listing.domainMismatch) {
-      return { ok: false, status: 409, code: "domain_mismatch", errors: ["This container's saved tracking domain is not its own domain. Fix it in Setup Assistant, or add a new container for this store."] };
-    }
-    if (!listing.ready) {
-      return { ok: false, status: 400, errors: ["This container is not set up yet: it needs a tracking domain and a GA4 Measurement ID."] };
-    }
-    if (listing.otherSite) {
-      return { ok: false, status: 409, code: "container_other_site", errors: [`This container is set up for your ${listing.otherSiteLabel} site. Each store needs its own container: add one for this Shopify store.`] };
-    }
+    if (!entry) return { ok: false, status: 404, code: "no_container", errors: ["This workspace has no Tagioo container to connect yet. Add a tracking container for this store first."] };
     const result = connectShopifyContainerLocked(data, tenant, containerId, entry.tracking, shop);
     if (result.ok) await writeDatabase(data);
     return result;
@@ -14327,7 +14357,7 @@ const server = createServer(async (req, res) => {
       const result = await addOrderWebhook({ ...payload, shop_domain: matchedIntegration.tracking.shopify.shop, tenant_id: tenantId, container_id: containerId, source: "tagioo-shopify-app" });
       // The merchant may be watching the dashboard; show the order on the next load.
       if (result.ok) invalidateCustomerDashboardCache(tenantId);
-      jsonResponse(res, result.ok ? (result.created ? 202 : 200) : 400, result.ok
+      jsonResponse(res, result.ok ? (result.created ? 202 : 200) : (result.status || 400), result.ok
         ? { accepted: true, created: result.created, order_id: result.order.id }
         : { errors: result.errors });
       return;

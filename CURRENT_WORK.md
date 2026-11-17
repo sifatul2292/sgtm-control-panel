@@ -1,6 +1,44 @@
 # CURRENT_WORK — SGTM Control Panel (Tagioo)
 
-Living status doc. Update after meaningful progress. Last updated: 2026-11-13.
+Living status doc. Update after meaningful progress. Last updated: 2026-11-17.
+
+## 2026-11-17 — Shopify review 2.1.4 investigation and final fixes
+
+- Rechecked the 19-second Nov 2 screencast, both review branches, production VPS,
+  Partner submission and the prepared account. The original reviewer used the app-made
+  veil-vow workspace with no container, saved the prepared account's tracking domain,
+  and was incorrectly allowed to connect. Historical notes record 35 hits / 6 purchase
+  requests arriving in the prepared workspace's log. This is an app validation failure,
+  not a requirement that reviewers use a particular account. The supplied testing
+  instructions still described the retired connection-code flow.
+- Confirmed production already has 788080a / b3b0fe9 / 0b69463 / 563d085 (Nov 4)
+  and app image release-7021fe8. Review container is live and was unbound on entry;
+  veil-vow still has no container. Production history encryption is enabled.
+- Fixed the remaining legacy-code bypass by moving real-container, domain ownership,
+  destination setup and other-site checks into the connector shared by both APIs.
+  Regression failed before the fix and passes for missing/deleted/wrong-domain/
+  other-site/unfinished destinations without consuming the code or writing state.
+- Shopify backend purchases now return 503 when sGTM rejects/times out, leaving the
+  app's existing durable queue to retry. Mark delivered only after an accepted request;
+  successful replays remain one stored order. Network calls run outside the JSON lock.
+  Non-Shopify recovery remains unchanged. Regression covers failure, recovery, replay,
+  strict HTTP failure and the five-second forwarding timeout.
+- App review worktree: normalized web-pixel Shopify Order GIDs to the numeric ID used
+  by backend forwarding; VM regression covers numeric/string/GID forms, currency/value
+  and shared event/transaction IDs. Replaced premature active-tracking claims with
+  explicit Event Logs verification instructions; downloaded template is no longer
+  presented as published. Separate old-main uncommitted work preserved.
+- Checks: panel focused suite 81/81 before the two new retry checks; full suite 246/249,
+  same existing Paddle activation and two WooCommerce failures. App 36/36, build,
+  lint, typecheck and `shopify app config validate --json` pass. Shopify pixel version
+  review-sync-20261117 released (1228233539585). Deployment/live purchase proof and
+  submission outcome will be recorded below.
+- Partner Dashboard now says Draft / Ready to submit. Protected-data prerequisite
+  shows completed. Listing already uses Custom Loader / Priority support. A broad
+  canonical local review found 28 likely passing and 3 requiring live/context checks
+  (claims, billing lifecycle, TLS); ten nonapplicable/opt-in category groups skipped.
+  Consent on backend order forwarding remains a separate documented product issue;
+  do not assert GDPR compliance or independently verified destination receipt.
 
 ## 2026-11-13 — Shopify 2.1.4 resubmission prep — LOCAL, NOT DEPLOYED, NOT COMMITTED
 
