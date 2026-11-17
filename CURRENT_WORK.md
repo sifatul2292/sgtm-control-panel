@@ -2,6 +2,21 @@
 
 Living status doc. Update after meaningful progress. Last updated: 2026-11-17.
 
+## 2026-11-17 — Deployment and purchase proof complete; submission withheld
+
+- Panel 7173d49 deployed as dd279a0, including Nov 13 template/assistant changes;
+  35 production checks passed before reload. App 5c151a8 deployed as a664c36/image
+  release-5c151a8 after 36 checks, image build and isolated canary. Pixel released as
+  review-sync-20261117. Private rollback snapshots: /var/backups/tagioo-review-20261117.
+- Real Bogus-gateway order 19206751453488: browser HTTP200 at 10:18:32 and backend
+  HTTP200 at 10:18:37 Asia/Dhaka, $1 USD, one Browser + Server inspector row. Stored
+  delivery marker confirmed. App's Last backend order matches. Dev store disconnected;
+  prepared workspace back on Free, container unbound/live. All sGTM IDs unchanged.
+- Saved corrected testing instructions and account description in the Shopify draft.
+  Owner then explicitly canceled submission pending their own check. Partner status
+  remains Draft / Ready to submit. No re-review request was sent.
+- Detailed report, known limits and verification: docs/shopify-review-2026-11-17.md.
+
 ## 2026-11-17 — Shopify review 2.1.4 investigation and final fixes
 
 - Rechecked the 19-second Nov 2 screencast, both review branches, production VPS,
