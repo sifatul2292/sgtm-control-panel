@@ -302,3 +302,20 @@ html.reveal-ready .lp .steps.is-in li::after { transform: scaleY(1); }
 @media (prefers-reduced-motion: reduce) {
   .lp *, .lp *::before, .lp *::after { animation: none !important; transition: none !important; }
 }
+
+/* ── Single-column pages (/founding) ─────────────────────── */
+.hero-solo .wrap { justify-items: center; text-align: center; }
+.hero-solo .hero-sub { margin-inline: auto; max-width: 640px; }
+.hero-solo .hero-ctas { justify-content: center; }
+.cta-alt { margin-top: 14px; color: var(--muted); font-size: 14px; }
+.final .cta-alt a { color: #fff; }
+.grid-narrow, .compare-narrow { max-width: 840px; margin-inline: auto; }
+.steps-solo { max-width: 640px; margin-inline: auto; }
+.steps-solo li { color: var(--ink); font-size: 1.05rem; padding-bottom: 28px; }
+.compare-col > ul:first-child { margin-top: 0; }
+@media (min-width: 640px) {
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 900px) {
+  .hero-solo .wrap { grid-template-columns: minmax(0, 860px); justify-content: center; }
+}

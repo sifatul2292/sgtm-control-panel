@@ -4,6 +4,11 @@
     "shopify": "LX7BDDENcII",
     "woocommerce": "9PGfxptCQtk"
   },
+  "founding": {
+    "_readme": "Buttons on /founding. While BOOKING_URL is empty, 'Book your free setup' opens WHATSAPP_URL instead. Edit and save: no restart or deploy needed.",
+    "BOOKING_URL": "",
+    "WHATSAPP_URL": "https://wa.me/+8801990208987?text=Hi%2C%20I'd%20like%20a%20founding-customer%20setup%20for%20my%20store%3A%20"
+  },
   "showPlaceholders": false,
   "caseStudies": [
     {

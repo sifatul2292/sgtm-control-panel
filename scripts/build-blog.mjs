@@ -342,7 +342,7 @@ function articlePage(post, all, chrome) {
     `<aside class="post-toc"><nav aria-label="On this page"><p>On this page</p><ol>${tocItems}</ol></nav></aside>` +
     `<article class="post-body"><details class="toc-mobile"><summary>On this page</summary><ol>${tocItems}</ol></details>\n${md.html}` +
     `<aside class="post-share" aria-label="Share this article"><p class="post-share-title">Found this useful? Share it with your team.</p>${shareBar(post, false)}</aside>` +
-    `<section class="post-cta"><h2>See your own events, server-side.</h2><p>Tagioo hosts your server-side GTM container on your own domain and generates the GA4, Google Ads, Meta and TikTok setup for you. Free for 15,000 events a month, no card needed.</p><div class="post-cta-actions"><a class="btn-primary" href="/signup">Start free →</a><a class="btn-ghost" href="/pricing">See pricing</a></div></section>` +
+    `<section class="post-cta"><h2>See your own events, server-side.</h2><p>Tagioo hosts your server-side GTM container on your own domain and generates the GA4, Google Ads, Meta and TikTok setup for you. Free for 15,000 events a month, no card needed.</p><div class="post-cta-actions"><a class="btn-primary" href="/signup">Start free →</a><a class="btn-ghost" href="/pricing">See pricing</a></div><p class="post-cta-offer">Want us to set it up for you? The first 25 stores get free setup and a free first month. <a href="/founding">See the founding offer</a></p></section>` +
     `</article></div>` +
     (related.length ? `<section class="post-related"><div class="wrap"><h2>Keep reading</h2><div class="card-grid">${related.map((p) => postCard(p)).join("")}</div></div></section>` : "") +
     `</main>`;
@@ -418,6 +418,7 @@ const STATIC_PAGES = [
   ["/pricing", "public/pricing.html", "0.9"],
   ["/how-it-works", "public/how-it-works.html", "0.8"],
   ["/compare", "public/compare.html", "0.8"],
+  ["/founding", "public/founding.html", "0.8"],
   ["/woocommerce", "public/woocommerce.html", "0.9"],
   ["/shopify", "public/shopify.html", "0.9"],
   ["/website-tracking-checker", "public/tracking-checker.html", "0.7"],

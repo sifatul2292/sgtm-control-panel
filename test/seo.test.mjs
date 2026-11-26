@@ -57,7 +57,7 @@ test('generated articles have unique canonicals, one h1, parseable schema and re
     for (const link of html.matchAll(/href="\/blog\/([^"]+)"/g)) assert.ok(articles.includes(link[1] + '.html'), link[1]);
   }
   const sitemap = await readFile(new URL('sitemap.xml', publicDir), 'utf8');
-  assert.equal((sitemap.match(/<loc>/g) || []).length, 13 + articles.length);
-  assert.equal((sitemap.match(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/g) || []).length, 13 + articles.length);
+  assert.equal((sitemap.match(/<loc>/g) || []).length, 14 + articles.length);
+  assert.equal((sitemap.match(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/g) || []).length, 14 + articles.length);
   for (const name of articles) assert.ok(sitemap.includes('https://tagioo.com/blog/' + name.slice(0, -5)));
 });

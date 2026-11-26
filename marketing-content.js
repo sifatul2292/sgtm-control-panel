@@ -54,13 +54,38 @@ export function renderVideo(content, key, title) {
     + `<img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="" width="480" height="360" loading="lazy" decoding="async"><span class="video-play" aria-hidden="true"></span></a></div>`;
 }
 
-const MARKER_RE = /<!-- tagioo:(case-studies|video|robots-if-placeholder)([^>]*?)-->/g;
+// Founding-customer offer (/founding). BOOKING_URL and WHATSAPP_URL are set in
+// content/marketing.json under "founding"; while BOOKING_URL is empty, the
+// "Book your free setup" button opens WhatsApp instead.
+export function foundingLinks(content) {
+  const whatsapp = String(content?.founding?.WHATSAPP_URL || "").trim() || "mailto:hello@tagioo.com";
+  const booking = String(content?.founding?.BOOKING_URL || "").trim() || whatsapp;
+  return { booking, whatsapp };
+}
+
+function linkAttrs(href) {
+  return /^https?:\/\//i.test(href) ? ` href="${esc(href)}" target="_blank" rel="noopener"` : ` href="${esc(href)}"`;
+}
+
+const ARROW_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>';
+
+// Default: hero/closing buttons plus the email line. "sticky": the booking button alone.
+export function renderFoundingCtas(content, variant = "") {
+  const { booking, whatsapp } = foundingLinks(content);
+  const book = `<a class="btn btn-primary"${linkAttrs(booking)}>Book your free setup ${ARROW_ICON}</a>`;
+  if (variant === "sticky") return book;
+  return `<div class="hero-ctas">${book}<a class="btn btn-secondary"${linkAttrs(whatsapp)}>Message us on WhatsApp</a></div>`
+    + `<p class="cta-alt">or email <a href="mailto:hello@tagioo.com">hello@tagioo.com</a></p>`;
+}
+
+const MARKER_RE = /<!-- tagioo:(case-studies|video|robots-if-placeholder|founding-ctas)([^>]*?)-->/g;
 
 export function applyMarketingContent(html, content) {
   return html.replace(MARKER_RE, (_, kind, rawArgs) => {
     const args = Object.fromEntries([...rawArgs.matchAll(/(\w+)=("[^"]*"|\S+)/g)].map(([, k, v]) => [k, v.replace(/^"|"$/g, "")]));
     const positional = rawArgs.trim().split(/\s+/)[0] || "";
     if (kind === "video") return renderVideo(content, positional, args.title || "Setup video");
+    if (kind === "founding-ctas") return renderFoundingCtas(content, positional);
     if (kind === "robots-if-placeholder") {
       const real = (content?.caseStudies || []).some((study) => !study.placeholder);
       return real ? "" : '<meta name="robots" content="noindex, follow" />';

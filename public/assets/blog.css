@@ -167,6 +167,8 @@
 .blog-page .post-cta h2 { position: relative; font-size: 26px; letter-spacing: -.02em; color: #fff; margin: 0 0 10px; border: 0; padding: 0; }
 .blog-page .post-cta p { position: relative; font-size: 16px; line-height: 1.65; color: #B9C1D4; margin: 0 0 22px; }
 .blog-page .post-cta .post-cta-actions { position: relative; }
+.blog-page .post-cta p.post-cta-offer { margin: 22px 0 0; padding-top: 18px; border-top: 1px solid rgba(255, 255, 255, .14); font-size: 15px; line-height: 1.6; }
+.blog-page .post-body .post-cta-offer a { color: #fff; font-weight: 650; white-space: nowrap; }
 
 .blog-page .post-related { background: var(--b-soft); border-top: 1px solid var(--b-line); padding: 64px 0 80px; margin-top: 56px; }
 .blog-page .post-related h2 { font-size: 28px; letter-spacing: -.022em; margin: 0 0 26px; }

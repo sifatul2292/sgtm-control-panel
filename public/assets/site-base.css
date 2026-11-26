@@ -38,3 +38,10 @@ html.geo-bd a.whatsapp-float[data-bd-only] { display: flex !important; }
 .support-float svg { flex: none; }
 
 .currency-switch { font-size: 13px; }
+
+/* Founding-customer offer: slim band under the homepage hero, banner above the pricing cards. */
+.offer-band { background: #eef0ff; border-block: 1px solid #dcdffb; color: #1e1b4b; font: 500 14.5px/1.5 "Inter", ui-sans-serif, system-ui, sans-serif; text-align: center; }
+.offer-band p { max-width: 1120px; margin: 0 auto; padding: 12px 20px; }
+.offer-band a { margin-left: 6px; color: #4338ca; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.offer-band a:hover { text-decoration: underline; }
+.offer-band-inline { max-width: 760px; margin: 20px auto 28px; border: 1px solid #dcdffb; border-radius: 14px; }

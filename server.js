@@ -13134,7 +13134,7 @@ const server = createServer(async (req, res) => {
       res.end();
       return;
     }
-    if (isReadRequest && /^\/(?:blog|features|pricing|compare|how-it-works|docs|shopify|woocommerce|website-tracking-checker|terms|privacy|refunds|blog\/[a-z0-9-]+)\/$/.test(pathname)) {
+    if (isReadRequest && /^\/(?:blog|features|pricing|compare|founding|how-it-works|docs|shopify|woocommerce|website-tracking-checker|terms|privacy|refunds|blog\/[a-z0-9-]+)\/$/.test(pathname)) {
       res.writeHead(301, { location: pathname.slice(0, -1) + reqUrl.search, "cache-control": "public, max-age=86400" });
       res.end();
       return;
@@ -13272,6 +13272,11 @@ const server = createServer(async (req, res) => {
 
     if (pathname === "/compare") {
       await servePublicPage(req, res, "compare.html");
+      return;
+    }
+
+    if (pathname === "/founding") {
+      await servePublicPage(req, res, "founding.html");
       return;
     }
 
