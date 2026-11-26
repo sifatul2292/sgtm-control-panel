@@ -1,11 +1,11 @@
 ---
 title: "Shopify Server-Side Tracking: How It Works and How to Set It Up (2026)"
-seoTitle: "Shopify Server-Side Tracking: How It Works + Setup (2026)"
-description: "How server side tracking on Shopify works with Customer events and Custom Pixels, what changed in 2025-2026, your options, and how to avoid duplicate purchases."
+seoTitle: "Shopify Server-Side Tracking and Tagging: Setup Guide (2026)"
+description: "How Shopify server-side tracking works with Custom Pixels in 2026: what changed, your options, a 5-step setup, and how to avoid double counting purchases."
 category: Ecommerce
 keyword: server side tracking shopify
 published: 2026-10-26
-updated: 2026-10-26
+updated: 2026-11-26
 summary: "How Customer events, the pixel sandbox and Optimized sharing changed Shopify tracking, and how to go server-side without double counting."
 related: meta-conversions-api, server-side-gtm-setup, conversion-tracking-discrepancies
 featured: false
@@ -138,6 +138,8 @@ There are four realistic routes. Each one is fine for someone.
 
 **Server GTM via a Custom Pixel.** A Custom Pixel subscribes to Shopify's events and sends them to a server container on your own subdomain, which forwards them to each platform's API. One place to see and control what leaves your store.
 
+To pick a host for that server container, see our guide to [Stape alternatives](/blog/stape-alternative).
+
 **Order webhooks.** Shopify can notify an app when an order is paid. That's how some apps send purchases from the backend, so a failed Thank you page doesn't mean a missing sale.
 
 > **Recommended article:** [Meta Conversions API: how it works and how to set it up](/blog/meta-conversions-api)
@@ -250,6 +252,8 @@ You remain responsible for your consent configuration. This isn't legal advice.
 7. **Look for second copies.** Check each ad platform for a duplicate from a native app.
 
 A tip: web container preview inside Shopify's pixel sandbox can be unreliable, because the code runs in an iframe. The server container preview, which shows what actually arrived, is the dependable check.
+
+For more GA4 checks, such as DebugView and missing page data, see our guide to [GA4 server-side tracking](/blog/ga4-server-side-tracking).
 
 ## 7 common Shopify tracking mistakes
 

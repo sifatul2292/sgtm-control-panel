@@ -1,11 +1,11 @@
 ---
 title: "GA4 Server-Side Tracking: How It Works, Setup and Fixes for Missing Data"
-seoTitle: "GA4 Server-Side Tracking: Setup and Fixes (2026)"
-description: GA4 server side tracking guide: how the GA4 client works, sGTM vs Measurement Protocol, 8 setup steps, purchase dedup, and fixes for missing data.
+seoTitle: "GA4 Server-Side Tracking: 8-Step Setup and Fixes (2026)"
+description: "Set up GA4 server-side tracking in 8 steps: how the GA4 client works, sGTM vs Measurement Protocol, purchase dedup, and fixes for missing data."
 category: Google
 keyword: ga4 server side tracking
 published: 2026-10-27
-updated: 2026-10-27
+updated: 2026-11-26
 summary: Set up GA4 through a server GTM container, track purchases with transaction_id, and fix the issues that make server-side data look wrong.
 related: server-side-gtm-setup, conversion-tracking-discrepancies, woocommerce-purchase-tracking-checklist
 featured: false
@@ -165,6 +165,8 @@ For `purchase`, these fields matter most:
 - **`transaction_id`.** Use your order number, the same one in your store's backend.
 - **`value` and `currency`.** The order total as a number, plus an ISO currency code. A missing currency is a common reason revenue shows as zero.
 - **`items`.** Item ID, name, price and quantity, so product reports work.
+
+On Shopify, these events come from a Custom Pixel; our guide to [Shopify server-side tracking](/blog/shopify-server-side-tracking) walks through that setup.
 
 ### How does GA4 deduplicate purchases?
 

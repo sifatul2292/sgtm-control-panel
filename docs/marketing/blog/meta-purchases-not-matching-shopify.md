@@ -1,11 +1,11 @@
 ---
 title: "Meta (Facebook) Purchases Not Matching Shopify Orders? How to Fix It (2026)"
-seoTitle: "Facebook (Meta) Purchases Not Matching Shopify? Fix It"
-description: "Facebook (Meta) purchases not matching Shopify orders? Find which problem you have in 10 minutes, then fix lost purchases, duplicates or attribution."
+seoTitle: "Meta (Facebook) Purchases Not Matching Shopify? 13 Fixes"
+description: "Ads Manager shows fewer or more purchases than your Shopify orders? Run a 10-minute test to find the cause, then follow the matching fix step by step."
 category: Troubleshooting
 keyword: meta purchases not matching shopify
 published: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-26
 summary: "A 10-minute test that shows which gap you have, then step-by-step fixes for lost purchases, duplicates and Shopify not crediting Meta."
 related: conversion-tracking-discrepancies, meta-capi-deduplication-checklist, shopify-server-side-tracking
 featured: false
@@ -228,6 +228,8 @@ Normally, tracking code in the shopper's browser sends each event straight to Me
 Server-side tracking puts a server in the middle, on your own subdomain, such as `track.yourstore.com`. The browser sends each event once, to your server. Your server then sends it to each platform: Meta's Conversions API, GA4, Google Ads and TikTok's Events API.
 
 Most stores run this with server-side Google Tag Manager, also called a tagging server.
+
+If you'd rather not host it yourself, our guide to [Stape alternatives](/blog/stape-alternative) compares the managed options.
 
 This short video shows the idea for Shopify stores:
 
@@ -496,6 +498,8 @@ All three. Each one, for its own job.
 | **Ads Manager** | Comparing campaigns and ads with each other, under one consistent attribution setting |
 
 What you shouldn't do is treat Ads Manager as your order count, or Shopify's last-click report as the full value of your Meta ads. Both ignore part of the picture.
+
+If you also report purchases in GA4, our guide to [GA4 server-side tracking](/blog/ga4-server-side-tracking) explains how GA4 counts and deduplicates them.
 
 Not sure where your store stands? Start with the free [Website Tracking Checker](/website-tracking-checker). It shows whether your Meta Pixel and other tags are browser-only or server-side, and flags duplicate tags. When you're ready, Tagioo's [Free plan](/signup) covers 15,000 events per 30 days, with no card.
 

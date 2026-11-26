@@ -1,11 +1,11 @@
 ---
 title: "Meta CAPI Deduplication: How to Fix Duplicate Pixel and Conversions API Events"
-seoTitle: "Meta CAPI Deduplication: Fix Duplicate Purchases (2026)"
-description: "Meta CAPI deduplication explained: why the Facebook Pixel and Conversions API create duplicate events, how event_id matching works, and a 7-step fix."
+seoTitle: "Meta CAPI Double Counting Purchases? 7-Step Dedup Checklist"
+description: "Purchases counted twice in Events Manager? See why the Pixel and Conversions API duplicate events, how event_id dedup works, and run 7 checks to fix it."
 category: Meta
 keyword: meta capi deduplication
 published: 2026-10-12
-updated: 2026-10-20
+updated: 2026-11-26
 summary: "Why Pixel + CAPI can double count purchases, how Meta's event_id matching works, and a 7-step checklist to prove each sale counts once."
 related: meta-conversions-api, meta-capi-woocommerce, conversion-tracking-discrepancies
 featured: false
@@ -119,6 +119,8 @@ Here are the five usual suspects:
 4. **Pixel firing twice.** The thank-you page fires Purchase again on every reload or revisit. Meta's fallback doesn't deduplicate two browser events, so don't count on it to clean this up.
 5. **Retries with new IDs.** A webhook or queue retry that builds a fresh `event_id` each time.
 
+On Shopify, watch for the Facebook & Instagram channel running next to a second tool; our guide to [Shopify server-side tracking](/blog/shopify-server-side-tracking) shows how to avoid that overlap.
+
 ![Checklist of five things to check when Meta shows more purchases than store orders: different browser and server IDs, different event names, two integrations sending Purchase, the Pixel firing on page reload, and server retries with new IDs; if all clear, the gap is likely attribution](/assets/blog/meta-capi-deduplication-diagnosis.svg "Walk down the list with one test order. Stop at the first yes.")
 
 ## How do you check Meta CAPI deduplication? (7-step checklist)
@@ -218,6 +220,8 @@ You still need to verify. If your site also runs a platform's own Meta app or an
 Then use **Event Logs** and **Purchase Inspector** to confirm your test order reached the server container with the right order ID and value, and **Run tracking test** to check your Meta CAPI credentials.
 
 Plans start free with 15,000 events per 30 days, no card needed. See [pricing](/pricing), our [documentation](/docs), or scan your current tags with the free [Website Tracking Checker](/website-tracking-checker).
+
+Still choosing a host? See [how Tagioo compares with Stape](/blog/stape-alternative) and other server-side GTM providers.
 
 ## Sources and further reading
 
