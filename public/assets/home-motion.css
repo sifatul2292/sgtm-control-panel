@@ -1,0 +1,155 @@
+/* Homepage: "Inside Tagioo" live tiles + hero underline colour.
+   Animation states come from /assets/motion.css + motion.js. */
+
+.hero-copy .m-mark { color: var(--ink-text); }
+
+.tiles-section { background: var(--bg); }
+.tile-grid {
+  max-width: 1160px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 16px 22px;
+  background: var(--bg-3);
+  border-radius: 24px;
+  transition: background .25s ease;
+}
+.tile:hover { background: #EEEEF4; }
+.tile-demo { flex: 1; display: grid; place-items: center; min-height: 248px; padding: 20px 8px 4px; }
+.tile-copy { padding: 0 8px; }
+.tile-copy h3 { margin: 0 0 4px; font-size: 1rem; }
+.tile-copy p { margin: 0; font-size: .9rem; line-height: 1.55; color: var(--text-2); }
+
+/* Replay button: shows on hover/focus with a mouse, always on touch screens */
+.tile-replay {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--text-2);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: opacity .2s ease, color .2s ease, transform .2s ease;
+}
+.tile-replay svg { transition: transform .5s cubic-bezier(.2,.7,.2,1); }
+.tile-replay:hover { color: var(--text); transform: scale(1.06); }
+.tile-replay:active svg { transform: rotate(-300deg); }
+.tile-replay:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) {
+  .tile-replay { opacity: 0; }
+  .tile:hover .tile-replay, .tile:focus-within .tile-replay { opacity: 1; }
+}
+html:not(.m-ready) .tile-replay { display: none; }
+
+/* The mini dashboard card inside each tile */
+.tile-card {
+  --orange: #c2410c; /* darker orange so small badge text meets WCAG AA */
+  width: 100%;
+  max-width: 300px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  font-size: .8rem;
+  transition: transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s ease;
+}
+.tile:hover .tile-card { transform: translateY(-4px); box-shadow: var(--shadow), 0 0 0 1px rgba(14,16,21,.05); }
+.tc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; font-size: .72rem; font-weight: 600; color: var(--muted); }
+.tc-chip { padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--text-2); font-size: .66rem; font-weight: 600; white-space: nowrap; }
+.tc-chip.up { background: var(--green-soft); color: var(--green); }
+.tc-live { display: inline-flex; align-items: center; gap: 5px; color: var(--green); font-size: .66rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.tc-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: #10B981; animation: pulse 1.6s infinite; }
+.tc-note { margin: 12px 0 0; font-size: .7rem; color: var(--muted); }
+.tc-icon { display: grid; place-items: center; width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; background: var(--green-soft); color: var(--green); }
+
+/* 1. Live events */
+.tc-feed { margin: 0; padding: 0; list-style: none; }
+.tc-feed li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border-3); }
+.tc-feed li:last-child { border-bottom: 0; }
+.tc-meta { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: .72rem; }
+.tc-time { color: var(--muted); font-size: .66rem; }
+
+/* 2. Counted once */
+.tc-sources { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tc-sources > div { display: grid; gap: 2px; padding: 10px; border-radius: 10px; background: var(--bg-2); text-align: center; }
+.tc-sources span { font-size: .66rem; color: var(--muted); }
+.tc-sources strong { font-size: 1.25rem; letter-spacing: -.02em; color: var(--text); }
+.tc-merge { display: block; width: 100%; height: 30px; }
+.tc-merge path { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; opacity: .55; }
+.tc-result { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 10px; background: var(--green-soft); color: var(--green); font-weight: 600; }
+.tc-result strong { font-size: 1.05rem; }
+
+/* 3. Daily trends */
+.tc-big { display: block; margin: -4px 0 12px; font-size: 1.6rem; font-weight: 700; letter-spacing: -.03em; line-height: 1; color: var(--text); }
+.tc-big small { margin-left: 4px; font-size: .72rem; font-weight: 500; letter-spacing: 0; color: var(--muted); }
+.tc-bars { display: flex; align-items: flex-end; gap: 6px; height: 92px; }
+.tc-bars span { flex: 1; height: var(--h); border-radius: 5px 5px 2px 2px; background: repeating-linear-gradient(135deg, #E0E2F0 0 3px, #ECEDF6 3px 6px); }
+.tc-bars span.hi { background: linear-gradient(to top, var(--accent), #818CF8); box-shadow: 0 6px 16px rgba(79,70,229,.3); }
+.tc-days { display: flex; gap: 6px; margin-top: 6px; }
+.tc-days span { flex: 1; text-align: center; font-size: .6rem; color: var(--muted); }
+
+/* 4. Own tracking domain */
+.tc-domain { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-2); }
+.tc-domain svg { flex-shrink: 0; color: var(--green); }
+.tc-domain code { padding: 0; border: 0; background: none; color: var(--text); font-size: .76rem; }
+.tc-checks { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; color: var(--text); font-size: .76rem; }
+.tc-checks li { display: flex; align-items: center; gap: 9px; }
+.tc-checks li:last-child { color: var(--text-2); }
+.tc-checks .tc-dot { margin: 0 5.5px; }
+
+/* 5. Free plan */
+.tc-usage { margin: 0 0 10px; color: var(--muted); font-size: .74rem; }
+.tc-usage strong { margin-right: 2px; font-size: 1.6rem; letter-spacing: -.03em; color: var(--text); }
+.tc-meter { height: 10px; overflow: hidden; border-radius: 99px; background: var(--surface-2); }
+.tc-meter span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), #F97316); }
+.tc-meter-foot { display: flex; justify-content: space-between; margin-top: 6px; font-size: .62rem; color: var(--muted); }
+
+/* 6. Purchase alerts */
+.tc-spark { display: block; width: 100%; height: 76px; overflow: visible; }
+.tc-spark path { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.tc-spark-avg { stroke: var(--border-2); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.tc-spark-end { fill: #EF4444; transform-box: fill-box; transform-origin: center; }
+.tc-alert { display: flex; align-items: flex-start; gap: 9px; margin-top: 12px; padding: 10px; border: 1px solid rgba(239,68,68,.2); border-radius: 10px; background: var(--red-soft); }
+.tc-alert-icon { display: grid; place-items: center; width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; background: #EF4444; color: #fff; font-size: .72rem; font-weight: 800; }
+.tc-alert strong { display: block; font-size: .76rem; color: #B91C1C; }
+.tc-alert div span { font-size: .7rem; color: var(--text-2); }
+
+@media (max-width: 979px) {
+  .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* Phones: one swipeable row instead of a tall stack */
+@media (max-width: 639px) {
+  .tile-grid {
+    display: flex;
+    gap: 12px;
+    --bleed: clamp(20px, 5vw, 80px); /* matches .section side padding */
+    margin: 0 calc(-1 * var(--bleed));
+    padding: 0 var(--bleed) 6px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--bleed);
+    scrollbar-width: none;
+  }
+  .tile-grid::-webkit-scrollbar { display: none; }
+  .tile { flex: 0 0 86%; scroll-snap-align: start; }
+  .tile-demo { min-height: 236px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile, .tile-card, .tile-replay, .tile-replay svg { transition: none; }
+  .tile:hover .tile-card { transform: none; }
+  .tc-dot { animation: none; }
+}

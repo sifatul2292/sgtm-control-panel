@@ -1,0 +1,51 @@
+/* Motion helper styles; pairs with /assets/motion.js.
+   Start states only apply under html.m-ready, which motion.js sets unless the
+   visitor prefers reduced motion. Without it every element shows its final state.
+   Extra delay: set --d on a part (for example style="--d:.6s"). */
+
+@keyframes m-blur-in { from { opacity: 0; filter: blur(6px); transform: translateY(8px); } to { opacity: 1; filter: none; transform: none; } }
+@keyframes m-grow-y { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes m-grow-x { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes m-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes m-pop { 0% { opacity: 0; transform: scale(.86); } 60% { opacity: 1; transform: scale(1.04); } 100% { opacity: 1; transform: none; } }
+
+[data-count-to] { font-variant-numeric: tabular-nums; }
+[data-grow] > * { transform-origin: 50% 100%; }
+[data-fill] { transform-origin: 0 50%; }
+
+/* Rows: one by one, blurred to sharp */
+html.m-ready :is([data-motion]:not(.m-play) [data-stagger], [data-stagger][data-motion]:not(.m-play)) > * { opacity: 0; animation: none; }
+html.m-ready :is(.m-play [data-stagger], [data-stagger].m-play) > * {
+  animation: m-blur-in .55s cubic-bezier(.2,.7,.2,1) both;
+  animation-delay: calc(var(--d, 0s) + var(--i, 0) * 110ms);
+}
+
+/* Bars: grow up from the baseline */
+html.m-ready :is([data-motion]:not(.m-play) [data-grow], [data-grow][data-motion]:not(.m-play)) > * { transform: scaleY(0); animation: none; }
+html.m-ready :is(.m-play [data-grow], [data-grow].m-play) > * {
+  animation: m-grow-y .7s cubic-bezier(.2,.7,.2,1) both;
+  animation-delay: calc(var(--d, 0s) + var(--i, 0) * 60ms);
+}
+
+/* Meters: grow from the left */
+html.m-ready :is([data-motion]:not(.m-play) [data-fill], [data-fill][data-motion]:not(.m-play)) { transform: scaleX(0); animation: none; }
+html.m-ready :is(.m-play [data-fill], [data-fill].m-play) { animation: m-grow-x 1.1s cubic-bezier(.2,.7,.2,1) var(--d, .1s) both; }
+
+/* Lines: SVG paths need pathLength="1" */
+html.m-ready [data-draw] path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+html.m-ready :is(.m-play [data-draw], [data-draw].m-play) path { animation: m-draw 1.1s cubic-bezier(.65,0,.35,1) var(--d, .1s) both; }
+
+/* Badges and results: pop in last */
+html.m-ready :is([data-motion]:not(.m-play) [data-pop], [data-pop][data-motion]:not(.m-play)) { opacity: 0; animation: none; }
+html.m-ready :is(.m-play [data-pop], [data-pop].m-play) { animation: m-pop .5s cubic-bezier(.2,.7,.2,1) var(--d, .9s) both; }
+
+/* Hand-drawn underline that draws itself once on load (CSS only, no JS):
+   <span class="m-mark">phrase<svg viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="…"/></svg></span> */
+.m-mark { position: relative; white-space: nowrap; font-weight: 600; }
+.m-mark svg { position: absolute; left: -1%; bottom: -.34em; width: 102%; height: .5em; overflow: visible; pointer-events: none; }
+.m-mark path { fill: none; stroke: #f97316; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: m-draw .9s .7s cubic-bezier(.65,0,.35,1) forwards; }
+.lp .m-mark { color: var(--ink, #0b0d12); }
+
+@media (prefers-reduced-motion: reduce) {
+  .m-mark path { animation: none; stroke-dashoffset: 0; }
+}

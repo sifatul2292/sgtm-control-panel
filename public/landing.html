@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="/assets/home-production-style.css?v=mobile-menu-5"><link rel="stylesheet" href="/assets/home-hero-only.css?v=desktop-6"><link rel="stylesheet" href="/assets/home-flow.css?v=desktop-7"><link rel="stylesheet" href="/assets/home-integrations.css?v=1">
 
   <link rel="stylesheet" href="/assets/home-homepage-guides.css?v=6">
+  <link rel="stylesheet" href="/assets/motion.css?v=1"><link rel="stylesheet" href="/assets/home-motion.css?v=1">
     <link rel="stylesheet" href="/assets/landing-pages.css?v=1" />
 <link rel="canonical" href="https://tagioo.com/" />
 <meta property="og:url" content="https://tagioo.com/" />
@@ -86,7 +87,7 @@
       <div class="hero-content">
         <div class="hero-badge"><span class="badge-dot"></span> Server-side tracking for stores, lead generation &amp; agencies</div>
         <h1>Your store records the sale.<br><span class="hero-accent">Does your tracking?</span></h1>
-        <p class="hero-copy">Browser pixels can miss purchase events. Tagioo helps you connect browser and backend signals to your ad platforms through your own tracking domain.</p>
+        <p class="hero-copy">Browser pixels can miss purchase events. Tagioo helps you connect browser and backend signals to your ad platforms through <span class="m-mark">your own tracking domain<svg viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M1 6.5 C 22 3.5, 48 4, 70 5.2 S 92 6.4, 99 4"/></svg></span>.</p>
         <p class="works-with"><span>Works with <strong>Shopify</strong> and <strong>WooCommerce</strong></span><a href="/shopify">Shopify setup →</a><a href="/woocommerce">WooCommerce setup →</a></p>
       </div>
       <div class="hero-top-signup"><form class="hero-signup" action="/signup" method="get">
@@ -143,7 +144,7 @@
           <p class="section-sub">Review incoming requests, purchase events and daily trends. Then verify delivery in your analytics and advertising platforms.</p>
         </div>
         <div class="dash-showcase-visual">
-          <div class="dash-card">
+          <div class="dash-card" data-motion>
             <div class="dash-card-header">
               <div class="dash-card-dots">
                 <span></span><span></span><span></span>
@@ -158,19 +159,19 @@
                 <span class="dsm-change up">Sample activity</span>
               </div>
               <div class="dash-stat-mini">
-                <span class="dsm-val">124</span>
+                <span class="dsm-val" data-count-to="124">124</span>
                 <span class="dsm-label">Purchases</span>
                 <span class="dsm-change up">Unique orders</span>
               </div>
               <div class="dash-stat-mini">
-                <span class="dsm-val">$6,240</span>
+                <span class="dsm-val" data-count-to="6240" data-prefix="$">$6,240</span>
                 <span class="dsm-label">Purchase value</span>
                 <span class="dsm-change stable">Sample value</span>
               </div>
             </div>
             <div class="dash-chart">
               <div class="dc-label">Hourly events &amp; revenue</div>
-              <div class="dc-bars">
+              <div class="dc-bars" data-grow>
                 <div class="dc-bar" style="--h:45%"></div>
                 <div class="dc-bar" style="--h:62%"></div>
                 <div class="dc-bar" style="--h:38%"></div>
@@ -186,7 +187,7 @@
               </div>
               <div class="dc-trend-line"></div>
             </div>
-            <div class="dash-events">
+            <div class="dash-events" data-stagger style="--d:.3s">
               <div class="de-head">Recent events</div>
               <div class="de-row">
                 <span class="de-badge purchase">Purchase</span>
@@ -316,6 +317,101 @@
               <span>First-party</span>
               <span>tagging on your own domain</span>
             </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ── INSIDE TAGIOO: LIVE TILES ──────────────────────────── -->
+      <section class="section tiles-section" id="inside" aria-labelledby="insideTitle">
+        <div class="section-heading centered" data-reveal>
+          <p class="eyebrow">Inside Tagioo · Example data</p>
+          <h2 id="insideTitle">See your tracking at work.</h2>
+          <p class="section-sub">Six small previews of the Tagioo dashboard. Each one plays as you scroll. Press replay to watch it again.</p>
+        </div>
+        <div class="tile-grid">
+          <article class="tile" data-motion>
+            <div class="tile-demo" aria-hidden="true">
+              <div class="tile-card">
+                <div class="tc-head"><span>Recent events</span><span class="tc-live"><span class="tc-dot"></span>Live</span></div>
+                <ul class="tc-feed" data-stagger>
+                  <li><span class="de-badge purchase">Purchase</span><span class="tc-meta">$49 · Meta + GA4</span><span class="tc-time">2s</span></li>
+                  <li><span class="de-badge cart">AddToCart</span><span class="tc-meta">Product #1234</span><span class="tc-time">5s</span></li>
+                  <li><span class="de-badge view">PageView</span><span class="tc-meta">/checkout</span><span class="tc-time">8s</span></li>
+                  <li><span class="de-badge purchase">Purchase</span><span class="tc-meta">$36 · Meta + GA4</span><span class="tc-time">12s</span></li>
+                </ul>
+              </div>
+            </div>
+            <div class="tile-copy"><h3>Live event view</h3><p>See page views, carts and purchases as they arrive.</p></div>
+            <button type="button" class="tile-replay" data-replay aria-label="Replay: live event view"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+          </article>
+          <article class="tile" data-motion>
+            <div class="tile-demo" aria-hidden="true">
+              <div class="tile-card">
+                <div class="tc-head"><span>Purchases today</span><span class="tc-chip">Meta</span></div>
+                <div class="tc-sources">
+                  <div><span>Browser pixel</span><strong data-count-to="124">124</strong></div>
+                  <div><span>Server (CAPI)</span><strong data-count-to="124">124</strong></div>
+                </div>
+                <svg class="tc-merge" viewBox="0 0 200 30" preserveAspectRatio="none" data-draw style="--d:.6s"><path pathLength="1" d="M50 2 C50 18 100 12 100 28"/><path pathLength="1" d="M150 2 C150 18 100 12 100 28"/></svg>
+                <div class="tc-result" data-pop style="--d:1.3s"><span class="tc-icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span><strong>124</strong> unique orders</span></div>
+                <p class="tc-note">Matched by event ID</p>
+              </div>
+            </div>
+            <div class="tile-copy"><h3>Counted once</h3><p>Browser and server copies of a sale are matched, so each order counts once.</p></div>
+            <button type="button" class="tile-replay" data-replay aria-label="Replay: counted once"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+          </article>
+          <article class="tile" data-motion>
+            <div class="tile-demo" aria-hidden="true">
+              <div class="tile-card">
+                <div class="tc-head"><span>Events this week</span><span class="tc-chip up">+12%</span></div>
+                <strong class="tc-big"><span data-count-to="18420">18,420</span><small>events</small></strong>
+                <div class="tc-bars" data-grow>
+                  <span style="--h:46%"></span><span style="--h:58%"></span><span style="--h:52%"></span><span style="--h:70%"></span><span style="--h:64%"></span><span style="--h:82%"></span><span class="hi" style="--h:100%"></span>
+                </div>
+                <div class="tc-days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+              </div>
+            </div>
+            <div class="tile-copy"><h3>Daily trends</h3><p>Follow event volume day by day and spot drops early.</p></div>
+            <button type="button" class="tile-replay" data-replay aria-label="Replay: daily trends"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+          </article>
+          <article class="tile" data-motion>
+            <div class="tile-demo" aria-hidden="true">
+              <div class="tile-card">
+                <div class="tc-domain"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><code>track.yourstore.com</code></div>
+                <ul class="tc-checks" data-stagger style="--d:.15s">
+                  <li><span class="tc-icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Domain connected</li>
+                  <li><span class="tc-icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>SSL certificate active</li>
+                  <li><span class="tc-icon"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Tracking server running</li>
+                  <li><span class="tc-dot"></span>Last event 2s ago</li>
+                </ul>
+              </div>
+            </div>
+            <div class="tile-copy"><h3>Your own tracking domain</h3><p>We host the server and handle SSL. You connect a subdomain.</p></div>
+            <button type="button" class="tile-replay" data-replay aria-label="Replay: your own tracking domain"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+          </article>
+          <article class="tile" data-motion>
+            <div class="tile-demo" aria-hidden="true">
+              <div class="tile-card">
+                <div class="tc-head"><span>Free plan</span><span class="tc-chip">30-day cycle</span></div>
+                <p class="tc-usage"><strong data-count-to="12480">12,480</strong> of 15,000 events</p>
+                <div class="tc-meter"><span data-fill style="width:83%"></span></div>
+                <div class="tc-meter-foot"><span>0</span><span>15,000</span></div>
+                <p class="tc-note">Resets every 30 days.</p>
+              </div>
+            </div>
+            <div class="tile-copy"><h3>Start free</h3><p>15,000 events every 30 days on the Free plan. No card needed.</p></div>
+            <button type="button" class="tile-replay" data-replay aria-label="Replay: start free"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+          </article>
+          <article class="tile" data-motion>
+            <div class="tile-demo" aria-hidden="true">
+              <div class="tile-card">
+                <div class="tc-head"><span>Purchases, last 14 days</span><span class="tc-chip">Daily</span></div>
+                <svg class="tc-spark" viewBox="0 0 240 70" data-draw><line class="tc-spark-avg" x1="0" y1="27" x2="240" y2="27"/><path pathLength="1" d="M4 34 L22 28 L40 36 L58 24 L76 30 L94 20 L112 28 L130 18 L148 26 L166 22 L184 30 L204 26 L220 50 L236 60"/><circle class="tc-spark-end" cx="236" cy="60" r="4.5" data-pop style="--d:1.1s"/></svg>
+                <div class="tc-alert" data-pop style="--d:1.3s"><span class="tc-alert-icon">!</span><div><strong>Purchase drop</strong><span>Today is 61% below your 7-day average.</span></div></div>
+              </div>
+            </div>
+            <div class="tile-copy"><h3>Purchase alerts</h3><p>Get a warning when tracked purchases drop.</p></div>
+            <button type="button" class="tile-replay" data-replay aria-label="Replay: purchase alerts"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
           </article>
         </div>
       </section>
@@ -925,24 +1021,6 @@
         revealObs.observe(el);
       });
 
-      const countObs = new IntersectionObserver((entries) => {
-        entries.forEach(e => {
-          if (!e.isIntersecting) return;
-          const el = e.target;
-          countObs.unobserve(el);
-          const to = parseFloat(el.dataset.countTo);
-          const dur = 900;
-          const start = performance.now();
-          function tick(now) {
-            const p = Math.min((now - start) / dur, 1);
-            const eased = 1 - Math.pow(1 - p, 3);
-            el.textContent = Math.round(to * eased).toLocaleString();
-            if (p < 1) requestAnimationFrame(tick);
-          }
-          requestAnimationFrame(tick);
-        });
-      }, { threshold: 0.4 });
-      document.querySelectorAll("[data-count-to]").forEach(el => countObs.observe(el));
 
       // Billing-cycle toggle: recompute each paid plan's price, note, and signup
       // CTA cycle param. Monthly / 3-Month (-10% + free setup) / 6-Month (-20%) /
@@ -1014,7 +1092,7 @@
         if (freePrice) freePrice.textContent = bt(0);
       }).catch(() => {});
     </script>
-  <script src="/assets/home-hero-motion.js?v=2" defer></script><script src="/assets/home-homepage-guides.js?v=2" defer></script>
+  <script src="/assets/home-hero-motion.js?v=2" defer></script><script src="/assets/motion.js?v=1" defer></script><script src="/assets/home-homepage-guides.js?v=2" defer></script>
   <script src="/assets/geo.js?v=1" defer></script>
 </body>
 </html>
